@@ -250,9 +250,11 @@
             let readingStatuses = {};      // local copy for per-user statuses {bookId: status}
             let unsubscribeBooks = null;
             let unsubscribeStatus = null;
-            let activeTab = 'library';     // 'library', 'wishlist', 'settings'
+            let activeTab = 'library';     // 'library', 'wishlist', 'activity', 'settings'
             let viewMode = localStorage.getItem('mylib_viewMode') || 'grid';
             let sharedWithMe = [];         // UIDs of users who shared their library with me
+            let activities = [];           // activity log for book additions
+            
             let searchQuery = '';
             let searchTimeout = null;
             let sortBy = localStorage.getItem('mylib_sortBy') || localStorage.getItem('mylib_defaultSort') || 'newest';
@@ -831,6 +833,7 @@
                             <nav class="hidden md:flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
                                 <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'library' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700'}">Library</button>
                                 <button onclick="window.setTab('wishlist')" ${activeTab === 'wishlist' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'wishlist' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700'}">Wishlist</button>
+                                <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'activity' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700'}">Activity</button>
                                 <button onclick="window.setTab('settings')" ${activeTab === 'settings' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'settings' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700'}">Settings</button>
                             </nav>
                             <div class="flex items-center gap-1">
@@ -845,23 +848,22 @@
                         </div>
                     </header>
                     <main id="main-content" class="max-w-6xl mx-auto p-6 pb-32 w-full flex-1"></main>
-                    <nav id="mobile-nav" class="md:hidden fixed bottom-0 left-0 right-0 glass border-t border-slate-200 dark:border-slate-800 px-6 py-3 flex justify-between items-center z-40">
-                        <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 ${activeTab === 'library' ? 'text-blue-600' : 'text-slate-400'}">
+                    <nav id="mobile-nav" class="md:hidden fixed bottom-0 left-0 right-0 glass border-t border-slate-200 dark:border-slate-800 px-3 py-3 grid grid-cols-4 gap-2 z-40">
+                        <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'library' ? 'text-blue-600' : 'text-slate-400'}">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></svg>
-                            <span class="text-[10px] font-bold">Library</span>
+                            <span class="text-[9px] font-bold">Library</span>
                         </button>
-                        <button onclick="window.setTab('wishlist')" ${activeTab === 'wishlist' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 ${activeTab === 'wishlist' ? 'text-blue-600' : 'text-slate-400'}">
+                        <button onclick="window.setTab('wishlist')" ${activeTab === 'wishlist' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'wishlist' ? 'text-blue-600' : 'text-slate-400'}">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
-                            <span class="text-[10px] font-bold">Wishlist</span>
+                            <span class="text-[9px] font-bold">Wishlist</span>
                         </button>
-                        <div class="relative -top-8">
-                            <button id="mobile-scan-btn" class="w-14 h-14 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-lg shadow-blue-200 dark:shadow-blue-900/50 border-4 border-white dark:border-slate-900 active:scale-90 transition-transform">
-                                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                            </button>
-                        </div>
-                        <button onclick="window.setTab('settings')" ${activeTab === 'settings' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 ${activeTab === 'settings' ? 'text-blue-600' : 'text-slate-400'}">
+                        <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'activity' ? 'text-blue-600' : 'text-slate-400'}">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <span class="text-[9px] font-bold">Activity</span>
+                        </button>
+                        <button onclick="window.setTab('settings')" ${activeTab === 'settings' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'settings' ? 'text-blue-600' : 'text-slate-400'}">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                            <span class="text-[10px] font-bold">Settings</span>
+                            <span class="text-[9px] font-bold">Settings</span>
                         </button>
                     </nav>
                 `;
@@ -872,6 +874,9 @@
                 if (activeTab === 'settings') {
                     mainContentEl.innerHTML = renderSettings();
                     attachSettingsListeners();
+                } else if (activeTab === 'activity') {
+                    mainContentEl.innerHTML = renderActivity();
+                    attachActivityListeners();
                 } else {
                     if (!document.getElementById('search-input')) {
                         mainContentEl.innerHTML = `
@@ -1044,61 +1049,70 @@
                 const controlsBar = document.getElementById('controls-bar-container');
                 if (controlsBar) {
                     controlsBar.innerHTML = `
-                    <div class="mb-8 flex flex-wrap items-center justify-between gap-4">
-                        <div class="flex items-center gap-2">
-                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sort by</span>
-                            <select id="sort-select" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
-                                <option value="newest" ${sortBy === 'newest' ? 'selected' : ''}>Recently Added</option>
-                                <option value="title" ${sortBy === 'title' ? 'selected' : ''}>Title (A-Z)</option>
-                                <option value="author" ${sortBy === 'author' ? 'selected' : ''}>Author</option>
-                            </select>
+                    <div class="mb-8">
+                        <!-- Filter card for mobile/desktop -->
+                        <div class="glass rounded-2xl p-4 border border-slate-200 dark:border-slate-700 mb-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                                <div class="flex flex-col gap-2">
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sort by</span>
+                                    <select id="sort-select" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                                        <option value="newest" ${sortBy === 'newest' ? 'selected' : ''}>Recently Added</option>
+                                        <option value="title" ${sortBy === 'title' ? 'selected' : ''}>Title (A-Z)</option>
+                                        <option value="author" ${sortBy === 'author' ? 'selected' : ''}>Author</option>
+                                    </select>
+                                </div>
+                                <div class="flex flex-col gap-2">
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Genre</span>
+                                    <select id="category-filter" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                                        <option value="all" ${categoryFilter === 'all' ? 'selected' : ''}>All Genres</option>
+                                        ${[...new Set(books.flatMap(b => getBookGenres(b)).filter(Boolean))].sort().map(cat => `
+                                            <option value="${cat}" ${categoryFilter === cat ? 'selected' : ''}>${cat}</option>
+                                        `).join('')}
+                                    </select>
+                                </div>
+                                <div class="flex flex-col gap-2">
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</span>
+                                    <select id="status-filter" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                                        <option value="all" ${statusFilter === 'all' ? 'selected' : ''}>All</option>
+                                        <option value="want_to_read" ${statusFilter === 'want_to_read' ? 'selected' : ''}>Want to Read</option>
+                                        <option value="reading" ${statusFilter === 'reading' ? 'selected' : ''}>Reading</option>
+                                        <option value="finished" ${statusFilter === 'finished' ? 'selected' : ''}>Finished</option>
+                                    </select>
+                                </div>
+                                <div class="flex flex-col gap-2">
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Author</span>
+                                    <select id="author-filter" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                                        <option value="all" ${authorFilter === 'all' ? 'selected' : ''}>All Authors</option>
+                                        ${[...new Set(books.map(b => b.author).filter(Boolean))].sort().map(author => `
+                                            <option value="${author}" ${authorFilter === author ? 'selected' : ''}>${author}</option>
+                                        `).join('')}
+                                    </select>
+                                </div>
+                                <div class="flex flex-col gap-2">
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Owner</span>
+                                    <select id="owner-filter" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                                        <option value="all" ${ownerFilter === 'all' ? 'selected' : ''}>All Owners</option>
+                                        ${[...new Set(books.map(b => b.owner).filter(Boolean))].sort().map(owner => `
+                                            <option value="${owner}" ${ownerFilter === owner ? 'selected' : ''}>${owner}</option>
+                                        `).join('')}
+                                    </select>
+                                </div>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Genre</span>
-                            <select id="category-filter" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
-                                <option value="all" ${categoryFilter === 'all' ? 'selected' : ''}>All Genres</option>
-                                ${[...new Set(books.flatMap(b => getBookGenres(b)).filter(Boolean))].sort().map(cat => `
-                                    <option value="${cat}" ${categoryFilter === cat ? 'selected' : ''}>${cat}</option>
-                                `).join('')}
-                            </select>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</span>
-                            <select id="status-filter" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
-                                <option value="all" ${statusFilter === 'all' ? 'selected' : ''}>All</option>
-                                <option value="want_to_read" ${statusFilter === 'want_to_read' ? 'selected' : ''}>Want to Read</option>
-                                <option value="reading" ${statusFilter === 'reading' ? 'selected' : ''}>Reading</option>
-                                <option value="finished" ${statusFilter === 'finished' ? 'selected' : ''}>Finished</option>
-                            </select>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Author</span>
-                            <select id="author-filter" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none max-w-[120px]">
-                                <option value="all" ${authorFilter === 'all' ? 'selected' : ''}>All Authors</option>
-                                ${[...new Set(books.map(b => b.author).filter(Boolean))].sort().map(author => `
-                                    <option value="${author}" ${authorFilter === author ? 'selected' : ''}>${author}</option>
-                                `).join('')}
-                            </select>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Owner</span>
-                            <select id="owner-filter" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none max-w-[120px]">
-                                <option value="all" ${ownerFilter === 'all' ? 'selected' : ''}>All Owners</option>
-                                ${[...new Set(books.map(b => b.owner).filter(Boolean))].sort().map(owner => `
-                                    <option value="${owner}" ${ownerFilter === owner ? 'selected' : ''}>${owner}</option>
-                                `).join('')}
-                            </select>
-                        </div>
-                        <div class="px-3 py-2 rounded-xl bg-blue-50 dark:bg-slate-800 text-xs font-bold text-blue-700 dark:text-blue-300">
-                            ${filteredBooks.length} ${filteredBooks.length === 1 ? 'book' : 'books'} shown
-                        </div>
-                        <div class="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                            <button id="grid-view-btn" class="p-2 rounded-lg transition ${viewMode === 'grid' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
-                            </button>
-                            <button id="list-view-btn" class="p-2 rounded-lg transition ${viewMode === 'list' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
-                            </button>
+                        
+                        <!-- Results counter and view mode toggle -->
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div class="px-3 py-2 rounded-xl bg-blue-50 dark:bg-slate-800 text-xs font-bold text-blue-700 dark:text-blue-300">
+                                ${filteredBooks.length} ${filteredBooks.length === 1 ? 'book' : 'books'} shown
+                            </div>
+                            <div class="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                                <button id="grid-view-btn" class="p-2 rounded-lg transition ${viewMode === 'grid' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                                </button>
+                                <button id="list-view-btn" class="p-2 rounded-lg transition ${viewMode === 'list' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -1197,7 +1211,6 @@
 
             function attachGlobalListeners() {
                 document.getElementById('scan-btn')?.addEventListener('click', openScanner);
-                document.getElementById('mobile-scan-btn')?.addEventListener('click', openScanner);
                 document.getElementById('manual-add-btn')?.addEventListener('click', () => openManualEntry(''));
             }
 
@@ -2354,6 +2367,22 @@
                     }, { merge: true });
 
                     showToast('Book added!', 'success');
+                    
+                    // Track activity if book was added to shared library
+                    if (isAddingToSharedLibrary) {
+                        const targetUserName = allPartnershipsForUI?.find(p => p.uid === targetUserId)?.displayName || 'User';
+                        activities.unshift({
+                            type: 'book_added',
+                            title: bookData.title || 'Unknown',
+                            author: bookData.author || 'Unknown',
+                            addedBy: currentUser.email || currentUser.uid,
+                            addedTo: targetUserName,
+                            addedToId: targetUserId,
+                            timestamp: new Date(),
+                            bookId: docRef.id
+                        });
+                    }
+                    
                     return docRef.id;
                 } catch (err) {
                     console.error("=== SAVE ERROR ===");
@@ -2381,6 +2410,79 @@
                     showToast('Error saving: ' + err.message, 'error');
                 }
             }
+
+            // ---------- Activity Tab ----------
+            function renderActivity() {
+                if (activities.length === 0) {
+                    return `
+                    <div class="flex flex-col items-center justify-center py-16 text-center">
+                        <svg class="w-16 h-16 text-slate-300 dark:text-slate-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <h2 class="text-xl font-bold text-slate-700 dark:text-slate-300 mb-2">No Activity Yet</h2>
+                        <p class="text-slate-500 dark:text-slate-400 text-sm">When partners add books to your library, they'll appear here.</p>
+                    </div>
+                    `;
+                }
+
+                const html = `
+                <div class="space-y-4">
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">Recent Activity</h2>
+                    ${activities.map((activity, idx) => `
+                        <div class="glass rounded-2xl p-4 border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600 transition">
+                            <div class="flex items-start justify-between gap-4">
+                                <div class="flex-1">
+                                    <p class="font-bold text-slate-900 dark:text-white">
+                                        <span class="text-blue-600 dark:text-blue-400">${escapeHTML(activity.addedBy)}</span> added
+                                        <span class="text-slate-700 dark:text-slate-300">"${escapeHTML(activity.title)}"</span>
+                                    </p>
+                                    <p class="text-sm text-slate-600 dark:text-slate-400">by ${escapeHTML(activity.author)}</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-500 mt-2">
+                                        Added to ${escapeHTML(activity.addedTo)}'s library
+                                    </p>
+                                    <p class="text-xs text-slate-400 dark:text-slate-600 mt-1">${formatDate(activity.timestamp)}</p>
+                                </div>
+                                <button onclick="window.jumpToBook('${activity.bookId}')" class="px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-bold hover:bg-blue-200 dark:hover:bg-blue-900/50 transition">
+                                    View
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                `;
+                return html;
+            }
+
+            function attachActivityListeners() {
+                // Activity tab listeners would go here
+            }
+
+            function formatDate(date) {
+                const now = new Date();
+                const diffMs = now - date;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffHours = Math.floor(diffMs / 3600000);
+                const diffDays = Math.floor(diffMs / 86400000);
+
+                if (diffMins < 1) return 'Just now';
+                if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+                if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+                if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+            }
+
+            window.jumpToBook = async (bookId) => {
+                setTab('library');
+                // Find book and scroll to it
+                const book = books.find(b => b.id === bookId);
+                if (book) {
+                    setTimeout(() => {
+                        const element = document.querySelector(`[data-book-id="${bookId}"]`);
+                        if (element) {
+                            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    }, 100);
+                }
+            };
 
             // ---------- CSV Import/Export ----------
             let lastImportState = null;
