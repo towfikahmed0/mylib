@@ -684,6 +684,7 @@
                         initiatorId: currentUser.uid,
                         user1Unsubscribed: false,
                         user2Unsubscribed: false,
+                        allowAddBooks: false,
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     }, { merge: true });
 
@@ -693,6 +694,19 @@
                     showToast('Error creating partnership: ' + err.message, 'error');
                 }
             }
+
+            // Update partnership permission to allow/disallow adding books
+            window.updatePartnershipPermission = async (partnershipId, allowAddBooks) => {
+                try {
+                    await db.collection('partnerships').doc(partnershipId).update({
+                        allowAddBooks: allowAddBooks
+                    });
+                    showToast(allowAddBooks ? 'Permission granted!' : 'Permission revoked', 'success');
+                    renderPartners();
+                } catch (err) {
+                    showToast('Error updating permission: ' + err.message, 'error');
+                }
+            };
 
             let unsubscribePartners1 = null;
             let unsubscribePartners2 = null;
@@ -753,16 +767,23 @@
                         const isUnsubscribed = isUser1 ? partnership.user1Unsubscribed : partnership.user2Unsubscribed;
                         const partnerUnsubscribed = isUser1 ? partnership.user2Unsubscribed : partnership.user1Unsubscribed;
                         const partnerName = userDocs[idx].data()?.displayName || userDocs[idx].data()?.email || 'Unknown';
+                        const allowAddBooks = partnership.allowAddBooks || false;
 
                         return `
-                        <div class="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                        <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800 gap-4">
                             <div class="flex-1">
                                 <span class="text-sm font-medium block">${escapeHTML(partnerName)}</span>
                                 ${isUnsubscribed ? '<span class="text-xs text-slate-500 italic">You unfollowed this partnership</span>' : partnerUnsubscribed ? '<span class="text-xs text-slate-500 italic">Partner unfollowed this partnership</span>' : '<span class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Active partnership</span>'}
                             </div>
-                            <button onclick="window.leavePartnership('${partnership.id}')" class="text-rose-500 hover:text-rose-600 p-1 font-medium text-xs">
-                                ${isUnsubscribed ? 'Rejoin' : 'Unfollow'}
-                            </button>
+                            <div class="flex items-center gap-3">
+                                <label class="flex items-center gap-2 cursor-pointer ${isUnsubscribed ? 'opacity-50 pointer-events-none' : ''}">
+                                    <input type="checkbox" ${allowAddBooks ? 'checked' : ''} onchange="window.updatePartnershipPermission('${partnership.id}', this.checked)" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500" title="Allow this partner to add books to your library">
+                                    <span class="text-xs font-medium whitespace-nowrap">Can add books</span>
+                                </label>
+                                <button onclick="window.leavePartnership('${partnership.id}')" class="text-rose-500 hover:text-rose-600 p-1 font-medium text-xs whitespace-nowrap">
+                                    ${isUnsubscribed ? 'Rejoin' : 'Unfollow'}
+                                </button>
+                            </div>
                         </div>
                     `;
                     }).join('');
@@ -1086,42 +1107,91 @@
 
                 const libraryWrapper = document.getElementById('library-container-wrapper');
                 if (libraryWrapper) {
-                    // Separate own books from shared books
-                    const ownBooks = filteredBooks.filter(b => b.userId === currentUser.uid);
-                    const sharedBooks = filteredBooks.filter(b => b.userId !== currentUser.uid);
+                    // Separate and group books
+                    const myOwnBooks = filteredBooks.filter(b => b.userId === currentUser.uid && !b.addedBy);
+                    const booksAddedByOthers = filteredBooks.filter(b => b.userId === currentUser.uid && b.addedBy);
+                    const sharedFromPartners = filteredBooks.filter(b => b.userId !== currentUser.uid);
 
-                    libraryWrapper.innerHTML = `
-                    <div>
-                        ${ownBooks.length > 0 ? `
-                            <div>
-                                <h2 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200">My Books (${ownBooks.length})</h2>
-                                <div id="library-container-own" class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'flex flex-col gap-3'}">
-                                    ${ownBooks.map(book => renderBookCard(book)).join('')}
+                    // Group books added by others by their contributor
+                    const groupedByContributor = {};
+                    booksAddedByOthers.forEach(b => {
+                        const contributor = b.addedBy || 'unknown';
+                        if (!groupedByContributor[contributor]) {
+                            groupedByContributor[contributor] = [];
+                        }
+                        groupedByContributor[contributor].push(b);
+                    });
+
+                    let html = '';
+
+                    // My own books section
+                    if (myOwnBooks.length > 0) {
+                        html += `
+                        <div>
+                            <h2 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200">My Books (${myOwnBooks.length})</h2>
+                            <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'flex flex-col gap-3'}">
+                                ${myOwnBooks.map(book => renderBookCard(book)).join('')}
+                            </div>
+                        </div>
+                        `;
+                    }
+
+                    // Books added by others - grouped by contributor
+                    Object.entries(groupedByContributor).forEach(([contributorId, books]) => {
+                        if (books.length > 0) {
+                            html += `
+                            <div ${myOwnBooks.length > 0 || html ? 'class="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800"' : ''}>
+                                <h3 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200" data-contributor-id="${contributorId}">
+                                    Shared with Me by <span data-name="loading...">loading...</span> (${books.length})
+                                </h3>
+                                <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'flex flex-col gap-3'}">
+                                    ${books.map(book => renderBookCard(book)).join('')}
                                 </div>
                             </div>
-                        ` : ''}
-                        ${sharedBooks.length > 0 ? `
-                            <div ${ownBooks.length > 0 ? 'class="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800"' : ''}>
-                                <h2 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200">Shared with Me (${sharedBooks.length})</h2>
-                                <div id="library-container-shared" class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'flex flex-col gap-3'}">
-                                    ${sharedBooks.map(book => renderBookCard(book)).join('')}
-                                </div>
+                            `;
+                        }
+                    });
+
+                    // Books from shared partners' libraries
+                    if (sharedFromPartners.length > 0) {
+                        html += `
+                        <div ${(myOwnBooks.length > 0 || Object.keys(groupedByContributor).length > 0) ? 'class="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800"' : ''}>
+                            <h2 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200">Shared with Me (${sharedFromPartners.length})</h2>
+                            <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'flex flex-col gap-3'}">
+                                ${sharedFromPartners.map(book => renderBookCard(book)).join('')}
                             </div>
-                        ` : ''}
-                        ${ownBooks.length === 0 && sharedBooks.length === 0 ? `
-                            <div class="col-span-full py-32 text-center">
-                                <div class="bg-blue-50 dark:bg-slate-800 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
-                                    <svg class="w-12 h-12 text-blue-200 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                </div>
-                                <h3 class="text-xl font-black font-serif">${searchQuery || advancedFilters.rating !== 'all' || tagFilter ? 'No matching books' : (activeTab === 'wishlist' ? 'Wishlist is Empty' : 'Empty Library')}</h3>
-                                <p class="text-slate-400 max-w-xs mx-auto mt-2 text-sm">
-                                    ${searchQuery || advancedFilters.rating !== 'all' || tagFilter ? 'Try adjusting your search or filters to find what you are looking for.' : 'Scan a book or add manually to start building your collection.'}
-                                </p>
-                                ${searchQuery || advancedFilters.rating !== 'all' || tagFilter ? `<button onclick="window.clearAllFilters()" class="mt-6 px-6 py-2 bg-blue-600 text-white rounded-full font-bold text-sm shadow-lg">Clear All Filters</button>` : ''}
+                        </div>
+                        `;
+                    }
+
+                    // Empty state
+                    if (filteredBooks.length === 0) {
+                        html = `
+                        <div class="py-32 text-center">
+                            <div class="bg-blue-50 dark:bg-slate-800 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+                                <svg class="w-12 h-12 text-blue-200 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                             </div>
-                        ` : ''}
-                    </div>
-                `;
+                            <h3 class="text-xl font-black font-serif">${searchQuery || advancedFilters.rating !== 'all' || tagFilter ? 'No matching books' : (activeTab === 'wishlist' ? 'Wishlist is Empty' : 'Empty Library')}</h3>
+                            <p class="text-slate-400 max-w-xs mx-auto mt-2 text-sm">
+                                ${searchQuery || advancedFilters.rating !== 'all' || tagFilter ? 'Try adjusting your search or filters to find what you are looking for.' : 'Scan a book or add manually to start building your collection.'}
+                            </p>
+                            ${searchQuery || advancedFilters.rating !== 'all' || tagFilter ? `<button onclick="window.clearAllFilters()" class="mt-6 px-6 py-2 bg-blue-600 text-white rounded-full font-bold text-sm shadow-lg">Clear All Filters</button>` : ''}
+                        </div>
+                        `;
+                    }
+
+                    libraryWrapper.innerHTML = `<div>${html}</div>`;
+
+                    // Fetch contributor names
+                    Object.keys(groupedByContributor).forEach(contributorId => {
+                        db.collection('users').doc(contributorId).get().then(doc => {
+                            if (doc.exists) {
+                                const name = doc.data()?.displayName || doc.data()?.email || 'Unknown';
+                                const heading = libraryWrapper.querySelector(`[data-contributor-id="${contributorId}"] [data-name]`);
+                                if (heading) heading.textContent = name;
+                            }
+                        });
+                    });
                 }
             }
 
@@ -1509,6 +1579,8 @@
                 const bookStatus = rawStatus === 'unread' ? 'want_to_read' : rawStatus;
                 const isSelected = selectedBookIds.has(book.id);
                 const bookGenres = getBookGenres(book);
+                const isSharedBook = book.userId !== currentUser.uid;
+                const addedByBadge = book.addedBy && book.addedBy !== currentUser.uid ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">Added by contributor</div>` : '';
 
                 if (viewMode === 'list') {
                     return `
@@ -1580,6 +1652,7 @@
                             <div class="mt-2 flex flex-wrap gap-1">
                                 <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge}">${READING_STATUSES[bookStatus].label}</div>
                                 ${book.borrowedBy ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed by ${book.borrowedBy}</div>` : ''}
+                                ${addedByBadge}
                             </div>
                         </div>
                         <div class="flex items-center justify-between">
@@ -1679,40 +1752,110 @@
 
             // ---------- Scanner Logic ----------
             let scanner = null;
-            function openScanner() {
-                const modalHtml = `
-                <div class="w-full h-full flex flex-col p-6 overflow-y-auto">
-                    <div class="flex justify-between items-center mb-8">
-                        <h2 class="text-3xl font-black font-serif italic">Scan QR / Barcode</h2>
-                        <button data-close class="p-3 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
-                    </div>
-                    <div class="flex-1 flex flex-col items-center justify-center">
-                        <div id="reader" class="w-full max-w-lg aspect-square rounded-[3rem] overflow-hidden bg-slate-900 relative shadow-2xl">
-                            <!-- Overlay for a more professional look -->
-                            <div class="absolute inset-0 border-[40px] border-slate-900/40 pointer-events-none"></div>
-                            <div class="absolute inset-[40px] border-2 border-blue-500/50 rounded-lg pointer-events-none animate-pulse"></div>
+            let globalScanTargetLibrary = null; // Store globally for scanner flow
+            
+            // Helper: Show library selector for scanner
+            async function showLibrarySelectorForScan() {
+                const partnersWhoAllowAdding = allPartnershipsForUI.filter(p => p.allowAddBooks === true).map(p => {
+                    const isUser1 = p.userId1 === currentUser.uid;
+                    const partnerId = isUser1 ? p.userId2 : p.userId1;
+                    return { partnershipId: p.id, userId: partnerId, isActive: isUser1 ? !p.user1Unsubscribed : !p.user2Unsubscribed };
+                }).filter(p => p.isActive);
+
+                if (partnersWhoAllowAdding.length === 0) {
+                    globalScanTargetLibrary = currentUser.uid;
+                    return;
+                }
+
+                return new Promise((resolve) => {
+                    let destHtml = `
+                    <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up">
+                        <h2 class="text-2xl font-black mb-4">Add To Which Library?</h2>
+                        <div class="space-y-3">
+                            <label class="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer border-2 border-transparent" data-dest="${currentUser.uid}">
+                                <input type="radio" name="scan-library-dest" value="${currentUser.uid}" checked class="w-5 h-5 text-blue-600">
+                                <span class="font-medium">My Library</span>
+                            </label>
+                    `;
+
+                    partnersWhoAllowAdding.forEach(p => {
+                        destHtml += `
+                            <label class="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer border-2 border-transparent" data-dest="${p.userId}" data-partner-id="${p.userId}">
+                                <input type="radio" name="scan-library-dest" value="${p.userId}" class="w-5 h-5 text-blue-600">
+                                <span class="font-medium" data-name="">Loading...</span>
+                            </label>
+                        `;
+                    });
+
+                    destHtml += `
+                        <div class="flex gap-4 mt-8">
+                            <button data-close class="flex-1 px-4 py-4 bg-slate-200 dark:bg-slate-700 rounded-2xl font-bold">Cancel</button>
+                            <button id="scan-start-btn" class="flex-1 px-4 py-4 bg-blue-600 text-white rounded-2xl font-bold">Start Scan</button>
                         </div>
-                        <p class="text-sm text-center text-slate-400 mt-8 uppercase tracking-widest font-bold">Align code within the frame</p>
                     </div>
-                </div>
-            `;
-                const closeScanner = showModal(modalHtml, () => stopScanner(), true);
+                    `;
 
-                scanner = new Html5Qrcode("reader");
-                const config = {
-                    fps: 20,
-                    qrbox: { width: 250, height: 150 },
-                    aspectRatio: 1.0
-                };
+                    const close = showModal(destHtml);
 
-                scanner.start(
-                    { facingMode: "environment" },
-                    config,
-                    onScanSuccess,
-                    onScanFailure
-                ).catch(err => {
-                    console.warn("Camera start failed, falling back to any camera", err);
-                    scanner.start({ facingMode: "user" }, config, onScanSuccess, onScanFailure);
+                    // Fetch partner names
+                    Promise.all(partnersWhoAllowAdding.map(p => 
+                        db.collection('users').doc(p.userId).get()
+                    )).then(docs => {
+                        partnersWhoAllowAdding.forEach((p, idx) => {
+                            const label = modalContainer.querySelector(`[data-partner-id="${p.userId}"]`);
+                            const nameSpan = label?.querySelector('[data-name]');
+                            if (nameSpan && docs[idx].exists) {
+                                const name = docs[idx].data()?.displayName || docs[idx].data()?.email || 'Partner';
+                                nameSpan.textContent = `${name}'s Library`;
+                            }
+                        });
+                    });
+
+                    document.getElementById('scan-start-btn').addEventListener('click', () => {
+                        const selected = document.querySelector('input[name="scan-library-dest"]:checked');
+                        globalScanTargetLibrary = selected ? selected.value : currentUser.uid;
+                        close();
+                        resolve();
+                    });
+                });
+            }
+
+            function openScanner() {
+                showLibrarySelectorForScan().then(() => {
+                    const modalHtml = `
+                    <div class="w-full h-full flex flex-col p-6 overflow-y-auto">
+                        <div class="flex justify-between items-center mb-8">
+                            <h2 class="text-3xl font-black font-serif italic">Scan QR / Barcode</h2>
+                            <button data-close class="p-3 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center justify-center">
+                            <div id="reader" class="w-full max-w-lg aspect-square rounded-[3rem] overflow-hidden bg-slate-900 relative shadow-2xl">
+                                <!-- Overlay for a more professional look -->
+                                <div class="absolute inset-0 border-[40px] border-slate-900/40 pointer-events-none"></div>
+                                <div class="absolute inset-[40px] border-2 border-blue-500/50 rounded-lg pointer-events-none animate-pulse"></div>
+                            </div>
+                            <p class="text-sm text-center text-slate-400 mt-8 uppercase tracking-widest font-bold">Align code within the frame</p>
+                        </div>
+                    </div>
+                `;
+                    const closeScanner = showModal(modalHtml, () => stopScanner(), true);
+
+                    scanner = new Html5Qrcode("reader");
+                    const config = {
+                        fps: 20,
+                        qrbox: { width: 250, height: 150 },
+                        aspectRatio: 1.0
+                    };
+
+                    scanner.start(
+                        { facingMode: "environment" },
+                        config,
+                        onScanSuccess,
+                        onScanFailure
+                    ).catch(err => {
+                        console.warn("Camera start failed, falling back to any camera", err);
+                        scanner.start({ facingMode: "user" }, config, onScanSuccess, onScanFailure);
+                    });
                 });
             }
 
@@ -1804,7 +1947,7 @@
                         source: 'scanned',
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     };
-                    addBookToFirestore(book, 'want_to_read');
+                    addBookToFirestore(book, 'want_to_read', globalScanTargetLibrary || currentUser.uid);
                 } else {
                     showToast('No book found. Please enter details.', 'info');
                     openManualEntry(query);
@@ -1855,7 +1998,7 @@
                         tags: ['Scanned'],
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     };
-                    addBookToFirestore(book, 'want_to_read');
+                    addBookToFirestore(book, 'want_to_read', globalScanTargetLibrary || currentUser.uid);
                     close();
                 });
             }
@@ -1864,6 +2007,7 @@
                 const isEdit = !!existingBook;
                 let currentGenres = getBookGenres(existingBook || {});
                 if (currentGenres.length === 1 && currentGenres[0] === 'Other' && !isEdit) currentGenres = [];
+                let selectedLibraryUserId = currentUser.uid; // Track which library this book is being added to
 
                 const renderGenres = () => {
                     const container = document.getElementById('genres-badge-container');
@@ -1889,6 +2033,14 @@
                             <button data-close class="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm hover:bg-slate-100 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                         </div>
                         ${code ? `<p class="text-slate-500 text-sm mb-6">Code: ${code.substring(0, 20)}</p>` : ''}
+                        ${!isEdit ? `
+                        <div class="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-3">Add To Library</label>
+                            <div id="library-destination-container" class="space-y-2">
+                                <!-- populated by JavaScript -->
+                            </div>
+                        </div>
+                        ` : ''}
                         <div class="space-y-6">
                             <div><label class="text-[10px] font-bold text-slate-400 uppercase ml-1 font-serif">Title *</label><input id="man-title" placeholder="e.g. The Great Gatsby" value="${existingBook?.title || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
 
@@ -1966,6 +2118,50 @@
                 const close = showModal(modalHtml, null, true);
                 renderGenres();
 
+                // Populate library destination options
+                if (!isEdit) {
+                    const destContainer = document.getElementById('library-destination-container');
+                    if (destContainer) {
+                        // Get list of partnerships where we can add books
+                        const partnersWhoAllowAdding = allPartnershipsForUI.filter(p => p.allowAddBooks === true).map(p => {
+                            const isUser1 = p.userId1 === currentUser.uid;
+                            const partnerId = isUser1 ? p.userId2 : p.userId1;
+                            return { partnershipId: p.id, userId: partnerId, isActive: isUser1 ? !p.user1Unsubscribed : !p.user2Unsubscribed };
+                        }).filter(p => p.isActive);
+
+                        // Create radio buttons for destinations
+                        let html = `<label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="library-dest" value="${currentUser.uid}" checked class="w-4 h-4 text-blue-600">
+                            <span class="text-xs font-medium">My Library</span>
+                        </label>`;
+
+                        // Add partner options
+                        if (partnersWhoAllowAdding.length > 0) {
+                            html += partnersWhoAllowAdding.map(p => `
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="library-dest" value="${p.userId}" class="w-4 h-4 text-blue-600">
+                                    <span class="text-xs font-medium" data-partner-id="${p.userId}">Loading...</span>
+                                </label>
+                            `).join('');
+
+                            // Fetch partner names
+                            Promise.all(partnersWhoAllowAdding.map(p => 
+                                db.collection('users').doc(p.userId).get()
+                            )).then(docs => {
+                                partnersWhoAllowAdding.forEach((p, idx) => {
+                                    const span = destContainer.querySelector(`[data-partner-id="${p.userId}"]`);
+                                    if (span && docs[idx].exists) {
+                                        const name = docs[idx].data()?.displayName || docs[idx].data()?.email || 'Partner';
+                                        span.textContent = `${name}'s Library`;
+                                    }
+                                });
+                            });
+                        }
+
+                        destContainer.innerHTML = html;
+                    }
+                }
+
                 document.getElementById('man-status').addEventListener('change', e => {
                     document.getElementById('man-progress-container').classList.toggle('hidden', e.target.value !== 'reading');
                 });
@@ -2030,7 +2226,10 @@
                             close();
                         } catch (err) { showToast('Error updating: ' + err.message, 'error'); }
                     } else {
-                        addBookToFirestore(bookData, document.getElementById('man-status').value);
+                        // Get selected library destination
+                        const selectedDest = document.querySelector('input[name="library-dest"]:checked');
+                        const targetUserId = selectedDest ? selectedDest.value : currentUser.uid;
+                        addBookToFirestore(bookData, document.getElementById('man-status').value, targetUserId);
                         close();
                     }
                 });
@@ -2053,13 +2252,23 @@
             }
 
             // ---------- Firestore Write ----------
-            async function addBookToFirestore(bookData, status = 'want_to_read') {
+            async function addBookToFirestore(bookData, status = 'want_to_read', targetUserId = null) {
                 if (!currentUser) return;
+                targetUserId = targetUserId || currentUser.uid;
+                const isAddingToSharedLibrary = targetUserId !== currentUser.uid;
+
                 try {
-                    const duplicate = findDuplicateBook(bookData);
+                    // Check for duplicate in TARGET library (not current user's books)
+                    const targetLibraryBooks = books.filter(b => b.userId === targetUserId);
+                    const title = bookData.title?.trim().toLowerCase();
+                    const author = bookData.author?.trim().toLowerCase();
+                    const duplicate = targetLibraryBooks.find(b => {
+                        return b.title?.trim().toLowerCase() === title && b.author?.trim().toLowerCase() === author;
+                    });
 
                     if (duplicate) {
-                        const confirmUpdate = confirm(`This book ("${duplicate.title}") is already in your library. Would you like to update the existing record instead?`);
+                        const targetName = targetUserId === currentUser.uid ? 'your library' : 'this library';
+                        const confirmUpdate = confirm(`This book ("${duplicate.title}") is already in ${targetName}. Would you like to update the existing record instead?`);
                         if (!confirmUpdate) return null;
 
                         const updateData = {
@@ -2076,7 +2285,7 @@
                         await db.collection('books').doc(duplicate.id)
                             .collection('readingStatus').doc(currentUser.uid).set({
                                 status: status,
-                                rating: bookData.rating || 0, // ✅ FIXED: use bookData instead of undefined finalData
+                                rating: bookData.rating || 0,
                                 userId: currentUser.uid,
                                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                             }, { merge: true });
@@ -2095,8 +2304,14 @@
                         source: 'manual',
                         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                         ...bookData,
-                        userId: currentUser.uid
+                        userId: targetUserId
                     };
+                    
+                    // Track who added the book if it's being added to someone else's library
+                    if (isAddingToSharedLibrary) {
+                        finalData.addedBy = currentUser.uid;
+                    }
+                    
                     delete finalData.readingStatus; // Don't store status on the book itself
 
                     const docRef = await db.collection('books').add(finalData);
@@ -2104,7 +2319,7 @@
                     // Save per-user reading status in subcollection
                     await docRef.collection('readingStatus').doc(currentUser.uid).set({
                         status: status,
-                        rating: finalData.rating || 0, // Sync book rating
+                        rating: finalData.rating || 0,
                         userId: currentUser.uid,
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                     }, { merge: true });
