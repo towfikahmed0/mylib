@@ -254,6 +254,7 @@
             let viewMode = localStorage.getItem('mylib_viewMode') || 'grid';
             let sharedWithMe = [];         // UIDs of users who shared their library with me
             let activities = [];           // activity log for book additions
+            let metadataCache = { authors: [], genres: [], owners: [] }; // Performance optimization: single-pass cache
             
             let searchQuery = '';
             let searchTimeout = null;
@@ -544,7 +545,7 @@
                             <div>
                                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Authors</h3>
                                 <div class="flex flex-wrap gap-2">
-                                    ${[...new Set(books.map(b => b.author).filter(Boolean))].sort().map(author => `
+                                    ${metadataCache.authors.map(author => `
                                         <div class="group flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-sm transition-all hover:bg-blue-50 dark:hover:bg-blue-900/20">
                                             <span class="font-medium">${author}</span>
                                             <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -560,7 +561,7 @@
                             <div>
                                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Genres</h3>
                                 <div class="flex flex-wrap gap-2">
-                                    ${[...new Set(books.flatMap(b => getBookGenres(b)).filter(Boolean))].sort().map(genre => `
+                                    ${metadataCache.genres.map(genre => `
                                         <div class="group flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-sm transition-all hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
                                             <span class="font-medium">${genre}</span>
                                             <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -576,7 +577,7 @@
                             <div>
                                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Owners</h3>
                                 <div class="flex flex-wrap gap-2">
-                                    ${[...new Set(books.map(b => b.owner).filter(Boolean))].sort().map(owner => `
+                                    ${metadataCache.owners.map(owner => `
                                         <div class="group flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-sm transition-all hover:bg-amber-50 dark:hover:bg-amber-900/20">
                                             <span class="font-medium">${owner}</span>
                                             <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -900,7 +901,7 @@
                                 <div class="flex items-center gap-2">
                                     <select id="bulk-genre" class="bg-slate-100 dark:bg-slate-800 rounded-lg text-[10px] font-bold px-3 py-2 outline-none">
                                         <option value="">Change Genre...</option>
-                                        ${[...new Set(books.flatMap(b => getBookGenres(b)).filter(Boolean))].sort().map(cat => `<option value="${cat}">${cat}</option>`).join('')}
+                                        ${metadataCache.genres.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
                                     </select>
                                     <button onclick="window.bulkDelete()" class="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors" title="Delete Selected">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
@@ -1065,7 +1066,7 @@
                                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Genre</span>
                                     <select id="category-filter" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
                                         <option value="all" ${categoryFilter === 'all' ? 'selected' : ''}>All Genres</option>
-                                        ${[...new Set(books.flatMap(b => getBookGenres(b)).filter(Boolean))].sort().map(cat => `
+                                        ${metadataCache.genres.map(cat => `
                                             <option value="${cat}" ${categoryFilter === cat ? 'selected' : ''}>${cat}</option>
                                         `).join('')}
                                     </select>
@@ -1083,7 +1084,7 @@
                                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Author</span>
                                     <select id="author-filter" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
                                         <option value="all" ${authorFilter === 'all' ? 'selected' : ''}>All Authors</option>
-                                        ${[...new Set(books.map(b => b.author).filter(Boolean))].sort().map(author => `
+                                        ${metadataCache.authors.map(author => `
                                             <option value="${author}" ${authorFilter === author ? 'selected' : ''}>${author}</option>
                                         `).join('')}
                                     </select>
@@ -1092,7 +1093,7 @@
                                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Owner</span>
                                     <select id="owner-filter" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
                                         <option value="all" ${ownerFilter === 'all' ? 'selected' : ''}>All Owners</option>
-                                        ${[...new Set(books.map(b => b.owner).filter(Boolean))].sort().map(owner => `
+                                        ${metadataCache.owners.map(owner => `
                                             <option value="${owner}" ${ownerFilter === owner ? 'selected' : ''}>${owner}</option>
                                         `).join('')}
                                     </select>
@@ -1584,6 +1585,25 @@
                 return ['Other'];
             }
 
+            // Performance optimization: Update metadata cache in a single pass over the books array
+            function updateMetadataCache() {
+                const authorsSet = new Set();
+                const genresSet = new Set();
+                const ownersSet = new Set();
+
+                books.forEach(b => {
+                    if (b.author) authorsSet.add(b.author);
+                    if (b.owner) ownersSet.add(b.owner);
+                    getBookGenres(b).forEach(g => {
+                        if (g) genresSet.add(g);
+                    });
+                });
+
+                metadataCache.authors = [...authorsSet].sort();
+                metadataCache.genres = [...genresSet].sort();
+                metadataCache.owners = [...ownersSet].sort();
+            }
+
             // Helper to render a single book card
             function renderBookCard(book) {
                 const stars = book.rating ? '★'.repeat(book.rating) + '☆'.repeat(5 - book.rating) : '';
@@ -1743,6 +1763,7 @@
                                 const timeB = b.createdAt?.toMillis() || 0;
                                 return timeB - timeA;
                             });
+                            updateMetadataCache();
                             renderMainApp();
                         }, err => {
                             console.error("Firestore Error:", err);
@@ -2180,17 +2201,17 @@
                 });
 
                 // Setup searchable dropdowns
-                setupSearchableDropdown('man-author', 'author-dropdown', [...new Set(books.map(b => b.author).filter(Boolean))].sort(), (val) => {
+                setupSearchableDropdown('man-author', 'author-dropdown', metadataCache.authors, (val) => {
                     document.getElementById('man-author').value = val;
                 });
-                setupSearchableDropdown('man-category', 'category-dropdown', [...new Set(books.flatMap(b => getBookGenres(b)).filter(Boolean))].sort(), (val) => {
+                setupSearchableDropdown('man-category', 'category-dropdown', metadataCache.genres, (val) => {
                     if (!currentGenres.includes(val)) {
                         currentGenres.push(val);
                         renderGenres();
                     }
                     document.getElementById('man-category').value = '';
                 });
-                setupSearchableDropdown('man-owner', 'owner-dropdown', [...new Set(books.map(b => b.owner).filter(Boolean))].sort(), (val) => {
+                setupSearchableDropdown('man-owner', 'owner-dropdown', metadataCache.owners, (val) => {
                     document.getElementById('man-owner').value = val;
                 });
 
