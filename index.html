@@ -417,7 +417,7 @@
                         <h2 class="text-2xl font-black mb-6 font-serif italic text-blue-600 dark:text-blue-400">Profile Settings</h2>
                         <div class="space-y-4">
                             <div>
-                                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Display Name</label>
+                                <label for="profile-display-name" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Display Name</label>
                                 <div class="flex flex-col sm:flex-row gap-2">
                                     <input id="profile-display-name" type="text" placeholder="Your Name" value="${escapeHTML(userProfile?.displayName || '')}" class="flex-1 min-w-0 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
                                     <button id="save-profile-btn" class="sm:px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition active:scale-95 shadow-lg shadow-blue-200 dark:shadow-none">Save Profile</button>
@@ -525,7 +525,7 @@
                         <p class="text-sm text-slate-500 mb-6">Enter the emails of people you want to share your library with. They will be able to view and edit your collection.</p>
                         <div class="space-y-4">
                             <div>
-                                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Collaborator Email</label>
+                                <label for="share-email" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Collaborator Email</label>
                                 <div class="flex flex-col sm:flex-row gap-2">
                                     <input id="share-email" type="email" placeholder="email@example.com" class="flex-1 min-w-0 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
                                     <button id="save-sharing-btn" class="sm:px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition active:scale-95 shadow-lg shadow-blue-200 dark:shadow-none">Add Collaborator</button>
@@ -618,14 +618,14 @@
                             </div>
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Default View</label>
+                                    <label for="pref-default-view" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Default View</label>
                                     <select id="pref-default-view" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-xs font-bold mt-1">
                                         <option value="grid" ${localStorage.getItem('mylib_viewMode') === 'grid' ? 'selected' : ''}>Grid</option>
                                         <option value="list" ${localStorage.getItem('mylib_viewMode') === 'list' ? 'selected' : ''}>List</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Default Sort</label>
+                                    <label for="pref-default-sort" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Default Sort</label>
                                     <select id="pref-default-sort" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-xs font-bold mt-1">
                                         <option value="newest" ${localStorage.getItem('mylib_defaultSort') === 'newest' ? 'selected' : ''}>Newest</option>
                                         <option value="title" ${localStorage.getItem('mylib_defaultSort') === 'title' ? 'selected' : ''}>Title</option>
@@ -884,8 +884,11 @@
                         <!-- Smart Search Bar -->
                         <div class="mb-6 flex gap-2">
                             <div class="relative group flex-1">
-                                <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                <input id="search-input" type="text" placeholder="Smart search by title, author, genre..." value="${searchQuery}" class="w-full pl-12 pr-4 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-[1.5rem] text-lg transition-all outline-none shadow-sm">
+                                <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                <input id="search-input" type="text" placeholder="Smart search by title, author, genre..." value="${searchQuery}" aria-label="Search books" class="w-full pl-12 pr-12 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-[1.5rem] text-lg transition-all outline-none shadow-sm">
+                                <button id="clear-search-btn" class="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-blue-500 transition-colors hidden" aria-label="Clear search">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                </button>
                             </div>
                             <button id="advanced-search-btn" class="px-6 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[1.5rem] font-bold text-slate-500 hover:text-blue-600 transition-all shadow-sm flex items-center gap-2" aria-label="Open Advanced Filters">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
@@ -914,12 +917,18 @@
                         <div id="controls-bar-container"></div>
                         <div id="library-container-wrapper"></div>
                     `;
-                        document.getElementById('search-input').addEventListener('input', e => {
+                        const searchInput = document.getElementById('search-input');
+                        searchInput.addEventListener('input', e => {
                             searchQuery = e.target.value;
                             if (searchTimeout) clearTimeout(searchTimeout);
                             searchTimeout = setTimeout(() => {
                                 renderLibraryOnly();
                             }, 150);
+                        });
+                        document.getElementById('clear-search-btn').addEventListener('click', () => {
+                            searchQuery = '';
+                            searchInput.value = '';
+                            renderLibraryOnly();
                         });
                         document.getElementById('advanced-search-btn').addEventListener('click', openAdvancedSearch);
                     }
@@ -949,6 +958,10 @@
             };
 
             function renderLibraryOnly() {
+                const clearSearchBtn = document.getElementById('clear-search-btn');
+                if (clearSearchBtn) {
+                    clearSearchBtn.classList.toggle('hidden', !searchQuery);
+                }
                 const searchLower = searchQuery.toLowerCase();
                 let filteredBooks = books.filter(b => {
                     const matchesTab = activeTab === 'wishlist' ? b.isWishlist : !b.isWishlist;
@@ -2987,6 +3000,23 @@
                     }
                 });
             }
+
+            // ---------- Global keyboard listener for search (added once) ----------
+            document.addEventListener('keydown', e => {
+                if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+                    e.preventDefault();
+                    if (activeTab !== 'library' && activeTab !== 'wishlist') {
+                        window.setTab('library');
+                    }
+                    setTimeout(() => {
+                        const searchInput = document.getElementById('search-input');
+                        if (searchInput) {
+                            searchInput.focus();
+                            searchInput.select();
+                        }
+                    }, 50);
+                }
+            });
 
             // ---------- Global document click listener for book cards (added once) ----------
             document.addEventListener('click', e => {
