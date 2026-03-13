@@ -2258,6 +2258,29 @@
                 const isAddingToSharedLibrary = targetUserId !== currentUser.uid;
 
                 try {
+                    // DEBUG LOGGING
+                    console.log('=== ADD BOOK TO FIRESTORE DEBUG ===');
+                    console.log('Current User ID:', currentUser.uid);
+                    console.log('Target Library Owner ID:', targetUserId);
+                    console.log('Is Adding to Shared Library:', isAddingToSharedLibrary);
+                    
+                    if (isAddingToSharedLibrary) {
+                        // Calculate partnership ID the same way as Firestore rules
+                        const partnershipId = currentUser.uid < targetUserId ? 
+                            currentUser.uid + '_' + targetUserId : 
+                            targetUserId + '_' + currentUser.uid;
+                        console.log('Partnership ID to check:', partnershipId);
+                        
+                        // Fetch and log partnership data
+                        const partnershipDoc = await db.collection('partnerships').doc(partnershipId).get();
+                        if (partnershipDoc.exists) {
+                            console.log('Partnership found:', partnershipDoc.data());
+                            console.log('allowAddBooks value:', partnershipDoc.data().allowAddBooks);
+                        } else {
+                            console.log('Partnership NOT found - this will cause permission denied');
+                        }
+                    }
+                    
                     // Check for duplicate in TARGET library (not current user's books)
                     const targetLibraryBooks = books.filter(b => b.userId === targetUserId);
                     const title = bookData.title?.trim().toLowerCase();
@@ -2314,7 +2337,13 @@
                     
                     delete finalData.readingStatus; // Don't store status on the book itself
 
+                    console.log('=== CREATING BOOK ===');
+                    console.log('Final book data to save:', finalData);
+                    console.log('Book will be created with userId:', finalData.userId);
+                    console.log('Current user creating:', currentUser.uid);
+                    
                     const docRef = await db.collection('books').add(finalData);
+                    console.log('✓ Book created successfully with ID:', docRef.id);
 
                     // Save per-user reading status in subcollection
                     await docRef.collection('readingStatus').doc(currentUser.uid).set({
@@ -2327,7 +2356,28 @@
                     showToast('Book added!', 'success');
                     return docRef.id;
                 } catch (err) {
-                    console.error("Save error:", err);
+                    console.error("=== SAVE ERROR ===");
+                    console.error('Error message:', err.message);
+                    console.error('Error code:', err.code);
+                    console.error('Full error:', err);
+                    
+                    // Enhanced debugging for permission errors
+                    if (err.code === 'permission-denied') {
+                        console.error('PERMISSION DENIED - Debugging info:');
+                        console.error('- Trying to add book to userId:', targetUserId);
+                        console.error('- Current user:', currentUser.uid);
+                        console.error('- Is shared library:', isAddingToSharedLibrary);
+                        
+                        if (isAddingToSharedLibrary) {
+                            const partnershipId = currentUser.uid < targetUserId ? 
+                                currentUser.uid + '_' + targetUserId : 
+                                targetUserId + '_' + currentUser.uid;
+                            console.error('- Partnership ID:', partnershipId);
+                            console.error('- Check Firestore: partnerships/' + partnershipId);
+                            console.error('- Verify allowAddBooks field is set to true');
+                        }
+                    }
+                    
                     showToast('Error saving: ' + err.message, 'error');
                 }
             }
