@@ -661,53 +661,129 @@
                 if (!email) return;
 
                 try {
-                    const collabId = `${currentUser.uid}_${email}`;
-                    await db.collection('collaborators').doc(collabId).set({
-                        ownerId: currentUser.uid,
-                        collaboratorEmail: email,
+                    // Find the user by email
+                    const userSnapshot = await db.collection('users').where('email', '==', email).limit(1).get();
+                    if (userSnapshot.empty) {
+                        showToast('User not found. They must log in first.', 'error');
+                        return;
+                    }
+
+                    const partnerId = userSnapshot.docs[0].id;
+                    if (partnerId === currentUser.uid) {
+                        showToast('You cannot share with yourself.', 'error');
+                        return;
+                    }
+
+                    // Create a bidirectional partnership with sorted UIDs
+                    const ids = [currentUser.uid, partnerId].sort();
+                    const partnershipId = `${ids[0]}_${ids[1]}`;
+
+                    await db.collection('partnerships').doc(partnershipId).set({
+                        userId1: ids[0],
+                        userId2: ids[1],
+                        initiatorId: currentUser.uid,
+                        user1Unsubscribed: false,
+                        user2Unsubscribed: false,
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    showToast(`Shared with ${email}`, 'success');
+                    }, { merge: true });
+
+                    showToast(`Partnership created with ${email}!`, 'success');
                     document.getElementById('share-email').value = '';
                 } catch (err) {
-                    showToast('Error sharing: ' + err.message, 'error');
+                    showToast('Error creating partnership: ' + err.message, 'error');
                 }
             }
 
-            let unsubscribeCollaborators = null;
-            function renderCollaborators() {
+            let unsubscribePartners1 = null;
+            let unsubscribePartners2 = null;
+            let allPartnershipsForUI = [];
+
+            function renderPartners() {
                 const listEl = document.getElementById('collaborators-list');
                 if (!listEl) return;
 
-                if (unsubscribeCollaborators) unsubscribeCollaborators();
-                unsubscribeCollaborators = db.collection('collaborators')
-                    .where('ownerId', '==', currentUser.uid)
-                    .onSnapshot(snapshot => {
-                        if (snapshot.empty) {
-                            listEl.innerHTML = '<p class="text-xs text-slate-400 italic px-1">No collaborators yet.</p>';
-                            return;
-                        }
+                if (unsubscribePartners1) unsubscribePartners1();
+                if (unsubscribePartners2) unsubscribePartners2();
 
-                        listEl.innerHTML = snapshot.docs.map(doc => {
-                            const data = doc.data();
-                            return `
-                            <div class="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
-                                <span class="text-sm font-medium">${escapeHTML(data.collaboratorEmail)}</span>
-                                <button onclick="window.removeCollaborator('${doc.id}')" class="text-rose-500 hover:text-rose-600 p-1">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                </button>
-                            </div>
-                        `;
-                        }).join('');
+                // Query partnerships where current user is userId1
+                unsubscribePartners1 = db.collection('partnerships')
+                    .where('userId1', '==', currentUser.uid)
+                    .onSnapshot(snapshot => {
+                        const user1Partnerships = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        allPartnershipsForUI = user1Partnerships.concat(
+                            allPartnershipsForUI.filter(p => !user1Partnerships.some(u1p => u1p.id === p.id))
+                        );
+                        displayPartnerships();
+                    }, err => {
+                        console.error("Partners Query 1 Error:", err);
                     });
+
+                // Query partnerships where current user is userId2
+                unsubscribePartners2 = db.collection('partnerships')
+                    .where('userId2', '==', currentUser.uid)
+                    .onSnapshot(snapshot => {
+                        const user2Partnerships = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        allPartnershipsForUI = allPartnershipsForUI.filter(p => p.userId1 === currentUser.uid).concat(user2Partnerships);
+                        displayPartnerships();
+                    }, err => {
+                        console.error("Partners Query 2 Error:", err);
+                    });
+
+                async function displayPartnerships() {
+                    const listEl = document.getElementById('collaborators-list');
+                    if (!listEl) return;
+
+                    if (allPartnershipsForUI.length === 0) {
+                        listEl.innerHTML = '<p class="text-xs text-slate-400 italic px-1">No partnerships yet. Share your library to connect with friends!</p>';
+                        return;
+                    }
+
+                    // Fetch partner user details
+                    const partnerIds = allPartnershipsForUI.map(doc => {
+                        const data = doc;
+                        return data.userId1 === currentUser.uid ? data.userId2 : data.userId1;
+                    });
+
+                    const userDocs = await Promise.all(
+                        partnerIds.map(id => db.collection('users').doc(id).get())
+                    );
+
+                    listEl.innerHTML = allPartnershipsForUI.map((partnership, idx) => {
+                        const isUser1 = partnership.userId1 === currentUser.uid;
+                        const isUnsubscribed = isUser1 ? partnership.user1Unsubscribed : partnership.user2Unsubscribed;
+                        const partnerUnsubscribed = isUser1 ? partnership.user2Unsubscribed : partnership.user1Unsubscribed;
+                        const partnerName = userDocs[idx].data()?.displayName || userDocs[idx].data()?.email || 'Unknown';
+
+                        return `
+                        <div class="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <div class="flex-1">
+                                <span class="text-sm font-medium block">${escapeHTML(partnerName)}</span>
+                                ${isUnsubscribed ? '<span class="text-xs text-slate-500 italic">You unfollowed this partnership</span>' : partnerUnsubscribed ? '<span class="text-xs text-slate-500 italic">Partner unfollowed this partnership</span>' : '<span class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Active partnership</span>'}
+                            </div>
+                            <button onclick="window.leavePartnership('${partnership.id}')" class="text-rose-500 hover:text-rose-600 p-1 font-medium text-xs">
+                                ${isUnsubscribed ? 'Rejoin' : 'Unfollow'}
+                            </button>
+                        </div>
+                    `;
+                    }).join('');
+                }
             }
 
-            window.removeCollaborator = async (id) => {
-                if (confirm('Remove this collaborator?')) {
-                    try {
-                        await db.collection('collaborators').doc(id).delete();
-                        showToast('Collaborator removed', 'info');
-                    } catch (err) { showToast('Error: ' + err.message, 'error'); }
+            window.leavePartnership = async (partnershipId) => {
+                try {
+                    const partnershipDoc = await db.collection('partnerships').doc(partnershipId).get();
+                    const data = partnershipDoc.data();
+                    const isUser1 = data.userId1 === currentUser.uid;
+
+                    // Toggle unsubscribed status for current user
+                    const currentStatus = isUser1 ? data.user1Unsubscribed : data.user2Unsubscribed;
+                    const updateData = isUser1 ? { user1Unsubscribed: !currentStatus } : { user2Unsubscribed: !currentStatus };
+
+                    await db.collection('partnerships').doc(partnershipId).update(updateData);
+                    showToast(!currentStatus ? 'Partnership unfollowed' : 'Partnership rejoined', 'info');
+                    subscribeToBooks();
+                } catch (err) {
+                    showToast('Error: ' + err.message, 'error');
                 }
             };
 
@@ -1010,9 +1086,29 @@
 
                 const libraryWrapper = document.getElementById('library-container-wrapper');
                 if (libraryWrapper) {
+                    // Separate own books from shared books
+                    const ownBooks = filteredBooks.filter(b => b.userId === currentUser.uid);
+                    const sharedBooks = filteredBooks.filter(b => b.userId !== currentUser.uid);
+
                     libraryWrapper.innerHTML = `
-                    <div id="library-container" class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'flex flex-col gap-3'}">
-                        ${filteredBooks.length === 0 ? `
+                    <div>
+                        ${ownBooks.length > 0 ? `
+                            <div>
+                                <h2 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200">My Books (${ownBooks.length})</h2>
+                                <div id="library-container-own" class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'flex flex-col gap-3'}">
+                                    ${ownBooks.map(book => renderBookCard(book)).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${sharedBooks.length > 0 ? `
+                            <div ${ownBooks.length > 0 ? 'class="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800"' : ''}>
+                                <h2 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200">Shared with Me (${sharedBooks.length})</h2>
+                                <div id="library-container-shared" class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'flex flex-col gap-3'}">
+                                    ${sharedBooks.map(book => renderBookCard(book)).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${ownBooks.length === 0 && sharedBooks.length === 0 ? `
                             <div class="col-span-full py-32 text-center">
                                 <div class="bg-blue-50 dark:bg-slate-800 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
                                     <svg class="w-12 h-12 text-blue-200 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
@@ -1021,11 +1117,9 @@
                                 <p class="text-slate-400 max-w-xs mx-auto mt-2 text-sm">
                                     ${searchQuery || advancedFilters.rating !== 'all' || tagFilter ? 'Try adjusting your search or filters to find what you are looking for.' : 'Scan a book or add manually to start building your collection.'}
                                 </p>
-                                ${searchQuery || advancedFilters.rating !== 'all' || tagFilter ? `
-                                    <button onclick="window.clearAllFilters()" class="mt-6 px-6 py-2 bg-blue-600 text-white rounded-full font-bold text-sm shadow-lg">Clear All Filters</button>
-                                ` : ''}
+                                ${searchQuery || advancedFilters.rating !== 'all' || tagFilter ? `<button onclick="window.clearAllFilters()" class="mt-6 px-6 py-2 bg-blue-600 text-white rounded-full font-bold text-sm shadow-lg">Clear All Filters</button>` : ''}
                             </div>
-                        ` : filteredBooks.map(book => renderBookCard(book)).join('')}
+                        ` : ''}
                     </div>
                 `;
                 }
@@ -1081,7 +1175,7 @@
                     renderMainApp();
                 });
 
-                renderCollaborators();
+                renderPartners();
             }
 
             window.editMetadata = async (type, oldVal) => {
@@ -1503,34 +1597,71 @@
             }
 
             // ---------- Firestore Sync ----------
-            let unsubscribeShared = null;
+            let unsubscribePartnershipBooks1 = null;
+            let unsubscribePartnershipBooks2 = null;
+            let unsubscribeOwnBooks = null;
+            let allPartnerships = [];
+
             async function subscribeToBooks() {
                 if (unsubscribeBooks) unsubscribeBooks();
                 if (unsubscribeStatus) unsubscribeStatus();
-                if (unsubscribeShared) unsubscribeShared();
+                if (unsubscribePartnershipBooks1) unsubscribePartnershipBooks1();
+                if (unsubscribePartnershipBooks2) unsubscribePartnershipBooks2();
+                if (unsubscribeOwnBooks) unsubscribeOwnBooks();
                 if (!currentUser) return;
 
-                // Find libraries shared with me (Real-time)
-                unsubscribeShared = db.collection('collaborators')
-                    .where('collaboratorEmail', '==', currentUser.email.toLowerCase())
-                    .onSnapshot(sharedSnapshot => {
-                        const ownerIds = [currentUser.uid, ...sharedSnapshot.docs.map(doc => doc.data().ownerId)];
-
-                        if (unsubscribeBooks) unsubscribeBooks();
-                        unsubscribeBooks = db.collection('books')
-                            .where('userId', 'in', ownerIds.slice(0, 10))
-                            .onSnapshot(snapshot => {
-                                books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                                books.sort((a, b) => {
-                                    const timeA = a.createdAt?.toMillis() || 0;
-                                    const timeB = b.createdAt?.toMillis() || 0;
-                                    return timeB - timeA;
-                                });
-                                renderMainApp();
-                            }, err => {
-                                console.error("Firestore Error:", err);
-                            });
+                // Query partnerships where current user is userId1
+                unsubscribePartnershipBooks1 = db.collection('partnerships')
+                    .where('userId1', '==', currentUser.uid)
+                    .onSnapshot(snapshot => {
+                        allPartnerships = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        fetchBooksFromPartnerships();
+                    }, err => {
+                        console.error("Partnership Query 1 Error:", err);
                     });
+
+                // Query partnerships where current user is userId2
+                unsubscribePartnershipBooks2 = db.collection('partnerships')
+                    .where('userId2', '==', currentUser.uid)
+                    .onSnapshot(snapshot => {
+                        allPartnerships = [...allPartnerships.filter(p => p.userId1 === currentUser.uid), ...snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))];
+                        fetchBooksFromPartnerships();
+                    }, err => {
+                        console.error("Partnership Query 2 Error:", err);
+                    });
+
+                function fetchBooksFromPartnerships() {
+                    // Build list of user IDs to fetch books from
+                    let userIdsToFetch = [currentUser.uid];
+
+                    allPartnerships.forEach(partnership => {
+                        const isUser1 = partnership.userId1 === currentUser.uid;
+                        // Only include partner if current user hasn't unsubscribed
+                        const currentUserUnsubscribed = isUser1 ? partnership.user1Unsubscribed : partnership.user2Unsubscribed;
+                        if (!currentUserUnsubscribed) {
+                            const partnerId = isUser1 ? partnership.userId2 : partnership.userId1;
+                            if (!userIdsToFetch.includes(partnerId)) {
+                                userIdsToFetch.push(partnerId);
+                            }
+                        }
+                    });
+
+                    // Firestore 'in' query supports max 10 items
+                    if (unsubscribeOwnBooks) unsubscribeOwnBooks();
+                    unsubscribeOwnBooks = db.collection('books')
+                        .where('userId', 'in', userIdsToFetch.slice(0, 10))
+                        .onSnapshot(snapshot => {
+                            books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                            books.sort((a, b) => {
+                                const timeA = a.createdAt?.toMillis() || 0;
+                                const timeB = b.createdAt?.toMillis() || 0;
+                                return timeB - timeA;
+                            });
+                            renderMainApp();
+                        }, err => {
+                            console.error("Firestore Error:", err);
+                        });
+                }
 
                 // Use a collection group listener to get reading statuses for THIS user efficiently.
                 unsubscribeStatus = db.collectionGroup('readingStatus')
