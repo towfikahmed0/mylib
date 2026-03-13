@@ -1772,12 +1772,18 @@
                 }
 
                 // Use a collection group listener to get reading statuses for THIS user efficiently.
+                // Performance optimization: use docChanges() for incremental updates instead of re-processing the entire collection.
+                // This reduces the update complexity from O(N) to O(1) for most sync events.
                 unsubscribeStatus = db.collectionGroup('readingStatus')
                     .where('userId', '==', currentUser.uid)
                     .onSnapshot(snapshot => {
-                        snapshot.docs.forEach(doc => {
-                            const bookId = doc.ref.parent.parent.id;
-                            readingStatuses[bookId] = doc.data().status;
+                        snapshot.docChanges().forEach(change => {
+                            const bookId = change.doc.ref.parent.parent.id;
+                            if (change.type === 'removed') {
+                                delete readingStatuses[bookId];
+                            } else {
+                                readingStatuses[bookId] = change.doc.data().status;
+                            }
                         });
                         renderLibraryOnly();
                     }, err => {
