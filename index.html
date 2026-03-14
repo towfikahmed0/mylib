@@ -329,6 +329,21 @@
             const toastEl = document.getElementById('toast');
             const modalContainer = document.getElementById('modal-container');
 
+            // ---------- Utilities ----------
+
+            function getStatusData(bookId) {
+                const data = readingStatuses[bookId];
+                if (!data) return { status: 'want_to_read', rating: 0, progress: 0, comment: '' };
+                if (typeof data === 'string') return { status: data === 'unread' ? 'want_to_read' : data, rating: 0, progress: 0, comment: '' };
+
+                return {
+                    status: data.status === 'unread' ? 'want_to_read' : (data.status || 'want_to_read'),
+                    rating: data.rating || 0,
+                    progress: data.progress || 0,
+                    comment: data.comment || ''
+                };
+            }
+
             // ---------- Utility: Escape HTML ----------
             const escapeDiv = document.createElement('div');
             function escapeHTML(str) {
@@ -441,8 +456,8 @@
 
                     totalValue += (parseFloat(b.price) || 0);
 
-                    const rawStatus = readingStatuses[b.id] || 'want_to_read';
-                    const status = rawStatus === 'unread' ? 'want_to_read' : rawStatus;
+                    const statusData = getStatusData(b.id);
+                    const status = statusData.status;
                     if (statusCounts.hasOwnProperty(status)) statusCounts[status]++;
                 });
 
@@ -882,8 +897,8 @@
 
                 const statusCounts = { finished: 0, reading: 0, want_to_read: 0 };
                 books.forEach(b => {
-                    const rawStatus = readingStatuses[b.id] || 'want_to_read';
-                    const status = rawStatus === 'unread' ? 'want_to_read' : rawStatus;
+                    const statusData = getStatusData(b.id);
+                    const status = statusData.status;
                     if (statusCounts.hasOwnProperty(status)) statusCounts[status]++;
                 });
 
@@ -1078,8 +1093,8 @@
                         b.isbn?.toLowerCase().includes(searchLower) ||
                         (b.tags && b.tags.some(t => t.toLowerCase().includes(searchLower)));
 
-                    const rawStatus = readingStatuses[b.id] || 'want_to_read';
-                    const bookStatus = rawStatus === 'unread' ? 'want_to_read' : rawStatus;
+                    const statusData = getStatusData(b.id);
+                    const bookStatus = statusData.status;
 
                     const matchesStatus = statusFilter === 'all' || bookStatus === statusFilter;
                     const matchesCategory = categoryFilter === 'all' || bookGenres.includes(categoryFilter);
@@ -1842,10 +1857,13 @@
 
             // Helper to render a single book card
             function renderBookCard(book) {
-                const stars = book.rating ? '★'.repeat(book.rating) + '☆'.repeat(5 - book.rating) : '';
-                // Note: We could display averageRating here, but it would require pre-fetching or a more complex sync strategy.
-                const rawStatus = readingStatuses[book.id] || 'want_to_read';
-                const bookStatus = rawStatus === 'unread' ? 'want_to_read' : rawStatus;
+                const statusData = getStatusData(book.id);
+                const bookStatus = statusData.status;
+                const userRating = statusData.rating;
+                const userProgress = statusData.progress;
+
+                const stars = userRating ? '★'.repeat(userRating) + '☆'.repeat(5 - userRating) : (book.rating ? '★'.repeat(book.rating) + '☆'.repeat(5 - book.rating) : '');
+
                 const isSelected = selectedBookIds.has(book.id);
                 const bookGenres = getBookGenres(book);
                 const isSharedBook = book.userId !== currentUser.uid;
@@ -1920,9 +1938,9 @@
                         <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-6 h-6 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer">
                     </div>
                     <div class="w-28 h-40 bg-slate-100 dark:bg-slate-800 rounded-3xl overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 relative shadow-lg">
-                        ${bookStatus === 'reading' && book.progress ? `
+                        ${bookStatus === 'reading' ? `
                             <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-slate-200/50 z-10">
-                                <div class="h-full bg-blue-500" style="width: ${book.progress}%"></div>
+                                <div class="h-full bg-blue-500" style="width: ${userProgress || book.progress || 0}%"></div>
                             </div>
                         ` : ''}
                         ${book.coverUrl || book.thumbnail ?
@@ -2065,7 +2083,7 @@
                             if (change.type === 'removed') {
                                 delete readingStatuses[bookId];
                             } else {
-                                readingStatuses[bookId] = change.doc.data().status;
+                                readingStatuses[bookId] = change.doc.data();
                             }
                         });
                         renderLibraryOnly();
@@ -2552,6 +2570,8 @@
                                 .collection('readingStatus').doc(currentUser.uid).set({
                                     status: document.getElementById('man-status').value,
                                     rating: bookData.rating, // Sync book rating to per-user rating
+                                    progress: bookData.progress,
+                                    comment: bookData.comments,
                                     userId: currentUser.uid,
                                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                                 }, { merge: true });
@@ -2607,29 +2627,6 @@
                 const isAddingToSharedLibrary = targetUserId !== currentUser.uid;
 
                 try {
-                    // DEBUG LOGGING
-                    console.log('=== ADD BOOK TO FIRESTORE DEBUG ===');
-                    console.log('Current User ID:', currentUser.uid);
-                    console.log('Target Library Owner ID:', targetUserId);
-                    console.log('Is Adding to Shared Library:', isAddingToSharedLibrary);
-
-                    if (isAddingToSharedLibrary) {
-                        // Calculate partnership ID the same way as Firestore rules
-                        const partnershipId = currentUser.uid < targetUserId ?
-                            currentUser.uid + '_' + targetUserId :
-                            targetUserId + '_' + currentUser.uid;
-                        console.log('Partnership ID to check:', partnershipId);
-
-                        // Fetch and log partnership data
-                        const partnershipDoc = await db.collection('partnerships').doc(partnershipId).get();
-                        if (partnershipDoc.exists) {
-                            console.log('Partnership found:', partnershipDoc.data());
-                            console.log('allowAddBooks value:', partnershipDoc.data().allowAddBooks);
-                        } else {
-                            console.log('Partnership NOT found - this will cause permission denied');
-                        }
-                    }
-
                     // Check for duplicate in TARGET library (not current user's books)
                     const targetLibraryBooks = books.filter(b => b.userId === targetUserId);
                     const title = bookData.title?.trim().toLowerCase();
@@ -2658,6 +2655,8 @@
                             .collection('readingStatus').doc(currentUser.uid).set({
                                 status: status,
                                 rating: bookData.rating || 0,
+                                progress: bookData.progress || 0,
+                                comment: bookData.comments || '',
                                 userId: currentUser.uid,
                                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                             }, { merge: true });
@@ -2686,18 +2685,14 @@
 
                     delete finalData.readingStatus; // Don't store status on the book itself
 
-                    console.log('=== CREATING BOOK ===');
-                    console.log('Final book data to save:', finalData);
-                    console.log('Book will be created with userId:', finalData.userId);
-                    console.log('Current user creating:', currentUser.uid);
-
                     const docRef = await db.collection('books').add(finalData);
-                    console.log('✓ Book created successfully with ID:', docRef.id);
 
                     // Save per-user reading status in subcollection
                     await docRef.collection('readingStatus').doc(currentUser.uid).set({
                         status: status,
                         rating: finalData.rating || 0,
+                        progress: finalData.progress || 0,
+                        comment: finalData.comments || '',
                         userId: currentUser.uid,
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                     }, { merge: true });
@@ -2705,7 +2700,8 @@
                     showToast('Book added!', 'success');
 
                     // Track activity for everyone
-                    const targetUserName = allPartnershipsForUI?.find(p => p.uid === targetUserId)?.displayName || (targetUserId === currentUser.uid ? 'My' : 'Partner');
+                    const partner = allPartnershipsForUI?.find(p => (p.userId1 === targetUserId || p.userId2 === targetUserId) && (p.userId1 !== targetUserId || p.userId2 !== targetUserId));
+                    const targetUserName = targetUserId === currentUser.uid ? 'My' : 'Partner';
                     await db.collection('activityFeed').add({
                         type: 'book_added',
                         title: bookData.title || 'Unknown',
@@ -3166,15 +3162,21 @@
             });
 
             async function openBookDetails(book) {
-                const stars = book.rating ? '★'.repeat(book.rating) + '☆'.repeat(5 - book.rating) : '';
-                const rawStatus = readingStatuses[book.id] || 'want_to_read';
-                const bookStatus = rawStatus === 'unread' ? 'want_to_read' : rawStatus;
+                const statusData = getStatusData(book.id);
+                const bookStatus = statusData.status;
+                const userRating = statusData.rating;
+                const userComment = statusData.comment;
+                const userProgress = statusData.progress;
+
+                const stars = userRating ? '★'.repeat(userRating) + '☆'.repeat(5 - userRating) : (book.rating ? '★'.repeat(book.rating) + '☆'.repeat(5 - book.rating) : '');
+
                 const bookGenres = getBookGenres(book);
 
-                // Fetch current user's rating and comment for this book
+                // Re-fetch current user's rating and comment for this book to be sure
                 const userStatusDoc = await db.collection('books').doc(book.id).collection('readingStatus').doc(currentUser.uid).get();
-                const userRating = userStatusDoc.exists ? userStatusDoc.data().rating || 0 : 0;
-                const userComment = userStatusDoc.exists ? userStatusDoc.data().comment || '' : '';
+                const userRatingVal = userStatusDoc.exists ? userStatusDoc.data().rating || 0 : userRating;
+                const userCommentVal = userStatusDoc.exists ? userStatusDoc.data().comment || '' : userComment;
+                const userProgressVal = userStatusDoc.exists ? userStatusDoc.data().progress || 0 : userProgress;
 
                 // Fetch all ratings and comments for this book
                 const allStatusesSnapshot = await db.collection('books').doc(book.id).collection('readingStatus').get();
@@ -3241,7 +3243,7 @@
                                             <option value="finished" ${bookStatus === 'finished' ? 'selected' : ''}>Finished</option>
                                         </select>
                                         ${bookStatus === 'reading' ? `
-                                            <input id="detail-progress-input" type="number" min="0" max="100" value="${book.progress || 0}" class="w-20 px-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="%">
+                                            <input id="detail-progress-input" type="number" min="0" max="100" value="${userProgressVal}" class="w-20 px-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="%">
                                         ` : ''}
                                     </div>
                                 </div>
@@ -3255,14 +3257,14 @@
                                     <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">My Rating & Review</p>
                                     <div class="space-y-3">
                                         <select id="detail-rating-select" class="w-full px-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                                            <option value="0" ${userRating === 0 ? 'selected' : ''}>No Rating</option>
-                                            <option value="1" ${userRating === 1 ? 'selected' : ''}>1 Star</option>
-                                            <option value="2" ${userRating === 2 ? 'selected' : ''}>2 Stars</option>
-                                            <option value="3" ${userRating === 3 ? 'selected' : ''}>3 Star</option>
-                                            <option value="4" ${userRating === 4 ? 'selected' : ''}>4 Stars</option>
-                                            <option value="5" ${userRating === 5 ? 'selected' : ''}>5 Stars</option>
+                                            <option value="0" ${userRatingVal === 0 ? 'selected' : ''}>No Rating</option>
+                                            <option value="1" ${userRatingVal === 1 ? 'selected' : ''}>1 Star</option>
+                                            <option value="2" ${userRatingVal === 2 ? 'selected' : ''}>2 Stars</option>
+                                            <option value="3" ${userRatingVal === 3 ? 'selected' : ''}>3 Star</option>
+                                            <option value="4" ${userRatingVal === 4 ? 'selected' : ''}>4 Stars</option>
+                                            <option value="5" ${userRatingVal === 5 ? 'selected' : ''}>5 Stars</option>
                                         </select>
-                                        <textarea id="detail-comment-textarea" placeholder="What did you think of this book?" class="w-full px-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px]">${escapeHTML(userComment)}</textarea>
+                                        <textarea id="detail-comment-textarea" placeholder="What did you think of this book?" class="w-full px-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px]">${escapeHTML(userCommentVal)}</textarea>
                                         <button id="save-rating-btn" class="w-full py-2 bg-primary text-white text-[10px] font-black uppercase rounded-lg">Save Review</button>
                                     </div>
                                 </div>
@@ -3379,15 +3381,17 @@
                 document.getElementById('detail-status-select')?.addEventListener('change', async (e) => {
                     const newStatus = e.target.value;
                     try {
-                        await db.collection('books').doc(book.id)
-                            .collection('readingStatus').doc(currentUser.uid).set({
-                                status: newStatus,
-                                userId: currentUser.uid,
-                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                            }, { merge: true });
+                        const updateData = {
+                            status: newStatus,
+                            userId: currentUser.uid,
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        };
                         if (newStatus !== 'reading') {
-                            await db.collection('books').doc(book.id).update({ progress: firebase.firestore.FieldValue.delete() });
+                            updateData.progress = 0;
                         }
+                        await db.collection('books').doc(book.id)
+                            .collection('readingStatus').doc(currentUser.uid).set(updateData, { merge: true });
+
                         showToast('Status updated!', 'success');
                         close();
                         openBookDetails(books.find(b => b.id === book.id)); // refresh
@@ -3397,7 +3401,11 @@
                 document.getElementById('detail-progress-input')?.addEventListener('change', async (e) => {
                     const progress = parseInt(e.target.value) || 0;
                     try {
-                        await db.collection('books').doc(book.id).update({ progress });
+                        await db.collection('books').doc(book.id)
+                            .collection('readingStatus').doc(currentUser.uid).set({
+                                progress: progress,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            }, { merge: true });
                         showToast('Progress updated!', 'success');
                     } catch (err) { showToast('Error: ' + err.message, 'error'); }
                 });
