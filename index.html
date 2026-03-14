@@ -286,11 +286,11 @@
             const modalContainer = document.getElementById('modal-container');
 
             // ---------- Utility: Escape HTML ----------
+            const escapeDiv = document.createElement('div');
             function escapeHTML(str) {
                 if (!str) return '';
-                const div = document.createElement('div');
-                div.textContent = str;
-                return div.innerHTML;
+                escapeDiv.textContent = str;
+                return escapeDiv.innerHTML;
             }
 
             // ---------- Utility: Toast ----------
@@ -1135,19 +1135,23 @@
 
                 const libraryWrapper = document.getElementById('library-container-wrapper');
                 if (libraryWrapper) {
-                    // Separate and group books
-                    const myOwnBooks = filteredBooks.filter(b => b.userId === currentUser.uid && !b.addedBy);
-                    const booksAddedByOthers = filteredBooks.filter(b => b.userId === currentUser.uid && b.addedBy);
-                    const sharedFromPartners = filteredBooks.filter(b => b.userId !== currentUser.uid);
-
-                    // Group books added by others by their contributor
+                    // Performance optimization: Single-pass O(N) grouping of books
+                    const myOwnBooks = [];
+                    const sharedFromPartners = [];
                     const groupedByContributor = {};
-                    booksAddedByOthers.forEach(b => {
-                        const contributor = b.addedBy || 'unknown';
-                        if (!groupedByContributor[contributor]) {
-                            groupedByContributor[contributor] = [];
+
+                    filteredBooks.forEach(b => {
+                        if (b.userId !== currentUser.uid) {
+                            sharedFromPartners.push(b);
+                        } else if (!b.addedBy) {
+                            myOwnBooks.push(b);
+                        } else {
+                            const contributor = b.addedBy || 'unknown';
+                            if (!groupedByContributor[contributor]) {
+                                groupedByContributor[contributor] = [];
+                            }
+                            groupedByContributor[contributor].push(b);
                         }
-                        groupedByContributor[contributor].push(b);
                     });
 
                     let html = '';
