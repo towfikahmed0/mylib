@@ -314,6 +314,9 @@
                 }
             });
             let viewMode = localStorage.getItem('mylib_viewMode') || 'grid';
+            let defaultSort = localStorage.getItem('mylib_defaultSort') || 'newest';
+            let cardDensity = localStorage.getItem('mylib_density') || 'normal';
+            let readingGoal = parseInt(localStorage.getItem('mylib_readingGoal')) || 50;
             let sharedWithMe = [];         // UIDs of users who shared their library with me
             let activities = [];           // activity log for book additions
             let metadataCache = { authors: [], genres: [], owners: [] }; // Performance optimization: single-pass cache
@@ -321,7 +324,7 @@
 
             let searchQuery = '';
             let searchTimeout = null;
-            let sortBy = localStorage.getItem('mylib_sortBy') || localStorage.getItem('mylib_defaultSort') || 'newest';
+            let sortBy = localStorage.getItem('mylib_sortBy') || defaultSort;
             let statusFilter = localStorage.getItem('mylib_statusFilter') || 'all';
             let categoryFilter = 'all';
             let authorFilter = 'all';
@@ -349,18 +352,11 @@
             const modalContainer = document.getElementById('modal-container');
 
             // ---------- Utilities ----------
+            const DEFAULT_STATUS = Object.freeze({ status: 'want_to_read', rating: 0, progress: 0, comment: '' });
 
             function getStatusData(bookId) {
-                const data = readingStatuses[bookId];
-                if (!data) return { status: 'want_to_read', rating: 0, progress: 0, comment: '' };
-                if (typeof data === 'string') return { status: data === 'unread' ? 'want_to_read' : data, rating: 0, progress: 0, comment: '' };
-
-                return {
-                    status: data.status === 'unread' ? 'want_to_read' : (data.status || 'want_to_read'),
-                    rating: data.rating || 0,
-                    progress: data.progress || 0,
-                    comment: data.comment || ''
-                };
+                // Performance: Data is pre-normalized in the listener for O(1) lookup
+                return readingStatuses[bookId] || DEFAULT_STATUS;
             }
 
             let syncTimeout = null;
@@ -563,7 +559,7 @@
                             </div>
                             <div class="bg-amber-500 p-5 rounded-3xl text-white shadow-lg shadow-amber-200 dark:shadow-none">
                                 <div class="text-[10px] font-bold uppercase opacity-80 mb-1">Goal</div>
-                                <div class="text-2xl font-black font-serif">${statusCounts.finished} / ${localStorage.getItem('mylib_readingGoal') || 50}</div>
+                                <div class="text-2xl font-black font-serif">${statusCounts.finished} / ${readingGoal}</div>
                             </div>
                             <div class="bg-slate-100 dark:bg-slate-800 p-5 rounded-3xl border border-slate-200 dark:border-slate-700">
                                 <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Genres</div>
@@ -754,14 +750,14 @@
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
                                     <label for="pref-reading-goal" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Yearly Reading Goal</label>
-                                    <input id="pref-reading-goal" type="number" value="${localStorage.getItem('mylib_readingGoal') || 50}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-xs font-bold mt-1">
+                                    <input id="pref-reading-goal" type="number" value="${readingGoal}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-xs font-bold mt-1">
                                 </div>
                                 <div>
                                     <label for="pref-font-size" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Card Density</label>
                                     <select id="pref-card-density" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-xs font-bold mt-1">
-                                        <option value="relaxed" ${localStorage.getItem('mylib_density') === 'relaxed' ? 'selected' : ''}>Relaxed</option>
-                                        <option value="normal" ${!localStorage.getItem('mylib_density') || localStorage.getItem('mylib_density') === 'normal' ? 'selected' : ''}>Normal</option>
-                                        <option value="compact" ${localStorage.getItem('mylib_density') === 'compact' ? 'selected' : ''}>Tight</option>
+                                        <option value="relaxed" ${cardDensity === 'relaxed' ? 'selected' : ''}>Relaxed</option>
+                                        <option value="normal" ${cardDensity === 'normal' ? 'selected' : ''}>Normal</option>
+                                        <option value="compact" ${cardDensity === 'compact' ? 'selected' : ''}>Tight</option>
                                     </select>
                                 </div>
                             </div>
@@ -777,9 +773,9 @@
                                 <div>
                                     <label for="pref-default-sort" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Default Sort</label>
                                     <select id="pref-default-sort" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-xs font-bold mt-1">
-                                        <option value="newest" ${localStorage.getItem('mylib_defaultSort') === 'newest' ? 'selected' : ''}>Newest</option>
-                                        <option value="title" ${localStorage.getItem('mylib_defaultSort') === 'title' ? 'selected' : ''}>Title</option>
-                                        <option value="author" ${localStorage.getItem('mylib_defaultSort') === 'author' ? 'selected' : ''}>Author</option>
+                                        <option value="newest" ${defaultSort === 'newest' ? 'selected' : ''}>Newest</option>
+                                        <option value="title" ${defaultSort === 'title' ? 'selected' : ''}>Title</option>
+                                        <option value="author" ${defaultSort === 'author' ? 'selected' : ''}>Author</option>
                                     </select>
                                 </div>
                             </div>
@@ -997,7 +993,7 @@
                                     <div class="flex items-center gap-2">
                                         <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-widest">${currentUser.email}</p>
                                         <span class="text-[10px] text-slate-300">|</span>
-                                        <span class="text-[10px] font-black text-primary">${statusCounts.finished}/${localStorage.getItem('mylib_readingGoal') || 50}</span>
+                                        <span class="text-[10px] font-black text-primary">${statusCounts.finished}/${readingGoal}</span>
                                     </div>
                                 </div>
                             </div>
@@ -1240,7 +1236,7 @@
                     }
 
                     if (window.innerWidth < 768) {
-                        if (sortBy !== (localStorage.getItem('mylib_defaultSort') || 'newest')) activeCount++;
+                        if (sortBy !== defaultSort) activeCount++;
                         if (categoryFilter !== 'all') activeCount++;
                         if (statusFilter !== 'all') activeCount++;
                         if (authorFilter !== 'all') activeCount++;
@@ -1515,18 +1511,21 @@
                 });
                 document.getElementById('pref-default-sort')?.addEventListener('change', e => {
                     localStorage.setItem('mylib_defaultSort', e.target.value);
+                    defaultSort = e.target.value;
                     sortBy = e.target.value;
                     renderMainApp();
                 });
 
                 document.getElementById('pref-reading-goal')?.addEventListener('input', e => {
-                    localStorage.setItem('mylib_readingGoal', e.target.value);
-                    // No need to re-render everything immediately for every keystroke
+                    const val = parseInt(e.target.value) || 50;
+                    localStorage.setItem('mylib_readingGoal', val);
+                    readingGoal = val; // Update in-memory cache
                 });
                 document.getElementById('pref-reading-goal')?.addEventListener('blur', () => renderMainApp());
 
                 document.getElementById('pref-card-density')?.addEventListener('change', e => {
                     localStorage.setItem('mylib_density', e.target.value);
+                    cardDensity = e.target.value; // Update in-memory cache
                     renderMainApp();
                 });
 
@@ -2047,7 +2046,7 @@
                 `;
                 }
 
-                const densityClass = localStorage.getItem('mylib_density') === 'relaxed' ? 'density-relaxed' : localStorage.getItem('mylib_density') === 'compact' ? 'density-compact' : '';
+                const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
                 return `
                 <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-blue-100/50 dark:border-slate-800'} relative ${densityClass}" data-book-id="${book.id}">
                     <div class="absolute top-4 left-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -2233,7 +2232,14 @@
                             if (change.type === 'removed') {
                                 delete readingStatuses[bookId];
                             } else {
-                                readingStatuses[bookId] = change.doc.data();
+                                const data = change.doc.data();
+                                // Normalize data upon receipt to optimize render performance
+                                readingStatuses[bookId] = {
+                                    status: data.status === 'unread' ? 'want_to_read' : (data.status || 'want_to_read'),
+                                    rating: data.rating || 0,
+                                    progress: data.progress || 0,
+                                    comment: data.comment || ''
+                                };
                             }
                         });
                         renderLibraryOnly();
