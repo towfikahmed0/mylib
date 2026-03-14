@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Lib · PWA Library Manager</title>
+    <title>My Lib · Library Manager</title>
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/2232/2232688.png" type="image/x-icon">
     <!-- Primary Meta Tags -->
     <meta name="description"
         content="Manage your personal book collection with offline support, QR scanning, and cloud sync.">
@@ -100,8 +101,13 @@
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
-        .density-relaxed { padding: 2rem !important; }
-        .density-compact { padding: 0.75rem !important; }
+        .density-relaxed {
+            padding: 2rem !important;
+        }
+
+        .density-compact {
+            padding: 0.75rem !important;
+        }
 
         .book-card:hover {
             transform: translateY(-4px);
@@ -182,6 +188,18 @@
 
         :root {
             --primary-color: #3b82f6;
+        }
+
+        /* Utility class to prevent text selection on interactive elements like buttons or book cards */
+        .unselectable {
+            -webkit-user-select: none;
+            /* Safari */
+            -moz-user-select: none;
+            /* Firefox */
+            -ms-user-select: none;
+            /* Internet Explorer/Edge */
+            user-select: none;
+            /* Standard syntax */
         }
     </style>
 </head>
@@ -281,7 +299,7 @@
             let sharedWithMe = [];         // UIDs of users who shared their library with me
             let activities = [];           // activity log for book additions
             let metadataCache = { authors: [], genres: [], owners: [] }; // Performance optimization: single-pass cache
-            
+
             let searchQuery = '';
             let searchTimeout = null;
             let sortBy = localStorage.getItem('mylib_sortBy') || localStorage.getItem('mylib_defaultSort') || 'newest';
@@ -370,15 +388,6 @@
                                 <svg class="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
                                 Continue with Google
                             </button>
-                            <div class="relative">
-                                <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-200 dark:border-slate-700"></div></div>
-                                <div class="relative flex justify-center text-xs"><span class="px-4 bg-white dark:bg-slate-800 text-slate-400">or</span></div>
-                            </div>
-                            <form id="email-auth-form">
-                                <input type="email" id="email" placeholder="Email" class="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                                <input type="password" id="password" placeholder="Password" class="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-blue-900/30 transition active:scale-95">Sign In / Sign Up</button>
-                            </form>
                         </div>
                     </div>
                 </div>
@@ -646,10 +655,10 @@
                                 <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Accent Color</label>
                                 <div class="flex flex-wrap gap-3 mt-2">
                                     ${['blue', 'rose', 'emerald', 'amber', 'violet'].map(color => {
-                                        const bgClass = color === 'blue' ? 'bg-blue-500' : color === 'rose' ? 'bg-rose-500' : color === 'emerald' ? 'bg-emerald-500' : color === 'amber' ? 'bg-amber-500' : 'bg-violet-500';
-                                        const isSelected = (localStorage.getItem('mylib_accent') || 'blue') === color;
-                                        return `<button onclick="window.setAccent('${color}')" class="w-8 h-8 rounded-full ${bgClass} ${isSelected ? 'ring-4 ring-offset-2 ring-slate-300 dark:ring-slate-600' : ''}" title="${color.charAt(0).toUpperCase() + color.slice(1)}"></button>`;
-                                    }).join('')}
+                    const bgClass = color === 'blue' ? 'bg-blue-500' : color === 'rose' ? 'bg-rose-500' : color === 'emerald' ? 'bg-emerald-500' : color === 'amber' ? 'bg-amber-500' : 'bg-violet-500';
+                    const isSelected = (localStorage.getItem('mylib_accent') || 'blue') === color;
+                    return `<button onclick="window.setAccent('${color}')" class="w-8 h-8 rounded-full ${bgClass} ${isSelected ? 'ring-4 ring-offset-2 ring-slate-300 dark:ring-slate-600' : ''}" title="${color.charAt(0).toUpperCase() + color.slice(1)}"></button>`;
+                }).join('')}
                                 </div>
                             </div>
                             <div class="grid grid-cols-2 gap-4">
@@ -1848,11 +1857,11 @@
                         <div class="absolute inset-0 bg-blue-600/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl"></div>
                         <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm relative">
                             ${book.coverUrl || book.thumbnail ?
-                                `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-105" alt="cover">` :
-                                `<div class="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-blue-50 dark:bg-slate-800 text-blue-200 dark:text-slate-600">
+                            `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-105" alt="cover">` :
+                            `<div class="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-blue-50 dark:bg-slate-800 text-blue-200 dark:text-slate-600">
                                     <span class="text-[8px] font-black uppercase font-serif line-clamp-3">${book.title}</span>
                                 </div>`
-                            }
+                        }
                             <div class="absolute bottom-2 right-2 flex flex-col items-end gap-1">
                                 <div class="px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase text-white ${READING_STATUSES[bookStatus].badge.includes('emerald') ? 'bg-emerald-500' : READING_STATUSES[bookStatus].badge.includes('blue') ? 'bg-blue-500' : 'bg-slate-500'}">
                                     ${READING_STATUSES[bookStatus].label === 'Want to Read' ? 'WTR' : READING_STATUSES[bookStatus].label}
@@ -2068,7 +2077,7 @@
             // ---------- Scanner Logic ----------
             let scanner = null;
             let globalScanTargetLibrary = null; // Store globally for scanner flow
-            
+
             // Helper: Show library selector for scanner
             async function showLibrarySelectorForScan() {
                 const partnersWhoAllowAdding = allPartnershipsForUI.filter(p => p.allowAddBooks === true).map(p => {
@@ -2113,7 +2122,7 @@
                     const close = showModal(destHtml);
 
                     // Fetch partner names
-                    Promise.all(partnersWhoAllowAdding.map(p => 
+                    Promise.all(partnersWhoAllowAdding.map(p =>
                         db.collection('users').doc(p.userId).get()
                     )).then(docs => {
                         partnersWhoAllowAdding.forEach((p, idx) => {
@@ -2461,7 +2470,7 @@
                             `).join('');
 
                             // Fetch partner names
-                            Promise.all(partnersWhoAllowAdding.map(p => 
+                            Promise.all(partnersWhoAllowAdding.map(p =>
                                 db.collection('users').doc(p.userId).get()
                             )).then(docs => {
                                 partnersWhoAllowAdding.forEach((p, idx) => {
@@ -2603,14 +2612,14 @@
                     console.log('Current User ID:', currentUser.uid);
                     console.log('Target Library Owner ID:', targetUserId);
                     console.log('Is Adding to Shared Library:', isAddingToSharedLibrary);
-                    
+
                     if (isAddingToSharedLibrary) {
                         // Calculate partnership ID the same way as Firestore rules
-                        const partnershipId = currentUser.uid < targetUserId ? 
-                            currentUser.uid + '_' + targetUserId : 
+                        const partnershipId = currentUser.uid < targetUserId ?
+                            currentUser.uid + '_' + targetUserId :
                             targetUserId + '_' + currentUser.uid;
                         console.log('Partnership ID to check:', partnershipId);
-                        
+
                         // Fetch and log partnership data
                         const partnershipDoc = await db.collection('partnerships').doc(partnershipId).get();
                         if (partnershipDoc.exists) {
@@ -2620,7 +2629,7 @@
                             console.log('Partnership NOT found - this will cause permission denied');
                         }
                     }
-                    
+
                     // Check for duplicate in TARGET library (not current user's books)
                     const targetLibraryBooks = books.filter(b => b.userId === targetUserId);
                     const title = bookData.title?.trim().toLowerCase();
@@ -2669,19 +2678,19 @@
                         ...bookData,
                         userId: targetUserId
                     };
-                    
+
                     // Track who added the book if it's being added to someone else's library
                     if (isAddingToSharedLibrary) {
                         finalData.addedBy = currentUser.uid;
                     }
-                    
+
                     delete finalData.readingStatus; // Don't store status on the book itself
 
                     console.log('=== CREATING BOOK ===');
                     console.log('Final book data to save:', finalData);
                     console.log('Book will be created with userId:', finalData.userId);
                     console.log('Current user creating:', currentUser.uid);
-                    
+
                     const docRef = await db.collection('books').add(finalData);
                     console.log('✓ Book created successfully with ID:', docRef.id);
 
@@ -2694,7 +2703,7 @@
                     }, { merge: true });
 
                     showToast('Book added!', 'success');
-                    
+
                     // Track activity for everyone
                     const targetUserName = allPartnershipsForUI?.find(p => p.uid === targetUserId)?.displayName || (targetUserId === currentUser.uid ? 'My' : 'Partner');
                     await db.collection('activityFeed').add({
@@ -2708,31 +2717,31 @@
                         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                         bookId: docRef.id
                     });
-                    
+
                     return docRef.id;
                 } catch (err) {
                     console.error("=== SAVE ERROR ===");
                     console.error('Error message:', err.message);
                     console.error('Error code:', err.code);
                     console.error('Full error:', err);
-                    
+
                     // Enhanced debugging for permission errors
                     if (err.code === 'permission-denied') {
                         console.error('PERMISSION DENIED - Debugging info:');
                         console.error('- Trying to add book to userId:', targetUserId);
                         console.error('- Current user:', currentUser.uid);
                         console.error('- Is shared library:', isAddingToSharedLibrary);
-                        
+
                         if (isAddingToSharedLibrary) {
-                            const partnershipId = currentUser.uid < targetUserId ? 
-                                currentUser.uid + '_' + targetUserId : 
+                            const partnershipId = currentUser.uid < targetUserId ?
+                                currentUser.uid + '_' + targetUserId :
                                 targetUserId + '_' + currentUser.uid;
                             console.error('- Partnership ID:', partnershipId);
                             console.error('- Check Firestore: partnerships/' + partnershipId);
                             console.error('- Verify allowAddBooks field is set to true');
                         }
                     }
-                    
+
                     showToast('Error saving: ' + err.message, 'error');
                 }
             }
