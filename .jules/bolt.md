@@ -9,3 +9,7 @@
 ## 2025-05-25 - [DOM allocation and redundant grouping optimization]
 **Learning:** In a single-file SPA, repeated DOM allocations (like creating a div for escaping HTML) and multiple O(N) filter passes over a growing books array can cause noticeable stutter during renders and UI updates.
 **Action:** Reused a persistent DOM element for escaping and consolidated multiple filtering passes into a single O(N) grouping pass. This minimizes garbage collection and reduces CPU time for large lists.
+
+## 2026-03-14 - [Eager data normalization and preference caching]
+**Learning:** Repetitive synchronous calls to `localStorage.getItem` and complex data transformation logic in the render path (e.g., `getStatusData`) created a performance ceiling for large libraries. Normalizing data once at the source (Firestore listener) and using an in-memory cache for preferences significantly reduces the per-item overhead in render loops.
+**Action:** Move data transformation logic from render-time helpers to data ingestion listeners and initialize frequently used storage values as global variables in the application's IIFE scope.
