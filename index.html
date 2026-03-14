@@ -19,6 +19,7 @@
             theme: {
                 extend: {
                     colors: {
+                        primary: 'var(--primary-color)',
                         sepia: {
                             50: '#fbf0e3',
                             100: '#f7e4cf',
@@ -99,6 +100,9 @@
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
+        .density-relaxed { padding: 2rem !important; }
+        .density-compact { padding: 0.75rem !important; }
+
         .book-card:hover {
             transform: translateY(-4px);
             box-shadow: 0 20px 30px -10px rgba(59, 130, 246, 0.2);
@@ -174,6 +178,10 @@
         .dark .dropdown-item:hover {
             background: #334155;
             color: #60a5fa;
+        }
+
+        :root {
+            --primary-color: #3b82f6;
         }
     </style>
 </head>
@@ -354,7 +362,7 @@
                             <div class="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-blue-200 dark:shadow-blue-900/30">
                                 <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
                             </div>
-                            <h1 class="text-3xl font-black mt-4 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent font-serif italic">My Lib</h1>
+                            <h1 class="text-3xl font-black mt-4 bg-gradient-to-r from-primary to-indigo-600 bg-clip-text text-transparent font-serif italic">My Lib</h1>
                             <p class="text-slate-500 dark:text-slate-400 text-sm mt-1">Sign in to manage your library</p>
                         </div>
                         <div class="space-y-4">
@@ -438,7 +446,7 @@
                                 <label for="profile-display-name" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Display Name</label>
                                 <div class="flex flex-col sm:flex-row gap-2">
                                     <input id="profile-display-name" type="text" placeholder="Your Name" value="${escapeHTML(userProfile?.displayName || '')}" class="flex-1 min-w-0 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
-                                    <button id="save-profile-btn" class="sm:px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition active:scale-95 shadow-lg shadow-blue-200 dark:shadow-none">Save Profile</button>
+                                    <button id="save-profile-btn" class="sm:px-6 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 dark:shadow-none">Save Profile</button>
                                 </div>
                             </div>
                         </div>
@@ -448,17 +456,17 @@
                         <h2 class="text-2xl font-black mb-6 font-serif italic text-blue-600 dark:text-blue-400">Library Insights</h2>
 
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-                            <div class="bg-blue-600 p-5 rounded-3xl text-white shadow-lg shadow-blue-200 dark:shadow-none">
+                            <div class="bg-primary p-5 rounded-3xl text-white shadow-lg shadow-primary/20 dark:shadow-none">
                                 <div class="text-[10px] font-bold uppercase opacity-80 mb-1">Books</div>
                                 <div class="text-3xl font-black font-serif">${books.length}</div>
                             </div>
-                            <div class="bg-emerald-600 p-5 rounded-3xl text-white shadow-lg shadow-emerald-200 dark:shadow-none">
+                            <div class="bg-emerald-600 p-5 rounded-3xl text-white shadow-lg shadow-emerald-200 dark:shadow-none cursor-pointer" onclick="window.setTab('library'); window.clearAllFilters(); advancedFilters.minPrice = 0.01; renderLibraryOnly();">
                                 <div class="text-[10px] font-bold uppercase opacity-80 mb-1">Value</div>
                                 <div class="text-2xl font-black font-serif">$${Math.round(totalValue)}</div>
                             </div>
-                            <div class="bg-slate-100 dark:bg-slate-800 p-5 rounded-3xl border border-slate-200 dark:border-slate-700">
-                                <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Authors</div>
-                                <div class="text-2xl font-black font-serif">${Object.keys(authorsCount).length}</div>
+                            <div class="bg-amber-500 p-5 rounded-3xl text-white shadow-lg shadow-amber-200 dark:shadow-none">
+                                <div class="text-[10px] font-bold uppercase opacity-80 mb-1">Goal</div>
+                                <div class="text-2xl font-black font-serif">${statusCounts.finished} / ${localStorage.getItem('mylib_readingGoal') || 50}</div>
                             </div>
                             <div class="bg-slate-100 dark:bg-slate-800 p-5 rounded-3xl border border-slate-200 dark:border-slate-700">
                                 <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Genres</div>
@@ -546,7 +554,7 @@
                                 <label for="share-email" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Collaborator Email</label>
                                 <div class="flex flex-col sm:flex-row gap-2">
                                     <input id="share-email" type="email" placeholder="email@example.com" class="flex-1 min-w-0 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
-                                    <button id="save-sharing-btn" class="sm:px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition active:scale-95 shadow-lg shadow-blue-200 dark:shadow-none">Add Collaborator</button>
+                                    <button id="save-sharing-btn" class="sm:px-6 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 dark:shadow-none">Add Collaborator</button>
                                 </div>
                             </div>
                             <div id="collaborators-list" class="space-y-2">
@@ -629,9 +637,33 @@
                             <div>
                                 <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Theme Selection</label>
                                 <div class="grid grid-cols-3 gap-2 mt-1">
-                                    <button onclick="window.setTheme('light')" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') !== 'dark' && localStorage.getItem('mylib_theme') !== 'sepia' ? 'border-blue-600' : 'border-transparent'} bg-white text-slate-900 text-xs font-bold">Light</button>
-                                    <button onclick="window.setTheme('dark')" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'dark' ? 'border-blue-600' : 'border-transparent'} bg-slate-900 text-white text-xs font-bold">Dark</button>
-                                    <button onclick="window.setTheme('sepia')" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'sepia' ? 'border-blue-600' : 'border-transparent'} bg-sepia-100 text-sepia-900 text-xs font-bold">Sepia</button>
+                                    <button onclick="window.setTheme('light')" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') !== 'dark' && localStorage.getItem('mylib_theme') !== 'sepia' ? 'border-primary' : 'border-transparent'} bg-white text-slate-900 text-xs font-bold">Light</button>
+                                    <button onclick="window.setTheme('dark')" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'dark' ? 'border-primary' : 'border-transparent'} bg-slate-900 text-white text-xs font-bold">Dark</button>
+                                    <button onclick="window.setTheme('sepia')" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'sepia' ? 'border-primary' : 'border-transparent'} bg-sepia-100 text-sepia-900 text-xs font-bold">Sepia</button>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Accent Color</label>
+                                <div class="flex flex-wrap gap-3 mt-2">
+                                    ${['blue', 'rose', 'emerald', 'amber', 'violet'].map(color => {
+                                        const bgClass = color === 'blue' ? 'bg-blue-500' : color === 'rose' ? 'bg-rose-500' : color === 'emerald' ? 'bg-emerald-500' : color === 'amber' ? 'bg-amber-500' : 'bg-violet-500';
+                                        const isSelected = (localStorage.getItem('mylib_accent') || 'blue') === color;
+                                        return `<button onclick="window.setAccent('${color}')" class="w-8 h-8 rounded-full ${bgClass} ${isSelected ? 'ring-4 ring-offset-2 ring-slate-300 dark:ring-slate-600' : ''}" title="${color.charAt(0).toUpperCase() + color.slice(1)}"></button>`;
+                                    }).join('')}
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label for="pref-reading-goal" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Yearly Reading Goal</label>
+                                    <input id="pref-reading-goal" type="number" value="${localStorage.getItem('mylib_readingGoal') || 50}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-xs font-bold mt-1">
+                                </div>
+                                <div>
+                                    <label for="pref-font-size" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Card Density</label>
+                                    <select id="pref-card-density" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-xs font-bold mt-1">
+                                        <option value="relaxed" ${localStorage.getItem('mylib_density') === 'relaxed' ? 'selected' : ''}>Relaxed</option>
+                                        <option value="normal" ${!localStorage.getItem('mylib_density') || localStorage.getItem('mylib_density') === 'normal' ? 'selected' : ''}>Normal</option>
+                                        <option value="compact" ${localStorage.getItem('mylib_density') === 'compact' ? 'selected' : ''}>Tight</option>
+                                    </select>
                                 </div>
                             </div>
                             <div class="grid grid-cols-2 gap-4">
@@ -640,6 +672,7 @@
                                     <select id="pref-default-view" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-xs font-bold mt-1">
                                         <option value="grid" ${localStorage.getItem('mylib_viewMode') === 'grid' ? 'selected' : ''}>Grid</option>
                                         <option value="list" ${localStorage.getItem('mylib_viewMode') === 'list' ? 'selected' : ''}>List</option>
+                                <option value="compact" ${localStorage.getItem('mylib_viewMode') === 'compact' ? 'selected' : ''}>Compact</option>
                                     </select>
                                 </div>
                                 <div>
@@ -673,6 +706,11 @@
                     <button id="logout-btn" class="w-full p-4 bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 rounded-2xl font-bold hover:bg-rose-100 dark:hover:bg-rose-900/20 transition">
                         Sign Out
                     </button>
+
+                                    <div class="pt-8 border-t border-slate-100 dark:border-slate-800 text-center">
+                                        <p class="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-4">Legacy Data</p>
+                                        <button onclick="window.runDataMigration()" class="text-xs font-bold text-slate-500 hover:text-primary transition-colors underline">Migrate Default Library Data</button>
+                                    </div>
                 </div>
             `;
             }
@@ -833,6 +871,13 @@
             function renderMainApp() {
                 if (!currentUser) return;
 
+                const statusCounts = { finished: 0, reading: 0, want_to_read: 0 };
+                books.forEach(b => {
+                    const rawStatus = readingStatuses[b.id] || 'want_to_read';
+                    const status = rawStatus === 'unread' ? 'want_to_read' : rawStatus;
+                    if (statusCounts.hasOwnProperty(status)) statusCounts[status]++;
+                });
+
                 // Only rebuild the whole app shell if we've switched tabs or the container is empty
                 if (!appEl.querySelector('header') || (activeTab === 'settings' && !appEl.querySelector('#logout-btn')) || (activeTab !== 'settings' && appEl.querySelector('#logout-btn'))) {
                     appEl.innerHTML = `
@@ -840,26 +885,31 @@
                     <header class="sticky top-0 z-40 glass border-b border-slate-200 dark:border-slate-800">
                         <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
                             <div class="flex items-center gap-3 flex-shrink-0">
-                                <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 dark:shadow-blue-900/30">
+                                <div class="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 dark:shadow-primary/10">
                                     <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
                                 </div>
                                 <div class="hidden sm:block">
-                                    <h1 class="text-lg font-black tracking-tight leading-tight font-serif">My Lib</h1>
-                                    <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-widest">${currentUser.email}</p>
+                                    <h1 class="text-lg font-black tracking-tight leading-tight font-serif text-primary">My Lib</h1>
+                                    <div class="flex items-center gap-2">
+                                        <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-widest">${currentUser.email}</p>
+                                        <span class="text-[10px] text-slate-300">|</span>
+                                        <span class="text-[10px] font-black text-primary">${statusCounts.finished}/${localStorage.getItem('mylib_readingGoal') || 50}</span>
+                                    </div>
                                 </div>
                             </div>
                             <div class="flex-1"></div>
                             <nav class="hidden md:flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                                <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'library' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700'}">Library</button>
-                                <button onclick="window.setTab('wishlist')" ${activeTab === 'wishlist' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'wishlist' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700'}">Wishlist</button>
-                                <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'activity' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700'}">Activity</button>
-                                <button onclick="window.setTab('settings')" ${activeTab === 'settings' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'settings' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-700'}">Settings</button>
+                                <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'library' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Library</button>
+                                <button onclick="window.setTab('wishlist')" ${activeTab === 'wishlist' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'wishlist' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Wishlist</button>
+                                <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'activity' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Activity</button>
+                                <button onclick="window.setTab('recommendations')" ${activeTab === 'recommendations' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'recommendations' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">AI</button>
+                                <button onclick="window.setTab('settings')" ${activeTab === 'settings' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'settings' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Settings</button>
                             </nav>
                             <div class="flex items-center gap-1">
                                 <button id="manual-add-btn" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500" title="Add Book Manually" aria-label="Add Book Manually">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                 </button>
-                                <button id="scan-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-full text-sm font-bold flex items-center gap-2 transition-all shadow-md active:scale-95" aria-label="Scan QR or Barcode" title="Scan QR or Barcode">
+                                <button id="scan-btn" class="bg-primary hover:opacity-90 text-white px-5 py-2.5 rounded-full text-sm font-bold flex items-center gap-2 transition-all shadow-md active:scale-95" aria-label="Scan QR or Barcode" title="Scan QR or Barcode">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                     <span class="hidden lg:inline">Scan</span>
                                 </button>
@@ -868,19 +918,23 @@
                     </header>
                     <main id="main-content" class="max-w-6xl mx-auto p-6 pb-32 w-full flex-1"></main>
                     <nav id="mobile-nav" class="md:hidden fixed bottom-0 left-0 right-0 glass border-t border-slate-200 dark:border-slate-800 px-3 py-3 grid grid-cols-4 gap-2 z-40">
-                        <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'library' ? 'text-blue-600' : 'text-slate-400'}">
+                        <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'library' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></svg>
                             <span class="text-[9px] font-bold">Library</span>
                         </button>
-                        <button onclick="window.setTab('wishlist')" ${activeTab === 'wishlist' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'wishlist' ? 'text-blue-600' : 'text-slate-400'}">
+                        <button onclick="window.setTab('wishlist')" ${activeTab === 'wishlist' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'wishlist' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                             <span class="text-[9px] font-bold">Wishlist</span>
                         </button>
-                        <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'activity' ? 'text-blue-600' : 'text-slate-400'}">
+                        <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'activity' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             <span class="text-[9px] font-bold">Activity</span>
                         </button>
-                        <button onclick="window.setTab('settings')" ${activeTab === 'settings' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'settings' ? 'text-blue-600' : 'text-slate-400'}">
+                        <button onclick="window.setTab('recommendations')" ${activeTab === 'recommendations' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'recommendations' ? 'text-primary' : 'text-slate-400'}">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                            <span class="text-[9px] font-bold">AI</span>
+                        </button>
+                        <button onclick="window.setTab('settings')" ${activeTab === 'settings' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'settings' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                             <span class="text-[9px] font-bold">Settings</span>
                         </button>
@@ -896,6 +950,9 @@
                 } else if (activeTab === 'activity') {
                     mainContentEl.innerHTML = renderActivity();
                     attachActivityListeners();
+                } else if (activeTab === 'recommendations') {
+                    mainContentEl.innerHTML = renderRecommendations();
+                    attachRecommendationsListeners();
                 } else {
                     if (!document.getElementById('search-input')) {
                         mainContentEl.innerHTML = `
@@ -904,6 +961,7 @@
                             <div class="relative group flex-1">
                                 <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                                 <input id="search-input" type="text" placeholder="Smart search by title, author, genre..." value="${searchQuery}" class="w-full pl-12 pr-14 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-[1.5rem] text-lg transition-all outline-none shadow-sm" aria-label="Search books">
+                                <div id="search-hint" class="absolute right-12 top-1/2 -translate-y-1/2 px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded text-[10px] font-bold text-slate-400 pointer-events-none transition-opacity duration-300 ${searchQuery ? 'opacity-0' : ''}">/</div>
                                 <button id="clear-search-btn" class="${searchQuery ? '' : 'hidden'} absolute right-4 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors" aria-label="Clear search">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                                 </button>
@@ -911,6 +969,7 @@
                             <button id="advanced-search-btn" class="px-6 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[1.5rem] font-bold text-slate-500 hover:text-blue-600 transition-all shadow-sm flex items-center gap-2" aria-label="Open Advanced Filters">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
                                 <span class="hidden sm:inline">Filters</span>
+                                <span id="filter-dot" class="hidden w-2 h-2 bg-blue-500 rounded-full"></span>
                             </button>
                         </div>
                         <div id="bulk-actions-bar" class="mb-6 hidden animate-slide-up">
@@ -940,10 +999,17 @@
                         searchInput.addEventListener('input', e => {
                             searchQuery = e.target.value;
                             document.getElementById('clear-search-btn').classList.toggle('hidden', !searchQuery);
+                            if (searchHint) searchHint.classList.toggle('opacity-0', !!searchQuery);
                             if (searchTimeout) clearTimeout(searchTimeout);
                             searchTimeout = setTimeout(() => {
                                 renderLibraryOnly();
                             }, 150);
+                        });
+                        searchInput.addEventListener('focus', () => {
+                            if (searchHint) searchHint.classList.add('opacity-0');
+                        });
+                        searchInput.addEventListener('blur', () => {
+                            if (searchHint && !searchQuery) searchHint.classList.remove('opacity-0');
                         });
                         document.getElementById('clear-search-btn').addEventListener('click', () => {
                             searchQuery = '';
@@ -1034,22 +1100,41 @@
                         const timeB = b.createdAt?.toMillis() || 0;
                         return timeB - timeA;
                     }
+                    if (sortBy === 'oldest') {
+                        const timeA = a.createdAt?.toMillis() || 0;
+                        const timeB = b.createdAt?.toMillis() || 0;
+                        return timeA - timeB;
+                    }
                     return 0;
                 });
 
                 const activeFiltersContainer = document.getElementById('active-filters-bar');
                 if (activeFiltersContainer) {
                     let html = '';
+                    let activeCount = 0;
                     if (advancedFilters.rating !== 'all') {
                         html += `<span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-bold flex items-center gap-2">${advancedFilters.rating} Stars <button onclick="window.clearAdvancedFilter('rating')">×</button></span>`;
+                        activeCount++;
                     }
                     if (advancedFilters.minPrice || advancedFilters.maxPrice) {
                         html += `<span class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold flex items-center gap-2">$${advancedFilters.minPrice || 0} - $${advancedFilters.maxPrice || '∞'} <button onclick="window.clearAdvancedFilter('price')">×</button></span>`;
+                        activeCount++;
                     }
                     if (advancedFilters.startDate || advancedFilters.endDate) {
                         html += `<span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold flex items-center gap-2">Date Range <button onclick="window.clearAdvancedFilter('date')">×</button></span>`;
+                        activeCount++;
                     }
+
+                    if (window.innerWidth < 768) {
+                        if (sortBy !== (localStorage.getItem('mylib_defaultSort') || 'newest')) activeCount++;
+                        if (categoryFilter !== 'all') activeCount++;
+                        if (statusFilter !== 'all') activeCount++;
+                        if (authorFilter !== 'all') activeCount++;
+                        if (ownerFilter !== 'all') activeCount++;
+                    }
+
                     activeFiltersContainer.innerHTML = html;
+                    document.getElementById('filter-dot')?.classList.toggle('hidden', activeCount === 0);
                 }
 
                 const bulkBar = document.getElementById('bulk-actions-bar');
@@ -1095,12 +1180,13 @@
                     controlsBar.innerHTML = `
                     <div class="mb-8">
                         <!-- Filter card for mobile/desktop -->
-                        <div class="glass rounded-2xl p-4 border border-slate-200 dark:border-slate-700 mb-6">
+                        <div class="glass rounded-2xl p-4 border border-slate-200 dark:border-slate-700 mb-6 hidden md:block">
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
                                 <div class="flex flex-col gap-2">
                                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sort by</span>
                                     <select id="sort-select" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
                                         <option value="newest" ${sortBy === 'newest' ? 'selected' : ''}>Recently Added</option>
+                                        <option value="oldest" ${sortBy === 'oldest' ? 'selected' : ''}>Oldest First</option>
                                         <option value="title" ${sortBy === 'title' ? 'selected' : ''}>Title (A-Z)</option>
                                         <option value="author" ${sortBy === 'author' ? 'selected' : ''}>Author</option>
                                     </select>
@@ -1153,6 +1239,9 @@
                                 <button id="grid-view-btn" class="p-2 rounded-lg transition ${viewMode === 'grid' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}" aria-label="Grid view">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                                 </button>
+                                <button id="compact-view-btn" class="p-2 rounded-lg transition ${viewMode === 'compact' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}" aria-label="Compact grid view">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
+                                </button>
                                 <button id="list-view-btn" class="p-2 rounded-lg transition ${viewMode === 'list' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}" aria-label="List view">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
                                 </button>
@@ -1191,7 +1280,7 @@
                         html += `
                         <div>
                             <h2 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200">My Books (${myOwnBooks.length})</h2>
-                            <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'flex flex-col gap-3'}">
+                            <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3'}">
                                 ${myOwnBooks.map(book => renderBookCard(book)).join('')}
                             </div>
                         </div>
@@ -1206,7 +1295,7 @@
                                 <h3 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200" data-contributor-id="${contributorId}">
                                     Shared with Me by <span data-name="loading...">loading...</span> (${books.length})
                                 </h3>
-                                <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'flex flex-col gap-3'}">
+                                <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3'}">
                                     ${books.map(book => renderBookCard(book)).join('')}
                                 </div>
                             </div>
@@ -1219,7 +1308,7 @@
                         html += `
                         <div ${(myOwnBooks.length > 0 || Object.keys(groupedByContributor).length > 0) ? 'class="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800"' : ''}>
                             <h2 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200">Shared with Me (${sharedFromPartners.length})</h2>
-                            <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'flex flex-col gap-3'}">
+                            <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3'}">
                                 ${sharedFromPartners.map(book => renderBookCard(book)).join('')}
                             </div>
                         </div>
@@ -1304,6 +1393,17 @@
                 document.getElementById('pref-default-sort')?.addEventListener('change', e => {
                     localStorage.setItem('mylib_defaultSort', e.target.value);
                     sortBy = e.target.value;
+                    renderMainApp();
+                });
+
+                document.getElementById('pref-reading-goal')?.addEventListener('input', e => {
+                    localStorage.setItem('mylib_readingGoal', e.target.value);
+                    // No need to re-render everything immediately for every keystroke
+                });
+                document.getElementById('pref-reading-goal')?.addEventListener('blur', () => renderMainApp());
+
+                document.getElementById('pref-card-density')?.addEventListener('change', e => {
+                    localStorage.setItem('mylib_density', e.target.value);
                     renderMainApp();
                 });
 
@@ -1408,6 +1508,11 @@
                     localStorage.setItem('mylib_viewMode', 'grid');
                     renderLibraryOnly();
                 });
+                document.getElementById('compact-view-btn')?.addEventListener('click', () => {
+                    viewMode = 'compact';
+                    localStorage.setItem('mylib_viewMode', 'compact');
+                    renderLibraryOnly();
+                });
                 document.getElementById('list-view-btn')?.addEventListener('click', () => {
                     viewMode = 'list';
                     localStorage.setItem('mylib_viewMode', 'list');
@@ -1442,6 +1547,23 @@
                 renderMainApp(); // Re-render to update border classes
             };
 
+            window.setAccent = (color) => {
+                const colors = {
+                    blue: '#3b82f6',
+                    rose: '#f43f5e',
+                    emerald: '#10b981',
+                    amber: '#f59e0b',
+                    violet: '#8b5cf6'
+                };
+                const primary = colors[color] || colors.blue;
+                document.documentElement.style.setProperty('--primary-color', primary);
+                localStorage.setItem('mylib_accent', color);
+                renderMainApp();
+            };
+
+            // Initialize accent on load
+            window.setAccent(localStorage.getItem('mylib_accent') || 'blue');
+
             window.toggleSelection = (id) => {
                 if (selectedBookIds.has(id)) selectedBookIds.delete(id);
                 else selectedBookIds.add(id);
@@ -1468,10 +1590,54 @@
             };
 
             function openAdvancedSearch() {
+                const isMobile = window.innerWidth < 768;
                 const modalHtml = `
-                <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up">
+                <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up overflow-y-auto max-h-[90vh]">
                     <h2 class="text-2xl font-black mb-6 font-serif italic">Advanced Filters</h2>
                     <div class="space-y-6">
+                        ${isMobile ? `
+                        <div class="grid grid-cols-1 gap-4 pb-6 border-b border-slate-100 dark:border-slate-800">
+                            <div>
+                                <label for="adv-sort" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Sort by</label>
+                                <select id="adv-sort" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none">
+                                    <option value="newest" ${sortBy === 'newest' ? 'selected' : ''}>Recently Added</option>
+                                    <option value="oldest" ${sortBy === 'oldest' ? 'selected' : ''}>Oldest First</option>
+                                    <option value="title" ${sortBy === 'title' ? 'selected' : ''}>Title (A-Z)</option>
+                                    <option value="author" ${sortBy === 'author' ? 'selected' : ''}>Author</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="adv-genre" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Genre</label>
+                                <select id="adv-genre" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none">
+                                    <option value="all" ${categoryFilter === 'all' ? 'selected' : ''}>All Genres</option>
+                                    ${metadataCache.genres.map(cat => `<option value="${cat}" ${categoryFilter === cat ? 'selected' : ''}>${cat}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label for="adv-status" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Status</label>
+                                <select id="adv-status" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none">
+                                    <option value="all" ${statusFilter === 'all' ? 'selected' : ''}>All</option>
+                                    <option value="want_to_read" ${statusFilter === 'want_to_read' ? 'selected' : ''}>Want to Read</option>
+                                    <option value="reading" ${statusFilter === 'reading' ? 'selected' : ''}>Reading</option>
+                                    <option value="finished" ${statusFilter === 'finished' ? 'selected' : ''}>Finished</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="adv-author" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Author</label>
+                                <select id="adv-author" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none">
+                                    <option value="all" ${authorFilter === 'all' ? 'selected' : ''}>All Authors</option>
+                                    ${metadataCache.authors.map(author => `<option value="${author}" ${authorFilter === author ? 'selected' : ''}>${author}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label for="adv-owner" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Owner</label>
+                                <select id="adv-owner" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none">
+                                    <option value="all" ${ownerFilter === 'all' ? 'selected' : ''}>All Owners</option>
+                                    ${metadataCache.owners.map(owner => `<option value="${owner}" ${ownerFilter === owner ? 'selected' : ''}>${owner}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                        ` : ''}
                         <div>
                             <label for="adv-rating" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Minimum Rating</label>
                             <select id="adv-rating" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none">
@@ -1501,7 +1667,7 @@
                     </div>
                     <div class="flex gap-4 mt-8">
                         <button data-close class="flex-1 px-4 py-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold">Cancel</button>
-                        <button id="apply-filters" class="flex-1 px-4 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200">Apply</button>
+                        <button id="apply-filters" class="flex-1 px-4 py-4 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20">Apply</button>
                     </div>
                 </div>
             `;
@@ -1513,6 +1679,17 @@
                     advancedFilters.maxPrice = document.getElementById('adv-max-price').value ? parseFloat(document.getElementById('adv-max-price').value) : null;
                     advancedFilters.startDate = document.getElementById('adv-start-date').value || null;
                     advancedFilters.endDate = document.getElementById('adv-end-date').value || null;
+
+                    if (isMobile) {
+                        sortBy = document.getElementById('adv-sort').value;
+                        categoryFilter = document.getElementById('adv-genre').value;
+                        statusFilter = document.getElementById('adv-status').value;
+                        authorFilter = document.getElementById('adv-author').value;
+                        ownerFilter = document.getElementById('adv-owner').value;
+                        localStorage.setItem('mylib_sortBy', sortBy);
+                        localStorage.setItem('mylib_statusFilter', statusFilter);
+                    }
+
                     renderLibraryOnly();
                     close();
                 });
@@ -1627,11 +1804,12 @@
                 });
             }
 
+            const GENRE_FALLBACK = ['Other'];
             // Helper to get book genres as an array
             function getBookGenres(book) {
                 if (Array.isArray(book.categories)) return book.categories;
                 if (book.category) return [book.category];
-                return ['Other'];
+                return GENRE_FALLBACK;
             }
 
             // Performance optimization: Update metadata cache in a single pass over the books array
@@ -1662,7 +1840,35 @@
                 const isSelected = selectedBookIds.has(book.id);
                 const bookGenres = getBookGenres(book);
                 const isSharedBook = book.userId !== currentUser.uid;
-                const addedByBadge = book.addedBy && book.addedBy !== currentUser.uid ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">Added by contributor</div>` : '';
+                const addedByBadge = book.addedBy && book.addedBy !== currentUser.uid ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">Added by contributor</div>` : '';
+
+                if (viewMode === 'compact') {
+                    return `
+                    <div class="book-card relative group cursor-pointer" data-book-id="${book.id}">
+                        <div class="absolute inset-0 bg-blue-600/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl"></div>
+                        <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm relative">
+                            ${book.coverUrl || book.thumbnail ?
+                                `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-105" alt="cover">` :
+                                `<div class="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-blue-50 dark:bg-slate-800 text-blue-200 dark:text-slate-600">
+                                    <span class="text-[8px] font-black uppercase font-serif line-clamp-3">${book.title}</span>
+                                </div>`
+                            }
+                            <div class="absolute bottom-2 right-2 flex flex-col items-end gap-1">
+                                <div class="px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase text-white ${READING_STATUSES[bookStatus].badge.includes('emerald') ? 'bg-emerald-500' : READING_STATUSES[bookStatus].badge.includes('blue') ? 'bg-blue-500' : 'bg-slate-500'}">
+                                    ${READING_STATUSES[bookStatus].label === 'Want to Read' ? 'WTR' : READING_STATUSES[bookStatus].label}
+                                </div>
+                            </div>
+                            <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-5 h-5 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer">
+                            </div>
+                        </div>
+                        <div class="mt-2 px-1">
+                            <h4 class="text-[10px] font-black font-serif truncate leading-tight">${book.title}</h4>
+                            <p class="text-[9px] text-slate-400 truncate">${book.author || 'Unknown'}</p>
+                        </div>
+                    </div>
+                    `;
+                }
 
                 if (viewMode === 'list') {
                     return `
@@ -1698,8 +1904,9 @@
                 `;
                 }
 
+                const densityClass = localStorage.getItem('mylib_density') === 'relaxed' ? 'density-relaxed' : localStorage.getItem('mylib_density') === 'compact' ? 'density-compact' : '';
                 return `
-                <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-blue-500 ring-4 ring-blue-500/10 shadow-xl' : 'border-blue-100/50 dark:border-slate-800'} relative" data-book-id="${book.id}">
+                <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-blue-100/50 dark:border-slate-800'} relative ${densityClass}" data-book-id="${book.id}">
                     <div class="absolute top-4 left-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
                         <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-6 h-6 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer">
                     </div>
@@ -1720,7 +1927,7 @@
                     <div class="flex-1 flex flex-col justify-between overflow-hidden py-1">
                         <div>
                             <div class="flex justify-between items-start gap-2">
-                                <span class="text-[9px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400 truncate max-w-[150px]">${bookGenres.join(', ')}</span>
+                                <span class="text-[9px] font-black uppercase tracking-widest text-primary truncate max-w-[150px]">${bookGenres.join(', ')}</span>
                                 <div class="text-amber-400 text-[10px] tracking-tighter">${stars}</div>
                             </div>
                             <h3 class="font-black text-lg leading-tight line-clamp-2 mt-1 group-hover:text-blue-600 transition-colors font-serif italic">${book.title}</h3>
@@ -1755,6 +1962,7 @@
             let unsubscribePartnershipBooks1 = null;
             let unsubscribePartnershipBooks2 = null;
             let unsubscribeOwnBooks = null;
+            let unsubscribeActivity = null;
             let allPartnerships = [];
 
             async function subscribeToBooks() {
@@ -1763,6 +1971,7 @@
                 if (unsubscribePartnershipBooks1) unsubscribePartnershipBooks1();
                 if (unsubscribePartnershipBooks2) unsubscribePartnershipBooks2();
                 if (unsubscribeOwnBooks) unsubscribeOwnBooks();
+                if (unsubscribeActivity) unsubscribeActivity();
                 if (!currentUser) return;
 
                 // Query partnerships where current user is userId1
@@ -1816,6 +2025,23 @@
                             renderMainApp();
                         }, err => {
                             console.error("Firestore Error:", err);
+                        });
+
+                    // Subscribe to activity feed for these libraries
+                    if (unsubscribeActivity) unsubscribeActivity();
+                    unsubscribeActivity = db.collection('activityFeed')
+                        .where('libraryId', 'in', userIdsToFetch.slice(0, 10))
+                        .orderBy('timestamp', 'desc')
+                        .limit(30)
+                        .onSnapshot(snapshot => {
+                            activities = snapshot.docs.map(doc => ({
+                                id: doc.id,
+                                ...doc.data(),
+                                timestamp: doc.data().timestamp?.toDate() || new Date()
+                            }));
+                            if (activeTab === 'activity') renderMainApp();
+                        }, err => {
+                            console.error("Activity Listener Error:", err);
                         });
                 }
 
@@ -2469,20 +2695,19 @@
 
                     showToast('Book added!', 'success');
                     
-                    // Track activity if book was added to shared library
-                    if (isAddingToSharedLibrary) {
-                        const targetUserName = allPartnershipsForUI?.find(p => p.uid === targetUserId)?.displayName || 'User';
-                        activities.unshift({
-                            type: 'book_added',
-                            title: bookData.title || 'Unknown',
-                            author: bookData.author || 'Unknown',
-                            addedBy: currentUser.email || currentUser.uid,
-                            addedTo: targetUserName,
-                            addedToId: targetUserId,
-                            timestamp: new Date(),
-                            bookId: docRef.id
-                        });
-                    }
+                    // Track activity for everyone
+                    const targetUserName = allPartnershipsForUI?.find(p => p.uid === targetUserId)?.displayName || (targetUserId === currentUser.uid ? 'My' : 'Partner');
+                    await db.collection('activityFeed').add({
+                        type: 'book_added',
+                        title: bookData.title || 'Unknown',
+                        author: bookData.author || 'Unknown',
+                        addedBy: currentUser.displayName || currentUser.email || currentUser.uid,
+                        addedById: currentUser.uid,
+                        addedTo: targetUserName,
+                        libraryId: targetUserId,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        bookId: docRef.id
+                    });
                     
                     return docRef.id;
                 } catch (err) {
@@ -2537,7 +2762,7 @@
                                     </p>
                                     <p class="text-sm text-slate-600 dark:text-slate-400">by ${escapeHTML(activity.author)}</p>
                                     <p class="text-xs text-slate-500 dark:text-slate-500 mt-2">
-                                        Added to ${escapeHTML(activity.addedTo)}'s library
+                                        Added to ${activity.addedTo === 'My' ? 'My Library' : escapeHTML(activity.addedTo) + '\'s library'}
                                     </p>
                                     <p class="text-xs text-slate-400 dark:text-slate-600 mt-1">${formatDate(activity.timestamp)}</p>
                                 </div>
@@ -2570,6 +2795,135 @@
 
                 return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
             }
+
+            let recommendations = [];
+            let loadingRecommendations = false;
+
+            function renderRecommendations() {
+                if (loadingRecommendations) {
+                    return `
+                    <div class="flex flex-col items-center justify-center py-32 text-center">
+                        <div class="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mb-6"></div>
+                        <h2 class="text-xl font-black font-serif italic">AI is exploring the library...</h2>
+                        <p class="text-slate-400 mt-2">Finding books you might love based on your collection.</p>
+                    </div>
+                    `;
+                }
+
+                if (recommendations.length === 0) {
+                    return `
+                    <div class="flex flex-col items-center justify-center py-20 text-center">
+                        <div class="w-24 h-24 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-8">
+                            <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                        </div>
+                        <h2 class="text-2xl font-black font-serif italic mb-3">AI Recommendations</h2>
+                        <p class="text-slate-500 max-w-sm mx-auto mb-8">Get personalized book suggestions based on the genres and authors in your current library.</p>
+                        <button id="generate-recs-btn" class="px-8 py-4 bg-primary text-white rounded-2xl font-black shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all">Generate Recommendations</button>
+                    </div>
+                    `;
+                }
+
+                return `
+                <div class="space-y-8 animate-slide-up">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-3xl font-black font-serif italic">For You</h2>
+                        <button id="refresh-recs-btn" class="p-3 text-primary hover:bg-primary/10 rounded-full transition-colors" title="Refresh recommendations">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                        ${recommendations.map(rec => `
+                            <div class="group">
+                                <div class="aspect-[2/3] rounded-2xl overflow-hidden shadow-lg border border-slate-200 dark:border-slate-700 relative">
+                                    <img src="${rec.thumbnail || 'https://via.placeholder.com/200x300?text=No+Cover'}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
+                                    <div class="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
+                                        <button onclick="window.quickAddRecommendation('${btoa(JSON.stringify(rec))}')" class="w-full py-2 bg-white text-slate-900 rounded-xl font-bold text-xs shadow-xl active:scale-95 transition-transform">+ Quick Add</button>
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <h4 class="text-sm font-black font-serif truncate leading-tight">${escapeHTML(rec.title)}</h4>
+                                    <p class="text-[10px] text-slate-500 truncate mt-0.5">${escapeHTML(rec.author)}</p>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                `;
+            }
+
+            function attachRecommendationsListeners() {
+                document.getElementById('generate-recs-btn')?.addEventListener('click', fetchRecommendations);
+                document.getElementById('refresh-recs-btn')?.addEventListener('click', fetchRecommendations);
+            }
+
+            async function fetchRecommendations() {
+                if (books.length === 0) {
+                    showToast('Add some books to your library first!', 'info');
+                    return;
+                }
+
+                loadingRecommendations = true;
+                renderMainApp();
+
+                try {
+                    // Extract top 3 genres and authors from collection
+                    const genres = {};
+                    const authors = {};
+                    books.forEach(b => {
+                        getBookGenres(b).forEach(g => { if (g !== 'Other') genres[g] = (genres[g] || 0) + 1; });
+                        if (b.author && b.author !== 'Unknown') authors[b.author] = (authors[author] || 0) + 1;
+                    });
+
+                    const topGenres = Object.entries(genres).sort((a, b) => b[1] - a[1]).slice(0, 2).map(x => x[0]);
+                    const topAuthors = Object.entries(authors).sort((a, b) => b[1] - a[1]).slice(0, 2).map(x => x[0]);
+
+                    const query = [...topGenres, ...topAuthors].join(' ');
+                    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=20&orderBy=relevance`);
+                    const data = await res.json();
+
+                    if (data.items) {
+                        recommendations = data.items
+                            .filter(item => !books.some(b => b.title.toLowerCase() === item.volumeInfo.title.toLowerCase()))
+                            .map(item => ({
+                                title: item.volumeInfo.title,
+                                author: item.volumeInfo.authors ? item.volumeInfo.authors.join(', ') : 'Unknown',
+                                thumbnail: item.volumeInfo.imageLinks?.thumbnail?.replace('http:', 'https:'),
+                                isbn: item.volumeInfo.industryIdentifiers?.[0]?.identifier || '',
+                                categories: item.volumeInfo.categories || ['Other'],
+                                description: item.volumeInfo.description || ''
+                            }))
+                            .slice(0, 10);
+                    }
+                } catch (err) {
+                    console.error('AI Error:', err);
+                    showToast('AI had trouble reaching the library shelves.', 'error');
+                } finally {
+                    loadingRecommendations = false;
+                    renderMainApp();
+                }
+            }
+
+            window.quickAddRecommendation = (encoded) => {
+                try {
+                    const rec = JSON.parse(atob(encoded));
+                    const bookData = {
+                        title: rec.title,
+                        author: rec.author,
+                        thumbnail: rec.thumbnail,
+                        coverUrl: rec.thumbnail,
+                        categories: rec.categories,
+                        isbn: rec.isbn,
+                        source: 'ai_recommendation',
+                        isWishlist: true,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+                    addBookToFirestore(bookData, 'want_to_read', currentUser.uid);
+                    recommendations = recommendations.filter(r => r.title !== rec.title);
+                    renderMainApp();
+                } catch (e) {
+                    console.error(e);
+                }
+            };
 
             window.jumpToBook = async (bookId) => {
                 setTab('library');
@@ -2604,6 +2958,30 @@
                 }
                 return 'Other';
             }
+
+            window.runDataMigration = async () => {
+                if (!confirm('This will move all books from the legacy "default" library to your personal library. Proceed?')) return;
+
+                showToast('Starting migration...', 'info');
+                try {
+                    let migratedCount = 0;
+                    // 1. Migrate books with libraryId: 'default'
+                    const defaultSnapshot = await db.collection('books').where('libraryId', '==', 'default').get();
+                    const batch1 = db.batch();
+                    defaultSnapshot.docs.forEach(doc => {
+                        batch1.update(doc.ref, { userId: currentUser.uid, libraryId: firebase.firestore.FieldValue.delete() });
+                        migratedCount++;
+                    });
+                    await batch1.commit();
+
+                    // 2. Migrate books with no userId (legacy structure)
+                    // Note: This is tricky in Firestore without a specific index, so we'll do a general fetch if needed or skip if not common
+
+                    showToast(`Successfully migrated ${migratedCount} books to your personal library!`, 'success');
+                } catch (err) {
+                    showToast('Migration error: ' + err.message, 'error');
+                }
+            };
 
             async function undoImport() {
                 if (!lastImportState) return;
@@ -2876,7 +3254,7 @@
                                             <option value="5" ${userRating === 5 ? 'selected' : ''}>5 Stars</option>
                                         </select>
                                         <textarea id="detail-comment-textarea" placeholder="What did you think of this book?" class="w-full px-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px]">${escapeHTML(userComment)}</textarea>
-                                        <button id="save-rating-btn" class="w-full py-2 bg-blue-600 text-white text-[10px] font-black uppercase rounded-lg">Save Review</button>
+                                        <button id="save-rating-btn" class="w-full py-2 bg-primary text-white text-[10px] font-black uppercase rounded-lg">Save Review</button>
                                     </div>
                                 </div>
                                 <div class="mt-4 px-4">
@@ -2893,7 +3271,7 @@
                                         <div class="flex flex-col gap-2">
                                             <div class="flex gap-2">
                                                 <input id="borrower-name" type="text" placeholder="Borrower Name" class="flex-1 px-3 py-2 text-xs bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                                                <button id="borrow-book-btn" class="px-4 py-2 bg-blue-600 text-white text-[10px] font-black uppercase rounded-lg">Borrow</button>
+                                                <button id="borrow-book-btn" class="px-4 py-2 bg-primary text-white text-[10px] font-black uppercase rounded-lg">Borrow</button>
                                             </div>
                                             <p class="text-[9px] text-slate-400">Leave name empty to borrow as yourself (${currentUser.displayName || currentUser.email})</p>
                                         </div>
@@ -2909,7 +3287,7 @@
                                     ${allStatuses.filter(s => s.uid !== currentUser.uid && (s.comment || s.rating > 0)).sort((a, b) => (b.updatedAt?.toMillis() || 0) - (a.updatedAt?.toMillis() || 0)).map(s => `
                                         <div class="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
                                             <div class="flex justify-between items-center mb-2">
-                                                <span class="text-xs font-bold text-blue-600 dark:text-blue-400">${escapeHTML(userProfiles[s.uid]?.displayName || userProfiles[s.uid]?.email || 'Unknown User')}</span>
+                                                <span class="text-xs font-bold text-primary">${escapeHTML(userProfiles[s.uid]?.displayName || userProfiles[s.uid]?.email || 'Unknown User')}</span>
                                                 <div class="text-amber-400 text-[10px]">${s.rating ? '★'.repeat(s.rating) + '☆'.repeat(5 - s.rating) : ''}</div>
                                             </div>
                                             ${s.comment ? `<p class="text-sm text-slate-600 dark:text-slate-300 italic leading-relaxed">"${escapeHTML(s.comment)}"</p>` : ''}
@@ -2931,7 +3309,7 @@
                             <button id="delete-book-btn" class="w-full sm:w-auto px-8 py-4 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-2xl font-bold transition-all">Delete</button>
                             <div class="flex w-full sm:w-auto gap-4">
                                 <button id="edit-book-btn" class="flex-1 sm:flex-none px-8 py-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition-all">Edit Details</button>
-                                <button data-close class="flex-1 sm:flex-none px-10 py-4 bg-blue-600 dark:bg-white text-white dark:text-blue-900 rounded-2xl font-bold shadow-xl shadow-blue-200 dark:shadow-none hover:scale-105 active:scale-95 transition-all">Close</button>
+                                <button data-close class="flex-1 sm:flex-none px-10 py-4 bg-primary dark:bg-white text-white dark:text-primary rounded-2xl font-bold shadow-xl shadow-primary/20 dark:shadow-none hover:scale-105 active:scale-95 transition-all">Close</button>
                             </div>
                         </div>
                     </div>
@@ -3041,23 +3419,6 @@
                     }
                 });
             }
-
-            // ---------- Global keyboard listener for search (added once) ----------
-            document.addEventListener('keydown', e => {
-                if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
-                    e.preventDefault();
-                    if (activeTab !== 'library' && activeTab !== 'wishlist') {
-                        window.setTab('library');
-                    }
-                    setTimeout(() => {
-                        const searchInput = document.getElementById('search-input');
-                        if (searchInput) {
-                            searchInput.focus();
-                            searchInput.select();
-                        }
-                    }, 50);
-                }
-            });
 
             // ---------- Global document click listener for book cards (added once) ----------
             document.addEventListener('click', e => {
