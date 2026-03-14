@@ -440,6 +440,7 @@
                 const statusCounts = { finished: 0, reading: 0, want_to_read: 0 };
 
                 books.forEach(b => {
+                    if (b.isWishlist) return;
                     const author = b.author || 'Unknown';
                     authorsCount[author] = (authorsCount[author] || 0) + 1;
 
@@ -482,7 +483,7 @@
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
                             <div class="bg-primary p-5 rounded-3xl text-white shadow-lg shadow-primary/20 dark:shadow-none">
                                 <div class="text-[10px] font-bold uppercase opacity-80 mb-1">Books</div>
-                                <div class="text-3xl font-black font-serif">${books.length}</div>
+                                <div class="text-3xl font-black font-serif">${books.filter(b => !b.isWishlist).length}</div>
                             </div>
                             <div class="bg-emerald-600 p-5 rounded-3xl text-white shadow-lg shadow-emerald-200 dark:shadow-none cursor-pointer" onclick="window.setTab('library'); window.clearAllFilters(); advancedFilters.minPrice = 0.01; renderLibraryOnly();">
                                 <div class="text-[10px] font-bold uppercase opacity-80 mb-1">Value</div>
@@ -502,7 +503,8 @@
                             <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Reading Progress</h3>
                             <div class="space-y-4">
                                 ${Object.entries(statusCounts).map(([status, count]) => {
-                    const percent = books.length ? Math.round((count / books.length) * 100) : 0;
+                    const totalNonWishlist = books.filter(b => !b.isWishlist).length;
+                    const percent = totalNonWishlist ? Math.round((count / totalNonWishlist) * 100) : 0;
                     const color = status === 'finished' ? 'bg-emerald-500' : status === 'reading' ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600';
                     return `
                                         <div>
@@ -897,6 +899,7 @@
 
                 const statusCounts = { finished: 0, reading: 0, want_to_read: 0 };
                 books.forEach(b => {
+                    if (b.isWishlist) return;
                     const statusData = getStatusData(b.id);
                     const status = statusData.status;
                     if (statusCounts.hasOwnProperty(status)) statusCounts[status]++;
@@ -926,7 +929,6 @@
                                 <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'library' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Library</button>
                                 <button onclick="window.setTab('wishlist')" ${activeTab === 'wishlist' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'wishlist' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Wishlist</button>
                                 <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'activity' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Activity</button>
-                                <button onclick="window.setTab('recommendations')" ${activeTab === 'recommendations' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'recommendations' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">AI</button>
                                 <button onclick="window.setTab('settings')" ${activeTab === 'settings' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'settings' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Settings</button>
                             </nav>
                             <div class="flex items-center gap-1">
@@ -954,10 +956,6 @@
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             <span class="text-[9px] font-bold">Activity</span>
                         </button>
-                        <button onclick="window.setTab('recommendations')" ${activeTab === 'recommendations' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'recommendations' ? 'text-primary' : 'text-slate-400'}">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-                            <span class="text-[9px] font-bold">AI</span>
-                        </button>
                         <button onclick="window.setTab('settings')" ${activeTab === 'settings' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'settings' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                             <span class="text-[9px] font-bold">Settings</span>
@@ -974,9 +972,6 @@
                 } else if (activeTab === 'activity') {
                     mainContentEl.innerHTML = renderActivity();
                     attachActivityListeners();
-                } else if (activeTab === 'recommendations') {
-                    mainContentEl.innerHTML = renderRecommendations();
-                    attachRecommendationsListeners();
                 } else {
                     if (!document.getElementById('search-input')) {
                         mainContentEl.innerHTML = `
@@ -1862,7 +1857,8 @@
                 const userRating = statusData.rating;
                 const userProgress = statusData.progress;
 
-                const stars = userRating ? '★'.repeat(userRating) + '☆'.repeat(5 - userRating) : (book.rating ? '★'.repeat(book.rating) + '☆'.repeat(5 - book.rating) : '');
+                const displayRating = book.averageRating ? Math.round(book.averageRating) : (userRating || book.rating || 0);
+                const stars = displayRating ? '★'.repeat(displayRating) + '☆'.repeat(5 - displayRating) : '';
 
                 const isSelected = selectedBookIds.has(book.id);
                 const bookGenres = getBookGenres(book);
@@ -1955,7 +1951,7 @@
                         <div>
                             <div class="flex justify-between items-start gap-2">
                                 <span class="text-[9px] font-black uppercase tracking-widest text-primary truncate max-w-[150px]">${bookGenres.join(', ')}</span>
-                                <div class="text-amber-400 text-[10px] tracking-tighter">${stars}</div>
+                                <div class="text-amber-400 text-[10px] tracking-tighter">${stars}${book.averageRating ? `<span class="ml-1 text-slate-400">(${book.averageRating.toFixed(1)})</span>` : ''}</div>
                             </div>
                             <h3 class="font-black text-lg leading-tight line-clamp-2 mt-1 group-hover:text-blue-600 transition-colors font-serif italic">${book.title}</h3>
                             <div class="flex justify-between items-center gap-2">
@@ -2413,17 +2409,6 @@
                             </div>
 
                             <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label for="man-rating" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Rating</label>
-                                    <select id="man-rating" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none appearance-none transition-all">
-                                        <option value="0">No Rating</option>
-                                        <option value="1" ${existingBook?.rating == 1 ? 'selected' : ''}>1 Star</option>
-                                        <option value="2" ${existingBook?.rating == 2 ? 'selected' : ''}>2 Stars</option>
-                                        <option value="3" ${existingBook?.rating == 3 ? 'selected' : ''}>3 Stars</option>
-                                        <option value="4" ${existingBook?.rating == 4 ? 'selected' : ''}>4 Stars</option>
-                                        <option value="5" ${existingBook?.rating == 5 ? 'selected' : ''}>5 Stars</option>
-                                    </select>
-                                </div>
                                 <div class="flex flex-col justify-end pb-2 px-1">
                                     <label for="man-wishlist" class="flex items-center gap-2 cursor-pointer">
                                         <input type="checkbox" id="man-wishlist" ${existingBook?.isWishlist ? 'checked' : ''} class="w-5 h-5 rounded text-blue-600 focus:ring-blue-500">
@@ -2432,23 +2417,10 @@
                                 </div>
                             </div>
 
-                            <div>
-                                <label for="man-status" class="text-[10px] font-bold text-slate-400 uppercase ml-1">My Reading Status</label>
-                                <select id="man-status" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl">
-                                    <option value="want_to_read" ${(existingBook?.readingStatus || 'want_to_read') === 'want_to_read' ? 'selected' : ''}>Want to Read</option>
-                                    <option value="reading" ${existingBook?.readingStatus === 'reading' ? 'selected' : ''}>Reading</option>
-                                    <option value="finished" ${existingBook?.readingStatus === 'finished' ? 'selected' : ''}>Finished</option>
-                                </select>
-                            </div>
-                            <div id="man-progress-container" class="${existingBook?.readingStatus === 'reading' ? '' : 'hidden'}">
-                                <label for="man-progress" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Reading Progress (%)</label>
-                                <input id="man-progress" type="number" min="0" max="100" placeholder="0" value="${existingBook?.progress || 0}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl">
-                            </div>
                             <div class="grid grid-cols-2 gap-4">
                                 <div><label for="man-price" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Price</label><input id="man-price" type="number" step="0.01" placeholder="0.00" value="${existingBook?.price || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
                                 <div><label for="man-date" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Date</label><input id="man-date" type="date" value="${(existingBook?.purchaseDate || new Date().toISOString()).split('T')[0]}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
                             </div>
-                            <div><label for="man-comments" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Comments</label><textarea id="man-comments" placeholder="Personal notes..." class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl min-h-[100px]">${existingBook?.comments || ''}</textarea></div>
                         </div>
                         <div class="flex gap-4 mt-10 pb-10">
                             <button data-close class="flex-1 px-4 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold">Cancel</button>
@@ -2505,10 +2477,6 @@
                     }
                 }
 
-                document.getElementById('man-status').addEventListener('change', e => {
-                    document.getElementById('man-progress-container').classList.toggle('hidden', e.target.value !== 'reading');
-                });
-
                 // Setup searchable dropdowns
                 setupSearchableDropdown('man-author', 'author-dropdown', metadataCache.authors, (val) => {
                     document.getElementById('man-author').value = val;
@@ -2544,12 +2512,9 @@
                         owner: document.getElementById('man-owner').value || '',
                         tags: tags,
                         coverUrl: document.getElementById('man-cover').value || null,
-                        rating: parseInt(document.getElementById('man-rating').value) || 0,
-                        progress: parseInt(document.getElementById('man-progress')?.value) || 0,
                         isWishlist: document.getElementById('man-wishlist').checked,
                         price: document.getElementById('man-price').value ? parseFloat(document.getElementById('man-price').value) : null,
                         purchaseDate: safeDate(document.getElementById('man-date').value),
-                        comments: document.getElementById('man-comments').value || '',
                         isbn: existingBook?.isbn || code || '',
                         thumbnail: existingBook?.thumbnail || null,
                         source: existingBook?.source || (code ? 'scanned' : 'manual'),
@@ -2565,17 +2530,6 @@
                     if (isEdit) {
                         try {
                             await db.collection('books').doc(existingBook.id).update(bookData);
-                            // Save per-user reading status
-                            await db.collection('books').doc(existingBook.id)
-                                .collection('readingStatus').doc(currentUser.uid).set({
-                                    status: document.getElementById('man-status').value,
-                                    rating: bookData.rating, // Sync book rating to per-user rating
-                                    progress: bookData.progress,
-                                    comment: bookData.comments,
-                                    userId: currentUser.uid,
-                                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                                }, { merge: true });
-
                             showToast('Book updated!', 'success');
                             close();
                         } catch (err) {
@@ -2588,7 +2542,7 @@
                             // Get selected library destination
                             const selectedDest = document.querySelector('input[name="library-dest"]:checked');
                             const targetUserId = selectedDest ? selectedDest.value : currentUser.uid;
-                            const result = await addBookToFirestore(bookData, document.getElementById('man-status').value, targetUserId);
+                            const result = await addBookToFirestore(bookData, 'want_to_read', targetUserId);
                             if (result) {
                                 close();
                             } else {
@@ -2704,10 +2658,9 @@
                     const targetUserName = targetUserId === currentUser.uid ? 'My' : 'Partner';
                     await db.collection('activityFeed').add({
                         type: 'book_added',
-                        title: bookData.title || 'Unknown',
-                        author: bookData.author || 'Unknown',
-                        addedBy: currentUser.displayName || currentUser.email || currentUser.uid,
-                        addedById: currentUser.uid,
+                        bookTitle: bookData.title || 'Unknown',
+                        userName: currentUser.displayName || currentUser.email || currentUser.uid,
+                        userId: currentUser.uid,
                         addedTo: targetUserName,
                         libraryId: targetUserId,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
@@ -2746,37 +2699,93 @@
             function renderActivity() {
                 if (activities.length === 0) {
                     return `
-                    <div class="flex flex-col items-center justify-center py-16 text-center">
-                        <svg class="w-16 h-16 text-slate-300 dark:text-slate-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        <h2 class="text-xl font-bold text-slate-700 dark:text-slate-300 mb-2">No Activity Yet</h2>
-                        <p class="text-slate-500 dark:text-slate-400 text-sm">When partners add books to your library, they'll appear here.</p>
+                    <div class="flex flex-col items-center justify-center py-24 text-center">
+                        <div class="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6">
+                            <svg class="w-10 h-10 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <h2 class="text-xl font-black font-serif italic text-slate-700 dark:text-slate-300">No Activity Yet</h2>
+                        <p class="text-slate-500 dark:text-slate-400 text-sm max-w-xs mt-2">When you or your partners update library books, those events will appear here.</p>
                     </div>
                     `;
                 }
 
                 const html = `
-                <div class="space-y-4">
-                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-6">Recent Activity</h2>
-                    ${activities.map((activity, idx) => `
-                        <div class="glass rounded-2xl p-4 border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600 transition">
-                            <div class="flex items-start justify-between gap-4">
-                                <div class="flex-1">
-                                    <p class="font-bold text-slate-900 dark:text-white">
-                                        <span class="text-blue-600 dark:text-blue-400">${escapeHTML(activity.addedBy)}</span> added
-                                        <span class="text-slate-700 dark:text-slate-300">"${escapeHTML(activity.title)}"</span>
-                                    </p>
-                                    <p class="text-sm text-slate-600 dark:text-slate-400">by ${escapeHTML(activity.author)}</p>
-                                    <p class="text-xs text-slate-500 dark:text-slate-500 mt-2">
-                                        Added to ${activity.addedTo === 'My' ? 'My Library' : escapeHTML(activity.addedTo) + '\'s library'}
-                                    </p>
-                                    <p class="text-xs text-slate-400 dark:text-slate-600 mt-1">${formatDate(activity.timestamp)}</p>
+                <div class="max-w-3xl mx-auto space-y-6 animate-slide-up">
+                    <div class="flex items-center justify-between mb-2">
+                        <h2 class="text-3xl font-black font-serif italic">Library Activity</h2>
+                        <span class="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-[10px] font-black uppercase tracking-widest">${activities.length} Events</span>
+                    </div>
+                    <div class="space-y-4">
+                        ${activities.map((activity, idx) => {
+                    let icon = '';
+                    let actionText = '';
+                    let badgeColor = '';
+
+                    switch (activity.type) {
+                        case 'book_added':
+                            icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>';
+                            actionText = 'added a new book';
+                            badgeColor = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400';
+                            break;
+                        case 'status_updated':
+                            icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+                            actionText = `marked as <span class="font-black uppercase text-[10px]">${READING_STATUSES[activity.status]?.label || activity.status}</span>`;
+                            badgeColor = 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+                            break;
+                        case 'rating_updated':
+                            icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.54 1.118l-3.976-2.888a1 1 0 00-1.175 0l-3.976 2.888c-.784.57-1.838-.197-1.539-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>';
+                            actionText = `rated <span class="font-black text-amber-500">${activity.rating} ★</span>`;
+                            badgeColor = 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
+                            break;
+                        case 'book_borrowed':
+                            icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>';
+                            actionText = `lent to <span class="font-bold">${escapeHTML(activity.borrowedBy)}</span>`;
+                            badgeColor = 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400';
+                            break;
+                        case 'book_returned':
+                            icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>';
+                            actionText = 'marked as returned';
+                            badgeColor = 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+                            break;
+                        default:
+                            icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+                            actionText = 'performed an action';
+                            badgeColor = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400';
+                    }
+
+                    return `
+                        <div class="glass rounded-3xl p-5 border border-blue-100/50 dark:border-slate-800 hover:shadow-xl transition-all group">
+                            <div class="flex items-start gap-4">
+                                <div class="w-12 h-12 rounded-2xl ${badgeColor} flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-110 transition-transform">
+                                    ${icon}
                                 </div>
-                                <button onclick="window.jumpToBook('${activity.bookId}')" class="px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-bold hover:bg-blue-200 dark:hover:bg-blue-900/50 transition">
-                                    View
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex flex-wrap items-center gap-x-2 text-sm">
+                                        <span class="font-black text-primary">${escapeHTML(activity.userName || activity.addedBy || 'Someone')}</span>
+                                        <span class="text-slate-500">${actionText}</span>
+                                    </div>
+                                    <h4 class="font-serif italic font-black text-lg mt-1 truncate">${escapeHTML(activity.bookTitle || activity.title)}</h4>
+                                    <div class="flex items-center gap-3 mt-3">
+                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${formatDate(activity.timestamp)}</span>
+                                        <span class="w-1 h-1 bg-slate-200 dark:bg-slate-700 rounded-full"></span>
+                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                            Library: ${activity.addedTo === 'My' ? 'Personal' : (activity.libraryName || 'Shared')}
+                                        </span>
+                                    </div>
+                                    ${activity.comment ? `
+                                        <div class="mt-4 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 text-sm text-slate-600 dark:text-slate-400 italic">
+                                            "${escapeHTML(activity.comment)}"
+                                        </div>
+                                    ` : ''}
+                                </div>
+                                <button onclick="window.jumpToBook('${activity.bookId}')" class="p-3 bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-primary hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-2xl transition-all active:scale-90" title="Go to book">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                                 </button>
                             </div>
                         </div>
-                    `).join('')}
+                    `;
+                }).join('')}
+                    </div>
                 </div>
                 `;
                 return html;
@@ -2801,134 +2810,6 @@
                 return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
             }
 
-            let recommendations = [];
-            let loadingRecommendations = false;
-
-            function renderRecommendations() {
-                if (loadingRecommendations) {
-                    return `
-                    <div class="flex flex-col items-center justify-center py-32 text-center">
-                        <div class="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mb-6"></div>
-                        <h2 class="text-xl font-black font-serif italic">AI is exploring the library...</h2>
-                        <p class="text-slate-400 mt-2">Finding books you might love based on your collection.</p>
-                    </div>
-                    `;
-                }
-
-                if (recommendations.length === 0) {
-                    return `
-                    <div class="flex flex-col items-center justify-center py-20 text-center">
-                        <div class="w-24 h-24 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-8">
-                            <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-                        </div>
-                        <h2 class="text-2xl font-black font-serif italic mb-3">AI Recommendations</h2>
-                        <p class="text-slate-500 max-w-sm mx-auto mb-8">Get personalized book suggestions based on the genres and authors in your current library.</p>
-                        <button id="generate-recs-btn" class="px-8 py-4 bg-primary text-white rounded-2xl font-black shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all">Generate Recommendations</button>
-                    </div>
-                    `;
-                }
-
-                return `
-                <div class="space-y-8 animate-slide-up">
-                    <div class="flex items-center justify-between">
-                        <h2 class="text-3xl font-black font-serif italic">For You</h2>
-                        <button id="refresh-recs-btn" class="p-3 text-primary hover:bg-primary/10 rounded-full transition-colors" title="Refresh recommendations">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                        </button>
-                    </div>
-                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                        ${recommendations.map(rec => `
-                            <div class="group">
-                                <div class="aspect-[2/3] rounded-2xl overflow-hidden shadow-lg border border-slate-200 dark:border-slate-700 relative">
-                                    <img src="${rec.thumbnail || 'https://via.placeholder.com/200x300?text=No+Cover'}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
-                                    <div class="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
-                                        <button onclick="window.quickAddRecommendation('${btoa(JSON.stringify(rec))}')" class="w-full py-2 bg-white text-slate-900 rounded-xl font-bold text-xs shadow-xl active:scale-95 transition-transform">+ Quick Add</button>
-                                    </div>
-                                </div>
-                                <div class="mt-3">
-                                    <h4 class="text-sm font-black font-serif truncate leading-tight">${escapeHTML(rec.title)}</h4>
-                                    <p class="text-[10px] text-slate-500 truncate mt-0.5">${escapeHTML(rec.author)}</p>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-                `;
-            }
-
-            function attachRecommendationsListeners() {
-                document.getElementById('generate-recs-btn')?.addEventListener('click', fetchRecommendations);
-                document.getElementById('refresh-recs-btn')?.addEventListener('click', fetchRecommendations);
-            }
-
-            async function fetchRecommendations() {
-                if (books.length === 0) {
-                    showToast('Add some books to your library first!', 'info');
-                    return;
-                }
-
-                loadingRecommendations = true;
-                renderMainApp();
-
-                try {
-                    // Extract top 3 genres and authors from collection
-                    const genres = {};
-                    const authors = {};
-                    books.forEach(b => {
-                        getBookGenres(b).forEach(g => { if (g !== 'Other') genres[g] = (genres[g] || 0) + 1; });
-                        if (b.author && b.author !== 'Unknown') authors[b.author] = (authors[author] || 0) + 1;
-                    });
-
-                    const topGenres = Object.entries(genres).sort((a, b) => b[1] - a[1]).slice(0, 2).map(x => x[0]);
-                    const topAuthors = Object.entries(authors).sort((a, b) => b[1] - a[1]).slice(0, 2).map(x => x[0]);
-
-                    const query = [...topGenres, ...topAuthors].join(' ');
-                    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=20&orderBy=relevance`);
-                    const data = await res.json();
-
-                    if (data.items) {
-                        recommendations = data.items
-                            .filter(item => !books.some(b => b.title.toLowerCase() === item.volumeInfo.title.toLowerCase()))
-                            .map(item => ({
-                                title: item.volumeInfo.title,
-                                author: item.volumeInfo.authors ? item.volumeInfo.authors.join(', ') : 'Unknown',
-                                thumbnail: item.volumeInfo.imageLinks?.thumbnail?.replace('http:', 'https:'),
-                                isbn: item.volumeInfo.industryIdentifiers?.[0]?.identifier || '',
-                                categories: item.volumeInfo.categories || ['Other'],
-                                description: item.volumeInfo.description || ''
-                            }))
-                            .slice(0, 10);
-                    }
-                } catch (err) {
-                    console.error('AI Error:', err);
-                    showToast('AI had trouble reaching the library shelves.', 'error');
-                } finally {
-                    loadingRecommendations = false;
-                    renderMainApp();
-                }
-            }
-
-            window.quickAddRecommendation = (encoded) => {
-                try {
-                    const rec = JSON.parse(atob(encoded));
-                    const bookData = {
-                        title: rec.title,
-                        author: rec.author,
-                        thumbnail: rec.thumbnail,
-                        coverUrl: rec.thumbnail,
-                        categories: rec.categories,
-                        isbn: rec.isbn,
-                        source: 'ai_recommendation',
-                        isWishlist: true,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    };
-                    addBookToFirestore(bookData, 'want_to_read', currentUser.uid);
-                    recommendations = recommendations.filter(r => r.title !== rec.title);
-                    renderMainApp();
-                } catch (e) {
-                    console.error(e);
-                }
-            };
 
             window.jumpToBook = async (bookId) => {
                 setTab('library');
@@ -3347,6 +3228,19 @@
                             borrowedBy: name,
                             borrowDate: new Date().toISOString()
                         });
+
+                        await db.collection('activityFeed').add({
+                            type: 'book_borrowed',
+                            bookId: book.id,
+                            bookTitle: book.title,
+                            userName: currentUser.displayName || currentUser.email || currentUser.uid,
+                            userId: currentUser.uid,
+                            borrowedBy: name,
+                            addedTo: book.userId === currentUser.uid ? 'My' : 'Partner',
+                            libraryId: book.userId,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+
                         showToast(`Marked as borrowed by ${name}`, 'success');
                         close();
                     } catch (err) { showToast('Error: ' + err.message, 'error'); }
@@ -3367,6 +3261,34 @@
                                 userId: currentUser.uid,
                                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                             }, { merge: true });
+
+                        if (rating > 0 || comment) {
+                            await db.collection('activityFeed').add({
+                                type: 'rating_updated',
+                                bookId: book.id,
+                                bookTitle: book.title,
+                                userName: currentUser.displayName || currentUser.email || currentUser.uid,
+                                userId: currentUser.uid,
+                                rating: rating,
+                                comment: comment,
+                                addedTo: book.userId === currentUser.uid ? 'My' : 'Partner',
+                                libraryId: book.userId,
+                                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        }
+
+                        // Update average rating on the book document
+                        const updatedStatusesSnapshot = await db.collection('books').doc(book.id).collection('readingStatus').get();
+                        const updatedStatuses = updatedStatusesSnapshot.docs.map(doc => doc.data());
+                        const allRatings = updatedStatuses.map(s => s.rating).filter(r => r > 0);
+                        const newAvg = allRatings.length > 0 ? (allRatings.reduce((a, b) => a + b, 0) / allRatings.length) : 0;
+                        const newCount = allRatings.length;
+
+                        await db.collection('books').doc(book.id).update({
+                            averageRating: newAvg,
+                            ratingCount: newCount
+                        });
+
                         showToast('Review saved!', 'success');
                         close();
                         // Small delay to ensure Firestore sync
@@ -3392,6 +3314,18 @@
                         await db.collection('books').doc(book.id)
                             .collection('readingStatus').doc(currentUser.uid).set(updateData, { merge: true });
 
+                        await db.collection('activityFeed').add({
+                            type: 'status_updated',
+                            bookId: book.id,
+                            bookTitle: book.title,
+                            userName: currentUser.displayName || currentUser.email || currentUser.uid,
+                            userId: currentUser.uid,
+                            status: newStatus,
+                            addedTo: book.userId === currentUser.uid ? 'My' : 'Partner',
+                            libraryId: book.userId,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+
                         showToast('Status updated!', 'success');
                         close();
                         openBookDetails(books.find(b => b.id === book.id)); // refresh
@@ -3416,6 +3350,18 @@
                             borrowedBy: firebase.firestore.FieldValue.delete(),
                             borrowDate: firebase.firestore.FieldValue.delete()
                         });
+
+                        await db.collection('activityFeed').add({
+                            type: 'book_returned',
+                            bookId: book.id,
+                            bookTitle: book.title,
+                            userName: currentUser.displayName || currentUser.email || currentUser.uid,
+                            userId: currentUser.uid,
+                            addedTo: book.userId === currentUser.uid ? 'My' : 'Partner',
+                            libraryId: book.userId,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+
                         showToast('Book returned!', 'success');
                         close();
                     } catch (err) { showToast('Error: ' + err.message, 'error'); }
