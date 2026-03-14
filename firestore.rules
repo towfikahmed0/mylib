@@ -10,15 +10,15 @@ service cloud.firestore {
     // Check if user is a member of the library (owner or partner)
     function isLibraryMember(userId, libraryOwnerId) {
       return userId == libraryOwnerId ||
-             exists(/databases/$(database)/documents/partnerships/$(getPartnershipId(userId, libraryOwnerId)));
+             exists(path('/databases/' + database + '/documents/partnerships/' + getPartnershipId(userId, libraryOwnerId)));
     }
 
     // Check if user has edit permissions in the library
     function canEditLibrary(userId, libraryOwnerId) {
-      if (userId == libraryOwnerId) return true;
-      let partnershipId = getPartnershipId(userId, libraryOwnerId);
-      let partnership = get(/databases/$(database)/documents/partnerships/$(partnershipId));
-      return partnership != null && partnership.data.get('allowAddBooks', false) == true;
+      return userId == libraryOwnerId || (
+        exists(path('/databases/' + database + '/documents/partnerships/' + getPartnershipId(userId, libraryOwnerId))) &&
+        get(path('/databases/' + database + '/documents/partnerships/' + getPartnershipId(userId, libraryOwnerId))).data.get('allowAddBooks', false) == true
+      );
     }
 
     // ========== USERS COLLECTION ==========
@@ -65,9 +65,7 @@ service cloud.firestore {
     match /{path=**}/readingStatus/{userId} {
       allow read: if request.auth != null && (
         request.auth.uid == userId ||
-        isLibraryMember(request.auth.uid, get(/databases/$(database)/documents/books/$(resource.data.bookId)).data.userId) ||
-        // Fallback for cases where bookId is not in the document but in the path
-        isLibraryMember(request.auth.uid, get(path.removeLast(2)).data.userId)
+        isLibraryMember(request.auth.uid, get(/databases/$(database)/documents/$(path)).data.userId)
       );
       allow write: if request.auth.uid == userId;
     }
