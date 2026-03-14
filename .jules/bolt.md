@@ -5,3 +5,7 @@
 ## 2025-05-20 - [Incremental Firestore Synchronization]
 **Learning:** Processing full Firestore snapshots with `snapshot.docs.forEach` on every update causes unnecessary (N)$ processing and fails to handle document deletions from the local state. For users with large collections, this leads to increasing UI stutter during real-time sync.
 **Action:** Use `snapshot.docChanges()` to perform (1)$ incremental updates and explicitly handle `removed` change types to maintain local state integrity.
+
+## 2025-05-25 - [DOM allocation and redundant grouping optimization]
+**Learning:** In a single-file SPA, repeated DOM allocations (like creating a div for escaping HTML) and multiple O(N) filter passes over a growing books array can cause noticeable stutter during renders and UI updates.
+**Action:** Reused a persistent DOM element for escaping and consolidated multiple filtering passes into a single O(N) grouping pass. This minimizes garbage collection and reduces CPU time for large lists.
