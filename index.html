@@ -290,10 +290,15 @@
             let unsubscribeBooks = null;
             let unsubscribeStatus = null;
             let activeTab = 'library';     // 'library', 'wishlist', 'activity', 'settings'
+            let currentModalCloseHandler = null;
 
             // Global keyboard shortcuts (attached once)
             document.addEventListener('keydown', (e) => {
-                if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+                if (e.key === 'Escape' && currentModalCloseHandler) {
+                    currentModalCloseHandler();
+                    return;
+                }
+                if (e.key === '/' && !currentModalCloseHandler && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
                     e.preventDefault();
                     if (activeTab !== 'library') {
                         window.setTab('library');
@@ -365,6 +370,18 @@
                 return escapeDiv.innerHTML;
             }
 
+            window.copyISBN = (isbn) => {
+                if (!navigator.clipboard) {
+                    showToast('Clipboard not available', 'error');
+                    return;
+                }
+                navigator.clipboard.writeText(isbn).then(() => {
+                    showToast('ISBN copied to clipboard!', 'success');
+                }).catch(err => {
+                    showToast('Failed to copy ISBN', 'error');
+                });
+            };
+
             // ---------- Utility: Toast ----------
             function showToast(message, type = 'info', duration = 4000) {
                 toastEl.innerHTML = `
@@ -392,9 +409,16 @@
                 const closeHandler = () => {
                     modal.remove();
                     modalContainer.classList.remove('pointer-events-auto');
+                    currentModalCloseHandler = null;
                     if (onClose) onClose();
                 };
+                currentModalCloseHandler = closeHandler;
                 modal.querySelector('[data-close]')?.addEventListener('click', closeHandler);
+                if (!isFullscreen) {
+                    modal.addEventListener('click', (e) => {
+                        if (e.target === modal) closeHandler();
+                    });
+                }
                 return closeHandler;
             }
 
@@ -1037,6 +1061,16 @@
                             searchTimeout = setTimeout(() => {
                                 renderLibraryOnly();
                             }, 150);
+                        });
+                        searchInput.addEventListener('keydown', e => {
+                            if (e.key === 'Escape') {
+                                searchQuery = '';
+                                searchInput.value = '';
+                                searchInput.blur();
+                                document.getElementById('clear-search-btn').classList.add('hidden');
+                                if (searchHint) searchHint.classList.remove('opacity-0');
+                                renderLibraryOnly();
+                            }
                         });
                         searchInput.addEventListener('focus', () => {
                             if (searchHint) searchHint.classList.add('opacity-0');
@@ -3181,7 +3215,14 @@
                                     <div class="bg-blue-50/50 dark:bg-slate-800/40 p-4 rounded-2xl border border-blue-100/50 dark:border-slate-700"><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Purchased</p><p class="text-xl font-black font-serif">${book.purchaseDate ? new Date(book.purchaseDate).toLocaleDateString() : '—'}</p></div>
                                 </div>
 
-                                ${book.isbn ? `<div class="mt-6 px-4"><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">ISBN</p><p class="text-sm font-mono tracking-wider">${book.isbn}</p></div>` : ''}
+                                ${book.isbn ? `
+                                    <div class="mt-6 px-4">
+                                        <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">ISBN</p>
+                                        <button onclick="window.copyISBN('${book.isbn.replace(/'/g, "\\'")}')" class="flex items-center gap-2 group/isbn hover:text-blue-600 transition-colors" title="Copy ISBN" aria-label="Copy ISBN">
+                                            <span class="text-sm font-mono tracking-wider">${book.isbn}</span>
+                                            <svg class="w-3.5 h-3.5 opacity-0 group-hover/isbn:opacity-100 transition-opacity" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                                        </button>
+                                    </div>` : ''}
                                 <div class="mt-4 px-4">
                                     <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">My Reading Status</p>
                                     <div class="flex gap-2">
