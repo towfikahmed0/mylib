@@ -304,11 +304,11 @@
             const modalContainer = document.getElementById('modal-container');
 
             // ---------- Utility: Escape HTML ----------
+            const escapeDiv = document.createElement('div');
             function escapeHTML(str) {
                 if (!str) return '';
-                const div = document.createElement('div');
-                div.textContent = str;
-                return div.innerHTML;
+                escapeDiv.textContent = str;
+                return escapeDiv.innerHTML;
             }
 
             // ---------- Utility: Toast ----------
@@ -435,7 +435,7 @@
                         <h2 class="text-2xl font-black mb-6 font-serif italic text-blue-600 dark:text-blue-400">Profile Settings</h2>
                         <div class="space-y-4">
                             <div>
-                                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Display Name</label>
+                                <label for="profile-display-name" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Display Name</label>
                                 <div class="flex flex-col sm:flex-row gap-2">
                                     <input id="profile-display-name" type="text" placeholder="Your Name" value="${escapeHTML(userProfile?.displayName || '')}" class="flex-1 min-w-0 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
                                     <button id="save-profile-btn" class="sm:px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition active:scale-95 shadow-lg shadow-blue-200 dark:shadow-none">Save Profile</button>
@@ -543,7 +543,7 @@
                         <p class="text-sm text-slate-500 mb-6">Enter the emails of people you want to share your library with. They will be able to view and edit your collection.</p>
                         <div class="space-y-4">
                             <div>
-                                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Collaborator Email</label>
+                                <label for="share-email" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Collaborator Email</label>
                                 <div class="flex flex-col sm:flex-row gap-2">
                                     <input id="share-email" type="email" placeholder="email@example.com" class="flex-1 min-w-0 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
                                     <button id="save-sharing-btn" class="sm:px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition active:scale-95 shadow-lg shadow-blue-200 dark:shadow-none">Add Collaborator</button>
@@ -636,14 +636,14 @@
                             </div>
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Default View</label>
+                                    <label for="pref-default-view" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Default View</label>
                                     <select id="pref-default-view" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-xs font-bold mt-1">
                                         <option value="grid" ${localStorage.getItem('mylib_viewMode') === 'grid' ? 'selected' : ''}>Grid</option>
                                         <option value="list" ${localStorage.getItem('mylib_viewMode') === 'list' ? 'selected' : ''}>List</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Default Sort</label>
+                                    <label for="pref-default-sort" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Default Sort</label>
                                     <select id="pref-default-sort" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-xs font-bold mt-1">
                                         <option value="newest" ${localStorage.getItem('mylib_defaultSort') === 'newest' ? 'selected' : ''}>Newest</option>
                                         <option value="title" ${localStorage.getItem('mylib_defaultSort') === 'title' ? 'selected' : ''}>Title</option>
@@ -859,7 +859,7 @@
                                 <button id="manual-add-btn" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500" title="Add Book Manually" aria-label="Add Book Manually">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                 </button>
-                                <button id="scan-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-full text-sm font-bold flex items-center gap-2 transition-all shadow-md active:scale-95" aria-label="Scan QR or Barcode">
+                                <button id="scan-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-full text-sm font-bold flex items-center gap-2 transition-all shadow-md active:scale-95" aria-label="Scan QR or Barcode" title="Scan QR or Barcode">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                     <span class="hidden lg:inline">Scan</span>
                                 </button>
@@ -935,7 +935,9 @@
                         <div id="controls-bar-container"></div>
                         <div id="library-container-wrapper"></div>
                     `;
-                        document.getElementById('search-input').addEventListener('input', e => {
+                        const searchInput = document.getElementById('search-input');
+                        const searchHint = document.getElementById('search-hint');
+                        searchInput.addEventListener('input', e => {
                             searchQuery = e.target.value;
                             document.getElementById('clear-search-btn').classList.toggle('hidden', !searchQuery);
                             if (searchTimeout) clearTimeout(searchTimeout);
@@ -979,6 +981,17 @@
             };
 
             function renderLibraryOnly() {
+                const clearSearchBtn = document.getElementById('clear-search-btn');
+                const searchHint = document.getElementById('search-hint');
+                if (clearSearchBtn) {
+                    clearSearchBtn.classList.toggle('hidden', !searchQuery);
+                }
+                if (searchHint) {
+                    searchHint.classList.toggle('hidden', !!searchQuery);
+                    if (!searchQuery && document.activeElement !== document.getElementById('search-input')) {
+                        searchHint.classList.remove('opacity-0');
+                    }
+                }
                 const searchLower = searchQuery.toLowerCase();
                 let filteredBooks = books.filter(b => {
                     const matchesTab = activeTab === 'wishlist' ? b.isWishlist : !b.isWishlist;
@@ -1152,19 +1165,23 @@
 
                 const libraryWrapper = document.getElementById('library-container-wrapper');
                 if (libraryWrapper) {
-                    // Separate and group books
-                    const myOwnBooks = filteredBooks.filter(b => b.userId === currentUser.uid && !b.addedBy);
-                    const booksAddedByOthers = filteredBooks.filter(b => b.userId === currentUser.uid && b.addedBy);
-                    const sharedFromPartners = filteredBooks.filter(b => b.userId !== currentUser.uid);
-
-                    // Group books added by others by their contributor
+                    // Performance optimization: Single-pass O(N) grouping of books
+                    const myOwnBooks = [];
+                    const sharedFromPartners = [];
                     const groupedByContributor = {};
-                    booksAddedByOthers.forEach(b => {
-                        const contributor = b.addedBy || 'unknown';
-                        if (!groupedByContributor[contributor]) {
-                            groupedByContributor[contributor] = [];
+
+                    filteredBooks.forEach(b => {
+                        if (b.userId !== currentUser.uid) {
+                            sharedFromPartners.push(b);
+                        } else if (!b.addedBy) {
+                            myOwnBooks.push(b);
+                        } else {
+                            const contributor = b.addedBy || 'unknown';
+                            if (!groupedByContributor[contributor]) {
+                                groupedByContributor[contributor] = [];
+                            }
+                            groupedByContributor[contributor].push(b);
                         }
-                        groupedByContributor[contributor].push(b);
                     });
 
                     let html = '';
@@ -1803,12 +1820,18 @@
                 }
 
                 // Use a collection group listener to get reading statuses for THIS user efficiently.
+                // Performance optimization: use docChanges() for incremental updates instead of re-processing the entire collection.
+                // This reduces the update complexity from O(N) to O(1) for most sync events.
                 unsubscribeStatus = db.collectionGroup('readingStatus')
                     .where('userId', '==', currentUser.uid)
                     .onSnapshot(snapshot => {
-                        snapshot.docs.forEach(doc => {
-                            const bookId = doc.ref.parent.parent.id;
-                            readingStatuses[bookId] = doc.data().status;
+                        snapshot.docChanges().forEach(change => {
+                            const bookId = change.doc.ref.parent.parent.id;
+                            if (change.type === 'removed') {
+                                delete readingStatuses[bookId];
+                            } else {
+                                readingStatuses[bookId] = change.doc.data().status;
+                            }
                         });
                         renderLibraryOnly();
                     }, err => {
@@ -3018,6 +3041,23 @@
                     }
                 });
             }
+
+            // ---------- Global keyboard listener for search (added once) ----------
+            document.addEventListener('keydown', e => {
+                if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+                    e.preventDefault();
+                    if (activeTab !== 'library' && activeTab !== 'wishlist') {
+                        window.setTab('library');
+                    }
+                    setTimeout(() => {
+                        const searchInput = document.getElementById('search-input');
+                        if (searchInput) {
+                            searchInput.focus();
+                            searchInput.select();
+                        }
+                    }, 50);
+                }
+            });
 
             // ---------- Global document click listener for book cards (added once) ----------
             document.addEventListener('click', e => {
