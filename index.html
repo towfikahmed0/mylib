@@ -221,8 +221,21 @@
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
+        // Global variables for persistence state
+        let persistenceInitialized = false;
+        let authObserverStarted = false;
+
         // Enable offline persistence
-        db.enablePersistence({ synchronizeTabs: true }).catch(err => console.warn("Offline persistence error:", err));
+        db.enablePersistence({ synchronizeTabs: true })
+            .then(() => {
+                persistenceInitialized = true;
+                startApp();
+            })
+            .catch(err => {
+                console.warn("Offline persistence error:", err);
+                persistenceInitialized = true;
+                startApp();
+            });
     </script>
     <!-- ============================================================================== -->
 
@@ -415,7 +428,7 @@
                 });
 
                 // Email/Password sign in (if user doesn't exist, it creates)
-                document.getElementById('email-auth-form').addEventListener('submit', (e) => {
+                document.getElementById('email-auth-form')?.addEventListener('submit', (e) => {
                     e.preventDefault();
                     const email = document.getElementById('email').value;
                     const password = document.getElementById('password').value;
@@ -804,14 +817,15 @@
                 if (unsubscribePartners1) unsubscribePartners1();
                 if (unsubscribePartners2) unsubscribePartners2();
 
+                let partners1 = [];
+                let partners2 = [];
+
                 // Query partnerships where current user is userId1
                 unsubscribePartners1 = db.collection('partnerships')
                     .where('userId1', '==', currentUser.uid)
                     .onSnapshot(snapshot => {
-                        const user1Partnerships = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        allPartnershipsForUI = user1Partnerships.concat(
-                            allPartnershipsForUI.filter(p => !user1Partnerships.some(u1p => u1p.id === p.id))
-                        );
+                        partners1 = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        allPartnershipsForUI = [...partners1, ...partners2];
                         displayPartnerships();
                     }, err => {
                         console.error("Partners Query 1 Error:", err);
@@ -821,8 +835,8 @@
                 unsubscribePartners2 = db.collection('partnerships')
                     .where('userId2', '==', currentUser.uid)
                     .onSnapshot(snapshot => {
-                        const user2Partnerships = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        allPartnershipsForUI = allPartnershipsForUI.filter(p => p.userId1 === currentUser.uid).concat(user2Partnerships);
+                        partners2 = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        allPartnershipsForUI = [...partners1, ...partners2];
                         displayPartnerships();
                     }, err => {
                         console.error("Partners Query 2 Error:", err);
@@ -1046,20 +1060,28 @@
 
             window.clearSelection = () => {
                 selectedBookIds.clear();
-                renderLibraryOnly();
+                if (document.getElementById('bulk-actions-bar')) {
+                    renderLibraryOnly();
+                }
             };
 
             window.bulkDelete = async () => {
                 if (!selectedBookIds.size) return;
                 if (confirm(`Delete ${selectedBookIds.size} selected books?`)) {
                     showToast(`Deleting ${selectedBookIds.size} books...`, 'info');
-                    const batch = db.batch();
-                    selectedBookIds.forEach(id => {
-                        batch.delete(db.collection('books').doc(id));
-                        // Cleanup user's reading status
-                        batch.delete(db.collection('books').doc(id).collection('readingStatus').doc(currentUser.uid));
-                    });
-                    await batch.commit();
+
+                    const ids = Array.from(selectedBookIds);
+                    // Firestore batches are limited to 500 operations. Each delete is 2 operations here.
+                    for (let i = 0; i < ids.length; i += 200) {
+                        const chunk = ids.slice(i, i + 200);
+                        const batch = db.batch();
+                        chunk.forEach(id => {
+                            batch.delete(db.collection('books').doc(id));
+                            batch.delete(db.collection('books').doc(id).collection('readingStatus').doc(currentUser.uid));
+                        });
+                        await batch.commit();
+                    }
+
                     selectedBookIds.clear();
                     showToast('Deleted books successfully', 'success');
                 }
@@ -1168,11 +1190,20 @@
                             const newCat = e.target.value;
                             if (!newCat || !selectedBookIds.size) return;
                             showToast(`Updating ${selectedBookIds.size} books...`, 'info');
-                            const batch = db.batch();
-                            selectedBookIds.forEach(id => {
-                                batch.update(db.collection('books').doc(id), { categories: [newCat], category: firebase.firestore.FieldValue.delete() });
-                            });
-                            await batch.commit();
+
+                                    const ids = Array.from(selectedBookIds);
+                                    for (let i = 0; i < ids.length; i += 500) {
+                                        const chunk = ids.slice(i, i + 500);
+                                        const batch = db.batch();
+                                        chunk.forEach(id => {
+                                            batch.update(db.collection('books').doc(id), {
+                                                categories: [newCat],
+                                                category: firebase.firestore.FieldValue.delete()
+                                            });
+                                        });
+                                        await batch.commit();
+                                    }
+
                             selectedBookIds.clear();
                             showToast('Updated books successfully', 'success');
                         };
@@ -1997,11 +2028,15 @@
                 if (unsubscribeActivity) unsubscribeActivity();
                 if (!currentUser) return;
 
+                let partnerships1 = [];
+                let partnerships2 = [];
+
                 // Query partnerships where current user is userId1
                 unsubscribePartnershipBooks1 = db.collection('partnerships')
                     .where('userId1', '==', currentUser.uid)
                     .onSnapshot(snapshot => {
-                        allPartnerships = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        partnerships1 = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        allPartnerships = [...partnerships1, ...partnerships2];
                         fetchBooksFromPartnerships();
                     }, err => {
                         console.error("Partnership Query 1 Error:", err);
@@ -2011,7 +2046,8 @@
                 unsubscribePartnershipBooks2 = db.collection('partnerships')
                     .where('userId2', '==', currentUser.uid)
                     .onSnapshot(snapshot => {
-                        allPartnerships = [...allPartnerships.filter(p => p.userId1 === currentUser.uid), ...snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))];
+                        partnerships2 = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        allPartnerships = [...partnerships1, ...partnerships2];
                         fetchBooksFromPartnerships();
                     }, err => {
                         console.error("Partnership Query 2 Error:", err);
@@ -2033,39 +2069,68 @@
                         }
                     });
 
-                    // Firestore 'in' query supports max 10 items
-                    if (unsubscribeOwnBooks) unsubscribeOwnBooks();
-                    unsubscribeOwnBooks = db.collection('books')
-                        .where('userId', 'in', userIdsToFetch.slice(0, 10))
-                        .onSnapshot(snapshot => {
-                            books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                            books.sort((a, b) => {
-                                const timeA = a.createdAt?.toMillis() || 0;
-                                const timeB = b.createdAt?.toMillis() || 0;
-                                return timeB - timeA;
+                    // Firestore 'in' query supports max 10-30 items
+                    if (unsubscribeOwnBooks) {
+                        if (Array.isArray(unsubscribeOwnBooks)) unsubscribeOwnBooks.forEach(unsub => unsub());
+                        else unsubscribeOwnBooks();
+                    }
+
+                    const bookUnsubs = [];
+                    let chunkedBooks = {};
+
+                    for (let i = 0; i < userIdsToFetch.length; i += 10) {
+                        const chunk = userIdsToFetch.slice(i, i + 10);
+                        const unsub = db.collection('books')
+                            .where('userId', 'in', chunk)
+                            .onSnapshot(snapshot => {
+                                chunkedBooks[i] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                                // Merge and sort all chunked books
+                                books = Object.values(chunkedBooks).flat().sort((a, b) => {
+                                    const timeA = a.createdAt?.toMillis() || 0;
+                                    const timeB = b.createdAt?.toMillis() || 0;
+                                    return timeB - timeA;
+                                });
+                                updateMetadataCache();
+                                renderMainApp();
+                            }, err => {
+                                console.error("Firestore Error for chunk:", chunk, err);
                             });
-                            updateMetadataCache();
-                            renderMainApp();
-                        }, err => {
-                            console.error("Firestore Error:", err);
-                        });
+                        bookUnsubs.push(unsub);
+                    }
+                    unsubscribeOwnBooks = bookUnsubs;
 
                     // Subscribe to activity feed for these libraries
-                    if (unsubscribeActivity) unsubscribeActivity();
-                    unsubscribeActivity = db.collection('activityFeed')
-                        .where('libraryId', 'in', userIdsToFetch.slice(0, 10))
-                        .orderBy('timestamp', 'desc')
-                        .limit(30)
-                        .onSnapshot(snapshot => {
-                            activities = snapshot.docs.map(doc => ({
-                                id: doc.id,
-                                ...doc.data(),
-                                timestamp: doc.data().timestamp?.toDate() || new Date()
-                            }));
-                            if (activeTab === 'activity') renderMainApp();
-                        }, err => {
-                            console.error("Activity Listener Error:", err);
-                        });
+                    if (unsubscribeActivity) {
+                        if (Array.isArray(unsubscribeActivity)) unsubscribeActivity.forEach(unsub => unsub());
+                        else unsubscribeActivity();
+                    }
+
+                    const activityUnsubs = [];
+                    let chunkedActivities = {};
+
+                    for (let i = 0; i < userIdsToFetch.length; i += 10) {
+                        const chunk = userIdsToFetch.slice(i, i + 10);
+                        const unsub = db.collection('activityFeed')
+                            .where('libraryId', 'in', chunk)
+                            .orderBy('timestamp', 'desc')
+                            .limit(30)
+                            .onSnapshot(snapshot => {
+                                chunkedActivities[i] = snapshot.docs.map(doc => ({
+                                    id: doc.id,
+                                    ...doc.data(),
+                                    timestamp: doc.data().timestamp?.toDate() || new Date()
+                                }));
+
+                                // Merge and sort all chunked activities
+                                activities = Object.values(chunkedActivities).flat().sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
+                                if (activeTab === 'activity') renderMainApp();
+                            }, err => {
+                                console.error("Activity Listener Error for chunk:", chunk, err);
+                            });
+                        activityUnsubs.push(unsub);
+                    }
+                    unsubscribeActivity = activityUnsubs;
                 }
 
                 // Use a collection group listener to get reading statuses for THIS user efficiently.
@@ -2558,18 +2623,20 @@
                 });
             }
 
-            // Helper for duplicate detection
-            function findDuplicateBook(bookData) {
+            // Helper for duplicate detection within a specific user's library
+            function findDuplicateBook(bookData, targetUserId) {
                 const isbn = bookData.isbn?.replace(/[^0-9X]/gi, '');
                 const title = bookData.title?.trim().toLowerCase();
                 const author = bookData.author?.trim().toLowerCase();
 
+                const targetLibraryBooks = books.filter(b => b.userId === targetUserId);
+
                 let duplicate = null;
                 if (isbn) {
-                    duplicate = books.find(b => b.isbn?.replace(/[^0-9X]/gi, '') === isbn);
+                    duplicate = targetLibraryBooks.find(b => b.isbn?.replace(/[^0-9X]/gi, '') === isbn);
                 }
                 if (!duplicate && title && author) {
-                    duplicate = books.find(b => b.title?.trim().toLowerCase() === title && b.author?.trim().toLowerCase() === author);
+                    duplicate = targetLibraryBooks.find(b => b.title?.trim().toLowerCase() === title && b.author?.trim().toLowerCase() === author);
                 }
                 return duplicate;
             }
@@ -2581,13 +2648,8 @@
                 const isAddingToSharedLibrary = targetUserId !== currentUser.uid;
 
                 try {
-                    // Check for duplicate in TARGET library (not current user's books)
-                    const targetLibraryBooks = books.filter(b => b.userId === targetUserId);
-                    const title = bookData.title?.trim().toLowerCase();
-                    const author = bookData.author?.trim().toLowerCase();
-                    const duplicate = targetLibraryBooks.find(b => {
-                        return b.title?.trim().toLowerCase() === title && b.author?.trim().toLowerCase() === author;
-                    });
+                    // Check for duplicate in TARGET library
+                    const duplicate = findDuplicateBook(bookData, targetUserId);
 
                     if (duplicate) {
                         const targetName = targetUserId === currentUser.uid ? 'your library' : 'this library';
@@ -2946,7 +3008,7 @@
                                     userId: currentUser.uid
                                 };
 
-                                const duplicate = findDuplicateBook(bookData);
+                                const duplicate = findDuplicateBook(bookData, currentUser.uid);
 
                                 if (duplicate) {
                                     // Store previous state for undo
@@ -3013,9 +3075,13 @@
             }
 
             // ---------- Auth State Observer ----------
-            auth.onAuthStateChanged(async (user) => {
-                currentUser = user;
-                if (user) {
+            window.startApp = function() {
+                if (authObserverStarted) return;
+                authObserverStarted = true;
+
+                auth.onAuthStateChanged(async (user) => {
+                    currentUser = user;
+                    if (user) {
                     // Ensure user profile exists in Firestore
                     const userDoc = await db.collection('users').doc(user.uid).get();
                     if (!userDoc.exists) {
@@ -3032,15 +3098,16 @@
 
                     subscribeToBooks();
                     renderMainApp();
-                } else {
-                    if (unsubscribeBooks) unsubscribeBooks();
-                    if (unsubscribeStatus) unsubscribeStatus();
-                    books = [];
-                    readingStatuses = {};
-                    appEl.innerHTML = '';
-                    renderAuth();
-                }
-            });
+                    } else {
+                        if (unsubscribeBooks) unsubscribeBooks();
+                        if (unsubscribeStatus) unsubscribeStatus();
+                        books = [];
+                        readingStatuses = {};
+                        appEl.innerHTML = '';
+                        renderAuth();
+                    }
+                });
+            };
 
             async function openBookDetails(book) {
                 const statusData = getStatusData(book.id);

@@ -2,11 +2,31 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // Helper function to get partnership ID (sorted)
+    function getPartnershipId(uid1, uid2) {
+      return uid1 < uid2 ? uid1 + '_' + uid2 : uid2 + '_' + uid1;
+    }
+
+    // Check if user is a member of the library (owner or partner)
+    function isLibraryMember(userId, libraryOwnerId) {
+      return userId == libraryOwnerId ||
+             exists(/databases/$(database)/documents/partnerships/$(getPartnershipId(userId, libraryOwnerId)));
+    }
+
+    // Check if user has edit permissions in the library
+    function canEditLibrary(userId, libraryOwnerId) {
+      if (userId == libraryOwnerId) return true;
+      let partnershipId = getPartnershipId(userId, libraryOwnerId);
+      let partnership = get(/databases/$(database)/documents/partnerships/$(partnershipId));
+      return partnership != null && partnership.data.get('allowAddBooks', false) == true;
+    }
+
     // ========== USERS COLLECTION ==========
     match /users/{userId} {
       allow read: if request.auth != null;
       allow create: if request.auth.uid == userId;
-      allow update, delete: if request.auth.uid == userId;
+      allow update: if request.auth.uid == userId;
+      allow delete: if false;
     }
 
     // ========== PARTNERSHIPS COLLECTION ==========
@@ -16,7 +36,8 @@ service cloud.firestore {
          request.auth.uid == resource.data.userId2);
          
       allow create: if request.auth != null && 
-        request.auth.uid in [request.resource.data.userId1, request.resource.data.userId2];
+        (request.auth.uid == request.resource.data.userId1 ||
+         request.auth.uid == request.resource.data.userId2);
          
       allow update: if request.auth != null && 
         (request.auth.uid == resource.data.userId1 || 
@@ -29,39 +50,39 @@ service cloud.firestore {
 
     // ========== BOOKS COLLECTION ==========
     match /books/{bookId} {
-      allow read: if request.auth != null;
+      // Allow read if user is the owner or a partner
+      allow read: if request.auth != null &&
+        isLibraryMember(request.auth.uid, resource.data.userId);
       
-      // Helper function to get partnership ID (sorted)
-      function getPartnershipId(uid1, uid2) {
-        return uid1 < uid2 ? uid1 + '_' + uid2 : uid2 + '_' + uid1;
-      }
+      allow create: if request.auth != null &&
+        canEditLibrary(request.auth.uid, request.resource.data.userId);
+
+      allow update, delete: if request.auth != null &&
+        canEditLibrary(request.auth.uid, resource.data.userId);
+    }
+
+    // ========== READING STATUS SUBCOLLECTION (supports Collection Group) ==========
+    match /{path=**}/readingStatus/{userId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == userId ||
+        isLibraryMember(request.auth.uid, get(/databases/$(database)/documents/books/$(resource.data.bookId)).data.userId) ||
+        // Fallback for cases where bookId is not in the document but in the path
+        isLibraryMember(request.auth.uid, get(path.removeLast(2)).data.userId)
+      );
+      allow write: if request.auth.uid == userId;
+    }
+
+    // ========== ACTIVITY FEED COLLECTION ==========
+    match /activityFeed/{activityId} {
+      allow read: if request.auth != null &&
+        isLibraryMember(request.auth.uid, resource.data.libraryId);
       
       allow create: if request.auth != null && (
-        // User can create books in their own library
-        request.auth.uid == request.resource.data.userId ||
-        // User can add books to partner's library if permission is granted
-        (request.auth.uid != request.resource.data.userId &&
-         exists(/databases/$(database)/documents/partnerships/$(
-           getPartnershipId(request.auth.uid, request.resource.data.userId)
-         )) &&
-         get(/databases/$(database)/documents/partnerships/$(
-           getPartnershipId(request.auth.uid, request.resource.data.userId)
-         )).data.get('allowAddBooks', false) == true)
+        request.auth.uid == request.resource.data.userId &&
+        isLibraryMember(request.auth.uid, request.resource.data.libraryId)
       );
-        
-      allow update: if request.auth != null && 
-        request.auth.uid == resource.data.userId;
-        
-      allow delete: if request.auth != null && 
-        request.auth.uid == resource.data.userId;
 
-      // ===== READING STATUS SUBCOLLECTION =====
-      // Allow any authenticated user to READ (for ratings/comments display)
-      // Only owner can WRITE (for their own status)
-      match /readingStatus/{userId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth.uid == userId;
-      }
+      allow update, delete: if false;
     }
   }
 }
