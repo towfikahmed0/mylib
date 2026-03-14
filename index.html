@@ -312,6 +312,7 @@
             let sharedWithMe = [];         // UIDs of users who shared their library with me
             let activities = [];           // activity log for book additions
             let metadataCache = { authors: [], genres: [], owners: [] }; // Performance optimization: single-pass cache
+            let userProfileCache = {}; // Cache for user profiles (names/emails)
 
             let searchQuery = '';
             let searchTimeout = null;
@@ -355,6 +356,31 @@
                     progress: data.progress || 0,
                     comment: data.comment || ''
                 };
+            }
+
+            let syncTimeout = null;
+            async function syncCompletedBooksCount() {
+                if (!currentUser) return;
+
+                if (syncTimeout) clearTimeout(syncTimeout);
+                syncTimeout = setTimeout(async () => {
+                    const count = Object.values(readingStatuses).filter(data => {
+                        const status = typeof data === 'string' ? data : data.status;
+                        return status === 'finished';
+                    }).length;
+
+                    if (userProfile && userProfile.completedBooksCount === count) return;
+
+                    try {
+                        await db.collection('users').doc(currentUser.uid).update({
+                            completedBooksCount: count,
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        if (userProfile) userProfile.completedBooksCount = count;
+                    } catch (err) {
+                        console.error("Error syncing completed books count:", err);
+                    }
+                }, 1000);
             }
 
             // ---------- Utility: Escape HTML ----------
@@ -453,7 +479,14 @@
                 const statusCounts = { finished: 0, reading: 0, want_to_read: 0 };
 
                 books.forEach(b => {
-                    if (b.isWishlist) return;
+                    const statusData = getStatusData(b.id);
+                    const status = statusData.status;
+
+                    if (b.isWishlist) {
+                        if (status === 'finished') statusCounts.finished++;
+                        return;
+                    }
+
                     const author = b.author || 'Unknown';
                     authorsCount[author] = (authorsCount[author] || 0) + 1;
 
@@ -470,8 +503,6 @@
 
                     totalValue += (parseFloat(b.price) || 0);
 
-                    const statusData = getStatusData(b.id);
-                    const status = statusData.status;
                     if (statusCounts.hasOwnProperty(status)) statusCounts[status]++;
                 });
 
@@ -516,8 +547,9 @@
                             <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Reading Progress</h3>
                             <div class="space-y-4">
                                 ${Object.entries(statusCounts).map(([status, count]) => {
-                    const totalNonWishlist = books.filter(b => !b.isWishlist).length;
-                    const percent = totalNonWishlist ? Math.round((count / totalNonWishlist) * 100) : 0;
+                    // Denominator is owned books + any finished wishlist books (since they are in the 'finished' count)
+                    const totalInProgress = books.filter(b => !b.isWishlist || getStatusData(b.id).status === 'finished').length;
+                    const percent = totalInProgress ? Math.round((count / totalInProgress) * 100) : 0;
                     const color = status === 'finished' ? 'bg-emerald-500' : status === 'reading' ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600';
                     return `
                                         <div>
@@ -913,9 +945,12 @@
 
                 const statusCounts = { finished: 0, reading: 0, want_to_read: 0 };
                 books.forEach(b => {
-                    if (b.isWishlist) return;
                     const statusData = getStatusData(b.id);
                     const status = statusData.status;
+                    if (b.isWishlist) {
+                        if (status === 'finished') statusCounts.finished++;
+                        return;
+                    }
                     if (statusCounts.hasOwnProperty(status)) statusCounts[status]++;
                 });
 
@@ -2148,6 +2183,7 @@
                             }
                         });
                         renderLibraryOnly();
+                        syncCompletedBooksCount();
                     }, err => {
                         console.error("Status Listener Error (Ensure index is created):", err);
                     });
@@ -3120,6 +3156,14 @@
 
                 const bookGenres = getBookGenres(book);
 
+                // Show a temporary loading modal while fetching detailed data
+                const closeLoading = showModal(`
+                    <div class="glass max-w-sm w-full rounded-[2.5rem] p-10 flex flex-col items-center justify-center gap-6 animate-pulse">
+                        <div class="w-16 h-16 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin"></div>
+                        <p class="text-slate-500 font-bold uppercase tracking-widest text-xs">Opening Book Details...</p>
+                    </div>
+                `);
+
                 // Re-fetch current user's rating and comment for this book to be sure
                 const userStatusDoc = await db.collection('books').doc(book.id).collection('readingStatus').doc(currentUser.uid).get();
                 const userRatingVal = userStatusDoc.exists ? userStatusDoc.data().rating || 0 : userRating;
@@ -3130,16 +3174,19 @@
                 const allStatusesSnapshot = await db.collection('books').doc(book.id).collection('readingStatus').get();
                 const allStatuses = allStatusesSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
 
-                // Fetch user profiles for display names
+                // Fetch user profiles for display names with local caching
                 const userIds = [...new Set(allStatuses.map(s => s.uid))];
-                const userProfiles = {};
-                if (userIds.length > 0) {
+                const userProfiles = { ...userProfileCache };
+                const missingUserIds = userIds.filter(id => !userProfiles[id]);
+
+                if (missingUserIds.length > 0) {
                     // Firestore 'in' query supports up to 10 items
-                    for (let i = 0; i < userIds.length; i += 10) {
-                        const chunk = userIds.slice(i, i + 10);
+                    for (let i = 0; i < missingUserIds.length; i += 10) {
+                        const chunk = missingUserIds.slice(i, i + 10);
                         const usersSnapshot = await db.collection('users').where('uid', 'in', chunk).get();
                         usersSnapshot.docs.forEach(doc => {
                             userProfiles[doc.id] = doc.data();
+                            userProfileCache[doc.id] = doc.data(); // Cache globally
                         });
                     }
                 }
@@ -3148,6 +3195,7 @@
                 const ratingsOnly = allStatuses.map(s => s.rating).filter(r => r > 0);
                 const averageRating = ratingsOnly.length > 0 ? (ratingsOnly.reduce((a, b) => a + b, 0) / ratingsOnly.length).toFixed(1) : null;
 
+                closeLoading();
                 const close = showModal(`
                 <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
                     <div class="glass max-w-2xl w-full rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up overflow-y-auto max-h-[90vh]">
