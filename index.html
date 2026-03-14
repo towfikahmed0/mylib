@@ -410,6 +410,10 @@
 
             // ---------- Utility: Toast ----------
             function showToast(message, type = 'info', duration = 4000) {
+                if (navigator.vibrate) {
+                    if (type === 'error') navigator.vibrate([50, 50, 50]);
+                    else if (type === 'success') navigator.vibrate(10);
+                }
                 toastEl.innerHTML = `
                 <div class="w-2 h-2 rounded-full ${type === 'success' ? 'bg-emerald-400' : type === 'error' ? 'bg-rose-400' : 'bg-blue-400'}"></div>
                 <span>${message}</span>
@@ -593,9 +597,9 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-8">
                             <div>
                                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Top Genres</h3>
-                                <div class="space-y-2">
+                                <div class="space-y-1">
                                     ${Object.entries(genresCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => `
-                                        <div class="flex justify-between items-center text-sm">
+                                        <div class="flex justify-between items-center text-sm cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 p-2 rounded-xl transition-colors" onclick='window.applyInsightFilter("genre", "${name.replace(/"/g, "&quot;")}")' role="button" tabindex="0" onkeydown='if(event.key==="Enter"||event.key===" ") window.applyInsightFilter("genre", "${name.replace(/"/g, "&quot;")}")'>
                                             <span class="font-medium truncate mr-2">${name}</span>
                                             <span class="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg font-bold text-xs">${count}</span>
                                         </div>
@@ -604,9 +608,9 @@
                             </div>
                             <div>
                                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Top Tags</h3>
-                                <div class="space-y-2">
+                                <div class="space-y-1">
                                     ${Object.entries(tagsCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => `
-                                        <div class="flex justify-between items-center text-sm">
+                                        <div class="flex justify-between items-center text-sm cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-900/20 p-2 rounded-xl transition-colors" onclick='window.applyInsightFilter("tag", "${name.replace(/"/g, "&quot;")}")' role="button" tabindex="0" onkeydown='if(event.key==="Enter"||event.key===" ") window.applyInsightFilter("tag", "${name.replace(/"/g, "&quot;")}")'>
                                             <span class="font-medium truncate mr-2">${name}</span>
                                             <span class="px-2 py-0.5 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-lg font-bold text-xs">${count}</span>
                                         </div>
@@ -618,9 +622,9 @@
                         <div class="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-8">
                             <div>
                                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Top Authors</h3>
-                                <div class="space-y-2">
+                                <div class="space-y-1">
                                     ${Object.entries(authorsCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => `
-                                        <div class="flex justify-between items-center text-sm">
+                                        <div class="flex justify-between items-center text-sm cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 p-2 rounded-xl transition-colors" onclick='window.applyInsightFilter("author", "${name.replace(/"/g, "&quot;")}")' role="button" tabindex="0" onkeydown='if(event.key==="Enter"||event.key===" ") window.applyInsightFilter("author", "${name.replace(/"/g, "&quot;")}")'>
                                             <span class="font-medium truncate mr-2">${name}</span>
                                             <span class="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg font-bold text-xs">${count}</span>
                                         </div>
@@ -629,9 +633,9 @@
                             </div>
                             <div>
                                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Top Owners</h3>
-                                <div class="space-y-2">
+                                <div class="space-y-1">
                                     ${Object.entries(ownersCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => `
-                                        <div class="flex justify-between items-center text-sm">
+                                        <div class="flex justify-between items-center text-sm cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 p-2 rounded-xl transition-colors" onclick='window.applyInsightFilter("owner", "${name.replace(/"/g, "&quot;")}")' role="button" tabindex="0" onkeydown='if(event.key==="Enter"||event.key===" ") window.applyInsightFilter("owner", "${name.replace(/"/g, "&quot;")}")'>
                                             <span class="font-medium truncate mr-2">${name}</span>
                                             <span class="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg font-bold text-xs">${count}</span>
                                         </div>
@@ -1659,6 +1663,22 @@
                 renderMainApp();
             };
 
+            window.setCategoryFilter = (category) => {
+                categoryFilter = category;
+                renderMainApp();
+            };
+
+            window.applyInsightFilter = (type, value) => {
+                activeTab = 'library';
+                searchQuery = '';
+                tagFilter = type === 'tag' ? value : null;
+                categoryFilter = type === 'genre' ? value : 'all';
+                authorFilter = type === 'author' ? value : 'all';
+                ownerFilter = type === 'owner' ? value : 'all';
+                advancedFilters = { rating: 'all', minPrice: null, maxPrice: null, startDate: null, endDate: null };
+                renderMainApp();
+            };
+
             window.setTheme = (theme) => {
                 document.documentElement.classList.remove('dark', 'sepia');
                 if (theme !== 'light') document.documentElement.classList.add(theme);
@@ -2299,7 +2319,7 @@
                     <div class="w-full h-full flex flex-col p-6 overflow-y-auto">
                         <div class="flex justify-between items-center mb-8">
                             <h2 class="text-3xl font-black font-serif italic">Scan QR / Barcode</h2>
-                            <button data-close class="p-3 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                            <button data-close class="p-3 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 transition-colors" aria-label="Close scanner"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                         </div>
                         <div class="flex-1 flex flex-col items-center justify-center">
                             <div id="reader" class="w-full max-w-lg aspect-square rounded-[3rem] overflow-hidden bg-slate-900 relative shadow-2xl">
@@ -2503,7 +2523,7 @@
                     <div class="max-w-2xl mx-auto w-full">
                         <div class="flex justify-between items-center mb-8">
                             <h2 class="text-3xl font-black font-serif italic">${isEdit ? 'Edit Book' : 'Add Manually'}</h2>
-                            <button data-close class="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm hover:bg-slate-100 transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                            <button data-close class="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm hover:bg-slate-100 transition-colors" aria-label="Close modal"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                         </div>
                         ${code ? `<p class="text-slate-500 text-sm mb-6">Code: ${code.substring(0, 20)}</p>` : ''}
                         ${!isEdit ? `
@@ -2910,8 +2930,8 @@
                                         </div>
                                     ` : ''}
                                 </div>
-                                <button onclick="window.jumpToBook('${activity.bookId}')" class="p-3 bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-primary hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-2xl transition-all active:scale-90" title="Go to book">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                <button onclick="window.jumpToBook('${activity.bookId}')" class="p-3 bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-primary hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-2xl transition-all active:scale-90" title="Go to book" aria-label="Jump to book">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                                 </button>
                             </div>
                         </div>
