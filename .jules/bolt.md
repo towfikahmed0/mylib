@@ -13,3 +13,7 @@
 ## 2026-03-14 - [Eager data normalization and preference caching]
 **Learning:** Repetitive synchronous calls to `localStorage.getItem` and complex data transformation logic in the render path (e.g., `getStatusData`) created a performance ceiling for large libraries. Normalizing data once at the source (Firestore listener) and using an in-memory cache for preferences significantly reduces the per-item overhead in render loops.
 **Action:** Move data transformation logic from render-time helpers to data ingestion listeners and initialize frequently used storage values as global variables in the application's IIFE scope.
+
+## 2026-03-15 - [Pre-normalization and loop hoisting]
+**Learning:** Performing multiple string conversions (`toLowerCase`), date parsing, and array iterations (`some`) inside hot filter/sort loops causes significant CPU overhead for large collections. Hoisting constant values outside loops and pre-calculating search strings/timestamps during data ingestion (normalization) drastically reduces per-item processing time.
+**Action:** Implemented a `normalizeBook` function to cache search-ready strings and numeric timestamps. Hoisted filter parameter parsing outside the `filteredBooks` loop. Added `STAR_CACHE` to avoid repeated string operations during UI rendering.
