@@ -289,7 +289,30 @@
                 if (activeTab === 'settings') renderMainApp();
             });
             let books = [];                // local copy for UI, synced with Firestore
+            let booksMap = new Map();      // Map for O(1) updates: bookId -> normalizedBook
             let readingStatuses = {};      // local copy for per-user statuses {bookId: status}
+
+            const GENRE_FALLBACK = ['Other'];
+            // Helper to get book genres as an array - Optimized to use cached _genres if available
+            function getBookGenres(book) {
+                if (book._genres) return book._genres;
+                if (Array.isArray(book.categories)) return book.categories;
+                if (book.category) return [book.category];
+                return GENRE_FALLBACK;
+            }
+
+            // Performance optimization: Pre-normalize book data to avoid redundant work during renders
+            function normalizeBook(id, data) {
+                const genres = Array.isArray(data.categories) ? data.categories : (data.category ? [data.category] : GENRE_FALLBACK);
+                return {
+                    id,
+                    ...data,
+                    _genres: genres,
+                    _searchBlob: `${data.title || ''} ${data.author || ''} ${genres.join(' ')} ${data.isbn || ''} ${(data.tags || []).join(' ')}`.toLowerCase(),
+                    _createdTime: data.createdAt?.toMillis() || 0,
+                    _purchaseTime: data.purchaseDate ? new Date(data.purchaseDate).getTime() : 0
+                };
+            }
             const userProfileCache = {};   // Performance optimization: cache for contributor names
 
             // Performance optimizations: pre-rendered star strings and frozen status constant
@@ -1148,30 +1171,30 @@
                         searchHint.classList.remove('opacity-0');
                     }
                 }
+                // Hoist constants outside of filter/sort loops for performance
                 const searchLower = searchQuery.toLowerCase();
+                const targetRating = advancedFilters.rating !== 'all' ? parseInt(advancedFilters.rating) : null;
+                const startTimestamp = advancedFilters.startDate ? new Date(advancedFilters.startDate).getTime() : null;
+                const endTimestamp = advancedFilters.endDate ? new Date(advancedFilters.endDate).getTime() : null;
+
                 let filteredBooks = books.filter(b => {
                     const matchesTab = activeTab === 'wishlist' ? b.isWishlist : !b.isWishlist;
-                    const bookGenres = getBookGenres(b);
-                    const matchesSearch = !searchQuery ||
-                        b.title?.toLowerCase().includes(searchLower) ||
-                        b.author?.toLowerCase().includes(searchLower) ||
-                        bookGenres.some(g => g.toLowerCase().includes(searchLower)) ||
-                        b.isbn?.toLowerCase().includes(searchLower) ||
-                        (b.tags && b.tags.some(t => t.toLowerCase().includes(searchLower)));
+                    // O(1) access to pre-calculated search blob
+                    const matchesSearch = !searchLower || b._searchBlob.includes(searchLower);
 
                     const statusData = getStatusData(b.id);
                     const bookStatus = statusData.status;
                     const userRating = statusData.rating;
 
                     const matchesStatus = statusFilter === 'all' || bookStatus === statusFilter;
-                    const matchesCategory = categoryFilter === 'all' || bookGenres.includes(categoryFilter);
+                    // Optimized to use pre-calculated _genres array
+                    const matchesCategory = categoryFilter === 'all' || b._genres.includes(categoryFilter);
                     const matchesAuthor = authorFilter === 'all' || b.author === authorFilter;
                     const matchesOwner = ownerFilter === 'all' || b.owner === ownerFilter;
                     const matchesTag = !tagFilter || (b.tags && b.tags.includes(tagFilter));
 
                     let matchesAdvancedRating = true;
-                    if (advancedFilters.rating !== 'all') {
-                        const targetRating = parseInt(advancedFilters.rating);
+                    if (targetRating !== null) {
                         if (targetRating === 0) {
                             matchesAdvancedRating = userRating === 0;
                         } else {
@@ -1183,10 +1206,11 @@
                         (!advancedFilters.maxPrice || b.price <= advancedFilters.maxPrice);
 
                     let matchesDate = true;
-                    if (advancedFilters.startDate || advancedFilters.endDate) {
-                        const bDate = b.purchaseDate ? new Date(b.purchaseDate).getTime() : 0;
-                        if (advancedFilters.startDate && bDate < new Date(advancedFilters.startDate).getTime()) matchesDate = false;
-                        if (advancedFilters.endDate && bDate > new Date(advancedFilters.endDate).getTime()) matchesDate = false;
+                    if (startTimestamp !== null || endTimestamp !== null) {
+                        // Use pre-calculated purchase time
+                        const bDate = b._purchaseTime;
+                        if (startTimestamp !== null && bDate < startTimestamp) matchesDate = false;
+                        if (endTimestamp !== null && bDate > endTimestamp) matchesDate = false;
                     }
 
                     return matchesTab && matchesSearch && matchesStatus && matchesCategory && matchesAuthor && matchesOwner && matchesTag && matchesAdvancedRating && matchesPrice && matchesDate;
@@ -1196,14 +1220,12 @@
                     if (sortBy === 'title') return (a.title || '').localeCompare(b.title || '');
                     if (sortBy === 'author') return (a.author || '').localeCompare(b.author || '');
                     if (sortBy === 'newest') {
-                        const timeA = a.createdAt?.toMillis() || 0;
-                        const timeB = b.createdAt?.toMillis() || 0;
-                        return timeB - timeA;
+                        // Use pre-calculated created time
+                        return b._createdTime - a._createdTime;
                     }
                     if (sortBy === 'oldest') {
-                        const timeA = a.createdAt?.toMillis() || 0;
-                        const timeB = b.createdAt?.toMillis() || 0;
-                        return timeA - timeB;
+                        // Use pre-calculated created time
+                        return a._createdTime - b._createdTime;
                     }
                     return 0;
                 });
@@ -1962,13 +1984,6 @@
                 });
             }
 
-            const GENRE_FALLBACK = ['Other'];
-            // Helper to get book genres as an array
-            function getBookGenres(book) {
-                if (Array.isArray(book.categories)) return book.categories;
-                if (book.category) return [book.category];
-                return GENRE_FALLBACK;
-            }
 
             // Performance optimization: Update metadata cache in a single pass over the books array
             function updateMetadataCache() {
@@ -2184,21 +2199,25 @@
                     }
 
                     const bookUnsubs = [];
-                    let chunkedBooks = {};
+                    booksMap.clear();
 
                     for (let i = 0; i < userIdsToFetch.length; i += 10) {
                         const chunk = userIdsToFetch.slice(i, i + 10);
                         const unsub = db.collection('books')
                             .where('userId', 'in', chunk)
                             .onSnapshot(snapshot => {
-                                chunkedBooks[i] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-                                // Merge and sort all chunked books
-                                books = Object.values(chunkedBooks).flat().sort((a, b) => {
-                                    const timeA = a.createdAt?.toMillis() || 0;
-                                    const timeB = b.createdAt?.toMillis() || 0;
-                                    return timeB - timeA;
+                                // Incremental updates for efficiency
+                                snapshot.docChanges().forEach(change => {
+                                    if (change.type === 'removed') {
+                                        booksMap.delete(change.doc.id);
+                                    } else {
+                                        booksMap.set(change.doc.id, normalizeBook(change.doc.id, change.doc.data()));
+                                    }
                                 });
+
+                                // Update global array and sort newest first by default
+                                books = Array.from(booksMap.values()).sort((a, b) => b._createdTime - a._createdTime);
+
                                 updateMetadataCache();
                                 syncCompletedBooksCount();
                                 renderMainApp();
@@ -3267,6 +3286,7 @@
                             else unsubscribeActivity();
                         }
                         books = [];
+                        booksMap.clear();
                         readingStatuses = {};
                         appEl.innerHTML = '';
                         renderAuth();

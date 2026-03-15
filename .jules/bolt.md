@@ -13,3 +13,7 @@
 ## 2026-03-15 - [Pre-normalized status lookups and Star Caching]
 **Learning:** Performing data normalization (e.g., mapping 'unread' to 'want_to_read') inside render loops like `getStatusData` causes redundant CPU work and object allocations. Moving this to the Firestore ingestion point ensures O(1) lookups during render. Additionally, when caching star strings, `STAR_CACHE[0]` must be an empty string, as even a string of empty stars is truthy and can break fallback logic (e.g., falling back to book metadata rating if user rating is 0).
 **Action:** Normalize Firestore documents in the `onSnapshot` listener before storage and ensure index 0 of the star cache returns a falsy value for correct conditional rendering.
+
+## 2026-03-20 - [Book Pre-normalization and Filter Hoisting]
+**Learning:** Re-calculating search strings, parsing dates, and performing case conversions inside high-frequency `filter` and `sort` loops causes measurable UI lag as the library grows. Pre-normalizing book data upon ingestion into a persistent `Map` and hoisting filter constants allows for O(1) attribute access and minimal computation during renders.
+**Action:** Implemented `normalizeBook` and a persistent `booksMap`. Refactored `renderLibraryOnly` to use these pre-calculated properties and hoisted constants.
