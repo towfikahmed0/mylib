@@ -753,7 +753,7 @@
                                     <input id="pref-reading-goal" type="number" value="${readingGoal}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-xs font-bold mt-1">
                                 </div>
                                 <div>
-                                    <label for="pref-font-size" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Card Density</label>
+                                    <label for="pref-card-density" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Card Density</label>
                                     <select id="pref-card-density" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-xs font-bold mt-1">
                                         <option value="relaxed" ${cardDensity === 'relaxed' ? 'selected' : ''}>Relaxed</option>
                                         <option value="normal" ${cardDensity === 'normal' ? 'selected' : ''}>Normal</option>
@@ -2027,7 +2027,7 @@
                         }
                             <div class="absolute bottom-2 right-2 flex flex-col items-end gap-1">
                                 <div class="px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase text-white ${READING_STATUSES[bookStatus].badge.includes('emerald') ? 'bg-emerald-500' : READING_STATUSES[bookStatus].badge.includes('blue') ? 'bg-blue-500' : 'bg-slate-500'}">
-                                    ${READING_STATUSES[bookStatus].label === 'Want to Read' ? 'WTR' : READING_STATUSES[bookStatus].label}
+                                    ${READING_STATUSES[bookStatus].label === 'Want to Read' ? 'WTR' : (bookStatus === 'reading' ? `Reading (${userProgress || book.progress || 0}%)` : READING_STATUSES[bookStatus].label)}
                                 </div>
                             </div>
                             <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -2069,7 +2069,9 @@
                                 <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100" aria-label="Edit book details">
                                     <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
-                                <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge}">${READING_STATUSES[bookStatus].label}</div>
+                                <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge}">
+                                    ${bookStatus === 'reading' ? `Reading (${userProgress || book.progress || 0}%)` : READING_STATUSES[bookStatus].label}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2111,7 +2113,9 @@
                                 ${(book.tags || []).map(tag => `<span onclick="event.stopPropagation(); window.setTagFilter('${tag}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors">${tag}</span>`).join('')}
                             </div>
                             <div class="mt-2 flex flex-wrap gap-1">
-                                <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge}">${READING_STATUSES[bookStatus].label}</div>
+                                <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge}">
+                                    ${bookStatus === 'reading' ? `Reading (${userProgress || book.progress || 0}%)` : READING_STATUSES[bookStatus].label}
+                                </div>
                                 ${book.borrowedBy ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed by ${book.borrowedBy}</div>` : ''}
                                 ${addedByBadge}
                             </div>
@@ -3324,7 +3328,7 @@
                                         </button>
                                     </div>` : ''}
                                 <div class="mt-4 px-4">
-                                    <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">My Reading Status</p>
+                                    <label for="detail-status-select" class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">My Reading Status</label>
                                     <div class="flex gap-2">
                                         <select id="detail-status-select" class="flex-1 px-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                                             <option value="want_to_read" ${bookStatus === 'want_to_read' ? 'selected' : ''}>Want to Read</option>
@@ -3343,7 +3347,7 @@
                                     </div>
                                 </div>
                                 <div class="mt-4 px-4">
-                                    <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">My Rating & Review</p>
+                                    <label for="detail-rating-select" class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">My Rating & Review</label>
                                     <div class="space-y-3">
                                         <select id="detail-rating-select" class="w-full px-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                                             <option value="0" ${userRatingVal === 0 ? 'selected' : ''}>No Rating</option>
@@ -3358,7 +3362,7 @@
                                     </div>
                                 </div>
                                 <div class="mt-4 px-4">
-                                    <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Borrowing</p>
+                                    <label for="borrower-name" class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Borrowing</label>
                                     ${book.borrowedBy ? `
                                         <div class="flex items-center justify-between bg-amber-50 dark:bg-amber-900/20 p-3 rounded-xl border border-amber-100 dark:border-amber-900/30">
                                             <div class="text-sm">
