@@ -239,6 +239,9 @@
     </script>
     <!-- ============================================================================== -->
 
+    <!-- Global Loading Bar -->
+    <div id="loading-bar" class="fixed top-0 left-0 right-0 h-1 bg-blue-500 z-[100] transition-transform duration-300 -translate-y-full"></div>
+
     <!-- App Container (conditional rendering based on auth) -->
     <div id="app" class="min-h-screen flex flex-col"></div>
 
@@ -287,6 +290,7 @@
             });
             let books = [];                // local copy for UI, synced with Firestore
             let readingStatuses = {};      // local copy for per-user statuses {bookId: status}
+            const userProfileCache = {};   // Performance optimization: cache for contributor names
 
             // Performance optimizations: pre-rendered star strings and frozen status constant
             const STAR_CACHE = Array.from({ length: 6 }, (_, i) => i === 0 ? '' : '★'.repeat(i) + '☆'.repeat(5 - i));
@@ -345,8 +349,17 @@
             const appEl = document.getElementById('app');
             const toastEl = document.getElementById('toast');
             const modalContainer = document.getElementById('modal-container');
+            const loadingBar = document.getElementById('loading-bar');
 
             // ---------- Utilities ----------
+
+            window.showLoading = () => {
+                loadingBar.classList.remove('-translate-y-full');
+            };
+
+            window.hideLoading = () => {
+                loadingBar.classList.add('-translate-y-full');
+            };
 
             function getStatusData(bookId) {
                 // Optimized for O(1) performance using pre-normalized data and frozen constant fallback
@@ -504,7 +517,7 @@
                             </div>
                             <div class="bg-amber-500 p-5 rounded-3xl text-white shadow-lg shadow-amber-200 dark:shadow-none">
                                 <div class="text-[10px] font-bold uppercase opacity-80 mb-1">Goal</div>
-                                <div class="text-2xl font-black font-serif">${statusCounts.finished} / ${localStorage.getItem('mylib_readingGoal') || 50}</div>
+                                <div class="text-2xl font-black font-serif">${userProfile?.completedBooksCount || 0} / ${localStorage.getItem('mylib_readingGoal') || 50}</div>
                             </div>
                             <div class="bg-slate-100 dark:bg-slate-800 p-5 rounded-3xl border border-slate-200 dark:border-slate-700">
                                 <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Genres</div>
@@ -523,7 +536,7 @@
                                         <div>
                                             <div class="flex justify-between text-xs font-bold mb-1 uppercase tracking-tight">
                                                 <span>${READING_STATUSES[status].label}</span>
-                                                <span class="text-slate-400">${count} books (${percent}%)</span>
+                                                <span class="text-slate-400">${status === 'finished' ? (userProfile?.completedBooksCount || count) : count} books (${percent}%)</span>
                                             </div>
                                             <div class="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                                                 <div class="h-full ${color} transition-all duration-1000" style="width: ${percent}%"></div>
@@ -539,8 +552,8 @@
                                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Top Genres</h3>
                                 <div class="space-y-2">
                                     ${Object.entries(genresCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => `
-                                        <div class="flex justify-between items-center text-sm">
-                                            <span class="font-medium truncate mr-2">${name}</span>
+                                        <div class="flex justify-between items-center text-sm cursor-pointer group" onclick="window.applyInsightFilter('genre', '${name.replace(/'/g, "\\'")}')">
+                                            <span class="font-medium truncate mr-2 group-hover:text-primary transition-colors">${name}</span>
                                             <span class="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg font-bold text-xs">${count}</span>
                                         </div>
                                     `).join('')}
@@ -550,8 +563,8 @@
                                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Top Tags</h3>
                                 <div class="space-y-2">
                                     ${Object.entries(tagsCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => `
-                                        <div class="flex justify-between items-center text-sm">
-                                            <span class="font-medium truncate mr-2">${name}</span>
+                                        <div class="flex justify-between items-center text-sm cursor-pointer group" onclick="window.applyInsightFilter('tag', '${name.replace(/'/g, "\\'")}')">
+                                            <span class="font-medium truncate mr-2 group-hover:text-primary transition-colors">${name}</span>
                                             <span class="px-2 py-0.5 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-lg font-bold text-xs">${count}</span>
                                         </div>
                                     `).join('')}
@@ -564,8 +577,8 @@
                                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Top Authors</h3>
                                 <div class="space-y-2">
                                     ${Object.entries(authorsCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => `
-                                        <div class="flex justify-between items-center text-sm">
-                                            <span class="font-medium truncate mr-2">${name}</span>
+                                        <div class="flex justify-between items-center text-sm cursor-pointer group" onclick="window.applyInsightFilter('author', '${name.replace(/'/g, "\\'")}')">
+                                            <span class="font-medium truncate mr-2 group-hover:text-primary transition-colors">${name}</span>
                                             <span class="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg font-bold text-xs">${count}</span>
                                         </div>
                                     `).join('')}
@@ -575,8 +588,8 @@
                                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Top Owners</h3>
                                 <div class="space-y-2">
                                     ${Object.entries(ownersCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => `
-                                        <div class="flex justify-between items-center text-sm">
-                                            <span class="font-medium truncate mr-2">${name}</span>
+                                        <div class="flex justify-between items-center text-sm cursor-pointer group" onclick="window.applyInsightFilter('owner', '${name.replace(/'/g, "\\'")}')">
+                                            <span class="font-medium truncate mr-2 group-hover:text-primary transition-colors">${name}</span>
                                             <span class="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg font-bold text-xs">${count}</span>
                                         </div>
                                     `).join('')}
@@ -750,6 +763,9 @@
                                         <p class="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-4">Legacy Data</p>
                                         <button onclick="window.runDataMigration()" class="text-xs font-bold text-slate-500 hover:text-primary transition-colors underline">Migrate Default Library Data</button>
                                     </div>
+                                    <div class="mt-8 pt-4 text-center">
+                                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Version 1.2.0</p>
+                                    </div>
                 </div>
             `;
             }
@@ -758,6 +774,7 @@
                 const email = document.getElementById('share-email').value.trim().toLowerCase();
                 if (!email) return;
 
+                window.showLoading();
                 try {
                     // Find the user by email
                     const userSnapshot = await db.collection('users').where('email', '==', email).limit(1).get();
@@ -790,11 +807,14 @@
                     document.getElementById('share-email').value = '';
                 } catch (err) {
                     showToast('Error creating partnership: ' + err.message, 'error');
+                } finally {
+                    window.hideLoading();
                 }
             }
 
             // Update partnership permission to allow/disallow adding books
             window.updatePartnershipPermission = async (partnershipId, allowAddBooks) => {
+                window.showLoading();
                 try {
                     await db.collection('partnerships').doc(partnershipId).update({
                         allowAddBooks: allowAddBooks
@@ -803,6 +823,8 @@
                     renderPartners();
                 } catch (err) {
                     showToast('Error updating permission: ' + err.message, 'error');
+                } finally {
+                    window.hideLoading();
                 }
             };
 
@@ -890,6 +912,7 @@
             }
 
             window.leavePartnership = async (partnershipId) => {
+                window.showLoading();
                 try {
                     const partnershipDoc = await db.collection('partnerships').doc(partnershipId).get();
                     const data = partnershipDoc.data();
@@ -904,6 +927,8 @@
                     subscribeToBooks();
                 } catch (err) {
                     showToast('Error: ' + err.message, 'error');
+                } finally {
+                    window.hideLoading();
                 }
             };
 
@@ -934,7 +959,7 @@
                                     <div class="flex items-center gap-2">
                                         <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-widest">${currentUser.email}</p>
                                         <span class="text-[10px] text-slate-300">|</span>
-                                        <span class="text-[10px] font-black text-primary">${statusCounts.finished}/${localStorage.getItem('mylib_readingGoal') || 50}</span>
+                                        <span class="text-[10px] font-black text-primary">${userProfile?.completedBooksCount || 0}/${localStorage.getItem('mylib_readingGoal') || 50}</span>
                                     </div>
                                 </div>
                             </div>
@@ -1044,6 +1069,15 @@
                         searchInput.addEventListener('blur', () => {
                             if (searchHint && !searchQuery) searchHint.classList.remove('opacity-0');
                         });
+                        searchInput.addEventListener('keydown', (e) => {
+                            if (e.key === 'Escape') {
+                                searchQuery = '';
+                                searchInput.value = '';
+                                searchInput.blur();
+                                document.getElementById('clear-search-btn').classList.add('hidden');
+                                renderLibraryOnly();
+                            }
+                        });
                         document.getElementById('clear-search-btn').addEventListener('click', () => {
                             searchQuery = '';
                             const input = document.getElementById('search-input');
@@ -1069,21 +1103,28 @@
                 if (!selectedBookIds.size) return;
                 if (confirm(`Delete ${selectedBookIds.size} selected books?`)) {
                     showToast(`Deleting ${selectedBookIds.size} books...`, 'info');
+                    window.showLoading();
 
-                    const ids = Array.from(selectedBookIds);
-                    // Firestore batches are limited to 500 operations. Each delete is 2 operations here.
-                    for (let i = 0; i < ids.length; i += 200) {
-                        const chunk = ids.slice(i, i + 200);
-                        const batch = db.batch();
-                        chunk.forEach(id => {
-                            batch.delete(db.collection('books').doc(id));
-                            batch.delete(db.collection('books').doc(id).collection('readingStatus').doc(currentUser.uid));
-                        });
-                        await batch.commit();
+                    try {
+                        const ids = Array.from(selectedBookIds);
+                        // Firestore batches are limited to 500 operations. Each delete is 2 operations here.
+                        for (let i = 0; i < ids.length; i += 200) {
+                            const chunk = ids.slice(i, i + 200);
+                            const batch = db.batch();
+                            chunk.forEach(id => {
+                                batch.delete(db.collection('books').doc(id));
+                                batch.delete(db.collection('books').doc(id).collection('readingStatus').doc(currentUser.uid));
+                            });
+                            await batch.commit();
+                        }
+
+                        selectedBookIds.clear();
+                        showToast('Deleted books successfully', 'success');
+                    } catch (err) {
+                        showToast('Error deleting books: ' + err.message, 'error');
+                    } finally {
+                        window.hideLoading();
                     }
-
-                    selectedBookIds.clear();
-                    showToast('Deleted books successfully', 'success');
                 }
             };
 
@@ -1112,6 +1153,7 @@
 
                     const statusData = getStatusData(b.id);
                     const bookStatus = statusData.status;
+                    const userRating = statusData.rating;
 
                     const matchesStatus = statusFilter === 'all' || bookStatus === statusFilter;
                     const matchesCategory = categoryFilter === 'all' || bookGenres.includes(categoryFilter);
@@ -1119,7 +1161,16 @@
                     const matchesOwner = ownerFilter === 'all' || b.owner === ownerFilter;
                     const matchesTag = !tagFilter || (b.tags && b.tags.includes(tagFilter));
 
-                    const matchesAdvancedRating = advancedFilters.rating === 'all' || b.rating >= parseInt(advancedFilters.rating);
+                    let matchesAdvancedRating = true;
+                    if (advancedFilters.rating !== 'all') {
+                        const targetRating = parseInt(advancedFilters.rating);
+                        if (targetRating === 0) {
+                            matchesAdvancedRating = userRating === 0;
+                        } else {
+                            matchesAdvancedRating = userRating >= targetRating;
+                        }
+                    }
+
                     const matchesPrice = (!advancedFilters.minPrice || b.price >= advancedFilters.minPrice) &&
                         (!advancedFilters.maxPrice || b.price <= advancedFilters.maxPrice);
 
@@ -1154,7 +1205,8 @@
                     let html = '';
                     let activeCount = 0;
                     if (advancedFilters.rating !== 'all') {
-                        html += `<span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-bold flex items-center gap-2">${advancedFilters.rating} Stars <button onclick="window.clearAdvancedFilter('rating')">×</button></span>`;
+                        const ratingText = advancedFilters.rating === '0' ? 'Not Rated' : `${advancedFilters.rating}+ Stars`;
+                        html += `<span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-bold flex items-center gap-2">${ratingText} <button onclick="window.clearAdvancedFilter('rating')">×</button></span>`;
                         activeCount++;
                     }
                     if (advancedFilters.minPrice || advancedFilters.maxPrice) {
@@ -1190,22 +1242,29 @@
                             const newCat = e.target.value;
                             if (!newCat || !selectedBookIds.size) return;
                             showToast(`Updating ${selectedBookIds.size} books...`, 'info');
+                            window.showLoading();
 
-                                    const ids = Array.from(selectedBookIds);
-                                    for (let i = 0; i < ids.length; i += 500) {
-                                        const chunk = ids.slice(i, i + 500);
-                                        const batch = db.batch();
-                                        chunk.forEach(id => {
-                                            batch.update(db.collection('books').doc(id), {
-                                                categories: [newCat],
-                                                category: firebase.firestore.FieldValue.delete()
-                                            });
+                            try {
+                                const ids = Array.from(selectedBookIds);
+                                for (let i = 0; i < ids.length; i += 500) {
+                                    const chunk = ids.slice(i, i + 500);
+                                    const batch = db.batch();
+                                    chunk.forEach(id => {
+                                        batch.update(db.collection('books').doc(id), {
+                                            categories: [newCat],
+                                            category: firebase.firestore.FieldValue.delete()
                                         });
-                                        await batch.commit();
-                                    }
+                                    });
+                                    await batch.commit();
+                                }
 
-                            selectedBookIds.clear();
-                            showToast('Updated books successfully', 'success');
+                                selectedBookIds.clear();
+                                showToast('Updated books successfully', 'success');
+                            } catch (err) {
+                                showToast('Error updating books: ' + err.message, 'error');
+                            } finally {
+                                window.hideLoading();
+                            }
                         };
                     }
                 }
@@ -1383,15 +1442,21 @@
 
                     libraryWrapper.innerHTML = `<div>${html}</div>`;
 
-                    // Fetch contributor names
+                    // Fetch contributor names with caching
                     Object.keys(groupedByContributor).forEach(contributorId => {
-                        db.collection('users').doc(contributorId).get().then(doc => {
-                            if (doc.exists) {
-                                const name = doc.data()?.displayName || doc.data()?.email || 'Unknown';
-                                const heading = libraryWrapper.querySelector(`[data-contributor-id="${contributorId}"] [data-name]`);
-                                if (heading) heading.textContent = name;
-                            }
-                        });
+                        if (userProfileCache[contributorId]) {
+                            const heading = libraryWrapper.querySelector(`[data-contributor-id="${contributorId}"] [data-name]`);
+                            if (heading) heading.textContent = userProfileCache[contributorId];
+                        } else {
+                            db.collection('users').doc(contributorId).get().then(doc => {
+                                if (doc.exists) {
+                                    const name = doc.data()?.displayName || doc.data()?.email || 'Unknown';
+                                    userProfileCache[contributorId] = name;
+                                    const heading = libraryWrapper.querySelector(`[data-contributor-id="${contributorId}"] [data-name]`);
+                                    if (heading) heading.textContent = name;
+                                }
+                            });
+                        }
                     });
                 }
             }
@@ -1421,6 +1486,7 @@
 
                 document.getElementById('save-profile-btn')?.addEventListener('click', async () => {
                     const displayName = document.getElementById('profile-display-name').value.trim();
+                    window.showLoading();
                     try {
                         await db.collection('users').doc(currentUser.uid).update({
                             displayName,
@@ -1432,6 +1498,8 @@
                         renderMainApp();
                     } catch (err) {
                         showToast('Error updating profile: ' + err.message, 'error');
+                    } finally {
+                        window.hideLoading();
                     }
                 });
 
@@ -1465,6 +1533,7 @@
                 if (!newVal || newVal === oldVal) return;
 
                 showToast(`Updating ${type}...`, 'info');
+                window.showLoading();
 
                 if (type === 'Genre') {
                     const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).get();
@@ -1493,6 +1562,7 @@
                     await batch.commit();
                     showToast(`Updated ${snapshot.size} books`, 'success');
                 }
+                window.hideLoading();
                 renderMainApp();
             };
 
@@ -1501,6 +1571,7 @@
                 if (!confirm(`Remove "${val}" from all books? (They will be set to "${fallback}" if no other genres remain)`)) return;
 
                 showToast(`Updating books...`, 'info');
+                window.showLoading();
                 if (type === 'Genre') {
                     const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).get();
                     const batch = db.batch();
@@ -1527,6 +1598,7 @@
                     await batch.commit();
                     showToast(`Updated ${snapshot.size} books`, 'success');
                 }
+                window.hideLoading();
                 renderMainApp();
             };
 
@@ -1572,6 +1644,9 @@
 
             window.setTab = (tab) => {
                 activeTab = tab;
+                // Reset status filter when switching tabs to avoid confusing empty views
+                statusFilter = 'all';
+                localStorage.setItem('mylib_statusFilter', 'all');
                 renderMainApp();
             };
 
@@ -1640,15 +1715,26 @@
                 renderLibraryOnly();
             };
 
-            window.clearAllFilters = () => {
+            window.clearAllFilters = (shouldRender = true) => {
                 searchQuery = '';
                 tagFilter = null;
+                statusFilter = 'all';
                 categoryFilter = 'all';
                 authorFilter = 'all';
                 ownerFilter = 'all';
                 advancedFilters = { rating: 'all', minPrice: null, maxPrice: null, startDate: null, endDate: null };
                 const searchInput = document.getElementById('search-input');
                 if (searchInput) searchInput.value = '';
+                if (shouldRender) renderMainApp();
+            };
+
+            window.applyInsightFilter = (type, value) => {
+                window.clearAllFilters(false);
+                activeTab = 'library';
+                if (type === 'genre') categoryFilter = value;
+                else if (type === 'tag') tagFilter = value;
+                else if (type === 'author') authorFilter = value;
+                else if (type === 'owner') ownerFilter = value;
                 renderMainApp();
             };
 
@@ -1702,9 +1788,10 @@
                         </div>
                         ` : ''}
                         <div>
-                            <label for="adv-rating" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Minimum Rating</label>
+                            <label for="adv-rating" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Rating</label>
                             <select id="adv-rating" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none">
                                 <option value="all">Any Rating</option>
+                                <option value="0" ${advancedFilters.rating == 0 ? 'selected' : ''}>Not Rated</option>
                                 <option value="1" ${advancedFilters.rating == 1 ? 'selected' : ''}>1+ Star</option>
                                 <option value="2" ${advancedFilters.rating == 2 ? 'selected' : ''}>2+ Stars</option>
                                 <option value="3" ${advancedFilters.rating == 3 ? 'selected' : ''}>3+ Stars</option>
@@ -1964,7 +2051,7 @@
                                 <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100" aria-label="Edit book details">
                                     <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
-                                <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge}">${READING_STATUSES[bookStatus].label}</div>
+                                <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge}">${READING_STATUSES[bookStatus].label}${bookStatus === 'reading' ? ` (${userProgress || 0}%)` : ''}</div>
                             </div>
                         </div>
                     </div>
@@ -2006,7 +2093,7 @@
                                 ${(book.tags || []).map(tag => `<span onclick="event.stopPropagation(); window.setTagFilter('${tag}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors">${tag}</span>`).join('')}
                             </div>
                             <div class="mt-2 flex flex-wrap gap-1">
-                                <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge}">${READING_STATUSES[bookStatus].label}</div>
+                                <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge}">${READING_STATUSES[bookStatus].label}${bookStatus === 'reading' ? ` (${userProgress || 0}%)` : ''}</div>
                                 ${book.borrowedBy ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed by ${book.borrowedBy}</div>` : ''}
                                 ${addedByBadge}
                             </div>
@@ -2105,6 +2192,7 @@
                                     return timeB - timeA;
                                 });
                                 updateMetadataCache();
+                                syncCompletedBooksCount();
                                 renderMainApp();
                             }, err => {
                                 console.error("Firestore Error for chunk:", chunk, err);
@@ -2167,6 +2255,7 @@
                                 };
                             }
                         });
+                        syncCompletedBooksCount();
                         renderLibraryOnly();
                     }, err => {
                         console.error("Status Listener Error (Ensure index is created):", err);
@@ -2666,6 +2755,7 @@
                 if (!currentUser) return;
                 targetUserId = targetUserId || currentUser.uid;
                 const isAddingToSharedLibrary = targetUserId !== currentUser.uid;
+                window.showLoading();
 
                 try {
                     // Check for duplicate in TARGET library
@@ -2774,6 +2864,8 @@
                     }
 
                     showToast('Error saving: ' + err.message, 'error');
+                } finally {
+                    window.hideLoading();
                 }
             }
 
@@ -2931,6 +3023,7 @@
                 if (!confirm('This will move all books from the legacy "default" library to your personal library. Proceed?')) return;
 
                 showToast('Starting migration...', 'info');
+                window.showLoading();
                 try {
                     let migratedCount = 0;
                     // 1. Migrate books with libraryId: 'default'
@@ -2948,12 +3041,15 @@
                     showToast(`Successfully migrated ${migratedCount} books to your personal library!`, 'success');
                 } catch (err) {
                     showToast('Migration error: ' + err.message, 'error');
+                } finally {
+                    window.hideLoading();
                 }
             };
 
             async function undoImport() {
                 if (!lastImportState) return;
                 showToast('Undoing import...', 'info');
+                window.showLoading();
 
                 const { addedIds, previousStates } = lastImportState;
                 const batch = db.batch();
@@ -2974,6 +3070,8 @@
                     lastImportState = null;
                 } catch (err) {
                     showToast('Error undoing import: ' + err.message, 'error');
+                } finally {
+                    window.hideLoading();
                 }
             }
 
@@ -2997,6 +3095,7 @@
                                 return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
                             };
 
+                            window.showLoading();
                             const importPromises = results.data.map(async row => {
                                 const title = (row.Title || row.title || 'Untitled').trim();
                                 const author = (row.Author || row.author || 'Unknown').trim() || 'Unknown';
@@ -3069,6 +3168,7 @@
                             await Promise.all(importPromises);
 
                             lastImportState = { addedIds, previousStates };
+                            window.hideLoading();
 
                             const toastMsg = `Imported ${importedCount} new, updated ${updatedCount} existing. <button onclick="window.undoImport()" class="ml-4 underline font-bold uppercase text-xs">Undo</button>`;
                             showToast(toastMsg, 'success', 10000);
@@ -3094,6 +3194,25 @@
                 a.click();
             }
 
+            let unsubscribeProfile = null;
+            // Debounced sync for completed books count
+            let syncTimeout = null;
+            function syncCompletedBooksCount() {
+                if (!currentUser) return;
+                if (syncTimeout) clearTimeout(syncTimeout);
+                syncTimeout = setTimeout(async () => {
+                    const finishedCount = books.filter(b => !b.isWishlist && getStatusData(b.id).status === 'finished').length;
+                    if (userProfile && userProfile.completedBooksCount !== finishedCount) {
+                        try {
+                            await db.collection('users').doc(currentUser.uid).update({
+                                completedBooksCount: finishedCount,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        } catch (err) { console.error("Error syncing count:", err); }
+                    }
+                }, 1000);
+            }
+
             // ---------- Auth State Observer ----------
             window.startApp = function() {
                 if (authObserverStarted) return;
@@ -3102,25 +3221,43 @@
                 auth.onAuthStateChanged(async (user) => {
                     currentUser = user;
                     if (user) {
-                    // Ensure user profile exists in Firestore
-                    const userDoc = await db.collection('users').doc(user.uid).get();
-                    if (!userDoc.exists) {
-                        await db.collection('users').doc(user.uid).set({
-                            uid: user.uid,
-                            email: user.email,
-                            displayName: user.displayName || '',
-                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        // Subscribe to user profile for real-time updates
+                        if (unsubscribeProfile) unsubscribeProfile();
+                        unsubscribeProfile = db.collection('users').doc(user.uid).onSnapshot(async (doc) => {
+                            if (!doc.exists) {
+                                // Create profile if it doesn't exist
+                                const initialProfile = {
+                                    uid: user.uid,
+                                    email: user.email,
+                                    displayName: user.displayName || '',
+                                    completedBooksCount: 0,
+                                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                };
+                                await db.collection('users').doc(user.uid).set(initialProfile);
+                                userProfile = initialProfile;
+                            } else {
+                                userProfile = doc.data();
+                            }
+                            renderMainApp();
                         });
-                        userProfile = { uid: user.uid, email: user.email, displayName: user.displayName || '' };
-                    } else {
-                        userProfile = userDoc.data();
-                    }
 
-                    subscribeToBooks();
-                    renderMainApp();
+                        subscribeToBooks();
                     } else {
                         if (unsubscribeBooks) unsubscribeBooks();
                         if (unsubscribeStatus) unsubscribeStatus();
+                        if (unsubscribeProfile) unsubscribeProfile();
+                        if (unsubscribePartners1) unsubscribePartners1();
+                        if (unsubscribePartners2) unsubscribePartners2();
+                        if (unsubscribePartnershipBooks1) unsubscribePartnershipBooks1();
+                        if (unsubscribePartnershipBooks2) unsubscribePartnershipBooks2();
+                        if (unsubscribeOwnBooks) {
+                            if (Array.isArray(unsubscribeOwnBooks)) unsubscribeOwnBooks.forEach(u => u());
+                            else unsubscribeOwnBooks();
+                        }
+                        if (unsubscribeActivity) {
+                            if (Array.isArray(unsubscribeActivity)) unsubscribeActivity.forEach(u => u());
+                            else unsubscribeActivity();
+                        }
                         books = [];
                         readingStatuses = {};
                         appEl.innerHTML = '';
