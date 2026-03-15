@@ -395,19 +395,27 @@
             // ---------- Modal helper ----------
             function showModal(html, onClose, isFullscreen = false) {
                 const modal = document.createElement('div');
-                modal.className = isFullscreen
-                    ? 'fixed inset-0 z-50 flex items-center justify-center bg-slate-50 dark:bg-slate-900 transition-all'
-                    : 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm transition-all';
+                modal.setAttribute('role', 'dialog');
+                modal.setAttribute('aria-modal', 'true');
+                modal.className = isFullscreen ? 'fixed inset-0 z-50 flex items-center justify-center bg-slate-50 dark:bg-slate-900' : 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm';
                 modal.innerHTML = html;
+                if (modalContainer._cleanup) modalContainer._cleanup();
                 modalContainer.innerHTML = '';
                 modalContainer.appendChild(modal);
                 modalContainer.classList.add('pointer-events-auto');
                 const closeHandler = () => {
+                    window.removeEventListener('keydown', escHandler);
                     modal.remove();
                     modalContainer.classList.remove('pointer-events-auto');
+                    modalContainer._cleanup = null;
                     if (onClose) onClose();
                 };
+                const escHandler = (e) => { if (e.key === 'Escape') closeHandler(); };
+                window.addEventListener('keydown', escHandler);
+                modalContainer._cleanup = closeHandler;
+                if (!isFullscreen) modal.addEventListener('click', (e) => { if (e.target === modal) closeHandler(); });
                 modal.querySelector('[data-close]')?.addEventListener('click', closeHandler);
+                setTimeout(() => { (modal.querySelector('input:not([type="hidden"]), select, textarea, button') || modal.querySelector('[data-close]'))?.focus(); }, 50);
                 return closeHandler;
             }
 
