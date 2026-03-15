@@ -287,6 +287,10 @@
             });
             let books = [];                // local copy for UI, synced with Firestore
             let readingStatuses = {};      // local copy for per-user statuses {bookId: status}
+
+            // Performance optimizations: pre-rendered star strings and frozen status constant
+            const STAR_CACHE = Array.from({ length: 6 }, (_, i) => i === 0 ? '' : '★'.repeat(i) + '☆'.repeat(5 - i));
+            const DEFAULT_STATUS = Object.freeze({ status: 'want_to_read', rating: 0, progress: 0, comment: '' });
             let unsubscribeBooks = null;
             let unsubscribeStatus = null;
             let activeTab = 'library';     // 'library', 'wishlist', 'activity', 'settings'
@@ -345,16 +349,8 @@
             // ---------- Utilities ----------
 
             function getStatusData(bookId) {
-                const data = readingStatuses[bookId];
-                if (!data) return { status: 'want_to_read', rating: 0, progress: 0, comment: '' };
-                if (typeof data === 'string') return { status: data === 'unread' ? 'want_to_read' : data, rating: 0, progress: 0, comment: '' };
-
-                return {
-                    status: data.status === 'unread' ? 'want_to_read' : (data.status || 'want_to_read'),
-                    rating: data.rating || 0,
-                    progress: data.progress || 0,
-                    comment: data.comment || ''
-                };
+                // Optimized for O(1) performance using pre-normalized data and frozen constant fallback
+                return readingStatuses[bookId] || DEFAULT_STATUS;
             }
 
             // ---------- Utility: Escape HTML ----------
@@ -1889,7 +1885,7 @@
                 const userProgress = statusData.progress;
 
                 const displayRating = book.averageRating ? Math.round(book.averageRating) : (userRating || book.rating || 0);
-                const stars = displayRating ? '★'.repeat(displayRating) + '☆'.repeat(5 - displayRating) : '';
+                const stars = STAR_CACHE[displayRating] || '';
 
                 const isSelected = selectedBookIds.has(book.id);
                 const bookGenres = getBookGenres(book);
@@ -2144,7 +2140,14 @@
                             if (change.type === 'removed') {
                                 delete readingStatuses[bookId];
                             } else {
-                                readingStatuses[bookId] = change.doc.data();
+                                const data = change.doc.data();
+                                // Normalize data upon ingestion to reduce CPU overhead during renders
+                                readingStatuses[bookId] = {
+                                    status: data.status === 'unread' ? 'want_to_read' : (data.status || 'want_to_read'),
+                                    rating: data.rating || 0,
+                                    progress: data.progress || 0,
+                                    comment: data.comment || ''
+                                };
                             }
                         });
                         renderLibraryOnly();
@@ -3116,7 +3119,7 @@
                 const userComment = statusData.comment;
                 const userProgress = statusData.progress;
 
-                const stars = userRating ? '★'.repeat(userRating) + '☆'.repeat(5 - userRating) : (book.rating ? '★'.repeat(book.rating) + '☆'.repeat(5 - book.rating) : '');
+                const stars = STAR_CACHE[userRating] || (book.rating ? STAR_CACHE[book.rating] : '');
 
                 const bookGenres = getBookGenres(book);
 
