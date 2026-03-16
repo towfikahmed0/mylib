@@ -17,3 +17,7 @@
 ## 2026-03-20 - [Book Pre-normalization and Filter Hoisting]
 **Learning:** Re-calculating search strings, parsing dates, and performing case conversions inside high-frequency `filter` and `sort` loops causes measurable UI lag as the library grows. Pre-normalizing book data upon ingestion into a persistent `Map` and hoisting filter constants allows for O(1) attribute access and minimal computation during renders.
 **Action:** Implemented `normalizeBook` and a persistent `booksMap`. Refactored `renderLibraryOnly` to use these pre-calculated properties and hoisted constants.
+
+## 2026-03-22 - [Caching localStorage for Hot Path Rendering]
+**Learning:** Synchronous `localStorage.getItem` calls within high-frequency loops (like `renderBookCard` which runs for every item in a list) introduce significant O(N) overhead and can cause UI jank as the list grows. Caching these preferences in a local scope variable reduces this to O(1) during render.
+**Action:** Always cache frequently accessed user preferences in local variables at app startup and keep them synchronized via event listeners when they are updated in Settings.
