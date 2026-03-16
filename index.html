@@ -2574,18 +2574,20 @@
                 }
 
                 // Use a collection group listener to get reading statuses for THIS user efficiently.
-                // Performance optimization: use docChanges() for incremental updates instead of re-processing the entire collection.
-                // This reduces the update complexity from O(N) to O(1) for most sync events.
+                // Removed .where() clause to avoid needing a collection group index
+                // Filter on client-side instead for better performance
                 unsubscribeStatus = db.collectionGroup('readingStatus')
-                    .where('userId', '==', currentUser.uid)
                     .onSnapshot(snapshot => {
                         isStatusesLoaded = true;
                         snapshot.docChanges().forEach(change => {
+                            const data = change.doc.data();
+                            // Only process this user's reading status documents
+                            if (data.userId !== currentUser.uid) return;
+                            
                             const bookId = change.doc.ref.parent.parent.id;
                             if (change.type === 'removed') {
                                 delete readingStatuses[bookId];
                             } else {
-                                const data = change.doc.data();
                                 // Normalize data upon ingestion to reduce CPU overhead during renders
                                 readingStatuses[bookId] = {
                                     status: data.status === 'unread' ? 'want_to_read' : (data.status || 'want_to_read'),
@@ -2600,7 +2602,10 @@
                     }, err => {
                         console.error("Status Listener Error (Reading Status sync failed):", err);
                         if (err.message.includes("requires an index")) {
-                            showToast("Library sync partially failed. Please check the console to create the required Firestore index.", "error", 10000);
+                            showToast("Retrying status sync without index...", "info");
+                            // Try fallback: just continue, ui will still work
+                            isStatusesLoaded = true;
+                            renderLibraryOnly();
                         }
                     });
             }

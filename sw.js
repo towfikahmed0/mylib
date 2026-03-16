@@ -1,6 +1,6 @@
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open('mylib-v1').then(cache => {
+    caches.open('mylib-v2').then(cache => {
       return cache.addAll([
         '/',
         '/index.html',
@@ -25,7 +25,7 @@ self.addEventListener('fetch', e => {
 
   // Stale-while-revalidate for everything
   e.respondWith(
-    caches.open('mylib-v1').then(cache => {
+    caches.open('mylib-v2').then(cache => {
       return cache.match(e.request).then(response => {
         const fetchPromise = fetch(e.request).then(networkResponse => {
           // Only cache successful same-origin or specific CDN responses to avoid CORS issues
