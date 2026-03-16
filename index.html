@@ -333,6 +333,7 @@
             let books = [];                // local copy for UI, synced with Firestore
             let booksMap = new Map();      // Map for O(1) updates: bookId -> normalizedBook
             let readingStatuses = {};      // local copy for per-user statuses {bookId: status}
+            let isStatusesLoaded = false;  // Flag to prevent premature sync before data is fetched
 
             const GENRE_FALLBACK = ['Other'];
             // Helper to get book genres as an array - Optimized to use cached _genres if available
@@ -2565,6 +2566,7 @@
                 unsubscribeStatus = db.collectionGroup('readingStatus')
                     .where('userId', '==', currentUser.uid)
                     .onSnapshot(snapshot => {
+                        isStatusesLoaded = true;
                         snapshot.docChanges().forEach(change => {
                             const bookId = change.doc.ref.parent.parent.id;
                             if (change.type === 'removed') {
@@ -2583,7 +2585,10 @@
                         syncCompletedBooksCount();
                         renderLibraryOnly();
                     }, err => {
-                        console.error("Status Listener Error (Ensure index is created):", err);
+                        console.error("Status Listener Error (Reading Status sync failed):", err);
+                        if (err.message.includes("requires an index")) {
+                            showToast("Library sync partially failed. Please check the console to create the required Firestore index.", "error", 10000);
+                        }
                     });
             }
 
@@ -3617,7 +3622,7 @@
             // Debounced sync for completed books count
             let syncTimeout = null;
             function syncCompletedBooksCount() {
-                if (!currentUser) return;
+                if (!currentUser || !isStatusesLoaded) return;
                 if (syncTimeout) clearTimeout(syncTimeout);
                 syncTimeout = setTimeout(async () => {
                     const finishedCount = books.filter(b => !b.isWishlist && getStatusData(b.id).status === 'finished').length;
@@ -3680,6 +3685,7 @@
                         books = [];
                         booksMap.clear();
                         readingStatuses = {};
+                        isStatusesLoaded = false;
                         appEl.innerHTML = '';
                         renderAuth();
                     }
@@ -3688,20 +3694,19 @@
 
             async function openBookDetails(book) {
                 const statusData = getStatusData(book.id);
-                const bookStatus = statusData.status;
-                const userRating = statusData.rating;
-                const userComment = statusData.comment;
-                const userProgress = statusData.progress;
 
-                const stars = STAR_CACHE[userRating] || (book.rating ? STAR_CACHE[book.rating] : '');
+                // Re-fetch current user's status, rating, progress and comment for this book to be sure
+                const userStatusDoc = await db.collection('books').doc(book.id).collection('readingStatus').doc(currentUser.uid).get();
+                const userData = userStatusDoc.exists ? userStatusDoc.data() : null;
+
+                const bookStatus = userData?.status || statusData.status;
+                const userRatingVal = userData?.rating ?? statusData.rating;
+                const userCommentVal = userData?.comment ?? statusData.comment;
+                const userProgressVal = userData?.progress ?? statusData.progress;
+
+                const stars = STAR_CACHE[userRatingVal] || (book.rating ? STAR_CACHE[book.rating] : '');
 
                 const bookGenres = getBookGenres(book);
-
-                // Re-fetch current user's rating and comment for this book to be sure
-                const userStatusDoc = await db.collection('books').doc(book.id).collection('readingStatus').doc(currentUser.uid).get();
-                const userRatingVal = userStatusDoc.exists ? userStatusDoc.data().rating || 0 : userRating;
-                const userCommentVal = userStatusDoc.exists ? userStatusDoc.data().comment || '' : userComment;
-                const userProgressVal = userStatusDoc.exists ? userStatusDoc.data().progress || 0 : userProgress;
 
                 // Fetch all ratings and comments for this book
                 const allStatusesSnapshot = await db.collection('books').doc(book.id).collection('readingStatus').get();
