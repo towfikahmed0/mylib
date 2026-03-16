@@ -384,7 +384,8 @@
                 }
             });
             let viewMode = localStorage.getItem('mylib_viewMode') || 'grid';
-            // Performance optimization: cache frequently accessed preferences in IIFE scope
+            // Performance optimization: cache frequently accessed preferences in IIFE scope and initialize collator
+            const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
             let cardDensity = localStorage.getItem('mylib_density') || 'normal';
             let readingGoal = parseInt(localStorage.getItem('mylib_readingGoal')) || 50;
             let defaultSort = localStorage.getItem('mylib_defaultSort') || 'newest';
@@ -1269,9 +1270,10 @@
                             if (result) {
                                 try {
                                     const cleanJson = result.replace(/```json|```/g, "").trim();
-                                    aiFilteredIds = JSON.parse(cleanJson);
-                                    if (Array.isArray(aiFilteredIds)) {
-                                        showToast(`AI found ${aiFilteredIds.length} matches`, 'success');
+                                    const ids = JSON.parse(cleanJson);
+                                    if (Array.isArray(ids)) {
+                                        aiFilteredIds = new Set(ids);
+                                        showToast(`AI found ${aiFilteredIds.size} matches`, 'success');
                                     }
                                 } catch (e) {
                                     console.error("AI Search Parse Error:", e);
@@ -1368,9 +1370,9 @@
                 let filteredBooks = books.filter(b => {
                     const matchesTab = activeTab === 'wishlist' ? b.isWishlist : !b.isWishlist;
 
-                    // AI filtering priority
-                    if (aiFilteredIds && Array.isArray(aiFilteredIds)) {
-                        return matchesTab && aiFilteredIds.includes(b.id);
+                    // AI filtering priority - Optimized O(1) Set lookup
+                    if (aiFilteredIds && aiFilteredIds instanceof Set) {
+                        return matchesTab && aiFilteredIds.has(b.id);
                     }
 
                     // O(1) access to pre-calculated search blob
@@ -1411,8 +1413,9 @@
                 });
 
                 filteredBooks.sort((a, b) => {
-                    if (sortBy === 'title') return (a.title || '').localeCompare(b.title || '');
-                    if (sortBy === 'author') return (a.author || '').localeCompare(b.author || '');
+                    // Optimized sorting using Intl.Collator
+                    if (sortBy === 'title') return collator.compare(a.title || '', b.title || '');
+                    if (sortBy === 'author') return collator.compare(a.author || '', b.author || '');
                     if (sortBy === 'newest') {
                         // Use pre-calculated created time
                         return b._createdTime - a._createdTime;
