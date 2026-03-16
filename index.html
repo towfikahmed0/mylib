@@ -3708,7 +3708,10 @@
                                             <option value="finished" ${bookStatus === 'finished' ? 'selected' : ''}>Finished</option>
                                         </select>
                                         ${bookStatus === 'reading' ? `
-                                            <input id="detail-progress-input" type="number" min="0" max="100" value="${userProgressVal}" class="w-20 px-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="%">
+                                            <div class="flex flex-1 items-center gap-3">
+                                                <input id="detail-progress-slider" type="range" min="0" max="100" value="${userProgressVal}" class="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary" aria-label="Reading progress slider">
+                                                <input id="detail-progress-input" type="number" min="0" max="100" value="${userProgressVal}" class="w-16 px-2 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-center" placeholder="%" aria-label="Reading progress percentage">
+                                            </div>
                                         ` : ''}
                                     </div>
                                 </div>
@@ -3988,17 +3991,29 @@
                     } catch (err) { showToast('Error: ' + err.message, 'error'); }
                 });
 
-                document.getElementById('detail-progress-input')?.addEventListener('change', async (e) => {
-                    const progress = parseInt(e.target.value) || 0;
-                    try {
-                        await db.collection('books').doc(book.id)
-                            .collection('readingStatus').doc(currentUser.uid).set({
-                                progress: progress,
-                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                            }, { merge: true });
-                        showToast('Progress updated!', 'success');
-                    } catch (err) { showToast('Error: ' + err.message, 'error'); }
-                });
+                const progressInput = document.getElementById('detail-progress-input');
+                const progressSlider = document.getElementById('detail-progress-slider');
+                if (progressInput && progressSlider) {
+                    const syncProgress = (val) => {
+                        progressInput.value = val;
+                        progressSlider.value = val;
+                    };
+                    [progressInput, progressSlider].forEach(el => {
+                        el.addEventListener('input', (e) => syncProgress(e.target.value));
+                        el.addEventListener('change', async (e) => {
+                            const progress = parseInt(e.target.value) || 0;
+                            syncProgress(progress);
+                            try {
+                                await db.collection('books').doc(book.id)
+                                    .collection('readingStatus').doc(currentUser.uid).set({
+                                        progress: progress,
+                                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                    }, { merge: true });
+                                showToast('Progress updated!', 'success');
+                            } catch (err) { showToast('Error: ' + err.message, 'error'); }
+                        });
+                    });
+                }
 
                 document.getElementById('return-book-btn')?.addEventListener('click', async (e) => {
                     const btn = e.currentTarget;
