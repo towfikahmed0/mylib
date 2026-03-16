@@ -383,6 +383,11 @@
                 }
             });
             let viewMode = localStorage.getItem('mylib_viewMode') || 'grid';
+            // Performance optimization: cache frequently accessed preferences in IIFE scope
+            let cardDensity = localStorage.getItem('mylib_density') || 'normal';
+            let readingGoal = parseInt(localStorage.getItem('mylib_readingGoal')) || 50;
+            let defaultSort = localStorage.getItem('mylib_defaultSort') || 'newest';
+
             let sharedWithMe = [];         // UIDs of users who shared their library with me
             let activities = [];           // activity log for book additions
             let metadataCache = { authors: [], genres: [], owners: [] }; // Performance optimization: single-pass cache
@@ -390,7 +395,7 @@
             let searchQuery = '';
             let aiFilteredIds = null;
             let searchTimeout = null;
-            let sortBy = localStorage.getItem('mylib_sortBy') || localStorage.getItem('mylib_defaultSort') || 'newest';
+            let sortBy = localStorage.getItem('mylib_sortBy') || defaultSort;
             let statusFilter = localStorage.getItem('mylib_statusFilter') || 'all';
             let categoryFilter = 'all';
             let authorFilter = 'all';
@@ -563,7 +568,7 @@
                     if (statusCounts.hasOwnProperty(status)) statusCounts[status]++;
                 });
 
-                const goal = parseInt(localStorage.getItem('mylib_readingGoal')) || 50;
+                const goal = readingGoal;
                 const finished = userProfile?.completedBooksCount || 0;
                 const goalPercent = Math.min(100, Math.round((finished / goal) * 100));
 
@@ -875,7 +880,7 @@
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
                                     <label for="pref-reading-goal" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Yearly Reading Goal</label>
-                                    <input id="pref-reading-goal" type="number" value="${localStorage.getItem('mylib_readingGoal') || 50}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-xs font-bold mt-1">
+                                    <input id="pref-reading-goal" type="number" value="${readingGoal}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-xs font-bold mt-1">
                                 </div>
                                 <div>
                                     <label for="pref-font-size" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Card Density</label>
@@ -1126,7 +1131,7 @@
                                     <div class="flex items-center gap-2">
                                         <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-widest">${currentUser.email}</p>
                                         <span class="text-[10px] text-slate-300">|</span>
-                                        <span class="text-[10px] font-black text-primary">${userProfile?.completedBooksCount || 0}/${localStorage.getItem('mylib_readingGoal') || 50}</span>
+                                        <span class="text-[10px] font-black text-primary">${userProfile?.completedBooksCount || 0}/${readingGoal}</span>
                                     </div>
                                 </div>
                             </div>
@@ -1437,7 +1442,7 @@
                     }
 
                     if (window.innerWidth < 768) {
-                        if (sortBy !== (localStorage.getItem('mylib_defaultSort') || 'newest')) activeCount++;
+                        if (sortBy !== defaultSort) activeCount++;
                         if (categoryFilter !== 'all') activeCount++;
                         if (statusFilter !== 'all') activeCount++;
                         if (authorFilter !== 'all') activeCount++;
@@ -1600,6 +1605,9 @@
                         }
                     });
 
+                    // Hoist container class calculation out of section template literals
+                    const containerClass = viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3';
+
                     let html = '';
 
                     // My own books section
@@ -1607,7 +1615,7 @@
                         html += `
                         <div>
                             <h2 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200">My Books (${myOwnBooks.length})</h2>
-                            <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3'}">
+                            <div class="${containerClass}">
                                 ${myOwnBooks.map(book => renderBookCard(book)).join('')}
                             </div>
                         </div>
@@ -1622,7 +1630,7 @@
                                 <h3 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200" data-contributor-id="${contributorId}">
                                     Shared with Me by <span data-name="loading...">loading...</span> (${books.length})
                                 </h3>
-                                <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3'}">
+                                <div class="${containerClass}">
                                     ${books.map(book => renderBookCard(book)).join('')}
                                 </div>
                             </div>
@@ -1635,7 +1643,7 @@
                         html += `
                         <div ${(myOwnBooks.length > 0 || Object.keys(groupedByContributor).length > 0) ? 'class="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800"' : ''}>
                             <h2 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200">Shared with Me (${sharedFromPartners.length})</h2>
-                            <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3'}">
+                            <div class="${containerClass}">
                                 ${sharedFromPartners.map(book => renderBookCard(book)).join('')}
                             </div>
                         </div>
@@ -1733,19 +1741,25 @@
                     renderMainApp();
                 });
                 document.getElementById('pref-default-sort')?.addEventListener('change', e => {
-                    localStorage.setItem('mylib_defaultSort', e.target.value);
-                    sortBy = e.target.value;
+                    const newVal = e.target.value;
+                    localStorage.setItem('mylib_defaultSort', newVal);
+                    defaultSort = newVal;
+                    sortBy = newVal;
                     renderMainApp();
                 });
 
                 document.getElementById('pref-reading-goal')?.addEventListener('input', e => {
-                    localStorage.setItem('mylib_readingGoal', e.target.value);
+                    const newVal = parseInt(e.target.value) || 0;
+                    localStorage.setItem('mylib_readingGoal', newVal);
+                    readingGoal = newVal;
                     // No need to re-render everything immediately for every keystroke
                 });
                 document.getElementById('pref-reading-goal')?.addEventListener('blur', () => renderMainApp());
 
                 document.getElementById('pref-card-density')?.addEventListener('change', e => {
-                    localStorage.setItem('mylib_density', e.target.value);
+                    const newVal = e.target.value;
+                    localStorage.setItem('mylib_density', newVal);
+                    cardDensity = newVal;
                     renderMainApp();
                 });
 
@@ -2315,7 +2329,6 @@
 
                 const isSelected = selectedBookIds.has(book.id);
                 const bookGenres = getBookGenres(book);
-                const isSharedBook = book.userId !== currentUser.uid;
                 const addedByBadge = book.addedBy && book.addedBy !== currentUser.uid ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">Added by contributor</div>` : '';
 
                 if (viewMode === 'compact') {
@@ -2380,7 +2393,7 @@
                 `;
                 }
 
-                const densityClass = localStorage.getItem('mylib_density') === 'relaxed' ? 'density-relaxed' : localStorage.getItem('mylib_density') === 'compact' ? 'density-compact' : '';
+                const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
                 return `
                 <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-blue-100/50 dark:border-slate-800'} relative ${densityClass}" data-book-id="${book.id}">
                     <div class="absolute top-4 left-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
