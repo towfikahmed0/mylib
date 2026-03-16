@@ -54,6 +54,11 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <!-- PapaParse for CSV -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- Google Generative AI -->
+    <script type="module">
+        import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+        window.GoogleGenerativeAI = GoogleGenerativeAI;
+    </script>
     <style>
         * {
             font-family: 'Inter', sans-serif;
@@ -273,6 +278,43 @@
         }
 
         (function () {
+            // ---------- AI Utility ----------
+            async function askGemini(prompt, systemInstruction = "") {
+                const apiKey = localStorage.getItem('mylib_gemini_api_key');
+                if (!apiKey) {
+                    showToast("Please set your Gemini API Key in Settings", "error");
+                    return null;
+                }
+
+                try {
+                    if (!window.GoogleGenerativeAI) {
+                        // Wait a bit if SDK is still loading
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        if (!window.GoogleGenerativeAI) throw new Error("AI SDK not loaded");
+                    }
+                    const genAI = new window.GoogleGenerativeAI(apiKey);
+                    const model = genAI.getGenerativeModel({
+                        model: "gemini-1.5-flash"
+                    });
+
+                    // If systemInstruction is supported by the model config, use it.
+                    // For now, prepend it to the prompt for simplicity and compatibility.
+                    const fullPrompt = systemInstruction ? `${systemInstruction}\n\nUser: ${prompt}` : prompt;
+
+                    const result = await model.generateContent(fullPrompt);
+                    const response = await result.response;
+                    return response.text();
+                } catch (err) {
+                    console.error("Gemini Error:", err);
+                    if (err.message.includes("API_KEY_INVALID")) {
+                        showToast("Invalid Gemini API Key. Please check your settings.", "error");
+                    } else {
+                        showToast("AI Error: " + err.message, "error");
+                    }
+                    return null;
+                }
+            }
+
             // ---------- State ----------
             let deferredPrompt = null;
             let currentUser = null;
@@ -345,6 +387,7 @@
             let metadataCache = { authors: [], genres: [], owners: [] }; // Performance optimization: single-pass cache
 
             let searchQuery = '';
+            let aiFilteredIds = null;
             let searchTimeout = null;
             let sortBy = localStorage.getItem('mylib_sortBy') || localStorage.getItem('mylib_defaultSort') || 'newest';
             let statusFilter = localStorage.getItem('mylib_statusFilter') || 'all';
@@ -576,6 +619,38 @@
                                 </div>
                                 <div class="text-[10px] font-bold uppercase text-slate-400 mb-1">Authors</div>
                                 <div class="text-2xl font-black font-serif">${Object.keys(authorsCount).length}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Recommendations Section -->
+                    <div id="ai-recs-container" class="glass p-8 rounded-[2.5rem] border border-violet-100 dark:border-violet-900/30 bg-gradient-to-br from-white to-violet-50/30 dark:from-slate-900 dark:to-violet-900/10">
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <h2 class="text-xl font-black font-serif italic text-violet-600 dark:text-violet-400">AI Curator</h2>
+                                <p class="text-xs text-slate-500">Personalized picks from your library</p>
+                            </div>
+                            <button id="refresh-ai-recs-btn" class="p-3 bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 rounded-2xl hover:bg-violet-200 transition-all shadow-sm" title="Refresh Recommendations">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            </button>
+                        </div>
+                        <div id="ai-recs-content" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="md:col-span-3 py-12 text-center">
+                                <p class="text-sm text-slate-400 italic">Tap refresh to see what you should read next!</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass p-8 rounded-[2.5rem] border border-violet-100/50 dark:border-slate-800 bg-gradient-to-br from-white to-violet-50/30 dark:from-slate-900 dark:to-violet-900/10">
+                        <h2 class="text-2xl font-black mb-6 font-serif italic text-violet-600 dark:text-violet-400">AI Configuration</h2>
+                        <div class="space-y-4">
+                            <div>
+                                <label for="gemini-api-key" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Gemini API Key</label>
+                                <div class="flex flex-col sm:flex-row gap-2">
+                                    <input id="gemini-api-key" type="password" placeholder="AIza..." value="${localStorage.getItem('mylib_gemini_api_key') || ''}" class="flex-1 min-w-0 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none text-sm transition-all">
+                                    <button id="save-ai-settings-btn" class="sm:px-6 py-3 bg-violet-600 text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-violet-200 dark:shadow-none">Save Key</button>
+                                </div>
+                                <p class="text-[9px] text-slate-400 mt-2 ml-1 italic">Your key is stored locally in your browser.</p>
                             </div>
                         </div>
                     </div>
@@ -1106,6 +1181,7 @@
                     attachSettingsListeners();
                 } else if (activeTab === 'insights') {
                     mainContentEl.innerHTML = renderInsights();
+                    attachInsightsListeners();
                 } else if (activeTab === 'activity') {
                     mainContentEl.innerHTML = renderActivity();
                     attachActivityListeners();
@@ -1154,13 +1230,51 @@
                         const searchHint = document.getElementById('search-hint');
                         searchInput.addEventListener('input', e => {
                             searchQuery = e.target.value;
+                            aiFilteredIds = null; // Reset AI filters on new input
                             document.getElementById('clear-search-btn').classList.toggle('hidden', !searchQuery);
                             if (searchHint) searchHint.classList.toggle('opacity-0', !!searchQuery);
+
                             if (searchTimeout) clearTimeout(searchTimeout);
-                            searchTimeout = setTimeout(() => {
-                                renderLibraryOnly();
-                            }, 150);
+                            searchTimeout = setTimeout(async () => {
+                                // Smart AI Detection: if more than 3 words or starts with "find", "suggest", etc.
+                                const words = searchQuery.trim().split(/\s+/);
+                                const isNaturalLanguage = words.length > 3 || /^(find|suggest|recommend|search for|about|show me)\b/i.test(searchQuery);
+
+                                if (isNaturalLanguage && searchQuery.length > 10) {
+                                    await performAISearch(searchQuery);
+                                } else {
+                                    renderLibraryOnly();
+                                }
+                            }, 500); // Longer debounce for NL detection
                         });
+
+                        async function performAISearch(query) {
+                            window.showLoading();
+                            const bookList = books.map(b => ({ id: b.id, title: b.title, author: b.author, genres: b._genres.join(', ') }));
+
+                            const prompt = `Query: "${query}"
+                            Library: ${JSON.stringify(bookList)}
+
+                            Return ONLY a JSON array of book IDs that best match this query. Empty array if none.
+                            Example: ["id1", "id2"]`;
+
+                            const systemInstruction = "You are a library search assistant. Analyze the user's natural language query and find relevant books from their specific collection. Return ONLY the JSON array of IDs.";
+
+                            const result = await askGemini(prompt, systemInstruction);
+                            if (result) {
+                                try {
+                                    const cleanJson = result.replace(/```json|```/g, "").trim();
+                                    aiFilteredIds = JSON.parse(cleanJson);
+                                    if (Array.isArray(aiFilteredIds)) {
+                                        showToast(`AI found ${aiFilteredIds.length} matches`, 'success');
+                                    }
+                                } catch (e) {
+                                    console.error("AI Search Parse Error:", e);
+                                }
+                            }
+                            renderLibraryOnly();
+                            window.hideLoading();
+                        }
                         searchInput.addEventListener('focus', () => {
                             if (searchHint) searchHint.classList.add('opacity-0');
                         });
@@ -1170,6 +1284,7 @@
                         searchInput.addEventListener('keydown', (e) => {
                             if (e.key === 'Escape') {
                                 searchQuery = '';
+                                aiFilteredIds = null;
                                 searchInput.value = '';
                                 searchInput.blur();
                                 document.getElementById('clear-search-btn').classList.add('hidden');
@@ -1178,6 +1293,7 @@
                         });
                         document.getElementById('clear-search-btn').addEventListener('click', () => {
                             searchQuery = '';
+                            aiFilteredIds = null;
                             const input = document.getElementById('search-input');
                             input.value = '';
                             input.focus();
@@ -1246,6 +1362,12 @@
 
                 let filteredBooks = books.filter(b => {
                     const matchesTab = activeTab === 'wishlist' ? b.isWishlist : !b.isWishlist;
+
+                    // AI filtering priority
+                    if (aiFilteredIds && Array.isArray(aiFilteredIds)) {
+                        return matchesTab && aiFilteredIds.includes(b.id);
+                    }
+
                     // O(1) access to pre-calculated search blob
                     const matchesSearch = !searchLower || b._searchBlob.includes(searchLower);
 
@@ -1581,6 +1703,12 @@
                 document.getElementById('notify-btn')?.addEventListener('click', requestNotificationPermission);
                 document.getElementById('save-sharing-btn')?.addEventListener('click', saveSharingSettings);
 
+                document.getElementById('save-ai-settings-btn')?.addEventListener('click', () => {
+                    const key = document.getElementById('gemini-api-key').value.trim();
+                    localStorage.setItem('mylib_gemini_api_key', key);
+                    showToast('AI Settings updated!', 'success');
+                });
+
                 document.getElementById('save-profile-btn')?.addEventListener('click', async () => {
                     const displayName = document.getElementById('profile-display-name').value.trim();
                     window.showLoading();
@@ -1747,7 +1875,79 @@
                     localStorage.setItem('mylib_statusFilter', 'all');
                 }
                 renderMainApp();
+
+                if (tab === 'insights') {
+                    attachInsightsListeners();
+                }
             };
+
+            function attachInsightsListeners() {
+                const refreshBtn = document.getElementById('refresh-ai-recs-btn');
+                if (refreshBtn) {
+                    refreshBtn.onclick = generateAIRecommendations;
+                }
+            }
+
+            async function generateAIRecommendations() {
+                const btn = document.getElementById('refresh-ai-recs-btn');
+                const content = document.getElementById('ai-recs-content');
+                if (!btn || !content) return;
+
+                btn.disabled = true;
+                btn.classList.add('animate-spin');
+
+                // Collect unread/reading books and highly rated books for context
+                const candidates = books.filter(b => !b.isWishlist && getStatusData(b.id).status !== 'finished').map(b => ({ id: b.id, title: b.title, author: b.author, genres: b._genres.join(', ') }));
+                const favorites = books.filter(b => getStatusData(b.id).rating >= 4).map(b => b.title);
+
+                if (candidates.length === 0) {
+                    content.innerHTML = '<div class="md:col-span-3 py-8 text-center text-slate-400 italic">No unread books found to recommend!</div>';
+                    btn.disabled = false;
+                    btn.classList.remove('animate-spin');
+                    return;
+                }
+
+                const prompt = `Candidates (Unread): ${JSON.stringify(candidates.slice(0, 50))}
+                Favorites (Rated highly): ${JSON.stringify(favorites.slice(0, 20))}
+
+                Pick the 3 best books from Candidates that match the user's tastes. Return ONLY valid JSON:
+                {
+                    "recs": [
+                        { "id": "string", "reason": "Short 1-sentence reason why this pick fits their taste" }
+                    ]
+                }`;
+
+                const systemInstruction = "You are a personalized book curator. Analyze the user's library and recommend the perfect next read from their unread collection. Return ONLY valid JSON.";
+
+                const result = await askGemini(prompt, systemInstruction);
+                if (result) {
+                    try {
+                        const cleanJson = result.replace(/```json|```/g, "").trim();
+                        const data = JSON.parse(cleanJson);
+
+                        content.innerHTML = data.recs.map(rec => {
+                            const book = books.find(b => b.id === rec.id);
+                            if (!book) return '';
+                            return `
+                                <div class="bg-white dark:bg-slate-800/50 p-4 rounded-3xl border border-violet-100 dark:border-violet-900/20 flex flex-col group cursor-pointer hover:shadow-lg transition-all" onclick="window.jumpToBook('${book.id}')">
+                                    <div class="aspect-[2/3] rounded-2xl overflow-hidden mb-3 shadow-sm">
+                                        <img src="${book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover'}" class="w-full h-full object-cover group-hover:scale-105 transition-transform">
+                                    </div>
+                                    <h4 class="font-black font-serif text-sm line-clamp-1 italic">${book.title}</h4>
+                                    <p class="text-[10px] text-slate-500 mb-2">${book.author}</p>
+                                    <p class="text-[10px] text-violet-600 dark:text-violet-400 font-medium leading-tight">"${rec.reason}"</p>
+                                </div>
+                            `;
+                        }).join('');
+                    } catch (e) {
+                        console.error("AI Recs Parse Error:", e);
+                        content.innerHTML = '<div class="md:col-span-3 py-8 text-center text-rose-500 italic text-sm">Failed to generate picks. Try again?</div>';
+                    }
+                }
+
+                btn.disabled = false;
+                btn.classList.remove('animate-spin');
+            }
 
             window.copyISBN = (isbn) => {
                 if (!isbn) return;
@@ -2651,7 +2851,15 @@
                         </div>
                         ` : ''}
                         <div class="space-y-6">
-                            <div><label for="man-title" class="text-[10px] font-bold text-slate-400 uppercase ml-1 font-serif">Title *</label><input id="man-title" placeholder="e.g. The Great Gatsby" value="${existingBook?.title || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                            <div class="flex items-end gap-2">
+                                <div class="flex-1">
+                                    <label for="man-title" class="text-[10px] font-bold text-slate-400 uppercase ml-1 font-serif">Title *</label>
+                                    <input id="man-title" placeholder="e.g. The Great Gatsby" value="${existingBook?.title || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                                </div>
+                                <button id="ai-suggest-btn" class="p-3.5 bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 rounded-xl hover:bg-violet-200 transition-colors shadow-sm" title="Suggest with AI">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                </button>
+                            </div>
 
                             <div class="relative">
                                 <label for="man-author" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Author</label>
@@ -2747,6 +2955,75 @@
                         destContainer.innerHTML = html;
                     }
                 }
+
+                // AI Suggestion Logic
+                document.getElementById('ai-suggest-btn').addEventListener('click', async () => {
+                    const title = document.getElementById('man-title').value.trim();
+                    const author = document.getElementById('man-author').value.trim();
+
+                    if (!title) {
+                        showToast("Please enter at least a title", "info");
+                        return;
+                    }
+
+                    window.showLoading();
+                    const btn = document.getElementById('ai-suggest-btn');
+                    btn.disabled = true;
+                    btn.classList.add('animate-pulse');
+
+                    const prompt = `Book Title: "${title}"${author ? `\nAuthor: "${author}"` : ''}
+                    Provide the following details in valid JSON format:
+                    {
+                        "author": "string",
+                        "genres": ["string"],
+                        "tags": ["string"],
+                        "summary": "string"
+                    }
+                    Keep the summary concise (1-2 sentences).`;
+
+                    const systemInstruction = "You are a helpful librarian AI. Return ONLY valid JSON.";
+
+                    const result = await askGemini(prompt, systemInstruction);
+                    if (result) {
+                        try {
+                            const cleanJson = result.replace(/```json|```/g, "").trim();
+                            const data = JSON.parse(cleanJson);
+
+                            if (data.author && !author) document.getElementById('man-author').value = data.author;
+
+                            if (data.genres && Array.isArray(data.genres)) {
+                                data.genres.forEach(g => {
+                                    if (!currentGenres.includes(g)) currentGenres.push(g);
+                                });
+                                renderGenres();
+                            }
+
+                            if (data.tags && Array.isArray(data.tags)) {
+                                const currentTags = document.getElementById('man-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+                                const newTags = [...new Set([...currentTags, ...data.tags])];
+                                document.getElementById('man-tags').value = newTags.join(', ');
+                            }
+
+                            if (data.summary) {
+                                // Update summary preview if it exists, otherwise create it
+                                let previewEl = document.getElementById('ai-summary-preview');
+                                if (!previewEl) {
+                                    previewEl = document.createElement('div');
+                                    previewEl.id = 'ai-summary-preview';
+                                    document.getElementById('ai-suggest-btn').closest('.space-y-6').appendChild(previewEl);
+                                }
+                                previewEl.innerHTML = `<div><label class="text-[10px] font-bold text-slate-400 uppercase ml-1">AI Summary Preview</label><p class="text-xs text-slate-500 italic p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-800 mb-4">${data.summary}</p></div>`;
+                            }
+                            showToast("AI suggestions applied!", "success");
+                        } catch (e) {
+                            console.error("Failed to parse AI response:", e, result);
+                            showToast("AI response was not in the expected format", "error");
+                        }
+                    }
+                    btn.disabled = false;
+                    btn.classList.remove('animate-pulse');
+                    window.hideLoading();
+                });
 
                 // Setup searchable dropdowns
                 setupSearchableDropdown('man-author', 'author-dropdown', metadataCache.authors, (val) => {
@@ -3514,6 +3791,16 @@
                             </div>
                         ` : ''}
 
+                        <div id="ai-details-container" class="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800">
+                            <div class="flex items-center justify-between mb-4">
+                                <p class="text-[10px] font-bold text-slate-400 uppercase">AI Insights</p>
+                                <button id="generate-ai-details-btn" class="text-[10px] font-black uppercase text-violet-600 dark:text-violet-400 hover:underline">✨ Generate</button>
+                            </div>
+                            <div id="ai-details-content" class="space-y-4 hidden">
+                                <!-- AI Content here -->
+                            </div>
+                        </div>
+
                         ${book.comments ? `
                             <div class="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800">
                                 <p class="text-[10px] font-bold text-slate-400 uppercase mb-4">Legacy Notes</p>
@@ -3535,6 +3822,53 @@
                 document.getElementById('edit-book-btn').addEventListener('click', () => {
                     close();
                     openManualEntry(null, book);
+                });
+
+                document.getElementById('generate-ai-details-btn')?.addEventListener('click', async () => {
+                    const btn = document.getElementById('generate-ai-details-btn');
+                    const content = document.getElementById('ai-details-content');
+                    btn.disabled = true;
+                    btn.innerText = '✨ Analyzing...';
+
+                    const prompt = `Book: "${book.title}" by "${book.author}"
+                    Provide a detailed overview in valid JSON format:
+                    {
+                        "summary": "Concise 2-3 sentence summary",
+                        "themes": ["theme 1", "theme 2"],
+                        "whyRead": "Compelling reason to read this book"
+                    }`;
+
+                    const systemInstruction = "You are a literary expert AI. Return ONLY valid JSON.";
+
+                    const result = await askGemini(prompt, systemInstruction);
+                    if (result) {
+                        try {
+                            const cleanJson = result.replace(/```json|```/g, "").trim();
+                            const data = JSON.parse(cleanJson);
+
+                            content.innerHTML = `
+                                <div class="p-5 bg-violet-50 dark:bg-violet-900/10 rounded-2xl border border-violet-100 dark:border-violet-900/30">
+                                    <p class="text-sm text-slate-700 dark:text-slate-300 leading-relaxed mb-4">${data.summary}</p>
+                                    <div class="flex flex-wrap gap-2 mb-4">
+                                        ${data.themes.map(t => `<span class="px-2 py-0.5 bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 rounded-lg text-[10px] font-bold">#${t}</span>`).join('')}
+                                    </div>
+                                    <div class="pt-4 border-t border-violet-100 dark:border-violet-900/20">
+                                        <p class="text-[10px] font-bold text-violet-500 uppercase mb-1">Why you'll love it</p>
+                                        <p class="text-xs text-slate-600 dark:text-slate-400 italic">"${data.whyRead}"</p>
+                                    </div>
+                                </div>
+                            `;
+                            content.classList.remove('hidden');
+                            btn.classList.add('hidden');
+                        } catch (e) {
+                            console.error("AI Parse Error:", e);
+                            btn.innerText = '✨ Try Again';
+                            btn.disabled = false;
+                        }
+                    } else {
+                        btn.innerText = '✨ Try Again';
+                        btn.disabled = false;
+                    }
                 });
 
                 document.getElementById('move-to-lib-btn')?.addEventListener('click', async (e) => {
