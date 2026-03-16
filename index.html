@@ -280,7 +280,7 @@
         (function () {
             // ---------- AI Utility ----------
             async function askGemini(prompt, systemInstruction = "") {
-                const apiKey = localStorage.getItem('mylib_gemini_api_key');
+                const apiKey = "AIzaSyDpvAIYuAekqn8R62zkyQinUlUmj633stM";
                 if (!apiKey) {
                     showToast("Please set your Gemini API Key in Settings", "error");
                     return null;
@@ -640,21 +640,6 @@
                             </div>
                         </div>
                     </div>
-
-                    <div class="glass p-8 rounded-[2.5rem] border border-violet-100/50 dark:border-slate-800 bg-gradient-to-br from-white to-violet-50/30 dark:from-slate-900 dark:to-violet-900/10">
-                        <h2 class="text-2xl font-black mb-6 font-serif italic text-violet-600 dark:text-violet-400">AI Configuration</h2>
-                        <div class="space-y-4">
-                            <div>
-                                <label for="gemini-api-key" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Gemini API Key</label>
-                                <div class="flex flex-col sm:flex-row gap-2">
-                                    <input id="gemini-api-key" type="password" placeholder="AIza..." value="${localStorage.getItem('mylib_gemini_api_key') || ''}" class="flex-1 min-w-0 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none text-sm transition-all">
-                                    <button id="save-ai-settings-btn" class="sm:px-6 py-3 bg-violet-600 text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-violet-200 dark:shadow-none">Save Key</button>
-                                </div>
-                                <p class="text-[9px] text-slate-400 mt-2 ml-1 italic">Your key is stored locally in your browser.</p>
-                            </div>
-                        </div>
-                    </div>
-
                     <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
                         <div class="mb-8">
                             <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Reading Status Breakdown</h3>
