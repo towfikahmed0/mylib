@@ -3537,15 +3537,24 @@
                     openManualEntry(null, book);
                 });
 
-                document.getElementById('move-to-lib-btn')?.addEventListener('click', async () => {
+                document.getElementById('move-to-lib-btn')?.addEventListener('click', async (e) => {
+                    const btn = e.currentTarget;
+                    btn.disabled = true;
                     try {
                         await db.collection('books').doc(book.id).update({ isWishlist: false });
                         showToast('Moved to library!', 'success');
                         close();
-                    } catch (err) { showToast('Error: ' + err.message, 'error'); }
+                    } catch (err) {
+                        showToast('Error: ' + err.message, 'error');
+                        btn.disabled = false;
+                    }
                 });
 
-                document.getElementById('borrow-book-btn')?.addEventListener('click', async () => {
+                document.getElementById('borrow-book-btn')?.addEventListener('click', async (e) => {
+                    const btn = e.currentTarget;
+                    const originalText = btn.innerText;
+                    btn.disabled = true;
+                    btn.innerText = 'Borrowing...';
                     const name = document.getElementById('borrower-name').value.trim() || (currentUser.displayName || currentUser.email);
                     try {
                         await db.collection('books').doc(book.id).update({
@@ -3567,7 +3576,11 @@
 
                         showToast(`Marked as borrowed by ${name}`, 'success');
                         close();
-                    } catch (err) { showToast('Error: ' + err.message, 'error'); }
+                    } catch (err) {
+                        showToast('Error: ' + err.message, 'error');
+                        btn.disabled = false;
+                        btn.innerText = originalText;
+                    }
                 });
 
                 document.getElementById('save-rating-btn')?.addEventListener('click', async (e) => {
@@ -3668,7 +3681,11 @@
                     } catch (err) { showToast('Error: ' + err.message, 'error'); }
                 });
 
-                document.getElementById('return-book-btn')?.addEventListener('click', async () => {
+                document.getElementById('return-book-btn')?.addEventListener('click', async (e) => {
+                    const btn = e.currentTarget;
+                    const originalText = btn.innerText;
+                    btn.disabled = true;
+                    btn.innerText = 'Returning...';
                     try {
                         await db.collection('books').doc(book.id).update({
                             borrowedBy: firebase.firestore.FieldValue.delete(),
@@ -3688,11 +3705,19 @@
 
                         showToast('Book returned!', 'success');
                         close();
-                    } catch (err) { showToast('Error: ' + err.message, 'error'); }
+                    } catch (err) {
+                        showToast('Error: ' + err.message, 'error');
+                        btn.disabled = false;
+                        btn.innerText = originalText;
+                    }
                 });
 
-                document.getElementById('delete-book-btn').addEventListener('click', async () => {
+                document.getElementById('delete-book-btn').addEventListener('click', async (e) => {
                     if (confirm('Are you sure you want to delete this book?')) {
+                        const btn = e.currentTarget;
+                        const originalText = btn.innerText;
+                        btn.disabled = true;
+                        btn.innerText = 'Deleting...';
                         try {
                             const batch = db.batch();
                             batch.delete(db.collection('books').doc(book.id));
@@ -3702,7 +3727,11 @@
 
                             showToast('Book deleted.', 'info');
                             close();
-                        } catch (err) { showToast('Error deleting: ' + err.message, 'error'); }
+                        } catch (err) {
+                            showToast('Error deleting: ' + err.message, 'error');
+                            btn.disabled = false;
+                            btn.innerText = originalText;
+                        }
                     }
                 });
             }
