@@ -93,13 +93,15 @@
         }
 
         .dark .glass {
-            background: rgba(15, 23, 42, 0.8);
-            border-color: rgba(255, 255, 255, 0.1);
+            background: rgba(30, 41, 59, 0.7);
+            border-color: rgba(255, 255, 255, 0.05);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
 
         .sepia .glass {
-            background: rgba(251, 240, 227, 0.8);
+            background: rgba(254, 243, 232, 0.8);
             border-color: rgba(129, 72, 14, 0.1);
+            box-shadow: 0 4px 6px -1px rgba(129, 72, 14, 0.05);
         }
 
         .book-card {
@@ -115,24 +117,37 @@
         }
 
         .book-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 20px 30px -10px rgba(59, 130, 246, 0.2);
+            transform: translateY(-6px) scale(1.01);
+            box-shadow: 0 25px 40px -15px rgba(59, 130, 246, 0.25);
+        }
+
+        .dark .book-card:hover {
+            box-shadow: 0 25px 40px -15px rgba(0, 0, 0, 0.5);
         }
 
         .animate-slide-up {
-            animation: slideUp 0.3s ease-out;
+            animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         @keyframes slideUp {
             from {
                 opacity: 0;
-                transform: translateY(20px);
+                transform: translateY(30px);
             }
 
             to {
                 opacity: 1;
                 transform: translateY(0);
             }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         /* Light blueish theme scrollbar */
@@ -397,6 +412,7 @@
             let searchQuery = '';
             let aiFilteredIds = null;
             let searchTimeout = null;
+            let lastSearchTime = 0;
             let sortBy = localStorage.getItem('mylib_sortBy') || defaultSort;
             let statusFilter = localStorage.getItem('mylib_statusFilter') || 'all';
             let categoryFilter = 'all';
@@ -451,8 +467,8 @@
             // ---------- Utility: Toast ----------
             function showToast(message, type = 'info', duration = 4000) {
                 if (navigator.vibrate) {
-                    if (type === 'success') navigator.vibrate(10);
-                    else if (type === 'error') navigator.vibrate([50, 50, 50]);
+                    if (type === 'success') navigator.vibrate([10, 30, 10]);
+                    else if (type === 'error') navigator.vibrate([50, 100, 50]);
                 }
                 toastEl.innerHTML = `
                 <div class="w-2 h-2 rounded-full ${type === 'success' ? 'bg-emerald-400' : type === 'error' ? 'bg-rose-400' : 'bg-blue-400'}"></div>
@@ -471,7 +487,7 @@
                 const modal = document.createElement('div');
                 modal.setAttribute('role', 'dialog');
                 modal.setAttribute('aria-modal', 'true');
-                modal.className = isFullscreen ? 'fixed inset-0 z-50 flex items-center justify-center bg-slate-50 dark:bg-slate-900' : 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm';
+                modal.className = (isFullscreen ? 'fixed inset-0 z-50 flex items-center justify-center bg-slate-50 dark:bg-slate-900' : 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm') + ' fade-in';
                 modal.innerHTML = html;
                 if (modalContainer._cleanup) modalContainer._cleanup();
                 modalContainer.innerHTML = '';
@@ -547,6 +563,28 @@
                 let totalValue = 0;
                 const statusCounts = { finished: 0, reading: 0, want_to_read: 0 };
 
+                // Heatmap Data Preparation
+                const now = new Date();
+                const daysToRender = 112; // ~4 months
+                const heatmapData = {};
+                const streakDates = new Set();
+
+                activities.forEach(act => {
+                    if (act.userId === currentUser.uid && act.timestamp) {
+                        const dateKey = act.timestamp.toISOString().split('T')[0];
+                        heatmapData[dateKey] = (heatmapData[dateKey] || 0) + 1;
+                        streakDates.add(dateKey);
+                    }
+                });
+
+                // Calculate Streak
+                let currentStreak = 0;
+                let checkDate = new Date();
+                while (streakDates.has(checkDate.toISOString().split('T')[0])) {
+                    currentStreak++;
+                    checkDate.setDate(checkDate.getDate() - 1);
+                }
+
                 books.forEach(b => {
                     if (b.isWishlist) return;
                     const author = b.author || 'Unknown';
@@ -582,6 +620,33 @@
                 return `
                 <div class="max-w-4xl mx-auto space-y-8 animate-slide-up">
                     <div class="flex flex-col md:flex-row gap-8">
+                        <!-- Streak & Heatmap Card -->
+                        <div class="glass flex-1 p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800 flex flex-col">
+                            <div class="flex items-center justify-between mb-6">
+                                <h2 class="text-xl font-black font-serif italic text-blue-600 dark:text-blue-400">Reading Streak</h2>
+                                <div class="flex items-center gap-1.5 bg-orange-100 dark:bg-orange-900/30 px-3 py-1 rounded-full">
+                                    <span class="text-orange-600 text-lg">🔥</span>
+                                    <span class="text-orange-700 dark:text-orange-400 font-black text-sm">${currentStreak} Days</span>
+                                </div>
+                            </div>
+
+                            <div class="flex-1 flex flex-col justify-center">
+                                <div class="flex flex-wrap gap-1.5 justify-center mb-4">
+                                    ${Array.from({ length: daysToRender }).map((_, i) => {
+                                        const d = new Date();
+                                        d.setDate(d.getDate() - (daysToRender - 1 - i));
+                                        const key = d.toISOString().split('T')[0];
+                                        const count = heatmapData[key] || 0;
+                                        const intensity = count === 0 ? 'bg-slate-100 dark:bg-slate-800' :
+                                                        count === 1 ? 'bg-blue-200 dark:bg-blue-900/40' :
+                                                        count === 2 ? 'bg-blue-400 dark:bg-blue-700' : 'bg-blue-600';
+                                        return `<div class="w-3 h-3 rounded-sm ${intensity} transition-all hover:scale-150 cursor-pointer" title="${key}: ${count} activities"></div>`;
+                                    }).join('')}
+                                </div>
+                                <p class="text-[10px] text-center text-slate-400 font-medium uppercase tracking-widest">Last 16 weeks of activity</p>
+                            </div>
+                        </div>
+
                         <!-- Goal Progress Card -->
                         <div class="glass flex-1 p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800 flex flex-col items-center justify-center text-center">
                             <h2 class="text-xl font-black mb-6 font-serif italic text-blue-600 dark:text-blue-400">Reading Goal</h2>
@@ -1216,12 +1281,20 @@
                                     <span id="selected-count" class="text-sm font-black text-blue-600 px-3 py-1 bg-blue-100 dark:bg-blue-900/50 rounded-lg">0 Selected</span>
                                     <button onclick="window.clearSelection()" class="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase">Clear</button>
                                 </div>
-                                <div class="flex items-center gap-2">
+                                <div class="flex flex-wrap items-center gap-2">
                                     <select id="bulk-genre" class="bg-slate-100 dark:bg-slate-800 rounded-lg text-[10px] font-bold px-3 py-2 outline-none">
                                         <option value="">Change Genre...</option>
                                         ${metadataCache.genres.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
                                     </select>
-                                    <button onclick="window.bulkDelete()" class="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors" title="Delete Selected" aria-label="Delete selected books">
+                                    <select id="bulk-status" class="bg-slate-100 dark:bg-slate-800 rounded-lg text-[10px] font-bold px-3 py-2 outline-none">
+                                        <option value="">Change Status...</option>
+                                        <option value="want_to_read">Want to Read</option>
+                                        <option value="reading">Reading</option>
+                                        <option value="finished">Finished</option>
+                                    </select>
+                                    <button onclick="window.bulkAddTags()" class="px-3 py-2 bg-slate-100 dark:bg-slate-800 text-[10px] font-bold rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">Add Tags</button>
+                                    <button onclick="window.bulkSetOwner()" class="px-3 py-2 bg-slate-100 dark:bg-slate-800 text-[10px] font-bold rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">Set Owner</button>
+                                    <button onclick="window.bulkDelete()" class="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors ml-2" title="Delete Selected" aria-label="Delete selected books">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                     </button>
                                 </div>
@@ -1236,9 +1309,20 @@
                         const searchHint = document.getElementById('search-hint');
                         searchInput.addEventListener('input', e => {
                             searchQuery = e.target.value;
+                            const searchTime = Date.now();
+                            lastSearchTime = searchTime;
+
+                            if (!searchQuery) {
+                                aiFilteredIds = null;
+                                document.getElementById('clear-search-btn').classList.add('hidden');
+                                if (searchHint) searchHint.classList.remove('opacity-0');
+                                renderLibraryOnly();
+                                return;
+                            }
+
                             aiFilteredIds = null; // Reset AI filters on new input
-                            document.getElementById('clear-search-btn').classList.toggle('hidden', !searchQuery);
-                            if (searchHint) searchHint.classList.toggle('opacity-0', !!searchQuery);
+                            document.getElementById('clear-search-btn').classList.remove('hidden');
+                            if (searchHint) searchHint.classList.add('opacity-0');
 
                             if (searchTimeout) clearTimeout(searchTimeout);
                             searchTimeout = setTimeout(async () => {
@@ -1247,14 +1331,14 @@
                                 const isNaturalLanguage = words.length > 3 || /^(find|suggest|recommend|search for|about|show me)\b/i.test(searchQuery);
 
                                 if (isNaturalLanguage && searchQuery.length > 10) {
-                                    await performAISearch(searchQuery);
+                                    await performAISearch(searchQuery, searchTime);
                                 } else {
-                                    renderLibraryOnly();
+                                    if (lastSearchTime === searchTime) renderLibraryOnly();
                                 }
                             }, 500); // Longer debounce for NL detection
                         });
 
-                        async function performAISearch(query) {
+                        async function performAISearch(query, searchTime) {
                             window.showLoading();
                             const bookList = books.map(b => ({ id: b.id, title: b.title, author: b.author, genres: b._genres.join(', ') }));
 
@@ -1267,19 +1351,23 @@
                             const systemInstruction = "You are a library search assistant. Analyze the user's natural language query and find relevant books from their specific collection. Return ONLY the JSON array of IDs.";
 
                             const result = await askGemini(prompt, systemInstruction);
-                            if (result) {
-                                try {
-                                    const cleanJson = result.replace(/```json|```/g, "").trim();
-                                    const ids = JSON.parse(cleanJson);
-                                    if (Array.isArray(ids)) {
-                                        aiFilteredIds = new Set(ids);
-                                        showToast(`AI found ${aiFilteredIds.size} matches`, 'success');
+
+                            // Only apply results if this is still the most recent search and search wasn't cleared
+                            if (lastSearchTime === searchTime && searchQuery) {
+                                if (result) {
+                                    try {
+                                        const cleanJson = result.replace(/```json|```/g, "").trim();
+                                        const ids = JSON.parse(cleanJson);
+                                        if (Array.isArray(ids)) {
+                                            aiFilteredIds = new Set(ids);
+                                            showToast(`AI found ${aiFilteredIds.size} matches`, 'success');
+                                        }
+                                    } catch (e) {
+                                        console.error("AI Search Parse Error:", e);
                                     }
-                                } catch (e) {
-                                    console.error("AI Search Parse Error:", e);
                                 }
+                                renderLibraryOnly();
                             }
-                            renderLibraryOnly();
                             window.hideLoading();
                         }
                         searchInput.addEventListener('focus', () => {
@@ -1494,6 +1582,105 @@
                             }
                         };
                     }
+
+                    const bulkStatusSelect = document.getElementById('bulk-status');
+                    if (bulkStatusSelect) {
+                        bulkStatusSelect.onchange = async (e) => {
+                            const newStatus = e.target.value;
+                            if (!newStatus || !selectedBookIds.size) return;
+                            showToast(`Updating status for ${selectedBookIds.size} books...`, 'info');
+                            window.showLoading();
+
+                            try {
+                                const ids = Array.from(selectedBookIds);
+                                // Limit chunks to 250 because each update is 2 operations (potential status doc creation)
+                                for (let i = 0; i < ids.length; i += 250) {
+                                    const chunk = ids.slice(i, i + 250);
+                                    const batch = db.batch();
+                                    chunk.forEach(id => {
+                                        const statusRef = db.collection('books').doc(id).collection('readingStatus').doc(currentUser.uid);
+                                        batch.set(statusRef, {
+                                            status: newStatus,
+                                            userId: currentUser.uid,
+                                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                        }, { merge: true });
+                                    });
+                                    await batch.commit();
+                                }
+
+                                selectedBookIds.clear();
+                                showToast('Updated status successfully', 'success');
+                            } catch (err) {
+                                showToast('Error updating status: ' + err.message, 'error');
+                            } finally {
+                                window.hideLoading();
+                            }
+                        };
+                    }
+
+                    window.bulkAddTags = async () => {
+                        if (!selectedBookIds.size) return;
+                        const tagsRaw = prompt("Enter tags to add (comma separated):");
+                        if (!tagsRaw) return;
+                        const newTags = tagsRaw.split(',').map(t => t.trim()).filter(Boolean);
+                        if (newTags.length === 0) return;
+
+                        showToast(`Adding tags to ${selectedBookIds.size} books...`, 'info');
+                        window.showLoading();
+
+                        try {
+                            const ids = Array.from(selectedBookIds);
+                            // We need to fetch current tags first for each book if we want to append
+                            // But for efficiency, we can use arrayUnion
+                            for (let i = 0; i < ids.length; i += 500) {
+                                const chunk = ids.slice(i, i + 500);
+                                const batch = db.batch();
+                                chunk.forEach(id => {
+                                    batch.update(db.collection('books').doc(id), {
+                                        tags: firebase.firestore.FieldValue.arrayUnion(...newTags)
+                                    });
+                                });
+                                await batch.commit();
+                            }
+
+                            selectedBookIds.clear();
+                            showToast('Added tags successfully', 'success');
+                        } catch (err) {
+                            showToast('Error adding tags: ' + err.message, 'error');
+                        } finally {
+                            window.hideLoading();
+                        }
+                    };
+
+                    window.bulkSetOwner = async () => {
+                        if (!selectedBookIds.size) return;
+                        const owner = prompt("Enter owner name:");
+                        if (owner === null) return; // User cancelled
+
+                        showToast(`Setting owner for ${selectedBookIds.size} books...`, 'info');
+                        window.showLoading();
+
+                        try {
+                            const ids = Array.from(selectedBookIds);
+                            for (let i = 0; i < ids.length; i += 500) {
+                                const chunk = ids.slice(i, i + 500);
+                                const batch = db.batch();
+                                chunk.forEach(id => {
+                                    batch.update(db.collection('books').doc(id), {
+                                        owner: owner.trim()
+                                    });
+                                });
+                                await batch.commit();
+                            }
+
+                            selectedBookIds.clear();
+                            showToast('Updated owner successfully', 'success');
+                        } catch (err) {
+                            showToast('Error updating owner: ' + err.message, 'error');
+                        } finally {
+                            window.hideLoading();
+                        }
+                    };
                 }
 
                 const tagContainer = document.getElementById('tag-filter-container');
@@ -2341,7 +2528,7 @@
                         <div class="absolute inset-0 bg-blue-600/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl"></div>
                         <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm relative">
                             ${book.coverUrl || book.thumbnail ?
-                            `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-105" alt="cover">` :
+                            `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-105" alt="${escapeHTML(book.title)} cover">` :
                             `<div class="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-blue-50 dark:bg-slate-800 text-blue-200 dark:text-slate-600">
                                     <span class="text-[8px] font-black uppercase font-serif line-clamp-3">${book.title}</span>
                                 </div>`
@@ -2370,7 +2557,7 @@
                             <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
                         </div>
                         <div class="w-12 h-16 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700">
-                            ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover">` : '<div class="w-full h-full flex items-center justify-center bg-blue-50 dark:bg-slate-700 text-[8px] text-blue-300 dark:text-slate-500 font-bold uppercase p-1 text-center">No Cover</div>'}
+                            ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover" alt="${escapeHTML(book.title)} cover">` : '<div class="w-full h-full flex items-center justify-center bg-blue-50 dark:bg-slate-700 text-[8px] text-blue-300 dark:text-slate-500 font-bold uppercase p-1 text-center">No Cover</div>'}
                         </div>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2">
@@ -2410,7 +2597,7 @@
                             </div>
                         ` : ''}
                         ${book.coverUrl || book.thumbnail ?
-                        `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-110" alt="cover">` :
+                        `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-110" alt="${escapeHTML(book.title)} cover">` :
                         `<div class="w-full h-full flex items-center justify-center bg-blue-50 dark:bg-slate-800 text-blue-200 dark:text-slate-600 text-[10px] font-bold uppercase p-2 text-center">No Cover</div>`
                     }
                         <div class="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[8px] font-black uppercase text-white ${book.source === 'manual' ? 'bg-orange-400' : 'bg-blue-500'}">
@@ -2577,16 +2764,12 @@
                 }
 
                 // Use a collection group listener to get reading statuses for THIS user efficiently.
-                // Removed .where() clause to avoid needing a collection group index
-                // Filter on client-side instead for better performance
                 unsubscribeStatus = db.collectionGroup('readingStatus')
+                    .where('userId', '==', currentUser.uid)
                     .onSnapshot(snapshot => {
                         isStatusesLoaded = true;
                         snapshot.docChanges().forEach(change => {
                             const data = change.doc.data();
-                            // Only process this user's reading status documents
-                            if (data.userId !== currentUser.uid) return;
-                            
                             const bookId = change.doc.ref.parent.parent.id;
                             if (change.type === 'removed') {
                                 delete readingStatuses[bookId];
@@ -3376,7 +3559,7 @@
                                         <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${formatDate(activity.timestamp)}</span>
                                         <span class="w-1 h-1 bg-slate-200 dark:bg-slate-700 rounded-full"></span>
                                         <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                            Library: ${activity.addedTo === 'My' ? 'Personal' : (activity.libraryName || 'Shared')}
+                                            Library: ${activity.libraryId === currentUser.uid ? 'My Library' : 'Partner Library'}
                                         </span>
                                     </div>
                                     ${activity.comment ? `
@@ -3644,9 +3827,16 @@
             let syncTimeout = null;
             function syncCompletedBooksCount() {
                 if (!currentUser || !isStatusesLoaded) return;
+
+                // If we have partnerships, we should wait until all chunks are loaded at least once
+                // This is a simple check - if books array is empty and we expect partnerships, wait.
+                // However, the real safeguard is isStatusesLoaded and a longer debounce.
+
                 if (syncTimeout) clearTimeout(syncTimeout);
                 syncTimeout = setTimeout(async () => {
-                    const finishedCount = books.filter(b => !b.isWishlist && getStatusData(b.id).status === 'finished').length;
+                    // Filter books where the status is 'finished' in the current user's readingStatuses
+                    const finishedCount = Object.values(readingStatuses).filter(s => s.status === 'finished').length;
+
                     if (userProfile && userProfile.completedBooksCount !== finishedCount) {
                         try {
                             await db.collection('users').doc(currentUser.uid).update({
@@ -3655,7 +3845,7 @@
                             });
                         } catch (err) { console.error("Error syncing count:", err); }
                     }
-                }, 1000);
+                }, 3000); // 3 second debounce to ensure initial load completes
             }
 
             // ---------- Auth State Observer ----------
@@ -4035,9 +4225,11 @@
                         });
 
                         showToast('Review saved!', 'success');
-                        close();
-                        // Small delay to ensure Firestore sync
-                        setTimeout(() => openBookDetails(books.find(b => b.id === book.id)), 100);
+                        // Update UI directly instead of closing and reopening
+                        const starsEl = modalContainer.querySelector('.text-amber-400.text-lg');
+                        if (starsEl) starsEl.textContent = STAR_CACHE[rating] || '';
+                        btn.disabled = false;
+                        btn.innerText = originalText;
                     } catch (err) {
                         showToast('Error: ' + err.message, 'error');
                         btn.disabled = false;
@@ -4075,29 +4267,53 @@
                         const container = document.getElementById('detail-status-select').parentElement;
                         if (newStatus === 'reading') {
                             if (!document.getElementById('detail-progress-input')) {
-                                const input = document.createElement('input');
-                                input.id = 'detail-progress-input';
-                                input.type = 'number';
-                                input.min = '0';
-                                input.max = '100';
-                                input.value = '0';
-                                input.className = 'w-20 px-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none';
-                                input.placeholder = '%';
-                                container.appendChild(input);
-                                input.addEventListener('change', async (ev) => {
-                                    const progress = parseInt(ev.target.value) || 0;
-                                    try {
-                                        await db.collection('books').doc(book.id)
-                                            .collection('readingStatus').doc(currentUser.uid).set({
-                                                progress: progress,
-                                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                                            }, { merge: true });
-                                        showToast('Progress updated!', 'success');
-                                    } catch (err) { showToast('Error: ' + err.message, 'error'); }
+                                const progressDiv = document.createElement('div');
+                                progressDiv.className = 'flex flex-1 items-center gap-3';
+                                progressDiv.innerHTML = `
+                                    <input id="detail-progress-slider" type="range" min="0" max="100" value="0" class="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary" aria-label="Reading progress slider">
+                                    <input id="detail-progress-input" type="number" min="0" max="100" value="0" class="w-16 px-2 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-center" placeholder="%" aria-label="Reading progress percentage">
+                                `;
+                                container.appendChild(progressDiv);
+
+                                const pInput = progressDiv.querySelector('#detail-progress-input');
+                                const pSlider = progressDiv.querySelector('#detail-progress-slider');
+
+                                const syncProgress = (val) => {
+                                    pInput.value = val;
+                                    pSlider.value = val;
+                                };
+
+                                [pInput, pSlider].forEach(el => {
+                                    el.addEventListener('input', (e) => syncProgress(e.target.value));
+                                    el.addEventListener('change', async (e) => {
+                                        const progress = parseInt(e.target.value) || 0;
+                                        syncProgress(progress);
+                                        try {
+                                            await db.collection('books').doc(book.id)
+                                                .collection('readingStatus').doc(currentUser.uid).set({
+                                                    progress: progress,
+                                                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                                }, { merge: true });
+
+                                        // Add activity for streak/heatmap tracking
+                                        await db.collection('activityFeed').add({
+                                            type: 'progress_updated',
+                                            bookId: book.id,
+                                            bookTitle: book.title,
+                                            userName: currentUser.displayName || currentUser.email || currentUser.uid,
+                                            userId: currentUser.uid,
+                                            progress: progress,
+                                            libraryId: book.userId,
+                                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                                        });
+
+                                            showToast('Progress updated!', 'success');
+                                        } catch (err) { showToast('Error: ' + err.message, 'error'); }
+                                    });
                                 });
                             }
                         } else {
-                            document.getElementById('detail-progress-input')?.remove();
+                            container.querySelector('.flex-1.items-center.gap-3')?.remove();
                         }
                     } catch (err) { showToast('Error: ' + err.message, 'error'); }
                 });
@@ -4120,6 +4336,19 @@
                                         progress: progress,
                                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                                     }, { merge: true });
+
+                                        // Add activity for streak/heatmap tracking
+                                        await db.collection('activityFeed').add({
+                                            type: 'progress_updated',
+                                            bookId: book.id,
+                                            bookTitle: book.title,
+                                            userName: currentUser.displayName || currentUser.email || currentUser.uid,
+                                            userId: currentUser.uid,
+                                            progress: progress,
+                                            libraryId: book.userId,
+                                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                                        });
+
                                 showToast('Progress updated!', 'success');
                             } catch (err) { showToast('Error: ' + err.message, 'error'); }
                         });
