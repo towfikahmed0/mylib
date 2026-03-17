@@ -2100,7 +2100,10 @@
                 const isMobile = window.innerWidth < 768;
                 const modalHtml = `
                 <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up overflow-y-auto max-h-[90vh]">
-                    <h2 class="text-2xl font-black mb-6 font-serif italic">Advanced Filters</h2>
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-2xl font-black font-serif italic">Advanced Filters</h2>
+                        <button id="clear-filters-btn" class="text-xs font-black uppercase text-slate-400 hover:text-rose-500 transition-colors">Clear All</button>
+                    </div>
                     <div class="space-y-6">
                         ${isMobile ? `
                         <div class="grid grid-cols-1 gap-4 pb-6 border-b border-slate-100 dark:border-slate-800">
@@ -2181,6 +2184,28 @@
             `;
                 const close = showModal(modalHtml);
                 document.getElementById('adv-rating')?.focus();
+
+                document.getElementById('clear-filters-btn')?.addEventListener('click', () => {
+                    window.clearAllFilters(false);
+
+                    // Reset UI
+                    document.getElementById('adv-rating').value = 'all';
+                    document.getElementById('adv-min-price').value = '';
+                    document.getElementById('adv-max-price').value = '';
+                    document.getElementById('adv-start-date').value = '';
+                    document.getElementById('adv-end-date').value = '';
+
+                    if (isMobile) {
+                        document.getElementById('adv-sort').value = defaultSort;
+                        document.getElementById('adv-genre').value = 'all';
+                        document.getElementById('adv-status').value = 'all';
+                        document.getElementById('adv-author').value = 'all';
+                        document.getElementById('adv-owner').value = 'all';
+                    }
+
+                    showToast('Filters cleared', 'info');
+                });
+
                 document.getElementById('apply-filters').addEventListener('click', () => {
                     advancedFilters.rating = document.getElementById('adv-rating').value;
                     advancedFilters.minPrice = document.getElementById('adv-min-price').value ? parseFloat(document.getElementById('adv-min-price').value) : null;
