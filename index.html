@@ -1374,64 +1374,58 @@
                 const endTimestamp = advancedFilters.endDate ? new Date(advancedFilters.endDate).getTime() : null;
 
                 let filteredBooks = books.filter(b => {
-                    const matchesTab = activeTab === 'wishlist' ? b.isWishlist : !b.isWishlist;
+                    // 1. High-disqualification criteria first (tab, search, static filters)
+                    if (activeTab === 'wishlist') {
+                        if (!b.isWishlist) return false;
+                    } else {
+                        if (b.isWishlist) return false;
+                    }
 
                     // AI filtering priority - Optimized O(1) Set lookup
                     if (aiFilteredIds && aiFilteredIds instanceof Set) {
-                        return matchesTab && aiFilteredIds.has(b.id);
+                        return aiFilteredIds.has(b.id);
                     }
 
-                    // O(1) access to pre-calculated search blob
-                    const matchesSearch = !searchLower || b._searchBlob.includes(searchLower);
+                    if (searchLower && !b._searchBlob.includes(searchLower)) return false;
+                    if (categoryFilter !== 'all' && !b._genres.includes(categoryFilter)) return false;
+                    if (authorFilter !== 'all' && b.author !== authorFilter) return false;
+                    if (ownerFilter !== 'all' && b.owner !== ownerFilter) return false;
+                    if (tagFilter && (!b.tags || !b.tags.includes(tagFilter))) return false;
 
-                    const statusData = getStatusData(b.id);
-                    const bookStatus = statusData.status;
-                    const userRating = statusData.rating;
+                    // 2. Advanced filters (price, date) - avoid expensive ops if possible
+                    if (advancedFilters.minPrice !== null && b.price < advancedFilters.minPrice) return false;
+                    if (advancedFilters.maxPrice !== null && b.price > advancedFilters.maxPrice) return false;
 
-                    const matchesStatus = statusFilter === 'all' || bookStatus === statusFilter;
-                    // Optimized to use pre-calculated _genres array
-                    const matchesCategory = categoryFilter === 'all' || b._genres.includes(categoryFilter);
-                    const matchesAuthor = authorFilter === 'all' || b.author === authorFilter;
-                    const matchesOwner = ownerFilter === 'all' || b.owner === ownerFilter;
-                    const matchesTag = !tagFilter || (b.tags && b.tags.includes(tagFilter));
+                    if (startTimestamp !== null || endTimestamp !== null) {
+                        const bDate = b._purchaseTime;
+                        if (startTimestamp !== null && bDate < startTimestamp) return false;
+                        if (endTimestamp !== null && bDate > endTimestamp) return false;
+                    }
 
-                    let matchesAdvancedRating = true;
-                    if (targetRating !== null) {
-                        if (targetRating === 0) {
-                            matchesAdvancedRating = userRating === 0;
-                        } else {
-                            matchesAdvancedRating = userRating >= targetRating;
+                    // 3. Conditional data fetching: Only fetch status data if needed for filtering
+                    if (statusFilter !== 'all' || targetRating !== null) {
+                        const statusData = getStatusData(b.id);
+                        if (statusFilter !== 'all' && statusData.status !== statusFilter) return false;
+                        if (targetRating !== null) {
+                            if (targetRating === 0) {
+                                if (statusData.rating !== 0) return false;
+                            } else {
+                                if (statusData.rating < targetRating) return false;
+                            }
                         }
                     }
 
-                    const matchesPrice = (!advancedFilters.minPrice || b.price >= advancedFilters.minPrice) &&
-                        (!advancedFilters.maxPrice || b.price <= advancedFilters.maxPrice);
-
-                    let matchesDate = true;
-                    if (startTimestamp !== null || endTimestamp !== null) {
-                        // Use pre-calculated purchase time
-                        const bDate = b._purchaseTime;
-                        if (startTimestamp !== null && bDate < startTimestamp) matchesDate = false;
-                        if (endTimestamp !== null && bDate > endTimestamp) matchesDate = false;
-                    }
-
-                    return matchesTab && matchesSearch && matchesStatus && matchesCategory && matchesAuthor && matchesOwner && matchesTag && matchesAdvancedRating && matchesPrice && matchesDate;
+                    return true;
                 });
 
-                filteredBooks.sort((a, b) => {
-                    // Optimized sorting using Intl.Collator
-                    if (sortBy === 'title') return collator.compare(a.title || '', b.title || '');
-                    if (sortBy === 'author') return collator.compare(a.author || '', b.author || '');
-                    if (sortBy === 'newest') {
-                        // Use pre-calculated created time
-                        return b._createdTime - a._createdTime;
-                    }
-                    if (sortBy === 'oldest') {
-                        // Use pre-calculated created time
-                        return a._createdTime - b._createdTime;
-                    }
-                    return 0;
-                });
+                // 4. Optimize sorting: Hoist comparator selection outside of the loop for performance
+                let comparator;
+                if (sortBy === 'title') comparator = (a, b) => collator.compare(a.title || '', b.title || '');
+                else if (sortBy === 'author') comparator = (a, b) => collator.compare(a.author || '', b.author || '');
+                else if (sortBy === 'oldest') comparator = (a, b) => a._createdTime - b._createdTime;
+                else if (sortBy === 'newest') comparator = (a, b) => b._createdTime - a._createdTime;
+
+                if (comparator) filteredBooks.sort(comparator);
 
                 const activeFiltersContainer = document.getElementById('active-filters-bar');
                 if (activeFiltersContainer) {
