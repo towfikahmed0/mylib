@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+:root {
+  --primary-color: #3b82f6;
+  --font-inter: 'Inter', sans-serif;
+  --font-playfair: 'Playfair Display', serif;
+}
+
+@theme {
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-playfair);
+
+  --color-primary: var(--primary-color);
+  --color-sepia-50: #fbf0e3;
+  --color-sepia-100: #f7e4cf;
+  --color-sepia-200: #efc9a1;
+  --color-sepia-300: #e7ae73;
+  --color-sepia-400: #df9345;
+  --color-sepia-500: #d77817;
+  --color-sepia-600: #ac6012;
+  --color-sepia-700: #81480e;
+  --color-sepia-800: #563009;
+  --color-sepia-900: #2b1805;
+}
+
+@layer base {
+  body {
+    @apply bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white;
+    font-family: var(--font-inter);
+  }
+}
+
+.font-serif {
+  font-family: var(--font-playfair);
+}
+
+.glass {
+  background: rgba(240, 249, 255, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.dark .glass {
+  background: rgba(15, 23, 42, 0.8);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.sepia .glass {
+  background: rgba(251, 240, 227, 0.8);
+  border-color: rgba(129, 72, 14, 0.1);
+}
+
+.book-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.book-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 30px -10px rgba(59, 130, 246, 0.2);
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Light blueish theme scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #bae6fd;
+  border-radius: 10px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #1e293b;
+}
+
+.unselectable {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
