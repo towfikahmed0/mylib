@@ -114,9 +114,15 @@
             padding: 0.75rem !important;
         }
 
-        .book-card:hover {
+        .book-card:hover,
+        .book-card:focus-visible {
             transform: translateY(-4px);
             box-shadow: 0 20px 30px -10px rgba(59, 130, 246, 0.2);
+            outline: none;
+        }
+
+        .book-card:focus-visible {
+            box-shadow: 0 0 0 4px var(--primary-color), 0 20px 30px -10px rgba(59, 130, 246, 0.2);
         }
 
         .animate-slide-up {
@@ -1996,11 +2002,16 @@
                 btn.classList.remove('animate-spin');
             }
 
-            window.copyISBN = (isbn) => {
+            window.copyISBN = (isbn, btn) => {
                 if (!isbn) return;
                 if (navigator.clipboard) {
                     navigator.clipboard.writeText(isbn).then(() => {
                         showToast('ISBN copied to clipboard!', 'success');
+                        if (btn) {
+                            const originalHTML = btn.innerHTML;
+                            btn.innerHTML = '<svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>';
+                            setTimeout(() => { btn.innerHTML = originalHTML; }, 2000);
+                        }
                     }).catch(err => {
                         showToast('Failed to copy ISBN', 'error');
                     });
@@ -2337,8 +2348,8 @@
 
                 if (viewMode === 'compact') {
                     return `
-                    <div class="book-card relative group cursor-pointer" data-book-id="${book.id}">
-                        <div class="absolute inset-0 bg-blue-600/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl"></div>
+                    <div class="book-card relative group cursor-pointer focus-visible:ring-4 focus-visible:ring-primary/50" data-book-id="${book.id}" tabindex="0" role="button" aria-label="View details for ${escapeHTML(book.title)} by ${escapeHTML(book.author || 'Unknown')}">
+                        <div class="absolute inset-0 bg-blue-600/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity rounded-2xl"></div>
                         <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm relative">
                             ${book.coverUrl || book.thumbnail ?
                             `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-105" alt="cover">` :
@@ -2351,8 +2362,8 @@
                                     ${READING_STATUSES[bookStatus].label === 'Want to Read' ? 'WTR' : READING_STATUSES[bookStatus].label}
                                 </div>
                             </div>
-                            <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-5 h-5 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer">
+                            <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                                <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-5 h-5 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer" aria-label="Select ${escapeHTML(book.title)}">
                             </div>
                         </div>
                         <div class="mt-2 px-1">
@@ -2365,9 +2376,9 @@
 
                 if (viewMode === 'list') {
                     return `
-                    <div class="book-card glass px-6 py-4 rounded-2xl flex items-center gap-4 cursor-pointer hover:bg-white dark:hover:bg-slate-800 transition-all border ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-lg' : 'border-blue-100/50 dark:border-slate-800'} group relative" data-book-id="${book.id}">
-                        <div class="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                    <div class="book-card glass px-6 py-4 rounded-2xl flex items-center gap-4 cursor-pointer hover:bg-white dark:hover:bg-slate-800 transition-all border ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-lg' : 'border-blue-100/50 dark:border-slate-800'} group relative focus-visible:ring-4 focus-visible:ring-primary/50" data-book-id="${book.id}" tabindex="0" role="button" aria-label="View details for ${escapeHTML(book.title)} by ${escapeHTML(book.author || 'Unknown')}">
+                        <div class="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                            <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" aria-label="Select ${escapeHTML(book.title)}">
                         </div>
                         <div class="w-12 h-16 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700">
                             ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover">` : '<div class="w-full h-full flex items-center justify-center bg-blue-50 dark:bg-slate-700 text-[8px] text-blue-300 dark:text-slate-500 font-bold uppercase p-1 text-center">No Cover</div>'}
@@ -2387,7 +2398,7 @@
                             <div class="text-[10px] font-bold text-blue-600 dark:text-blue-400 mt-1 truncate max-w-[120px]">${bookGenres.join(', ')}</div>
                             ${book.owner ? `<div class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors" onclick="event.stopPropagation(); window.setOwnerFilter('${(book.owner).replace(/'/g, "\\'")}')">Owner: ${book.owner}</div>` : ''}
                             <div class="flex items-center gap-2 mt-1">
-                                <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100" aria-label="Edit book details">
+                                <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Edit book details">
                                     <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
                                 <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge}">${READING_STATUSES[bookStatus].label}${bookStatus === 'reading' ? ` (${userProgress || 0}%)` : ''}</div>
@@ -2399,9 +2410,9 @@
 
                 const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
                 return `
-                <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-blue-100/50 dark:border-slate-800'} relative ${densityClass}" data-book-id="${book.id}">
-                    <div class="absolute top-4 left-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-6 h-6 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer">
+                <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-blue-100/50 dark:border-slate-800'} relative ${densityClass} focus-visible:ring-4 focus-visible:ring-primary/50" data-book-id="${book.id}" tabindex="0" role="button" aria-label="View details for ${escapeHTML(book.title)} by ${escapeHTML(book.author || 'Unknown')}">
+                    <div class="absolute top-4 left-4 z-20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-6 h-6 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer" aria-label="Select ${escapeHTML(book.title)}">
                     </div>
                     <div class="w-28 h-40 bg-slate-100 dark:bg-slate-800 rounded-3xl overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 relative shadow-lg">
                         ${bookStatus === 'reading' ? `
@@ -2441,7 +2452,7 @@
                             <span class="text-[10px] font-bold text-slate-400">${book.purchaseDate ? new Date(book.purchaseDate).toLocaleDateString() : ''}</span>
                             <div class="flex items-center gap-2">
                                 <span class="text-slate-900 dark:text-white font-black text-sm">${book.price ? '$' + book.price : ''}</span>
-                                <button class="p-2 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100" aria-label="Edit book details">
+                                <button class="p-2 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Edit book details">
                                     <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
                             </div>
@@ -3784,7 +3795,7 @@
                                     <div class="bg-blue-50/50 dark:bg-slate-800/40 p-4 rounded-2xl border border-blue-100/50 dark:border-slate-700"><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Purchased</p><p class="text-xl font-black font-serif">${book.purchaseDate ? new Date(book.purchaseDate).toLocaleDateString() : '—'}</p></div>
                                 </div>
 
-                                ${book.isbn ? `<div class="mt-6 px-4 flex items-center justify-between"><div class="flex-1"><label for="detail-isbn" class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">ISBN</label><p id="detail-isbn" class="text-sm font-mono tracking-wider">${book.isbn}</p></div><button onclick="window.copyISBN('${book.isbn.replace(/'/g, "\\'")}')" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-primary" title="Copy ISBN" aria-label="Copy ISBN"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg></button></div>` : ''}
+                                ${book.isbn ? `<div class="mt-6 px-4 flex items-center justify-between"><div class="flex-1"><label for="detail-isbn" class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">ISBN</label><p id="detail-isbn" class="text-sm font-mono tracking-wider">${book.isbn}</p></div><button onclick="window.copyISBN('${book.isbn.replace(/'/g, "\\'")}', this)" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-primary" title="Copy ISBN" aria-label="Copy ISBN"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg></button></div>` : ''}
                                 <div class="mt-4 px-4">
                                     <label for="detail-status-select" class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">My Reading Status</label>
                                     <div class="flex gap-2">
@@ -4197,6 +4208,18 @@
                     return;
                 }
                 openBookDetails(book);
+            });
+
+            document.addEventListener('keydown', e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    const card = e.target.closest('.book-card');
+                    if (card && e.target === card) {
+                        e.preventDefault();
+                        const bookId = card.dataset.bookId;
+                        const book = books.find(b => b.id === bookId);
+                        if (book) openBookDetails(book);
+                    }
+                }
             });
 
         })();
