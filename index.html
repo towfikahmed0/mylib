@@ -2990,6 +2990,11 @@
                                 <div><label for="man-price" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Price</label><input id="man-price" type="number" step="0.01" placeholder="0.00" value="${existingBook?.price || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
                                 <div><label for="man-date" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Date</label><input id="man-date" type="date" value="${(existingBook?.purchaseDate || new Date().toISOString()).split('T')[0]}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
                             </div>
+
+                            <div>
+                                <label for="man-about" class="text-[10px] font-bold text-slate-400 uppercase ml-1">About</label>
+                                <textarea id="man-about" placeholder="Summary or description of the book..." class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[120px]">${existingBook?.about || ''}</textarea>
+                            </div>
                         </div>
                         <div class="flex gap-4 mt-10 pb-10">
                             <button data-close class="flex-1 px-4 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold">Cancel</button>
@@ -3095,14 +3100,7 @@
                             }
 
                             if (data.summary) {
-                                // Update summary preview if it exists, otherwise create it
-                                let previewEl = document.getElementById('ai-summary-preview');
-                                if (!previewEl) {
-                                    previewEl = document.createElement('div');
-                                    previewEl.id = 'ai-summary-preview';
-                                    document.getElementById('ai-suggest-btn').closest('.space-y-6').appendChild(previewEl);
-                                }
-                                previewEl.innerHTML = `<div><label class="text-[10px] font-bold text-slate-400 uppercase ml-1">AI Summary Preview</label><p class="text-xs text-slate-500 italic p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-800 mb-4">${data.summary}</p></div>`;
+                                document.getElementById('man-about').value = data.summary;
                             }
                             showToast("AI suggestions applied!", "success");
                         } catch (e) {
@@ -3149,6 +3147,7 @@
                         categories: currentGenres.length > 0 ? currentGenres : ['Other'],
                         owner: document.getElementById('man-owner').value || '',
                         tags: tags,
+                        about: document.getElementById('man-about').value || '',
                         coverUrl: document.getElementById('man-cover').value || null,
                         isWishlist: document.getElementById('man-wishlist').checked,
                         price: document.getElementById('man-price').value ? parseFloat(document.getElementById('man-price').value) : null,
@@ -3788,12 +3787,15 @@
                 const averageRating = ratingsOnly.length > 0 ? (ratingsOnly.reduce((a, b) => a + b, 0) / ratingsOnly.length).toFixed(1) : null;
 
                 const close = showModal(`
-                <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-                    <div class="glass max-w-2xl w-full rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up overflow-y-auto max-h-[90vh]">
-                        <div class="flex flex-col sm:flex-row gap-8">
-                            <div class="flex-shrink-0 mx-auto sm:mx-0">
+                <div class="w-full h-full flex flex-col p-6 overflow-y-auto bg-slate-50 dark:bg-slate-900">
+                    <div class="max-w-4xl mx-auto w-full">
+                        <div class="flex justify-end mb-4">
+                            <button data-close class="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm hover:bg-slate-100 transition-colors" aria-label="Close details" title="Close details"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                        </div>
+                        <div class="flex flex-col md:flex-row gap-8">
+                            <div class="flex-shrink-0 mx-auto md:mx-0">
                                 <div class="relative group">
-                                    <img src="${book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover'}" class="w-44 h-64 object-cover rounded-3xl shadow-2xl border border-white/20">
+                                    <img src="${book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover'}" class="w-56 h-80 object-cover rounded-3xl shadow-2xl border border-white/20">
                                     ${book.isWishlist ? `
                                         <button id="move-to-lib-btn" title="Move to Library" class="absolute -top-3 -right-3 w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center shadow-lg border-4 border-white dark:border-slate-900 hover:scale-110 transition-transform active:scale-95" aria-label="Move to Library">
                                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
@@ -3801,52 +3803,64 @@
                                     ` : ''}
                                 </div>
                             </div>
-                            <div class="flex-1 text-center sm:text-left">
-                                <div class="flex flex-col sm:flex-row sm:items-center gap-2 justify-center sm:justify-start">
+                            <div class="flex-1 text-center md:text-left">
+                                <div class="flex flex-col sm:flex-row sm:items-center gap-2 justify-center md:justify-start">
                                     <div class="flex flex-wrap gap-1">
                                         ${bookGenres.map(g => `<span class="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">${escapeHTML(g)}</span>`).join('<span class="text-slate-300 mx-1">·</span>')}
                                     </div>
-                                    ${book.owner ? `<span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-auto">Owner: ${escapeHTML(book.owner)}</span>` : ''}
+                                    ${book.owner ? `<span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest sm:ml-auto">Owner: ${escapeHTML(book.owner)}</span>` : ''}
                                 </div>
-                                <h2 class="text-3xl font-black mt-3 leading-tight font-serif">${escapeHTML(book.title)}</h2>
-                                <p class="text-xl text-slate-500 dark:text-slate-400 mt-2 font-medium italic">${escapeHTML(book.author)}</p>
-                                <div class="flex items-center gap-4 m-5">
-                                    <div class="text-amber-400 text-lg">${stars}</div>
-                                    ${averageRating ? `<span class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-lg text-[11px] font-black">Avg: ${averageRating} ★</span>` : ''}
-                                </div>
-
-                                <div class="grid grid-cols-2 gap-8 mt-8">
-                                    <div class="bg-blue-50/50 dark:bg-slate-800/40 p-4 rounded-2xl border border-blue-100/50 dark:border-slate-700"><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Price</p><p class="text-xl font-black text-blue-600 dark:text-blue-400 font-serif">${book.price ? '$' + book.price : '—'}</p></div>
-                                    <div class="bg-blue-50/50 dark:bg-slate-800/40 p-4 rounded-2xl border border-blue-100/50 dark:border-slate-700"><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Purchased</p><p class="text-xl font-black font-serif">${book.purchaseDate ? new Date(book.purchaseDate).toLocaleDateString() : '—'}</p></div>
+                                <h2 class="text-4xl font-black mt-3 leading-tight font-serif">${escapeHTML(book.title)}</h2>
+                                <p class="text-2xl text-slate-500 dark:text-slate-400 mt-2 font-medium italic">${escapeHTML(book.author)}</p>
+                                <div class="flex items-center gap-4 mt-6 justify-center md:justify-start">
+                                    <div class="text-amber-400 text-2xl">${stars}</div>
+                                    ${averageRating ? `<span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-lg text-xs font-black">Avg: ${averageRating} ★</span>` : ''}
                                 </div>
 
-                                ${book.isbn ? `<div class="mt-6 px-4 flex items-center justify-between"><div class="flex-1"><label for="detail-isbn" class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">ISBN</label><p id="detail-isbn" class="text-sm font-mono tracking-wider">${book.isbn}</p></div><button onclick="window.copyISBN('${book.isbn.replace(/'/g, "\\'")}', this)" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-primary" title="Copy ISBN" aria-label="Copy ISBN"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg></button></div>` : ''}
-                                <div class="mt-4 px-4">
+                                ${book.about ? `
+                                    <div class="mt-6 px-1">
+                                        <p class="text-[10px] font-bold text-slate-400 uppercase mb-2">About</p>
+                                        <div class="text-sm text-slate-600 dark:text-slate-300 leading-relaxed max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                                            ${escapeHTML(book.about).replace(/\n/g, '<br>')}
+                                        </div>
+                                    </div>
+                                ` : ''}
+
+                                <div class="grid grid-cols-2 gap-4 mt-8">
+                                    <div class="bg-blue-50/50 dark:bg-slate-800/40 p-5 rounded-2xl border border-blue-100/50 dark:border-slate-700"><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Price</p><p class="text-2xl font-black text-blue-600 dark:text-blue-400 font-serif">${book.price ? '$' + book.price : '—'}</p></div>
+                                    <div class="bg-blue-50/50 dark:bg-slate-800/40 p-5 rounded-2xl border border-blue-100/50 dark:border-slate-700"><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Purchased</p><p class="text-2xl font-black font-serif">${book.purchaseDate ? new Date(book.purchaseDate).toLocaleDateString() : '—'}</p></div>
+                                </div>
+
+                                ${book.isbn ? `<div class="mt-8 px-1 flex items-center justify-between"><div class="flex-1"><label for="detail-isbn" class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">ISBN</label><p id="detail-isbn" class="text-sm font-mono tracking-wider">${book.isbn}</p></div><button onclick="window.copyISBN('${book.isbn.replace(/'/g, "\\'")}', this)" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-primary" title="Copy ISBN" aria-label="Copy ISBN"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg></button></div>` : ''}
+                                <div class="mt-6 px-1">
                                     <label for="detail-status-select" class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">My Reading Status</label>
-                                    <div class="flex gap-2">
-                                        <select id="detail-status-select" class="flex-1 px-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                                    <div class="flex flex-col sm:flex-row gap-4">
+                                        <select id="detail-status-select" class="w-full sm:w-48 px-4 py-3 text-sm bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
                                             <option value="want_to_read" ${bookStatus === 'want_to_read' ? 'selected' : ''}>Want to Read</option>
                                             <option value="reading" ${bookStatus === 'reading' ? 'selected' : ''}>Reading</option>
                                             <option value="finished" ${bookStatus === 'finished' ? 'selected' : ''}>Finished</option>
                                         </select>
                                         ${bookStatus === 'reading' ? `
-                                            <div class="flex flex-1 items-center gap-3">
+                                            <div class="flex-1 flex items-center gap-4 bg-slate-100 dark:bg-slate-800 p-3 rounded-xl">
                                                 <input id="detail-progress-slider" type="range" min="0" max="100" value="${userProgressVal}" class="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary" aria-label="Reading progress slider">
-                                                <input id="detail-progress-input" type="number" min="0" max="100" value="${userProgressVal}" class="w-16 px-2 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-center" placeholder="%" aria-label="Reading progress percentage">
+                                                <div class="flex items-center gap-2">
+                                                    <input id="detail-progress-input" type="number" min="0" max="100" value="${userProgressVal}" class="w-16 px-2 py-2 text-sm bg-white dark:bg-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-center font-bold" placeholder="%" aria-label="Reading progress percentage">
+                                                    <span class="text-xs font-bold text-slate-400">%</span>
+                                                </div>
                                             </div>
                                         ` : ''}
                                     </div>
                                 </div>
-                                <div class="mt-4 px-4">
+                                <div class="mt-6 px-1">
                                     <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Tags</p>
                                     <div class="flex flex-wrap gap-2">
                                         ${(book.tags || []).map(tag => `<span onclick="window.setTagFilter('${tag}'); document.querySelector('[data-close]').click();" class="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-bold cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors">${tag}</span>`).join('')}
                                     </div>
                                 </div>
-                                <div class="mt-4 px-4">
+                                <div class="mt-6 px-1">
                                     <label for="detail-rating-select" class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">My Rating & Review</label>
-                                    <div class="space-y-3">
-                                        <select id="detail-rating-select" class="w-full px-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                                    <div class="space-y-4">
+                                        <select id="detail-rating-select" class="w-full px-4 py-3 text-sm bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
                                             <option value="0" ${userRatingVal === 0 ? 'selected' : ''}>No Rating</option>
                                             <option value="1" ${userRatingVal === 1 ? 'selected' : ''}>1 Star</option>
                                             <option value="2" ${userRatingVal === 2 ? 'selected' : ''}>2 Stars</option>
@@ -3854,12 +3868,14 @@
                                             <option value="4" ${userRatingVal === 4 ? 'selected' : ''}>4 Stars</option>
                                             <option value="5" ${userRatingVal === 5 ? 'selected' : ''}>5 Stars</option>
                                         </select>
-                                        <label for="detail-comment-textarea" class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Your Review</label>
-                                        <textarea id="detail-comment-textarea" placeholder="What did you think of this book?" class="w-full px-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px]">${escapeHTML(userCommentVal)}</textarea>
-                                        <button id="save-rating-btn" class="w-full py-2 bg-primary text-white text-[10px] font-black uppercase rounded-lg">Save Review</button>
+                                        <div>
+                                            <label for="detail-comment-textarea" class="text-[10px] font-bold text-slate-400 uppercase mb-2 block">Your Review</label>
+                                            <textarea id="detail-comment-textarea" placeholder="What did you think of this book?" class="w-full px-4 py-3 text-sm bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none min-h-[100px] transition-all">${escapeHTML(userCommentVal)}</textarea>
+                                        </div>
+                                        <button id="save-rating-btn" class="w-full py-4 bg-primary text-white text-xs font-black uppercase rounded-xl shadow-lg shadow-primary/20 hover:opacity-90 transition-all active:scale-95">Save Review</button>
                                     </div>
                                 </div>
-                                <div class="mt-4 px-4">
+                                <div class="mt-6 px-1">
                                     <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Borrowing</p>
                                     ${book.borrowedBy ? `
                                         <div class="flex items-center justify-between bg-amber-50 dark:bg-amber-900/20 p-3 rounded-xl border border-amber-100 dark:border-amber-900/30">
@@ -3871,12 +3887,12 @@
                                         </div>
                                     ` : `
                                         <div class="flex flex-col gap-2">
-                                            <div class="flex gap-2">
+                                            <div class="flex gap-3">
                                                 <label for="borrower-name" class="sr-only">Borrower Name</label>
-                                                <input id="borrower-name" type="text" placeholder="Borrower Name" class="flex-1 px-3 py-2 text-xs bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                                                <button id="borrow-book-btn" class="px-4 py-2 bg-primary text-white text-[10px] font-black uppercase rounded-lg">Borrow</button>
+                                                <input id="borrower-name" type="text" placeholder="Borrower Name" class="flex-1 px-4 py-3 text-sm bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                                                <button id="borrow-book-btn" class="px-6 py-3 bg-primary text-white text-[10px] font-black uppercase rounded-xl shadow-lg shadow-primary/20 transition-all active:scale-95">Borrow</button>
                                             </div>
-                                            <p class="text-[9px] text-slate-400">Leave name empty to borrow as yourself (${currentUser.displayName || currentUser.email})</p>
+                                            <p class="text-[9px] text-slate-400 ml-1">Leave name empty to borrow as yourself (${currentUser.displayName || currentUser.email})</p>
                                         </div>
                                     `}
                                 </div>
