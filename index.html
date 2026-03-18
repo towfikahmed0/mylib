@@ -370,8 +370,9 @@
                         if (!window.GoogleGenerativeAI) throw new Error("AI SDK not loaded");
                     }
                     const genAI = new window.GoogleGenerativeAI(apiKey);
+                    const modelName = localStorage.getItem('mylib_gemini_model') || "gemini-3-flash-preview";
                     const model = genAI.getGenerativeModel({
-                        model: "gemini-3-flash-preview"
+                        model: modelName
                     });
 
                     // If systemInstruction is supported by the model config, use it.
@@ -967,15 +968,44 @@
 
                     <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
                         <h2 class="text-2xl font-black mb-6 font-serif italic text-violet-600 dark:text-violet-400">AI Configuration</h2>
-                        <div class="space-y-4">
+                        <div class="space-y-6">
                             <div>
                                 <label for="gemini-api-key" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Gemini API Key</label>
-                                <div class="flex flex-col sm:flex-row gap-2">
-                                    <input id="gemini-api-key" type="password" placeholder="Enter your Gemini API Key" value="${localStorage.getItem('mylib_gemini_api_key') || ''}" class="flex-1 min-w-0 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
-                                    <button id="save-ai-settings-btn" class="sm:px-6 py-3 bg-violet-600 text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-violet-200 dark:shadow-none">Save Key</button>
-                                </div>
-                                <p class="text-[10px] text-slate-400 mt-2 px-1">Your key is stored locally in your browser and used only to communicate with Google Gemini AI.</p>
+                                <input id="gemini-api-key" type="password" placeholder="Enter your Gemini API Key" value="${localStorage.getItem('mylib_gemini_api_key') || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
                             </div>
+
+                            <div>
+                                <label for="gemini-model-select" class="text-[10px] font-bold text-slate-400 uppercase ml-1">AI Model</label>
+                                <select id="gemini-model-select" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
+                                    ${(() => {
+                                        const models = [
+                                            { id: 'gemini-3.1-flash-lite-preview', label: 'Gemini 3.1 Flash-Lite' },
+                                            { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash' },
+                                            { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+                                            { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' }
+                                        ];
+                                        const currentModel = localStorage.getItem('mylib_gemini_model') || 'gemini-3-flash-preview';
+                                        const isCustom = !models.some(m => m.id === currentModel);
+                                        let options = models.map(m => `<option value="${m.id}" ${currentModel === m.id ? 'selected' : ''}>${m.label}</option>`).join('');
+                                        options += `<option value="custom" ${isCustom ? 'selected' : ''}>Custom Model...</option>`;
+                                        return options;
+                                    })()}
+                                </select>
+                            </div>
+
+                            <div id="custom-model-container" class="${(() => {
+                                const models = ['gemini-3.1-flash-lite-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'];
+                                const currentModel = localStorage.getItem('mylib_gemini_model') || 'gemini-3-flash-preview';
+                                const isCustom = !models.includes(currentModel);
+                                return isCustom ? '' : 'hidden';
+                            })()}">
+                                <label for="gemini-custom-model" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Custom Model Name</label>
+                                <input id="gemini-custom-model" type="text" placeholder="e.g. gemini-1.5-pro-exp-0827" value="${localStorage.getItem('mylib_gemini_model') || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
+                            </div>
+
+                            <button id="save-ai-settings-btn" class="w-full py-4 bg-violet-600 text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-violet-200 dark:shadow-none">Save AI Settings</button>
+
+                            <p class="text-[10px] text-slate-400 px-1">Your settings are stored locally in your browser and used only to communicate with Google Gemini AI.</p>
                         </div>
                     </div>
 
@@ -1904,9 +1934,30 @@
                 document.getElementById('notify-btn')?.addEventListener('click', requestNotificationPermission);
                 document.getElementById('save-sharing-btn')?.addEventListener('click', saveSharingSettings);
 
+                document.getElementById('gemini-model-select')?.addEventListener('change', (e) => {
+                    const container = document.getElementById('custom-model-container');
+                    if (container) {
+                        container.classList.toggle('hidden', e.target.value !== 'custom');
+                        if (e.target.value === 'custom') {
+                            document.getElementById('gemini-custom-model')?.focus();
+                        }
+                    }
+                });
+
                 document.getElementById('save-ai-settings-btn')?.addEventListener('click', () => {
                     const key = document.getElementById('gemini-api-key').value.trim();
+                    const modelSelect = document.getElementById('gemini-model-select').value;
+                    const customModel = document.getElementById('gemini-custom-model').value.trim();
+
+                    const finalModel = modelSelect === 'custom' ? customModel : modelSelect;
+
+                    if (modelSelect === 'custom' && !customModel) {
+                        showToast('Please enter a custom model name', 'error');
+                        return;
+                    }
+
                     localStorage.setItem('mylib_gemini_api_key', key);
+                    localStorage.setItem('mylib_gemini_model', finalModel);
                     showToast('AI Settings updated!', 'success');
                 });
 
