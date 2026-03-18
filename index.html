@@ -3947,16 +3947,20 @@
             });
 
             window.jumpToBook = async (bookId) => {
-                setTab('library');
-                // Find book and scroll to it
                 const book = books.find(b => b.id === bookId);
                 if (book) {
+                    window.setTab(book.isWishlist ? 'wishlist' : 'library');
                     setTimeout(() => {
                         const element = document.querySelector(`[data-book-id="${bookId}"]`);
                         if (element) {
                             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            element.focus();
+                            element.classList.add('ring-4', 'ring-primary');
+                            setTimeout(() => {
+                                element.classList.remove('ring-4', 'ring-primary');
+                            }, 2000);
                         }
-                    }, 100);
+                    }, 150);
                 }
             };
 
