@@ -494,7 +494,7 @@
                 window.addEventListener('keydown', escHandler);
                 modalContainer._cleanup = closeHandler;
                 if (!isFullscreen) modal.addEventListener('click', (e) => { if (e.target === modal) closeHandler(); });
-                modal.querySelector('[data-close]')?.addEventListener('click', closeHandler);
+                modal.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', closeHandler));
                 setTimeout(() => { (modal.querySelector('input:not([type="hidden"]), select, textarea, button') || modal.querySelector('[data-close]'))?.focus(); }, 50);
                 return closeHandler;
             }
@@ -648,6 +648,16 @@
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                             </button>
                         </div>
+
+                        <div class="mb-6">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Reading Mood</p>
+                            <div class="flex flex-wrap gap-2" id="mood-selectors">
+                                ${['Adventurous', 'Thoughtful', 'Lighthearted', 'Intense', 'Inquisitive'].map(mood => `
+                                    <button onclick="window.suggestByMood('${mood}')" class="px-4 py-2 bg-white dark:bg-slate-800 border border-violet-100 dark:border-violet-900/30 rounded-xl text-xs font-bold hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all text-violet-600 dark:text-violet-400">${mood}</button>
+                                `).join('')}
+                            </div>
+                        </div>
+
                         <div id="ai-recs-content" class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div class="md:col-span-3 py-12 text-center">
                                 <p class="text-sm text-slate-400 italic">Tap refresh to see what you should read next!</p>
@@ -655,6 +665,40 @@
                         </div>
                     </div>
                     <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
+                        <div class="mb-12">
+                            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Monthly Reading Activity (${new Date().getFullYear()})</h3>
+                            <div class="h-48 flex items-end gap-2 px-2">
+                                ${(() => {
+                        const monthlyData = new Array(12).fill(0);
+                        const currentYear = new Date().getFullYear();
+                        books.forEach(b => {
+                            const statusData = getStatusData(b.id);
+                            if (statusData.status === 'finished' && statusData.updatedAt) {
+                                const finishedDate = statusData.updatedAt.toDate();
+                                if (finishedDate.getFullYear() === currentYear) {
+                                    monthlyData[finishedDate.getMonth()]++;
+                                }
+                            }
+                        });
+                        const max = Math.max(...monthlyData, 1);
+                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        return monthlyData.map((count, i) => {
+                            const height = (count / max) * 100;
+                            const isCurrentMonth = new Date().getMonth() === i;
+                            return `
+                                        <div class="flex-1 flex flex-col items-center gap-2 group">
+                                            <div class="relative w-full">
+                                                <div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[8px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">${count} books</div>
+                                                <div class="w-full ${isCurrentMonth ? 'bg-primary shadow-lg shadow-primary/20' : 'bg-blue-100 dark:bg-blue-900/40 group-hover:bg-blue-200 dark:group-hover:bg-blue-900/60'} rounded-t-lg transition-all duration-1000 ease-out" style="height: ${height}%"></div>
+                                            </div>
+                                            <span class="text-[9px] font-bold ${isCurrentMonth ? 'text-primary' : 'text-slate-400'} uppercase">${months[i]}</span>
+                                        </div>
+                                    `;
+                        }).join('');
+                    })()}
+                            </div>
+                        </div>
+
                         <div class="mb-8">
                             <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Reading Status Breakdown</h3>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1235,6 +1279,7 @@
                         </div>
                         <div id="active-filters-bar" class="mb-4 flex flex-wrap gap-2"></div>
                         <div id="tag-filter-container"></div>
+                        <div id="currently-reading-container"></div>
                         <div id="controls-bar-container"></div>
                         <div id="library-container-wrapper"></div>
                     `;
@@ -1509,6 +1554,52 @@
                         </span>
                     </div>
                 ` : '';
+                }
+
+                const readingContainer = document.getElementById('currently-reading-container');
+                if (readingContainer) {
+                    const readingBooks = books.filter(b => !b.isWishlist && getStatusData(b.id).status === 'reading');
+                    if (readingBooks.length > 0 && !searchQuery && categoryFilter === 'all' && authorFilter === 'all' && ownerFilter === 'all' && !tagFilter && advancedFilters.rating === 'all') {
+                        readingContainer.innerHTML = `
+                            <div class="mb-8 overflow-hidden">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h2 class="text-sm font-black uppercase tracking-widest text-slate-400 font-serif italic">Currently Reading</h2>
+                                    <span class="px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full text-[10px] font-bold">${readingBooks.length}</span>
+                                </div>
+                                <div class="flex gap-4 overflow-x-auto pb-4 custom-scrollbar snap-x snap-mandatory -mx-6 px-6">
+                                    ${readingBooks.map(book => {
+                            const progress = getStatusData(book.id).progress || 0;
+                            return `
+                                            <div class="flex-shrink-0 w-64 glass p-4 rounded-[2rem] border border-blue-100/50 dark:border-slate-800 snap-start cursor-pointer hover:shadow-lg transition-all" data-book-id="${book.id}">
+                                                <div class="flex gap-3">
+                                                    <div class="w-16 h-24 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 shadow-sm relative">
+                                                        ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover">` : '<div class="w-full h-full flex items-center justify-center text-[8px] font-bold uppercase p-1 text-center text-slate-400">No Cover</div>'}
+                                                        <div class="absolute bottom-0 left-0 right-0 h-1 bg-slate-200/50">
+                                                            <div class="h-full bg-blue-500" style="width: ${progress}%"></div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="flex-1 min-w-0 flex flex-col justify-center">
+                                                        <h3 class="font-black text-xs truncate leading-tight">${book.title}</h3>
+                                                        <p class="text-[10px] text-slate-500 truncate mt-1">${book.author}</p>
+                                                        <div class="mt-3">
+                                                            <div class="flex justify-between items-center mb-1">
+                                                                <span class="text-[9px] font-black text-blue-600">${progress}%</span>
+                                                            </div>
+                                                            <div class="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                                                <div class="h-full bg-blue-500" style="width: ${progress}%"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        `;
+                        }).join('')}
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        readingContainer.innerHTML = '';
+                    }
                 }
 
                 const controlsBar = document.getElementById('controls-bar-container');
@@ -1934,6 +2025,67 @@
                     refreshBtn.onclick = generateAIRecommendations;
                 }
             }
+
+            window.suggestByMood = async (mood) => {
+                const content = document.getElementById('ai-recs-content');
+                if (!content) return;
+
+                const originalHTML = content.innerHTML;
+                content.innerHTML = `
+                    <div class="md:col-span-3 py-12 text-center">
+                        <div class="w-12 h-12 border-4 border-violet-200 border-t-violet-600 rounded-full animate-spin mx-auto mb-4"></div>
+                        <p class="text-sm text-slate-500 animate-pulse">Finding a ${mood.toLowerCase()} book for you...</p>
+                    </div>
+                `;
+
+                // Collect unread/reading books
+                const candidates = books.filter(b => !b.isWishlist && getStatusData(b.id).status !== 'finished').map(b => ({ id: b.id, title: b.title, author: b.author, genres: b._genres.join(', ') }));
+
+                if (candidates.length === 0) {
+                    content.innerHTML = `
+                        <div class="md:col-span-3 py-12 text-center">
+                            <p class="text-sm text-slate-400 italic">No unread books to suggest from!</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const prompt = `Mood: "${mood}"
+                Unread Books: ${JSON.stringify(candidates.slice(0, 50))}
+
+                Suggest ONE book from this list that matches the mood.
+                Return valid JSON: {"id": "bookId", "reason": "why it matches the mood"}`;
+
+                const result = await askGemini(prompt, "You are a mood-based book recommender. Return ONLY JSON.");
+                if (result) {
+                    try {
+                        const cleanJson = result.replace(/```json|```/g, "").trim();
+                        const data = JSON.parse(cleanJson);
+                        const book = books.find(b => b.id === data.id);
+                        if (book) {
+                            content.innerHTML = `
+                                <div class="md:col-span-3 p-6 bg-violet-50 dark:bg-violet-900/10 rounded-3xl border-2 border-violet-100 dark:border-violet-900/30 animate-slide-up">
+                                    <div class="flex flex-col md:flex-row gap-6 items-center">
+                                        <div class="w-24 h-36 flex-shrink-0 rounded-xl overflow-hidden shadow-lg">
+                                            <img src="${book.coverUrl || book.thumbnail || 'https://via.placeholder.com/100x150'}" class="w-full h-full object-cover">
+                                        </div>
+                                        <div class="flex-1 text-center md:text-left">
+                                            <span class="px-3 py-1 bg-violet-100 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400 rounded-full text-[10px] font-black uppercase tracking-widest">${mood} Match</span>
+                                            <h3 class="text-xl font-black font-serif italic mt-2">${book.title}</h3>
+                                            <p class="text-sm text-slate-500 mt-1">${book.author}</p>
+                                            <p class="text-sm text-slate-600 dark:text-slate-300 mt-4 leading-relaxed italic">"${data.reason}"</p>
+                                            <button onclick="window.jumpToBook('${book.id}')" class="mt-6 px-6 py-2.5 bg-violet-600 text-white rounded-full text-xs font-bold shadow-lg shadow-violet-200 dark:shadow-none hover:scale-105 active:scale-95 transition-all">Start Reading</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                            return;
+                        }
+                    } catch (e) { console.error(e); }
+                }
+                content.innerHTML = originalHTML;
+                showToast("Failed to generate mood suggestion", "error");
+            };
 
             async function generateAIRecommendations() {
                 const btn = document.getElementById('refresh-ai-recs-btn');
@@ -2626,7 +2778,8 @@
                                     status: data.status === 'unread' ? 'want_to_read' : (data.status || 'want_to_read'),
                                     rating: data.rating || 0,
                                     progress: data.progress || 0,
-                                    comment: data.comment || ''
+                                    comment: data.comment || '',
+                                    updatedAt: data.updatedAt
                                 };
                             }
                         });
@@ -3881,10 +4034,10 @@
                                         </div>
                                     ` : `
                                         <div class="flex flex-col gap-2">
-                                            <div class="flex gap-3">
+                                            <div class="flex flex-col sm:flex-row gap-3">
                                                 <label for="borrower-name" class="sr-only">Borrower Name</label>
                                                 <input id="borrower-name" type="text" placeholder="Borrower Name" class="flex-1 px-4 py-3 text-sm bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
-                                                <button id="borrow-book-btn" class="px-6 py-3 bg-primary text-white text-[10px] font-black uppercase rounded-xl shadow-lg shadow-primary/20 transition-all active:scale-95">Borrow</button>
+                                                <button id="borrow-book-btn" class="w-full sm:w-auto px-6 py-3 bg-primary text-white text-[10px] font-black uppercase rounded-xl shadow-lg shadow-primary/20 transition-all active:scale-95">Borrow</button>
                                             </div>
                                             <p class="text-[9px] text-slate-400 ml-1">Leave name empty to borrow as yourself (${currentUser.displayName || currentUser.email})</p>
                                         </div>
