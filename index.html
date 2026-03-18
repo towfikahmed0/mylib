@@ -255,20 +255,20 @@
     <!-- ==================== FIREBASE INIT (REPLACE WITH YOUR CONFIG) ==================== -->
     <script>
         const firebaseConfig = {
-            apiKey: "AIzaSyAELEVik7pEhEk_gUl8X0o_6_O6cgx3g1M",
-            authDomain: "mylib-5c855.firebaseapp.com",
-            projectId: "mylib-5c855",
-            storageBucket: "mylib-5c855.firebasestorage.app",
-            messagingSenderId: "866489718463",
-            appId: "1:866489718463:web:5b752d5826664512c9980a",
-            measurementId: "G-N049QSWR4Y"
+            apiKey: import.meta.env.VITE_API_KEY,
+            authDomain: import.meta.env.VITE_AUTH_DOMAIN,
+            projectId: import.meta.env.VITE_PROJECT_ID",
+            storageBucket: import.meta.env.VITE_STORAGE_BUCKET,
+            messagingSenderId: import.meta.env.VITE_MESSAGING_SENDER_ID,
+            appId: import.meta.env.VITE_APP_ID,
+            measurementId: import.meta.env.VITE_MEASUREMENT_ID
         };
         firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
+        window.auth = firebase.auth();
+        window.db = firebase.firestore();
         // Global variables for persistence state
-        let persistenceInitialized = false;
-        let authObserverStarted = false;
+        window.persistenceInitialized = false;
+        window.authObserverStarted = false;
 
         // Enable offline persistence
         db.enablePersistence({ synchronizeTabs: true })
@@ -4247,6 +4247,7 @@
                     }
                 });
             };
+            window.startApp = startApp;
 
             async function openBookDetails(book) {
                 const statusData = getStatusData(book.id);
