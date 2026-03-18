@@ -33,6 +33,15 @@
                             800: '#563009',
                             900: '#2b1805',
                         }
+                    },
+                    animation: {
+                        'loading-bar': 'loading-bar 1.5s infinite linear',
+                    },
+                    keyframes: {
+                        'loading-bar': {
+                            '0%': { transform: 'translateX(-100%)' },
+                            '100%': { transform: 'translateX(100%)' },
+                        }
                     }
                 }
             },
@@ -104,6 +113,31 @@
 
         .book-card {
             transition: transform 0.2s ease, box-shadow 0.2s ease;
+            touch-action: pan-y;
+            position: relative;
+        }
+
+        .swipe-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #3b82f6;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 2rem;
+            border-radius: 2rem;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            z-index: 10;
+        }
+
+        .book-card.swiping .swipe-overlay {
+            opacity: 1;
         }
 
         .density-relaxed {
@@ -251,7 +285,9 @@
     <!-- ============================================================================== -->
 
     <!-- Global Loading Bar -->
-    <div id="loading-bar" class="fixed top-0 left-0 right-0 h-1 bg-blue-500 z-[100] transition-transform duration-300 -translate-y-full"></div>
+    <div id="loading-bar" class="fixed top-0 left-0 right-0 h-1 bg-blue-500 z-[100] transition-transform duration-300 -translate-y-full overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent w-full h-full animate-loading-bar"></div>
+    </div>
 
     <!-- App Container (conditional rendering based on auth) -->
     <div id="app" class="min-h-screen flex flex-col"></div>
@@ -261,6 +297,41 @@
         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-medium shadow-2xl flex items-center gap-3 transition-all duration-300 opacity-0 translate-y-10 pointer-events-none">
     </div>
     <div id="modal-container" class="fixed inset-0 z-50 pointer-events-none"></div>
+
+    <!-- AI Librarian Chat Bubble -->
+    <div id="ai-chat-bubble" class="fixed bottom-24 right-6 z-40 transition-all duration-300 translate-y-20 opacity-0 pointer-events-none">
+        <button id="ai-chat-toggle" class="w-14 h-14 bg-violet-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all group pointer-events-auto">
+            <svg class="w-7 h-7 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+            <span class="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
+        </button>
+        <div id="ai-chat-window" class="absolute bottom-20 right-0 w-[calc(100vw-3rem)] sm:w-96 glass rounded-[2.5rem] shadow-2xl border border-violet-100 dark:border-violet-900/30 overflow-hidden flex flex-col transition-all duration-300 scale-90 opacity-0 pointer-events-none origin-bottom-right">
+            <div class="p-5 bg-violet-600 text-white flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                    </div>
+                    <div>
+                        <h3 class="font-black font-serif italic leading-none">AI Librarian</h3>
+                        <p class="text-[10px] text-white/70 font-bold uppercase tracking-widest mt-1">Online & Ready</p>
+                    </div>
+                </div>
+                <button id="ai-chat-close" class="p-2 hover:bg-white/10 rounded-full transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            </div>
+            <div id="ai-chat-messages" class="flex-1 p-5 space-y-4 overflow-y-auto max-h-[400px] min-h-[300px] custom-scrollbar">
+                <div class="bg-violet-50 dark:bg-violet-900/20 p-4 rounded-2xl rounded-tl-none border border-violet-100 dark:border-violet-900/30">
+                    <p class="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">Hello! I'm your AI Librarian. Ask me anything about your collection or for a recommendation!</p>
+                </div>
+            </div>
+            <div class="p-4 border-t border-slate-100 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50">
+                <form id="ai-chat-form" class="flex gap-2">
+                    <input id="ai-chat-input" type="text" placeholder="Ask about your books..." class="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-2xl focus:ring-2 focus:ring-violet-500 outline-none text-sm transition-all" autocomplete="off">
+                    <button type="submit" class="p-3 bg-violet-600 text-white rounded-2xl hover:opacity-90 transition active:scale-95 shadow-lg shadow-violet-200 dark:shadow-none">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <!-- PWA Service Worker Registration -->
     <script>
@@ -876,6 +947,20 @@
                                         </div>
                                     `).join('')}
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
+                        <h2 class="text-2xl font-black mb-6 font-serif italic text-violet-600 dark:text-violet-400">AI Power Tools</h2>
+                        <div class="space-y-6">
+                            <div>
+                                <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Bulk Auto-Tagging</h3>
+                                <p class="text-xs text-slate-500 mb-4">Let AI analyze your library and automatically add relevant tags to books that are missing them.</p>
+                                <button id="ai-auto-tag-btn" class="w-full flex items-center justify-center gap-3 p-4 bg-violet-50 dark:bg-violet-900/10 text-violet-600 dark:text-violet-400 rounded-2xl font-bold hover:bg-violet-100 dark:hover:bg-violet-900/20 transition group">
+                                    <svg class="w-5 h-5 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
+                                    Auto-Tag My Library
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -1811,6 +1896,8 @@
                     showToast('AI Settings updated!', 'success');
                 });
 
+                document.getElementById('ai-auto-tag-btn')?.addEventListener('click', window.aiAutoTagLibrary);
+
                 document.getElementById('save-profile-btn')?.addEventListener('click', async () => {
                     const displayName = document.getElementById('profile-display-name').value.trim();
                     window.showLoading();
@@ -2529,9 +2616,9 @@
                                 </div>`
                         }
                             <div class="absolute bottom-2 right-2 flex flex-col items-end gap-1">
-                                <div class="px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase text-white ${READING_STATUSES[bookStatus].badge.includes('emerald') ? 'bg-emerald-500' : READING_STATUSES[bookStatus].badge.includes('blue') ? 'bg-blue-500' : 'bg-slate-500'}">
+                                <button onclick="window.cycleBookStatus('${book.id}', event)" class="px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase text-white shadow-sm hover:scale-105 active:scale-95 transition-transform ${READING_STATUSES[bookStatus].badge.includes('emerald') ? 'bg-emerald-500' : READING_STATUSES[bookStatus].badge.includes('blue') ? 'bg-blue-500' : 'bg-slate-500'}" title="Quick toggle status">
                                     ${READING_STATUSES[bookStatus].label === 'Want to Read' ? 'WTR' : READING_STATUSES[bookStatus].label}
-                                </div>
+                                </button>
                             </div>
                             <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                                 <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-5 h-5 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer" aria-label="Select ${escapeHTML(book.title)}">
@@ -2572,7 +2659,9 @@
                                 <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Edit book details">
                                     <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
-                                <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge}">${READING_STATUSES[bookStatus].label}${bookStatus === 'reading' ? ` (${userProgress || 0}%)` : ''}</div>
+                                <button onclick="window.cycleBookStatus('${book.id}', event)" class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm hover:scale-105 active:scale-95 transition-transform ${READING_STATUSES[bookStatus].badge}" title="Quick toggle status">
+                                    ${READING_STATUSES[bookStatus].label}${bookStatus === 'reading' ? ` (${userProgress || 0}%)` : ''}
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -2614,7 +2703,9 @@
                                 ${(book.tags || []).map(tag => `<span onclick="event.stopPropagation(); window.setTagFilter('${tag}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors">${tag}</span>`).join('')}
                             </div>
                             <div class="mt-2 flex flex-wrap gap-1">
-                                <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge}">${READING_STATUSES[bookStatus].label}${bookStatus === 'reading' ? ` (${userProgress || 0}%)` : ''}</div>
+                                <button onclick="window.cycleBookStatus('${book.id}', event)" class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm hover:scale-105 active:scale-95 transition-transform ${READING_STATUSES[bookStatus].badge}" title="Quick toggle status">
+                                    ${READING_STATUSES[bookStatus].label}${bookStatus === 'reading' ? ` (${userProgress || 0}%)` : ''}
+                                </button>
                                 ${book.borrowedBy ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed by ${book.borrowedBy}</div>` : ''}
                                 ${addedByBadge}
                             </div>
@@ -3280,6 +3371,7 @@
                     const originalText = btn.innerText;
                     btn.disabled = true;
                     btn.innerText = 'Saving...';
+                    window.showLoading();
                     const tagsRaw = document.getElementById('man-tags').value;
                     const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
 
@@ -3320,6 +3412,8 @@
                             showToast('Error updating: ' + err.message, 'error');
                             btn.disabled = false;
                             btn.innerText = originalText;
+                        } finally {
+                            window.hideLoading();
                         }
                     } else {
                         try {
@@ -3337,6 +3431,8 @@
                             showToast('Error: ' + err.message, 'error');
                             btn.disabled = false;
                             btn.innerText = originalText;
+                        } finally {
+                            window.hideLoading();
                         }
                     }
                 });
@@ -3599,6 +3695,191 @@
                 return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
             }
 
+
+            window.cycleBookStatus = async (bookId, event) => {
+                if (event) event.stopPropagation();
+                if (!currentUser) return;
+
+                const statusData = getStatusData(bookId);
+                const currentStatus = statusData.status;
+
+                const sequence = ['want_to_read', 'reading', 'finished'];
+                let nextIndex = sequence.indexOf(currentStatus);
+                if (nextIndex === -1) nextIndex = 0;
+                else nextIndex = (nextIndex + 1) % sequence.length;
+
+                const nextStatus = sequence[nextIndex];
+
+                window.showLoading();
+                try {
+                    const book = books.find(b => b.id === bookId);
+                    const updateData = {
+                        status: nextStatus,
+                        userId: currentUser.uid,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+                    if (nextStatus !== 'reading') {
+                        updateData.progress = 0;
+                    }
+
+                    await db.collection('books').doc(bookId)
+                        .collection('readingStatus').doc(currentUser.uid).set(updateData, { merge: true });
+
+                    await db.collection('activityFeed').add({
+                        type: 'status_updated',
+                        bookId: bookId,
+                        bookTitle: book?.title || 'Unknown',
+                        userName: currentUser.displayName || currentUser.email || currentUser.uid,
+                        userId: currentUser.uid,
+                        status: nextStatus,
+                        addedTo: book?.userId === currentUser.uid ? 'My' : 'Partner',
+                        libraryId: book?.userId || currentUser.uid,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    showToast(`Updated to ${READING_STATUSES[nextStatus].label}`, 'success');
+                } catch (err) {
+                    showToast('Error updating status: ' + err.message, 'error');
+                } finally {
+                    window.hideLoading();
+                }
+            };
+
+            window.aiAutoTagLibrary = async () => {
+                const booksToTag = books.filter(b => b.userId === currentUser.uid && (!b.tags || b.tags.length === 0));
+                if (booksToTag.length === 0) {
+                    showToast("All your books already have tags!", "info");
+                    return;
+                }
+
+                if (!confirm(`AI will attempt to generate tags for ${booksToTag.length} books. This may take a minute. Proceed?`)) return;
+
+                window.showLoading();
+                const btn = document.getElementById('ai-auto-tag-btn');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerText = 'Tagging Library...';
+                }
+
+                try {
+                    // Process in chunks to avoid overwhelming the AI and Firestore
+                    const chunkSize = 5;
+                    let processedCount = 0;
+
+                    for (let i = 0; i < booksToTag.length; i += chunkSize) {
+                        const chunk = booksToTag.slice(i, i + chunkSize);
+                        const prompt = `For the following books, provide 3-5 relevant descriptive tags (e.g., #SciFi, #Classic, #Philosophy).
+                        Format the response as a JSON object where keys are the book IDs and values are arrays of strings.
+
+                        Books:
+                        ${chunk.map(b => `ID: ${b.id}, Title: ${b.title}, Author: ${b.author}`).join('\n')}`;
+
+                        const systemInstruction = "You are a professional librarian. Return ONLY valid JSON in the requested format.";
+                        const result = await askGemini(prompt, systemInstruction);
+
+                        if (result) {
+                            try {
+                                const cleanJson = result.replace(/```json|```/g, "").trim();
+                                const tagMap = JSON.parse(cleanJson);
+                                const batch = db.batch();
+
+                                chunk.forEach(book => {
+                                    const tags = tagMap[book.id];
+                                    if (tags && Array.isArray(tags)) {
+                                        batch.update(db.collection('books').doc(book.id), {
+                                            tags: tags,
+                                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                        });
+                                    }
+                                });
+
+                                await batch.commit();
+                                processedCount += chunk.length;
+                                showToast(`Progress: ${processedCount}/${booksToTag.length} tagged`, 'info');
+                            } catch (e) {
+                                console.error("Chunk parse error:", e, result);
+                            }
+                        }
+                    }
+                    showToast(`Successfully tagged ${processedCount} books!`, 'success');
+                } catch (err) {
+                    showToast('AI Tagging Error: ' + err.message, 'error');
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerText = 'Auto-Tag My Library';
+                    }
+                    window.hideLoading();
+                }
+            };
+
+            // AI Librarian Chat Logic
+            const chatBubble = document.getElementById('ai-chat-bubble');
+            const chatToggle = document.getElementById('ai-chat-toggle');
+            const chatWindow = document.getElementById('ai-chat-window');
+            const chatClose = document.getElementById('ai-chat-close');
+            const chatForm = document.getElementById('ai-chat-form');
+            const chatInput = document.getElementById('ai-chat-input');
+            const chatMessages = document.getElementById('ai-chat-messages');
+
+            window.toggleAIChat = (show) => {
+                if (show) {
+                    chatWindow.classList.remove('scale-90', 'opacity-0', 'pointer-events-none');
+                    chatWindow.classList.add('scale-100', 'opacity-100', 'pointer-events-auto');
+                    chatInput.focus();
+                } else {
+                    chatWindow.classList.add('scale-90', 'opacity-0', 'pointer-events-none');
+                    chatWindow.classList.remove('scale-100', 'opacity-100', 'pointer-events-auto');
+                }
+            };
+
+            chatToggle.addEventListener('click', () => window.toggleAIChat(chatWindow.classList.contains('opacity-0')));
+            chatClose.addEventListener('click', () => window.toggleAIChat(false));
+
+            chatForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const query = chatInput.value.trim();
+                if (!query) return;
+
+                // Add user message
+                const userMsg = document.createElement('div');
+                userMsg.className = 'flex justify-end';
+                userMsg.innerHTML = `<div class="bg-violet-600 text-white p-4 rounded-2xl rounded-tr-none shadow-sm max-w-[85%]"><p class="text-sm leading-relaxed">${escapeHTML(query)}</p></div>`;
+                chatMessages.appendChild(userMsg);
+                chatInput.value = '';
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+
+                // Loading state
+                const loadingMsg = document.createElement('div');
+                loadingMsg.className = 'flex justify-start';
+                loadingMsg.innerHTML = `<div class="bg-violet-50 dark:bg-violet-900/20 p-4 rounded-2xl rounded-tl-none border border-violet-100 dark:border-violet-900/30 animate-pulse"><p class="text-sm italic text-slate-400">Thinking...</p></div>`;
+                chatMessages.appendChild(loadingMsg);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+
+                const libraryContext = books.map(b => ({
+                    title: b.title,
+                    author: b.author,
+                    genres: b._genres.join(', '),
+                    status: getStatusData(b.id).status,
+                    tags: (b.tags || []).join(', '),
+                    owner: b.owner || ''
+                }));
+
+                const prompt = `User Query: "${query}"
+                Library Summary: ${JSON.stringify(libraryContext)}
+
+                You are an expert Librarian assistant. Answer the user's query concisely and helpfully based ONLY on their collection above. If recommending books, be enthusiastic! Keep responses brief (under 3 sentences).`;
+
+                const result = await askGemini(prompt, "You are a helpful, professional AI librarian for the user's personal book collection.");
+
+                loadingMsg.remove();
+
+                const botMsg = document.createElement('div');
+                botMsg.className = 'flex justify-start';
+                botMsg.innerHTML = `<div class="bg-violet-50 dark:bg-violet-900/20 p-4 rounded-2xl rounded-tl-none border border-violet-100 dark:border-violet-900/30 shadow-sm max-w-[85%]"><p class="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">${result || "I'm sorry, I'm having trouble connecting right now. Please try again."}</p></div>`;
+                chatMessages.appendChild(botMsg);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            });
 
             window.jumpToBook = async (bookId) => {
                 setTab('library');
@@ -3869,6 +4150,9 @@
                         });
 
                         subscribeToBooks();
+                        // Show chat bubble when logged in
+                        chatBubble.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+                        chatBubble.classList.add('translate-y-0', 'opacity-100');
                     } else {
                         if (unsubscribeBooks) unsubscribeBooks();
                         if (unsubscribeStatus) unsubscribeStatus();
@@ -3891,6 +4175,10 @@
                         isStatusesLoaded = false;
                         appEl.innerHTML = '';
                         renderAuth();
+                        // Hide chat bubble when logged out
+                        chatBubble.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+                        chatBubble.classList.remove('translate-y-0', 'opacity-100');
+                        window.toggleAIChat(false);
                     }
                 });
             };
@@ -4102,6 +4390,7 @@
                     const content = document.getElementById('ai-details-content');
                     btn.disabled = true;
                     btn.innerText = '✨ Analyzing...';
+                    window.showLoading();
 
                     const prompt = `Book: "${book.title}" by "${book.author}"
                     Provide a detailed overview in valid JSON format:
@@ -4137,10 +4426,13 @@
                             console.error("AI Parse Error:", e);
                             btn.innerText = '✨ Try Again';
                             btn.disabled = false;
+                        } finally {
+                            window.hideLoading();
                         }
                     } else {
                         btn.innerText = '✨ Try Again';
                         btn.disabled = false;
+                        window.hideLoading();
                     }
                 });
 
@@ -4195,6 +4487,7 @@
                     const originalText = btn.innerText;
                     btn.disabled = true;
                     btn.innerText = 'Saving...';
+                    window.showLoading();
                     const rating = parseInt(document.getElementById('detail-rating-select').value);
                     const comment = document.getElementById('detail-comment-textarea').value.trim();
                     try {
@@ -4241,6 +4534,8 @@
                         showToast('Error: ' + err.message, 'error');
                         btn.disabled = false;
                         btn.innerText = originalText;
+                    } finally {
+                        window.hideLoading();
                     }
                 });
 
@@ -4330,6 +4625,7 @@
                     const originalText = btn.innerText;
                     btn.disabled = true;
                     btn.innerText = 'Returning...';
+                    window.showLoading();
                     try {
                         await db.collection('books').doc(book.id).update({
                             borrowedBy: firebase.firestore.FieldValue.delete(),
@@ -4353,6 +4649,8 @@
                         showToast('Error: ' + err.message, 'error');
                         btn.disabled = false;
                         btn.innerText = originalText;
+                    } finally {
+                        window.hideLoading();
                     }
                 });
 
@@ -4362,6 +4660,7 @@
                         const originalText = btn.innerText;
                         btn.disabled = true;
                         btn.innerText = 'Deleting...';
+                        window.showLoading();
                         try {
                             const batch = db.batch();
                             batch.delete(db.collection('books').doc(book.id));
@@ -4375,6 +4674,8 @@
                             showToast('Error deleting: ' + err.message, 'error');
                             btn.disabled = false;
                             btn.innerText = originalText;
+                        } finally {
+                            window.hideLoading();
                         }
                     }
                 });
@@ -4409,6 +4710,76 @@
                     }
                 }
             });
+
+            // Swipe Gestures
+            let touchStartX = 0;
+            let touchCurrentX = 0;
+            let currentSwipingCard = null;
+
+            document.addEventListener('touchstart', e => {
+                const card = e.target.closest('.book-card');
+                if (!card || activeTab === 'wishlist') return;
+                touchStartX = e.touches[0].clientX;
+                touchCurrentX = touchStartX;
+                currentSwipingCard = card;
+            }, { passive: true });
+
+            document.addEventListener('touchmove', e => {
+                if (!currentSwipingCard) return;
+                touchCurrentX = e.touches[0].clientX;
+                const diff = touchStartX - touchCurrentX;
+
+                if (diff > 20) { // Swiping left
+                    currentSwipingCard.classList.add('swiping');
+                    const translate = Math.min(diff, 100);
+                    currentSwipingCard.style.transform = `translateX(-${translate}px)`;
+
+                    // Ensure overlay exists
+                    if (!currentSwipingCard.querySelector('.swipe-overlay')) {
+                        const overlay = document.createElement('div');
+                        overlay.className = 'swipe-overlay';
+                        overlay.innerHTML = `
+                            <div class="flex flex-col items-center gap-1">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+                                <span class="text-[8px] font-black uppercase">Wishlist</span>
+                            </div>
+                        `;
+                        currentSwipingCard.appendChild(overlay);
+                    }
+                } else {
+                    currentSwipingCard.classList.remove('swiping');
+                    currentSwipingCard.style.transform = '';
+                }
+            }, { passive: true });
+
+            document.addEventListener('touchend', async e => {
+                if (!currentSwipingCard) return;
+                const diff = touchStartX - touchCurrentX;
+                const card = currentSwipingCard;
+                const bookId = card.dataset.bookId;
+
+                card.classList.remove('swiping');
+                card.style.transform = '';
+                currentSwipingCard = null;
+
+                if (diff > 80) { // Threshold met
+                    const book = books.find(b => b.id === bookId);
+                    if (book && !book.isWishlist) {
+                        window.showLoading();
+                        try {
+                            await db.collection('books').doc(bookId).update({ isWishlist: true });
+                            showToast(`"${book.title}" moved to Wishlist`, 'success');
+                            if (navigator.vibrate) navigator.vibrate([10, 30, 10]);
+                        } catch (err) {
+                            showToast('Error moving to wishlist: ' + err.message, 'error');
+                        } finally {
+                            window.hideLoading();
+                        }
+                    }
+                }
+                touchStartX = 0;
+                touchCurrentX = 0;
+            }, { passive: true });
 
         })();
     </script>
