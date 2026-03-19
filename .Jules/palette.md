@@ -11,3 +11,7 @@
 ## 2026-03-18 - [Cross-Tab Navigation & Visual Focus]
 **Learning:** In a multi-tab library interface, "Jump to" actions must be context-aware. Switching to the correct tab (e.g., Library vs. Wishlist) before scrolling ensures the user actually sees the target. Combining 'element.scrollIntoView' with 'element.focus()' and a temporary Tailwind 'ring' highlight provides both visual and screen-reader confirmation of the navigation.
 **Action:** When implementing "jump to" or "deep link" functionality, always ensure the parent container/tab is active, manage keyboard focus, and use a transient visual highlight to anchor the user's attention.
+
+## 2026-03-20 - [Stateful ARIA in Vanilla JS]
+**Learning:** In a Vanilla JS SPA, accessibility attributes like `aria-expanded` and `aria-hidden` do not update automatically. Manually syncing these in toggle functions is critical for screen reader users to understand the interface state.
+**Action:** When creating toggleable UI (menus, chats, modals), always include `.setAttribute` calls for relevant ARIA attributes alongside the visual class toggles.
