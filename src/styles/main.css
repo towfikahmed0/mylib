@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root { --primary-color: #3b82f6; }
+    * { font-family: 'Inter', sans-serif; }
+    .font-serif { font-family: 'Playfair Display', serif; }
+    body { @apply bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white transition-colors duration-300 min-h-screen; }
+}
+
+@layer components {
+    .glass { @apply bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl border border-white/20 dark:border-white/5 shadow-xl; }
+    .animate-slide-up { animation: slide-up 0.5s ease-out; }
+    @keyframes slide-up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .book-card { @apply transition-all duration-300 rounded-[2.5rem]; }
+    .book-card:hover { @apply -translate-y-1 shadow-2xl shadow-primary/10; }
+}
