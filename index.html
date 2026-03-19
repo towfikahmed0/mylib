@@ -300,11 +300,13 @@
 
     <!-- AI Librarian Chat Bubble -->
     <div id="ai-chat-bubble" class="fixed bottom-24 right-6 z-40 transition-all duration-300 translate-y-20 opacity-0 pointer-events-none">
-        <button id="ai-chat-toggle" aria-label="Open AI Librarian" class="w-14 h-14 bg-violet-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all group pointer-events-auto">
+        <button id="ai-chat-toggle" aria-label="Open AI Librarian" aria-expanded="false" class="w-14 h-14 bg-violet-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all group pointer-events-auto">
             <svg class="w-7 h-7 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
-            <span class="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
+            <span class="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full">
+                <span class="animate-ping absolute inset-0 rounded-full bg-emerald-400 opacity-75"></span>
+            </span>
         </button>
-        <div id="ai-chat-window" class="absolute bottom-20 right-0 w-[calc(100vw-3rem)] sm:w-96 glass rounded-[2.5rem] shadow-2xl border border-violet-100 dark:border-violet-900/30 overflow-hidden flex flex-col transition-all duration-300 scale-90 opacity-0 pointer-events-none origin-bottom-right">
+        <div id="ai-chat-window" role="dialog" aria-label="AI Librarian Chat" aria-hidden="true" class="absolute bottom-20 right-0 w-[calc(100vw-3rem)] sm:w-96 glass rounded-[2.5rem] shadow-2xl border border-violet-100 dark:border-violet-900/30 overflow-hidden flex flex-col transition-all duration-300 scale-90 opacity-0 pointer-events-none origin-bottom-right">
             <div class="p-5 bg-violet-600 text-white flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
@@ -3907,7 +3909,10 @@
             const chatMessages = document.getElementById('ai-chat-messages');
 
             window.toggleAIChat = (show) => {
+                chatToggle.setAttribute('aria-expanded', show);
+                chatWindow.setAttribute('aria-hidden', !show);
                 if (show) {
+                    if (navigator.vibrate) navigator.vibrate([10, 30, 10]);
                     chatWindow.classList.remove('scale-90', 'opacity-0', 'pointer-events-none');
                     chatWindow.classList.add('scale-100', 'opacity-100', 'pointer-events-auto');
                     chatInput.focus();
