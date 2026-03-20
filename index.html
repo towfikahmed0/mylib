@@ -3921,6 +3921,13 @@
             const chatInput = document.getElementById('ai-chat-input');
             const chatMessages = document.getElementById('ai-chat-messages');
 
+            const handleChatEscape = (e) => {
+                if (e.key === 'Escape') {
+                    window.toggleAIChat(false);
+                    chatToggle.focus();
+                }
+            };
+
             window.toggleAIChat = (show) => {
                 chatToggle.setAttribute('aria-expanded', show);
                 chatWindow.setAttribute('aria-hidden', !show);
@@ -3929,9 +3936,11 @@
                     chatWindow.classList.remove('scale-90', 'opacity-0', 'pointer-events-none');
                     chatWindow.classList.add('scale-100', 'opacity-100', 'pointer-events-auto');
                     chatInput.focus();
+                    window.addEventListener('keydown', handleChatEscape);
                 } else {
                     chatWindow.classList.add('scale-90', 'opacity-0', 'pointer-events-none');
                     chatWindow.classList.remove('scale-100', 'opacity-100', 'pointer-events-auto');
+                    window.removeEventListener('keydown', handleChatEscape);
                 }
             };
 
