@@ -11,3 +11,7 @@
 ## 2026-03-18 - [Cross-Tab Navigation & Visual Focus]
 **Learning:** In a multi-tab library interface, "Jump to" actions must be context-aware. Switching to the correct tab (e.g., Library vs. Wishlist) before scrolling ensures the user actually sees the target. Combining 'element.scrollIntoView' with 'element.focus()' and a temporary Tailwind 'ring' highlight provides both visual and screen-reader confirmation of the navigation.
 **Action:** When implementing "jump to" or "deep link" functionality, always ensure the parent container/tab is active, manage keyboard focus, and use a transient visual highlight to anchor the user's attention.
+
+## 2026-03-22 - [Modal Focus Restoration & Semantic Interactive Triggers]
+**Learning:** In highly interactive SPAs with many modals, the lack of focus restoration on modal close disorients keyboard and screen-reader users by returning them to the top of the document. Additionally, using non-semantic elements (spans, paragraphs) as clickable triggers for filters makes features invisible to assistive technologies.
+**Action:** Always capture `document.activeElement` before opening a modal and restore focus upon closing. Convert all clickable triggers that are not links into `<button type="button">` elements with descriptive `aria-label` attributes to ensure they are discoverable and focusable.
