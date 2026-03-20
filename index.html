@@ -2693,7 +2693,7 @@
                         <div class="absolute inset-0 bg-blue-600/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity rounded-2xl"></div>
                         <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm relative">
                             ${book.coverUrl || book.thumbnail ?
-                            `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-105" alt="cover">` :
+                            `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-105" alt="Cover for ${escapeHTML(book.title)}">` :
                             `<div class="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-blue-50 dark:bg-slate-800 text-blue-200 dark:text-slate-600">
                                     <span class="text-[8px] font-black uppercase font-serif line-clamp-3">${book.title}</span>
                                 </div>`
@@ -2764,7 +2764,7 @@
                             </div>
                         ` : ''}
                         ${book.coverUrl || book.thumbnail ?
-                        `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-110" alt="cover">` :
+                        `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-110" alt="Cover for ${escapeHTML(book.title)}">` :
                         `<div class="w-full h-full flex items-center justify-center bg-blue-50 dark:bg-slate-800 text-blue-200 dark:text-slate-600 text-[10px] font-bold uppercase p-2 text-center">No Cover</div>`
                     }
                         <div class="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[8px] font-black uppercase text-white ${book.source === 'manual' ? 'bg-orange-400' : 'bg-blue-500'}">
