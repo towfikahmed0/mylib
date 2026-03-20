@@ -472,6 +472,7 @@
             let activities = [];           // activity log for book additions
             let metadataCache = { authors: [], genres: [], owners: [] }; // Performance optimization: single-pass cache
             let libraryStats = {
+                currentlyReading: [],
                 statusCounts: { finished: 0, reading: 0, want_to_read: 0 },
                 authorsCount: {},
                 ownersCount: {},
@@ -1645,7 +1646,9 @@
 
                 const readingContainer = document.getElementById('currently-reading-container');
                 if (readingContainer) {
-                    const readingBooks = books.filter(b => !b.isWishlist && getStatusData(b.id).status === 'reading');
+                    // Optimization: Use pre-calculated libraryStats.currentlyReading instead of filtering entire collection on every render
+                    // Impact: Reduces complexity from O(N) to O(1) in the common render path
+                    const readingBooks = libraryStats.currentlyReading;
                     if (readingBooks.length > 0 && !searchQuery && categoryFilter === 'all' && authorFilter === 'all' && ownerFilter === 'all' && !tagFilter && advancedFilters.rating === 'all') {
                         readingContainer.innerHTML = `
                             <div class="mb-8 overflow-hidden">
@@ -2616,6 +2619,7 @@
                 const ownersSet = new Set();
 
                 const stats = {
+                    currentlyReading: [],
                     statusCounts: { finished: 0, reading: 0, want_to_read: 0 },
                     authorsCount: {},
                     ownersCount: {},
@@ -2640,6 +2644,10 @@
                     const statusData = getStatusData(b.id);
                     const status = statusData.status;
                     if (stats.statusCounts.hasOwnProperty(status)) stats.statusCounts[status]++;
+
+                    if (status === 'reading') {
+                        stats.currentlyReading.push(b);
+                    }
 
                     const author = b.author || 'Unknown';
                     stats.authorsCount[author] = (stats.authorsCount[author] || 0) + 1;
