@@ -293,7 +293,7 @@
     <div id="app" class="min-h-screen flex flex-col"></div>
 
     <!-- Toast & Modal containers (global) -->
-    <div id="toast"
+    <div id="toast" role="status" aria-live="polite"
         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-medium shadow-2xl flex items-center gap-3 transition-all duration-300 opacity-0 translate-y-10 pointer-events-none">
     </div>
     <div id="modal-container" class="fixed inset-0 z-50 pointer-events-none"></div>
@@ -1662,7 +1662,7 @@
                                             <div class="flex-shrink-0 w-64 glass p-4 rounded-[2rem] border border-blue-100/50 dark:border-slate-800 snap-start cursor-pointer hover:shadow-lg transition-all" data-book-id="${book.id}">
                                                 <div class="flex gap-3">
                                                     <div class="w-16 h-24 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 shadow-sm relative">
-                                                        ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover">` : '<div class="w-full h-full flex items-center justify-center text-[8px] font-bold uppercase p-1 text-center text-slate-400">No Cover</div>'}
+                                                        ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover" alt="Cover for ${escapeHTML(book.title)}">` : '<div class="w-full h-full flex items-center justify-center text-[8px] font-bold uppercase p-1 text-center text-slate-400">No Cover</div>'}
                                                         <div class="absolute bottom-0 left-0 right-0 h-1 bg-slate-200/50">
                                                             <div class="h-full bg-blue-500" style="width: ${progress}%"></div>
                                                         </div>
@@ -2193,7 +2193,7 @@
                                 <div class="md:col-span-3 p-6 bg-violet-50 dark:bg-violet-900/10 rounded-3xl border-2 border-violet-100 dark:border-violet-900/30 animate-slide-up">
                                     <div class="flex flex-col md:flex-row gap-6 items-center">
                                         <div class="w-24 h-36 flex-shrink-0 rounded-xl overflow-hidden shadow-lg">
-                                            <img src="${book.coverUrl || book.thumbnail || 'https://via.placeholder.com/100x150'}" class="w-full h-full object-cover">
+                                            <img src="${book.coverUrl || book.thumbnail || 'https://via.placeholder.com/100x150'}" class="w-full h-full object-cover" alt="Cover for ${escapeHTML(book.title)}">
                                         </div>
                                         <div class="flex-1 text-center md:text-left">
                                             <span class="px-3 py-1 bg-violet-100 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400 rounded-full text-[10px] font-black uppercase tracking-widest">${mood} Match</span>
@@ -2256,7 +2256,7 @@
                             return `
                                 <div class="bg-white dark:bg-slate-800/50 p-4 rounded-3xl border border-violet-100 dark:border-violet-900/20 flex flex-col group cursor-pointer hover:shadow-lg transition-all" onclick="window.jumpToBook('${book.id}')">
                                     <div class="aspect-[2/3] rounded-2xl overflow-hidden mb-3 shadow-sm">
-                                        <img src="${book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover'}" class="w-full h-full object-cover group-hover:scale-105 transition-transform">
+                                        <img src="${book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover'}" class="w-full h-full object-cover group-hover:scale-105 transition-transform" alt="Cover for ${escapeHTML(book.title)}">
                                     </div>
                                     <h4 class="font-black font-serif text-sm line-clamp-1 italic">${book.title}</h4>
                                     <p class="text-[10px] text-slate-500 mb-2">${book.author}</p>
@@ -2695,7 +2695,7 @@
                         <div class="absolute inset-0 bg-blue-600/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity rounded-2xl"></div>
                         <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm relative">
                             ${book.coverUrl || book.thumbnail ?
-                            `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-105" alt="cover">` :
+                            `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-105" alt="Cover for ${escapeHTML(book.title)}">` :
                             `<div class="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-blue-50 dark:bg-slate-800 text-blue-200 dark:text-slate-600">
                                     <span class="text-[8px] font-black uppercase font-serif line-clamp-3">${book.title}</span>
                                 </div>`
@@ -2724,7 +2724,7 @@
                             <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" aria-label="Select ${escapeHTML(book.title)}">
                         </div>
                         <div class="w-12 h-16 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700">
-                            ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover">` : '<div class="w-full h-full flex items-center justify-center bg-blue-50 dark:bg-slate-700 text-[8px] text-blue-300 dark:text-slate-500 font-bold uppercase p-1 text-center">No Cover</div>'}
+                            ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover" alt="Cover for ${escapeHTML(book.title)}">` : '<div class="w-full h-full flex items-center justify-center bg-blue-50 dark:bg-slate-700 text-[8px] text-blue-300 dark:text-slate-500 font-bold uppercase p-1 text-center">No Cover</div>'}
                         </div>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2">
@@ -2766,7 +2766,7 @@
                             </div>
                         ` : ''}
                         ${book.coverUrl || book.thumbnail ?
-                        `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-110" alt="cover">` :
+                        `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-110" alt="Cover for ${escapeHTML(book.title)}">` :
                         `<div class="w-full h-full flex items-center justify-center bg-blue-50 dark:bg-slate-800 text-blue-200 dark:text-slate-600 text-[10px] font-bold uppercase p-2 text-center">No Cover</div>`
                     }
                         <div class="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[8px] font-black uppercase text-white ${book.source === 'manual' ? 'bg-orange-400' : 'bg-blue-500'}">
@@ -3916,11 +3916,18 @@
                     chatWindow.classList.remove('scale-90', 'opacity-0', 'pointer-events-none');
                     chatWindow.classList.add('scale-100', 'opacity-100', 'pointer-events-auto');
                     chatInput.focus();
+                    window.addEventListener('keydown', handleChatEscape);
                 } else {
                     chatWindow.classList.add('scale-90', 'opacity-0', 'pointer-events-none');
                     chatWindow.classList.remove('scale-100', 'opacity-100', 'pointer-events-auto');
+                    window.removeEventListener('keydown', handleChatEscape);
+                    chatToggle.focus();
                 }
             };
+
+            function handleChatEscape(e) {
+                if (e.key === 'Escape') window.toggleAIChat(false);
+            }
 
             chatToggle.addEventListener('click', () => window.toggleAIChat(chatWindow.classList.contains('opacity-0')));
             chatClose.addEventListener('click', () => window.toggleAIChat(false));
@@ -4324,7 +4331,7 @@
                         <div class="flex flex-col md:flex-row gap-8">
                             <div class="flex-shrink-0 mx-auto md:mx-0">
                                 <div class="relative group">
-                                    <img src="${book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover'}" class="w-56 h-80 object-cover rounded-3xl shadow-2xl border border-white/20">
+                                    <img src="${book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover'}" class="w-56 h-80 object-cover rounded-3xl shadow-2xl border border-white/20" alt="Cover for ${escapeHTML(book.title)}">
                                     ${book.isWishlist ? `
                                         <button id="move-to-lib-btn" title="Move to Library" class="absolute -top-3 -right-3 w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center shadow-lg border-4 border-white dark:border-slate-900 hover:scale-110 transition-transform active:scale-95" aria-label="Move to Library">
                                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
