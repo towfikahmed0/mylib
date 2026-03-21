@@ -15,3 +15,11 @@
 ## 2026-03-22 - [Modal Focus Restoration & Semantic Interactive Triggers]
 **Learning:** In highly interactive SPAs with many modals, the lack of focus restoration on modal close disorients keyboard and screen-reader users by returning them to the top of the document. Additionally, using non-semantic elements (spans, paragraphs) as clickable triggers for filters makes features invisible to assistive technologies.
 **Action:** Always capture `document.activeElement` before opening a modal and restore focus upon closing. Convert all clickable triggers that are not links into `<button type="button">` elements with descriptive `aria-label` attributes to ensure they are discoverable and focusable.
+
+## 2026-03-23 - [Centralized Filter Feedback & State Visibility]
+**Learning:** In a data-heavy application, fragmented filtering feedback (e.g., hidden dropdown values combined with a separate search bar and isolated tag filters) often leaves users confused about why their results are limited. Consolidating all active filter states into a single "active-filters-bar" with clearable chips provides immediate transparency and control.
+**Action:** Always implement a central  helper to sync UI elements like results counters ("X of Y found") and empty states. Ensure every active filter is represented as a removable badge to maintain "state visibility" for the user.
+
+## 2026-03-23 - [Centralized Filter Feedback & State Visibility]
+**Learning:** In a data-heavy application, fragmented filtering feedback (e.g., hidden dropdown values combined with a separate search bar and isolated tag filters) often leaves users confused about why their results are limited. Consolidating all active filter states into a single "active-filters-bar" with clearable chips provides immediate transparency and control.
+**Action:** Always implement a central `isAnyFilterActive` helper to sync UI elements like results counters ("X of Y found") and empty states. Ensure every active filter is represented as a removable badge to maintain "state visibility" for the user.
