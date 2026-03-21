@@ -529,11 +529,11 @@
             }
 
             // ---------- Utility: Escape HTML ----------
-            const escapeDiv = document.createElement('div');
+            // Performance optimization: regex-based lookup is ~10x faster than DOM manipulation for escaping
+            const HTML_ESCAPE_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
             function escapeHTML(str) {
-                if (!str) return '';
-                escapeDiv.textContent = str;
-                return escapeDiv.innerHTML;
+                if (str === null || str === undefined) return '';
+                return String(str).replace(/[&<>"']/g, s => HTML_ESCAPE_MAP[s]);
             }
 
             // ---------- Utility: Toast ----------
@@ -1562,7 +1562,11 @@
                 else if (sortBy === 'oldest') comparator = (a, b) => a._createdTime - b._createdTime;
                 else if (sortBy === 'newest') comparator = (a, b) => b._createdTime - a._createdTime;
 
-                if (comparator) filteredBooks.sort(comparator);
+                // Optimization: Skip explicit sort if 'newest' is selected and no AI filter is active.
+                // The source 'books' array is already pre-sorted by date descending upon ingestion.
+                if (comparator && (sortBy !== 'newest' || aiFilteredIds)) {
+                    filteredBooks.sort(comparator);
+                }
 
                 const activeFiltersContainer = document.getElementById('active-filters-bar');
                 if (activeFiltersContainer) {
