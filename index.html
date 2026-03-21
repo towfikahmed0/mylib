@@ -540,8 +540,8 @@
             // ---------- Utility: Toast ----------
             function showToast(message, type = 'info', duration = 4000) {
                 if (navigator.vibrate) {
-                    if (type === 'success') navigator.vibrate(10);
-                    else if (type === 'error') navigator.vibrate([50, 50, 50]);
+                    if (type === 'success') navigator.vibrate([10, 30, 10]);
+                    else if (type === 'error') navigator.vibrate([50, 100, 50]);
                 }
                 toastEl.innerHTML = `
                 <div class="w-2 h-2 rounded-full ${type === 'success' ? 'bg-emerald-400' : type === 'error' ? 'bg-rose-400' : 'bg-blue-400'}"></div>
@@ -557,6 +557,7 @@
 
             // ---------- Modal helper ----------
             function showModal(html, onClose, isFullscreen = false) {
+                const previousActiveElement = document.activeElement;
                 const modal = document.createElement('div');
                 modal.setAttribute('role', 'dialog');
                 modal.setAttribute('aria-modal', 'true');
@@ -572,6 +573,9 @@
                     modalContainer.classList.remove('pointer-events-auto');
                     modalContainer._cleanup = null;
                     if (onClose) onClose();
+                    if (previousActiveElement && typeof previousActiveElement.focus === 'function') {
+                        previousActiveElement.focus();
+                    }
                 };
                 const escHandler = (e) => { if (e.key === 'Escape') closeHandler(); };
                 window.addEventListener('keydown', escHandler);
@@ -4408,7 +4412,7 @@
                                 <div class="mt-6 px-1">
                                     <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Tags</p>
                                     <div class="flex flex-wrap gap-2">
-                                        ${(book.tags || []).map(tag => `<span onclick="window.setTagFilter('${tag}'); document.querySelector('[data-close]').click();" class="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-bold cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors">${tag}</span>`).join('')}
+                                        ${(book.tags || []).map(tag => `<button type="button" aria-label="Filter by tag: ${escapeHTML(tag)}" onclick="window.setTagFilter('${tag}'); document.querySelector('[data-close]').click();" class="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-bold cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors">${tag}</button>`).join('')}
                                     </div>
                                 </div>
                                 <div class="mt-6 px-1">
