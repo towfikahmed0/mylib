@@ -473,6 +473,8 @@
             let metadataCache = { authors: [], genres: [], owners: [] }; // Performance optimization: single-pass cache
             let libraryStats = {
                 currentlyReading: [],
+                libraryCount: 0,
+                wishlistCount: 0,
                 statusCounts: { finished: 0, reading: 0, want_to_read: 0 },
                 authorsCount: {},
                 ownersCount: {},
@@ -1577,7 +1579,9 @@
                     filteredBooks.sort(comparator);
                 }
 
-                const totalInTab = books.filter(b => activeTab === 'wishlist' ? b.isWishlist : !b.isWishlist).length;
+                // Optimization: Use pre-calculated tab counts from libraryStats
+                // Impact: Reduces complexity from O(N) to O(1) in the render path
+                const totalInTab = activeTab === 'wishlist' ? libraryStats.wishlistCount : libraryStats.libraryCount;
 
                 const activeFiltersContainer = document.getElementById('active-filters-bar');
                 if (activeFiltersContainer) {
@@ -2662,6 +2666,8 @@
 
                 const stats = {
                     currentlyReading: [],
+                    libraryCount: 0,
+                    wishlistCount: 0,
                     statusCounts: { finished: 0, reading: 0, want_to_read: 0 },
                     authorsCount: {},
                     ownersCount: {},
@@ -2679,6 +2685,10 @@
                     if (b.owner) ownersSet.add(b.owner);
                     const bGenres = getBookGenres(b);
                     bGenres.forEach(g => { if (g) genresSet.add(g); });
+
+                    // Update total counts for Library and Wishlist (Pre-calculation for O(1) retrieval)
+                    if (b.isWishlist) stats.wishlistCount++;
+                    else stats.libraryCount++;
 
                     // Update Statistics (Skip wishlist for most stats)
                     if (b.isWishlist) return;
