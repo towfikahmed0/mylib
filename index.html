@@ -529,13 +529,12 @@
             }
 
             // ---------- Utility: Escape HTML ----------
-            const HTML_ESCAPE_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
-            window.escapeHTML = function(str) {
-                if (str === null || str === undefined) return '';
-                const s = typeof str === 'string' ? str : String(str);
-                return s.replace(/[&<>"']/g, m => HTML_ESCAPE_MAP[m]);
-            };
-            const escapeHTML = window.escapeHTML;
+            const escapeDiv = document.createElement('div');
+            function escapeHTML(str) {
+                if (!str) return '';
+                escapeDiv.textContent = str;
+                return escapeDiv.innerHTML;
+            }
 
             // ---------- Utility: Toast ----------
             function showToast(message, type = 'info', duration = 4000) {
@@ -1563,14 +1562,7 @@
                 else if (sortBy === 'oldest') comparator = (a, b) => a._createdTime - b._createdTime;
                 else if (sortBy === 'newest') comparator = (a, b) => b._createdTime - a._createdTime;
 
-                // Optimization: Skip sorting if criteria is 'newest' and source is already-sorted books array
-                // Impact: Reduces complexity from O(N log N) to O(1) for the default sort view
-                if (comparator) {
-                    const isDefaultSort = sortBy === 'newest' && sourceCollection === books;
-                    if (!isDefaultSort) {
-                        filteredBooks.sort(comparator);
-                    }
-                }
+                if (comparator) filteredBooks.sort(comparator);
 
                 const activeFiltersContainer = document.getElementById('active-filters-bar');
                 if (activeFiltersContainer) {
@@ -2715,7 +2707,7 @@
                             ${book.coverUrl || book.thumbnail ?
                             `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-105" alt="Cover for ${escapeHTML(book.title)}">` :
                             `<div class="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-blue-50 dark:bg-slate-800 text-blue-200 dark:text-slate-600">
-                                    <span class="text-[8px] font-black uppercase font-serif line-clamp-3">${escapeHTML(book.title)}</span>
+                                    <span class="text-[8px] font-black uppercase font-serif line-clamp-3">${book.title}</span>
                                 </div>`
                         }
                             <div class="absolute bottom-2 right-2 flex flex-col items-end gap-1">
@@ -2728,8 +2720,8 @@
                             </div>
                         </div>
                         <div class="mt-2 px-1">
-                            <h4 class="text-[10px] font-black font-serif truncate leading-tight">${escapeHTML(book.title)}</h4>
-                            <p class="text-[9px] text-slate-400 truncate">${escapeHTML(book.author || 'Unknown')}</p>
+                            <h4 class="text-[10px] font-black font-serif truncate leading-tight">${book.title}</h4>
+                            <button type="button" aria-label="Filter by author: ${escapeHTML(book.author || 'Unknown')}" class="text-[9px] text-slate-400 truncate w-full text-left block" onclick="event.stopPropagation(); window.setAuthorFilter('${(book.author || 'Unknown').replace(/'/g, "\\'")}')">${book.author || 'Unknown'}</button>
                         </div>
                     </div>
                     `;
@@ -2746,18 +2738,18 @@
                         </div>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2">
-                                <h3 class="font-black text-sm truncate font-serif">${escapeHTML(book.title)}</h3>
+                                <h3 class="font-black text-sm truncate font-serif">${book.title}</h3>
                                 ${book.borrowedBy ? `<span class="px-2 py-0.5 rounded-full text-[8px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed</span>` : ''}
                             </div>
-                            <p class="text-xs text-slate-500 truncate hover:text-blue-500 transition-colors" onclick="event.stopPropagation(); window.setAuthorFilter('${(book.author || 'Unknown').replace(/'/g, "\\'")}')">${escapeHTML(book.author || 'Unknown')}</p>
+                            <button type="button" aria-label="Filter by author: ${escapeHTML(book.author || 'Unknown')}" class="text-xs text-slate-500 truncate hover:text-blue-500 transition-colors text-left w-full block" onclick="event.stopPropagation(); window.setAuthorFilter('${(book.author || 'Unknown').replace(/'/g, "\\'")}')">${book.author || 'Unknown'}</button>
                             <div class="flex flex-wrap gap-1 mt-1">
-                                ${(book.tags || []).map(tag => `<span onclick="event.stopPropagation(); window.setTagFilter('${tag}')" class="text-[8px] bg-slate-100 dark:bg-slate-700 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors">${escapeHTML(tag)}</span>`).join('')}
+                                ${(book.tags || []).map(tag => `<button type="button" aria-label="Filter by tag: ${escapeHTML(tag)}" onclick="event.stopPropagation(); window.setTagFilter('${tag}')" class="text-[8px] bg-slate-100 dark:bg-slate-800 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors">${tag}</button>`).join('')}
                             </div>
                         </div>
                         <div class="text-right flex-shrink-0 flex flex-col items-end">
                             <div class="text-amber-400 text-[10px]">${stars}</div>
-                            <div class="text-[10px] font-bold text-blue-600 dark:text-blue-400 mt-1 truncate max-w-[120px]">${bookGenres.map(g => escapeHTML(g)).join(', ')}</div>
-                            ${book.owner ? `<div class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors" onclick="event.stopPropagation(); window.setOwnerFilter('${(book.owner).replace(/'/g, "\\'")}')">Owner: ${escapeHTML(book.owner)}</div>` : ''}
+                            <div class="text-[10px] font-bold text-blue-600 dark:text-blue-400 mt-1 truncate max-w-[120px]">${bookGenres.join(', ')}</div>
+                            ${book.owner ? `<button type="button" aria-label="Filter by owner: ${escapeHTML(book.owner)}" class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors text-right block" onclick="event.stopPropagation(); window.setOwnerFilter('${(book.owner).replace(/'/g, "\\'")}')">Owner: ${book.owner}</button>` : ''}
                             <div class="flex items-center gap-2 mt-1">
                                 <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Edit book details">
                                     <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
@@ -2794,22 +2786,22 @@
                     <div class="flex-1 flex flex-col justify-between overflow-hidden py-1">
                         <div>
                             <div class="flex justify-between items-start gap-2">
-                                <span class="text-[9px] font-black uppercase tracking-widest text-primary truncate max-w-[150px]">${bookGenres.map(g => escapeHTML(g)).join(', ')}</span>
+                                <span class="text-[9px] font-black uppercase tracking-widest text-primary truncate max-w-[150px]">${bookGenres.join(', ')}</span>
                                 <div class="text-amber-400 text-[10px] tracking-tighter">${stars}${book.averageRating ? `<span class="ml-1 text-slate-400">(${book.averageRating.toFixed(1)})</span>` : ''}</div>
                             </div>
-                            <h3 class="font-black text-lg leading-tight line-clamp-2 mt-1 group-hover:text-blue-600 transition-colors font-serif italic">${escapeHTML(book.title)}</h3>
+                            <h3 class="font-black text-lg leading-tight line-clamp-2 mt-1 group-hover:text-blue-600 transition-colors font-serif italic">${book.title}</h3>
                             <div class="flex justify-between items-center gap-2">
-                                <p class="text-sm text-slate-500 dark:text-slate-400 mt-1 truncate font-medium hover:text-blue-500 transition-colors" onclick="event.stopPropagation(); window.setAuthorFilter('${(book.author || 'Unknown').replace(/'/g, "\\'")}')">${escapeHTML(book.author || 'Unknown')}</p>
-                                ${book.owner ? `<span class="text-[10px] text-slate-400 font-medium truncate hover:text-blue-500 transition-colors" onclick="event.stopPropagation(); window.setOwnerFilter('${(book.owner).replace(/'/g, "\\'")}')">Owner: ${escapeHTML(book.owner)}</span>` : ''}
+                                <button type="button" aria-label="Filter by author: ${escapeHTML(book.author || 'Unknown')}" class="text-sm text-slate-500 dark:text-slate-400 mt-1 truncate font-medium hover:text-blue-500 transition-colors text-left" onclick="event.stopPropagation(); window.setAuthorFilter('${(book.author || 'Unknown').replace(/'/g, "\\'")}')">${book.author || 'Unknown'}</button>
+                                ${book.owner ? `<button type="button" aria-label="Filter by owner: ${escapeHTML(book.owner)}" class="text-[10px] text-slate-400 font-medium truncate hover:text-blue-500 transition-colors text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${(book.owner).replace(/'/g, "\\'")}')">Owner: ${book.owner}</button>` : ''}
                             </div>
                             <div class="flex flex-wrap gap-1 mt-2">
-                                ${(book.tags || []).map(tag => `<span onclick="event.stopPropagation(); window.setTagFilter('${tag}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors">${escapeHTML(tag)}</span>`).join('')}
+                                ${(book.tags || []).map(tag => `<button type="button" aria-label="Filter by tag: ${escapeHTML(tag)}" onclick="event.stopPropagation(); window.setTagFilter('${tag}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors">${tag}</button>`).join('')}
                             </div>
                             <div class="mt-2 flex flex-wrap gap-1">
                                 <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status" class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm hover:scale-105 active:scale-95 transition-transform ${READING_STATUSES[bookStatus].badge}" title="Quick toggle status">
                                     ${READING_STATUSES[bookStatus].label}${bookStatus === 'reading' ? ` (${userProgress || 0}%)` : ''}
                                 </button>
-                                ${book.borrowedBy ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed by ${escapeHTML(book.borrowedBy)}</div>` : ''}
+                                ${book.borrowedBy ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed by ${book.borrowedBy}</div>` : ''}
                                 ${addedByBadge}
                             </div>
                         </div>
