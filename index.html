@@ -1668,10 +1668,10 @@
                                     ${readingBooks.map(book => {
                             const progress = getStatusData(book.id).progress || 0;
                             return `
-                                            <div class="flex-shrink-0 w-64 glass p-4 rounded-[2rem] border border-blue-100/50 dark:border-slate-800 snap-start cursor-pointer hover:shadow-lg transition-all" data-book-id="${book.id}">
+                                            <div class="book-card flex-shrink-0 w-64 glass p-4 rounded-[2rem] border border-blue-100/50 dark:border-slate-800 snap-start cursor-pointer hover:shadow-lg transition-all focus-visible:ring-4 focus-visible:ring-primary/50" data-book-id="${book.id}" role="button" tabindex="0" aria-label="View details for ${escapeHTML(book.title)} by ${escapeHTML(book.author || 'Unknown')}">
                                                 <div class="flex gap-3">
                                                     <div class="w-16 h-24 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 shadow-sm relative">
-                                                        ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover">` : '<div class="w-full h-full flex items-center justify-center text-[8px] font-bold uppercase p-1 text-center text-slate-400">No Cover</div>'}
+                                                        ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover" alt="Cover for ${escapeHTML(book.title)}">` : '<div class="w-full h-full flex items-center justify-center text-[8px] font-bold uppercase p-1 text-center text-slate-400">No Cover</div>'}
                                                         <div class="absolute bottom-0 left-0 right-0 h-1 bg-slate-200/50">
                                                             <div class="h-full bg-blue-500" style="width: ${progress}%"></div>
                                                         </div>
