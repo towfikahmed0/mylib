@@ -408,7 +408,10 @@
                 deferredPrompt = null;
                 if (activeTab === 'settings') renderMainApp();
             });
-            let books = [];                // local copy for UI, synced with Firestore
+            let books = [];                // local copy for UI (newest first)
+            let booksByTitle = [];         // pre-sorted: title A-Z
+            let booksByAuthor = [];        // pre-sorted: author A-Z
+            let booksByOldest = [];        // pre-sorted: oldest first
             let booksMap = new Map();      // Map for O(1) updates: bookId -> normalizedBook
             let readingStatuses = {};      // local copy for per-user statuses {bookId: status}
             let isStatusesLoaded = false;  // Flag to prevent premature sync before data is fetched
@@ -1522,9 +1525,15 @@
                 const startTimestamp = advancedFilters.startDate ? new Date(advancedFilters.startDate).getTime() : null;
                 const endTimestamp = advancedFilters.endDate ? new Date(advancedFilters.endDate).getTime() : null;
 
-                // AI filtering priority - Optimized path: Iterate only matching IDs instead of full collection
-                let sourceCollection = books;
-                if (aiFilteredIds && aiFilteredIds instanceof Set) {
+                // Optimization: Select pre-sorted source array based on user's sort preference
+                // Impact: Entirely skips O(N log N) sort step in the standard render path (O(N) search)
+                let sourceCollection = books; // Default 'newest'
+                if (sortBy === 'title') sourceCollection = booksByTitle;
+                else if (sortBy === 'author') sourceCollection = booksByAuthor;
+                else if (sortBy === 'oldest') sourceCollection = booksByOldest;
+
+                const isAISearchActive = aiFilteredIds && aiFilteredIds instanceof Set;
+                if (isAISearchActive) {
                     sourceCollection = [];
                     aiFilteredIds.forEach(id => {
                         const book = booksMap.get(id);
@@ -1541,7 +1550,7 @@
                     }
 
                     // Skip redundant search blob check if we already filtered by AI IDs
-                    if (sourceCollection !== books) return true;
+                    if (isAISearchActive) return true;
 
                     if (searchLower && !b._searchBlob.includes(searchLower)) return false;
                     if (categoryFilter !== 'all' && !b._genres.includes(categoryFilter)) return false;
@@ -1575,17 +1584,13 @@
                     return true;
                 });
 
-                // 4. Optimize sorting: Hoist comparator selection outside of the loop for performance
-                let comparator;
-                if (sortBy === 'title') comparator = (a, b) => collator.compare(a.title || '', b.title || '');
-                else if (sortBy === 'author') comparator = (a, b) => collator.compare(a.author || '', b.author || '');
-                else if (sortBy === 'oldest') comparator = (a, b) => a._createdTime - b._createdTime;
-                else if (sortBy === 'newest') comparator = (a, b) => b._createdTime - a._createdTime;
-
-                // Optimization: Skip explicit sort if 'newest' is selected and no AI filter is active.
-                // The source 'books' array is already pre-sorted by date descending upon ingestion.
-                if (comparator && (sortBy !== 'newest' || aiFilteredIds)) {
-                    filteredBooks.sort(comparator);
+                // Optimization: Skip explicit sort since we use pre-sorted source collections
+                // We only need to sort if we are in an AI filtered view (O(M log M) where M is small)
+                if (isAISearchActive) {
+                    if (sortBy === 'title') filteredBooks.sort((a, b) => collator.compare(a.title || '', b.title || ''));
+                    else if (sortBy === 'author') filteredBooks.sort((a, b) => collator.compare(a.author || '', b.author || ''));
+                    else if (sortBy === 'oldest') filteredBooks.sort((a, b) => a._createdTime - b._createdTime);
+                    else if (sortBy === 'newest') filteredBooks.sort((a, b) => b._createdTime - a._createdTime);
                 }
 
                 // Optimization: Use pre-calculated tab counts from libraryStats
@@ -2987,8 +2992,12 @@
                                     }
                                 });
 
-                                // Update global array and sort newest first by default
-                                books = Array.from(booksMap.values()).sort((a, b) => b._createdTime - a._createdTime);
+                                // Update global arrays and pre-sort for performance
+                                const allBooks = Array.from(booksMap.values());
+                                books = [...allBooks].sort((a, b) => b._createdTime - a._createdTime);
+                                booksByOldest = [...allBooks].sort((a, b) => a._createdTime - b._createdTime);
+                                booksByTitle = [...allBooks].sort((a, b) => collator.compare(a.title || '', b.title || ''));
+                                booksByAuthor = [...allBooks].sort((a, b) => collator.compare(a.author || '', b.author || ''));
 
                                 updateLibraryCache();
                                 syncCompletedBooksCount();
@@ -4373,6 +4382,9 @@
                             else unsubscribeActivity();
                         }
                         books = [];
+                        booksByTitle = [];
+                        booksByAuthor = [];
+                        booksByOldest = [];
                         booksMap.clear();
                         readingStatuses = {};
                         isStatusesLoaded = false;
