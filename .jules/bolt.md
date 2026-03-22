@@ -7,3 +7,11 @@
 ## 2025-05-14 - [String Comparison & Set Optimization]
 **Learning:** `Intl.Collator` is significantly faster than `localeCompare` for sorting operations in large collections because it avoids repeated locale resolution. Additionally, `Set.has` provides O(1) lookups for AI filtering, preventing O(N*M) performance degradation during search.
 **Action:** Use a global `Intl.Collator` for all sort functions and wrap filter arrays in `Set` for high-frequency lookup paths.
+
+## 2025-05-14 - [Hoisting & Caching in Render Loops]
+**Learning:** Redundant calls to `isAnyFilterActive()` (O(N) check) and post-render DOM scans to update cached contributor names (O(N*M)) were identified as major bottlenecks in `renderLibraryOnly`.
+**Action:** Hoist O(N) checks outside of rendering loops and use cached data (like `userProfileCache`) directly during HTML string generation to eliminate expensive DOM lookups.
+
+## 2025-05-14 - [The Attribute Escaping Trap]
+**Learning:** Escaping strings for HTML attributes that contain JavaScript (like `onclick`) is tricky. Standard HTML escaping (`'` to `&#39;`) breaks JavaScript's ability to handle apostrophes in string literals.
+**Action:** Always escape single quotes for JavaScript (replace `'` with `\'`) *before* wrapping the entire string in `escapeHTML()` when injecting data into `onclick` handlers.
