@@ -20,7 +20,7 @@
             theme: {
                 extend: {
                     colors: {
-                        primary: 'var(--primary-color)',
+                        primary: 'rgb(var(--primary-rgb) / <alpha-value>)',
                         sepia: {
                             50: '#fbf0e3',
                             100: '#f7e4cf',
@@ -233,6 +233,7 @@
 
         :root {
             --primary-color: #3b82f6;
+            --primary-rgb: 59, 130, 246;
         }
 
         /* Utility class to prevent text selection on interactive elements like buttons or book cards */
@@ -2379,14 +2380,15 @@
 
             window.setAccent = (color) => {
                 const colors = {
-                    blue: '#3b82f6',
-                    rose: '#f43f5e',
-                    emerald: '#10b981',
-                    amber: '#f59e0b',
-                    violet: '#8b5cf6'
+                    blue: { hex: '#3b82f6', rgb: '59, 130, 246' },
+                    rose: { hex: '#f43f5e', rgb: '244, 63, 94' },
+                    emerald: { hex: '#10b981', rgb: '16, 185, 129' },
+                    amber: { hex: '#f59e0b', rgb: '245, 158, 11' },
+                    violet: { hex: '#8b5cf6', rgb: '139, 92, 246' }
                 };
                 const primary = colors[color] || colors.blue;
-                document.documentElement.style.setProperty('--primary-color', primary);
+                document.documentElement.style.setProperty('--primary-color', primary.hex);
+                document.documentElement.style.setProperty('--primary-rgb', primary.rgb);
                 localStorage.setItem('mylib_accent', color);
                 renderMainApp();
             };
@@ -4988,12 +4990,33 @@
         })();
     </script>
 
+    <button id="back-to-top" aria-label="Back to top" class="fixed bottom-24 left-6 z-40 w-12 h-12 bg-white dark:bg-slate-800 text-primary rounded-full shadow-2xl flex items-center justify-center opacity-0 translate-y-10 pointer-events-none transition-all hover:scale-110 active:scale-95 border border-slate-200 dark:border-slate-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/50">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7"/></svg>
+    </button>
+
     <style>
         /* Prevent layout shift during re-render */
         #main-content:empty {
             min-height: 50vh;
         }
     </style>
+
+    <script>
+        // Back to Top Logic
+        const backToTopBtn = document.getElementById('back-to-top');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 500) {
+                backToTopBtn.classList.remove('opacity-0', 'translate-y-10', 'pointer-events-none');
+                backToTopBtn.classList.add('opacity-100', 'translate-y-0', 'pointer-events-auto');
+            } else {
+                backToTopBtn.classList.add('opacity-0', 'translate-y-10', 'pointer-events-none');
+                backToTopBtn.classList.remove('opacity-100', 'translate-y-0', 'pointer-events-auto');
+            }
+        });
+        backToTopBtn.addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    </script>
 
 </body>
 
