@@ -2636,13 +2636,12 @@
                         selectedIndex = Math.max(selectedIndex - 1, 0);
                         renderMenu(input.value);
                         menu.querySelectorAll('.dropdown-item')[selectedIndex]?.scrollIntoView({ block: 'nearest' });
-                    } else if (e.key === 'Enter' && selectedIndex >= 0) {
+                    } else if (e.key === 'Enter') {
                         e.preventDefault();
-                        const item = items[selectedIndex];
-                        if (item.dataset.action === 'add') {
-                            onAdd(item.dataset.value);
-                        } else {
-                            input.value = item.dataset.value;
+                        if (selectedIndex >= 0) {
+                            onAdd(items[selectedIndex].dataset.value);
+                        } else if (input.value.trim()) {
+                            onAdd(input.value.trim());
                         }
                         menu.style.display = 'none';
                     } else if (e.key === 'Escape') {
@@ -2658,14 +2657,10 @@
 
                 menu.addEventListener('click', (e) => {
                     const item = e.target.closest('.dropdown-item');
-                    if (!item) return;
-
-                    if (item.dataset.action === 'add') {
+                    if (item) {
                         onAdd(item.dataset.value);
-                    } else {
-                        input.value = item.dataset.value;
+                        menu.style.display = 'none';
                     }
-                    menu.style.display = 'none';
                 });
             }
 
