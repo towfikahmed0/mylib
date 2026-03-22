@@ -23,3 +23,7 @@
 ## 2026-03-23 - [Centralized Filter Feedback & State Visibility]
 **Learning:** In a data-heavy application, fragmented filtering feedback (e.g., hidden dropdown values combined with a separate search bar and isolated tag filters) often leaves users confused about why their results are limited. Consolidating all active filter states into a single "active-filters-bar" with clearable chips provides immediate transparency and control.
 **Action:** Always implement a central `isAnyFilterActive` helper to sync UI elements like results counters ("X of Y found") and empty states. Ensure every active filter is represented as a removable badge to maintain "state visibility" for the user.
+
+## 2026-03-24 - [Aesthetic Placeholders & Standardized Async Feedback]
+**Learning:** Generic "No Cover" text placeholders detract from the premium feel of a book-focused app. Using serif fonts and background gradients for placeholders maintains the visual rhythm of the library grid. Additionally, consistent "Saving..." states on all settings buttons (profile, AI, sharing) reduces user anxiety during network-bound operations.
+**Action:** For missing media, use stylized CSS placeholders that include semantic text (like the item title). Implement a standard "disable + text-swap" pattern for all buttons triggering async Firestore/AI operations.
