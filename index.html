@@ -292,6 +292,11 @@
     <!-- App Container (conditional rendering based on auth) -->
     <div id="app" class="min-h-screen flex flex-col"></div>
 
+    <!-- Back to Top Button -->
+    <button id="back-to-top" class="fixed bottom-24 left-6 z-40 w-12 h-12 bg-white dark:bg-slate-800 text-primary rounded-full shadow-2xl flex items-center justify-center opacity-0 translate-y-10 pointer-events-none transition-all hover:scale-110 active:scale-95 border border-slate-200 dark:border-slate-700 md:bottom-8" aria-label="Back to top">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7"/></svg>
+    </button>
+
     <!-- Toast & Modal containers (global) -->
     <div id="toast"
         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-medium shadow-2xl flex items-center gap-3 transition-all duration-300 opacity-0 translate-y-10 pointer-events-none">
@@ -411,6 +416,7 @@
             let books = [];                // local copy for UI, synced with Firestore
             let booksMap = new Map();      // Map for O(1) updates: bookId -> normalizedBook
             let readingStatuses = {};      // local copy for per-user statuses {bookId: status}
+            let partnerReadingStatuses = {}; // {bookId: {userId: status}}
             let isStatusesLoaded = false;  // Flag to prevent premature sync before data is fetched
 
             const GENRE_FALLBACK = ['Other'];
@@ -506,6 +512,8 @@
                 want_to_read: { label: 'Want to Read', badge: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200' },
                 reading: { label: 'Reading', badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' },
                 finished: { label: 'Finished', badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300' },
+                borrowed: { label: 'Borrowed', badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300' },
+                shared_wishlist: { label: 'Shared Wishlist', badge: 'bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300' },
                 unread: { label: 'Want to Read', badge: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200' } // fallback for legacy data
             };
 
@@ -735,9 +743,9 @@
                         </div>
                     </div>
                     <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
-                        <div class="mb-12">
-                            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Monthly Reading Activity (${new Date().getFullYear()})</h3>
-                            <div class="h-48 flex items-end gap-2 px-2">
+                        <div class="mb-12 overflow-x-auto custom-scrollbar">
+                            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 px-1">Monthly Reading Activity (${new Date().getFullYear()})</h3>
+                            <div class="h-48 flex items-end gap-1 sm:gap-2 px-1 min-w-[320px]">
                                 ${(() => {
                         const monthlyData = monthlyActivity || new Array(12).fill(0);
                         const max = Math.max(...monthlyData, 1);
@@ -1291,10 +1299,10 @@
                             </div>
                             <div class="flex-1"></div>
                             <nav class="hidden md:flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                                <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'library' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Library</button>
-                                <button onclick="window.setTab('wishlist')" ${activeTab === 'wishlist' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'wishlist' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Wishlist</button>
-                                <button onclick="window.setTab('insights')" ${activeTab === 'insights' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'insights' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Insights</button>
-                                <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'activity' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Activity</button>
+                                <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'library' ? 'bg-white dark:bg-slate-700 shadow-[0_8px_16px_rgba(var(--primary-rgb),0.15)] text-primary ring-2 ring-[rgba(var(--primary-rgb),0.1)]' : 'text-slate-500 hover:text-slate-700'}">Library</button>
+                                <button onclick="window.setTab('wishlist')" ${activeTab === 'wishlist' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'wishlist' ? 'bg-white dark:bg-slate-700 shadow-[0_8px_16px_rgba(var(--primary-rgb),0.15)] text-primary ring-2 ring-[rgba(var(--primary-rgb),0.1)]' : 'text-slate-500 hover:text-slate-700'}">Wishlist</button>
+                                <button onclick="window.setTab('insights')" ${activeTab === 'insights' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'insights' ? 'bg-white dark:bg-slate-700 shadow-[0_8px_16px_rgba(var(--primary-rgb),0.15)] text-primary ring-2 ring-[rgba(var(--primary-rgb),0.1)]' : 'text-slate-500 hover:text-slate-700'}">Insights</button>
+                                <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'activity' ? 'bg-white dark:bg-slate-700 shadow-[0_8px_16px_rgba(var(--primary-rgb),0.15)] text-primary ring-2 ring-[rgba(var(--primary-rgb),0.1)]' : 'text-slate-500 hover:text-slate-700'}">Activity</button>
                             </nav>
                             <div class="flex items-center gap-1">
                                 <button id="manual-add-btn" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500" title="Add Book Manually" aria-label="Add Book Manually">
@@ -1312,19 +1320,19 @@
                     </header>
                     <main id="main-content" class="max-w-6xl mx-auto p-6 pb-32 w-full flex-1"></main>
                     <nav id="mobile-nav" class="md:hidden fixed bottom-0 left-0 right-0 glass border-t border-slate-200 dark:border-slate-800 px-3 py-3 grid grid-cols-4 gap-2 z-40">
-                        <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'library' ? 'text-primary' : 'text-slate-400'}">
+                        <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'library' ? 'text-primary drop-shadow-[0_0_8px_rgba(var(--primary-rgb),0.5)]' : 'text-slate-400'}">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></svg>
                             <span class="text-[9px] font-bold">Library</span>
                         </button>
-                        <button onclick="window.setTab('wishlist')" ${activeTab === 'wishlist' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'wishlist' ? 'text-primary' : 'text-slate-400'}">
+                        <button onclick="window.setTab('wishlist')" ${activeTab === 'wishlist' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'wishlist' ? 'text-primary drop-shadow-[0_0_8px_rgba(var(--primary-rgb),0.5)]' : 'text-slate-400'}">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                             <span class="text-[9px] font-bold">Wishlist</span>
                         </button>
-                        <button onclick="window.setTab('insights')" ${activeTab === 'insights' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'insights' ? 'text-primary' : 'text-slate-400'}">
+                        <button onclick="window.setTab('insights')" ${activeTab === 'insights' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'insights' ? 'text-primary drop-shadow-[0_0_8px_rgba(var(--primary-rgb),0.5)]' : 'text-slate-400'}">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                             <span class="text-[9px] font-bold">Insights</span>
                         </button>
-                        <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'activity' ? 'text-primary' : 'text-slate-400'}">
+                        <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'activity' ? 'text-primary drop-shadow-[0_0_8px_rgba(var(--primary-rgb),0.5)]' : 'text-slate-400'}">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             <span class="text-[9px] font-bold">Activity</span>
                         </button>
@@ -1561,13 +1569,23 @@
 
                     // 3. Conditional data fetching: Only fetch status data if needed for filtering
                     if (statusFilter !== 'all' || targetRating !== null) {
-                        const statusData = getStatusData(b.id);
-                        if (statusFilter !== 'all' && statusData.status !== statusFilter) return false;
-                        if (targetRating !== null) {
-                            if (targetRating === 0) {
-                                if (statusData.rating !== 0) return false;
-                            } else {
-                                if (statusData.rating < targetRating) return false;
+                        if (statusFilter === 'borrowed') {
+                            if (!b.borrowedBy) return false;
+                        } else if (statusFilter === 'shared_wishlist') {
+                            if (!b.isWishlist) return false;
+                            // A book is in shared wishlist if it's on MY wishlist AND someone else also has it on theirs
+                            // Or in this case, since we unified the list, maybe it's just any book that is on wishlist and NOT owned by me?
+                            // Actually, let's define it as books on wishlist that are shared by partners.
+                            if (b.userId === currentUser.uid) return false;
+                        } else {
+                            const statusData = getStatusData(b.id);
+                            if (statusFilter !== 'all' && statusData.status !== statusFilter) return false;
+                            if (targetRating !== null) {
+                                if (targetRating === 0) {
+                                    if (statusData.rating !== 0) return false;
+                                } else {
+                                    if (statusData.rating < targetRating) return false;
+                                }
                             }
                         }
                     }
@@ -1579,6 +1597,7 @@
                 let comparator;
                 if (sortBy === 'title') comparator = (a, b) => collator.compare(a.title || '', b.title || '');
                 else if (sortBy === 'author') comparator = (a, b) => collator.compare(a.author || '', b.author || '');
+                else if (sortBy === 'series') comparator = (a, b) => (a.seriesIndex || 9999) - (b.seriesIndex || 9999) || collator.compare(a.title || '', b.title || '');
                 else if (sortBy === 'oldest') comparator = (a, b) => a._createdTime - b._createdTime;
                 else if (sortBy === 'newest') comparator = (a, b) => b._createdTime - a._createdTime;
 
@@ -1753,6 +1772,7 @@
                                         <option value="oldest" ${sortBy === 'oldest' ? 'selected' : ''}>Oldest First</option>
                                         <option value="title" ${sortBy === 'title' ? 'selected' : ''}>Title (A-Z)</option>
                                         <option value="author" ${sortBy === 'author' ? 'selected' : ''}>Author</option>
+                                        <option value="series" ${sortBy === 'series' ? 'selected' : ''}>Series Order</option>
                                     </select>
                                 </div>
                                 <div class="flex flex-col gap-2">
@@ -1771,6 +1791,8 @@
                                         <option value="want_to_read" ${statusFilter === 'want_to_read' ? 'selected' : ''}>Want to Read</option>
                                         <option value="reading" ${statusFilter === 'reading' ? 'selected' : ''}>Reading</option>
                                         <option value="finished" ${statusFilter === 'finished' ? 'selected' : ''}>Finished</option>
+                                        <option value="borrowed" ${statusFilter === 'borrowed' ? 'selected' : ''}>Borrowed</option>
+                                        <option value="shared_wishlist" ${statusFilter === 'shared_wishlist' ? 'selected' : ''}>Shared Wishlist</option>
                                     </select>
                                 </div>
                                 <div class="flex flex-col gap-2">
@@ -1818,72 +1840,10 @@
 
                 const libraryWrapper = document.getElementById('library-container-wrapper');
                 if (libraryWrapper) {
-                    // Performance optimization: Single-pass O(N) grouping of books
-                    const myOwnBooks = [];
-                    const sharedFromPartners = [];
-                    const groupedByContributor = {};
-
-                    filteredBooks.forEach(b => {
-                        if (b.userId !== currentUser.uid) {
-                            sharedFromPartners.push(b);
-                        } else if (!b.addedBy) {
-                            myOwnBooks.push(b);
-                        } else {
-                            const contributor = b.addedBy || 'unknown';
-                            if (!groupedByContributor[contributor]) {
-                                groupedByContributor[contributor] = [];
-                            }
-                            groupedByContributor[contributor].push(b);
-                        }
-                    });
-
                     // Hoist container class calculation out of section template literals
                     const containerClass = viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3';
 
-                    let html = '';
-
-                    // My own books section
-                    if (myOwnBooks.length > 0) {
-                        html += `
-                        <div>
-                            <h2 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200">My Books (${myOwnBooks.length})</h2>
-                            <div class="${containerClass}">
-                                ${myOwnBooks.map(book => renderBookCard(book)).join('')}
-                            </div>
-                        </div>
-                        `;
-                    }
-
-                    // Books added by others - grouped by contributor
-                    Object.entries(groupedByContributor).forEach(([contributorId, books]) => {
-                        if (books.length > 0) {
-                            // Optimization: Use cached name directly to avoid post-render DOM lookups
-                            const cachedName = userProfileCache[contributorId];
-                            const escapedName = cachedName ? escapeHTML(cachedName) : 'loading...';
-                            html += `
-                            <div ${myOwnBooks.length > 0 || html ? 'class="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800"' : ''}>
-                                <h3 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200" data-contributor-id="${contributorId}">
-                                    Shared with Me by <span data-name="${escapedName}">${escapedName}</span> (${books.length})
-                                </h3>
-                                <div class="${containerClass}">
-                                    ${books.map(book => renderBookCard(book)).join('')}
-                                </div>
-                            </div>
-                            `;
-                        }
-                    });
-
-                    // Books from shared partners' libraries
-                    if (sharedFromPartners.length > 0) {
-                        html += `
-                        <div ${(myOwnBooks.length > 0 || Object.keys(groupedByContributor).length > 0) ? 'class="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800"' : ''}>
-                            <h2 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200">Shared with Me (${sharedFromPartners.length})</h2>
-                            <div class="${containerClass}">
-                                ${sharedFromPartners.map(book => renderBookCard(book)).join('')}
-                            </div>
-                        </div>
-                        `;
-                    }
+                    let html = `<div class="${containerClass}">${filteredBooks.map(book => renderBookCard(book)).join('')}</div>`;
 
                     // Empty state
                     if (filteredBooks.length === 0) {
@@ -1913,21 +1873,6 @@
                     }
 
                     libraryWrapper.innerHTML = `<div>${html}</div>`;
-
-                    // Fetch contributor names with caching if not already present
-                    Object.keys(groupedByContributor).forEach(contributorId => {
-                        if (!userProfileCache[contributorId]) {
-                            db.collection('users').doc(contributorId).get().then(doc => {
-                                if (doc.exists) {
-                                    const name = doc.data()?.displayName || doc.data()?.email || 'Unknown';
-                                    userProfileCache[contributorId] = name;
-                                    // Only update DOM if name wasn't cached during initial render
-                                    const heading = libraryWrapper.querySelector(`[data-contributor-id="${contributorId}"] [data-name]`);
-                                    if (heading) heading.textContent = name;
-                                }
-                            });
-                        }
-                    });
                 }
             }
 
@@ -2379,14 +2324,15 @@
 
             window.setAccent = (color) => {
                 const colors = {
-                    blue: '#3b82f6',
-                    rose: '#f43f5e',
-                    emerald: '#10b981',
-                    amber: '#f59e0b',
-                    violet: '#8b5cf6'
+                    blue: { hex: '#3b82f6', rgb: '59, 130, 246' },
+                    rose: { hex: '#f43f5e', rgb: '244, 63, 94' },
+                    emerald: { hex: '#10b981', rgb: '16, 185, 129' },
+                    amber: { hex: '#f59e0b', rgb: '245, 158, 11' },
+                    violet: { hex: '#8b5cf6', rgb: '139, 92, 246' }
                 };
                 const primary = colors[color] || colors.blue;
-                document.documentElement.style.setProperty('--primary-color', primary);
+                document.documentElement.style.setProperty('--primary-color', primary.hex);
+                document.documentElement.style.setProperty('--primary-rgb', primary.rgb);
                 localStorage.setItem('mylib_accent', color);
                 renderMainApp();
             };
@@ -2458,6 +2404,7 @@
                                     <option value="oldest" ${sortBy === 'oldest' ? 'selected' : ''}>Oldest First</option>
                                     <option value="title" ${sortBy === 'title' ? 'selected' : ''}>Title (A-Z)</option>
                                     <option value="author" ${sortBy === 'author' ? 'selected' : ''}>Author</option>
+                                    <option value="series" ${sortBy === 'series' ? 'selected' : ''}>Series Order</option>
                                 </select>
                             </div>
                             <div>
@@ -2474,6 +2421,8 @@
                                     <option value="want_to_read" ${statusFilter === 'want_to_read' ? 'selected' : ''}>Want to Read</option>
                                     <option value="reading" ${statusFilter === 'reading' ? 'selected' : ''}>Reading</option>
                                     <option value="finished" ${statusFilter === 'finished' ? 'selected' : ''}>Finished</option>
+                                    <option value="borrowed" ${statusFilter === 'borrowed' ? 'selected' : ''}>Borrowed</option>
+                                    <option value="shared_wishlist" ${statusFilter === 'shared_wishlist' ? 'selected' : ''}>Shared Wishlist</option>
                                 </select>
                             </div>
                             <div>
@@ -2744,9 +2693,15 @@
 
                     stats.totalValue += (parseFloat(b.price) || 0);
 
-                    if (status === 'finished' && statusData.updatedAt) {
-                        const finishedDate = statusData.updatedAt.toDate();
-                        if (finishedDate.getFullYear() === currentYear) {
+                    if (status === 'finished') {
+                        let finishedDate = null;
+                        if (statusData.updatedAt) {
+                            finishedDate = typeof statusData.updatedAt.toDate === 'function' ? statusData.updatedAt.toDate() : new Date(statusData.updatedAt);
+                        } else if (b.createdAt) {
+                            finishedDate = typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate() : new Date(b.createdAt);
+                        }
+
+                        if (finishedDate && finishedDate.getFullYear() === currentYear) {
                             stats.monthlyActivity[finishedDate.getMonth()]++;
                         }
                     }
@@ -2772,7 +2727,21 @@
 
                 const isSelected = selectedBookIds.has(book.id);
                 const bookGenres = getBookGenres(book);
-                const addedByBadge = book.addedBy && book.addedBy !== currentUser.uid ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">Added by contributor</div>` : '';
+
+                let ownerName = book.owner;
+                if (!ownerName && book.userId !== currentUser.uid) {
+                    ownerName = userProfileCache[book.userId] || 'Partner';
+                }
+                const addedByBadge = ownerName ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">${escapeHTML(ownerName)}'s Book</div>` : '';
+
+                const pStatuses = partnerReadingStatuses[book.id] || {};
+                const partnerReadingInfo = Object.entries(pStatuses).map(([uid, data]) => {
+                    if (data.status === 'reading') {
+                        const name = userProfileCache[uid] || 'Partner';
+                        return `<div class="flex items-center gap-1 text-[8px] text-blue-500 font-bold uppercase"><div class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div> ${escapeHTML(name)} reading (${data.progress}%)</div>`;
+                    }
+                    return '';
+                }).join('');
 
                 // Optimization: Pre-escape frequently used fields
                 const escapedTitle = escapeHTML(book.title);
@@ -2781,12 +2750,15 @@
 
                 // Helpers for safe attribute injection
                 const jsAuthor = (book.author || 'Unknown').replace(/'/g, "\\'");
+                const isNew = book._createdTime > (Date.now() - 30 * 24 * 60 * 60 * 1000);
+                const newBadge = isNew ? `<div class="absolute top-2 left-2 z-30 px-2 py-0.5 rounded-full text-[8px] font-black uppercase text-white bg-blue-500 shadow-lg ring-1 ring-white/20">New</div>` : '';
 
                 if (viewMode === 'compact') {
                     return `
                     <div class="book-card relative group cursor-pointer focus-visible:ring-4 focus-visible:ring-primary/50" data-book-id="${book.id}" tabindex="0" role="button" aria-label="View details for ${escapedTitle} by ${escapedAuthor}">
                         <div class="absolute inset-0 bg-blue-600/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity rounded-2xl"></div>
                         <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm relative">
+                            ${newBadge}
                             ${book.coverUrl || book.thumbnail ?
                             `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-105" alt="Cover for ${escapedTitle}">` :
                             `<div class="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-blue-50 dark:bg-slate-800 text-blue-200 dark:text-slate-600">
@@ -2803,7 +2775,7 @@
                             </div>
                         </div>
                         <div class="mt-2 px-1">
-                            <h4 class="text-[10px] font-black font-serif truncate leading-tight">${escapedTitle}</h4>
+                            <h4 class="text-[10px] font-black font-serif truncate leading-tight">${escapedTitle}${book.seriesIndex ? ` <span class="text-[8px] font-black text-slate-400 font-sans not-italic">#${book.seriesIndex}</span>` : ''}</h4>
                             <button type="button" aria-label="Filter by author: ${escapedAuthor}" class="text-[9px] text-slate-400 truncate w-full text-left block" onclick="event.stopPropagation(); window.setAuthorFilter('${escapeHTML(jsAuthor)}')">${escapedAuthor}</button>
                         </div>
                     </div>
@@ -2816,12 +2788,13 @@
                         <div class="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                             <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" aria-label="Select ${escapedTitle}">
                         </div>
-                        <div class="w-12 h-16 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700">
+                        <div class="w-12 h-16 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 relative">
+                            ${isNew ? `<div class="absolute top-1 left-1 z-10 w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.8)]"></div>` : ''}
                             ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 text-blue-300 dark:text-slate-500 p-1 text-center"><span class="text-[6px] font-black uppercase font-serif italic leading-tight line-clamp-3">${escapedTitle}</span></div>`}
                         </div>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2">
-                                <h3 class="font-black text-sm truncate font-serif">${escapedTitle}</h3>
+                                <h3 class="font-black text-sm truncate font-serif">${escapedTitle}${book.seriesIndex ? ` <span class="text-[10px] font-black text-slate-400 font-sans not-italic">#${book.seriesIndex}</span>` : ''}</h3>
                                 ${book.borrowedBy ? `<span class="px-2 py-0.5 rounded-full text-[8px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed</span>` : ''}
                             </div>
                             <button type="button" aria-label="Filter by author: ${escapedAuthor}" class="text-xs text-slate-500 truncate hover:text-blue-500 transition-colors text-left w-full block" onclick="event.stopPropagation(); window.setAuthorFilter('${escapeHTML(jsAuthor)}')">${escapedAuthor}</button>
@@ -2869,9 +2842,7 @@
                                 <div class="w-8 h-px bg-blue-200/50 dark:bg-slate-700"></div>
                             </div>`
                     }
-                        <div class="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[8px] font-black uppercase text-white ${book.source === 'manual' ? 'bg-orange-400' : 'bg-blue-500'}">
-                            ${book.source || 'scanned'}
-                        </div>
+                        ${newBadge}
                     </div>
                     <div class="flex-1 flex flex-col justify-between overflow-hidden py-1">
                         <div>
@@ -2879,7 +2850,7 @@
                                 <span class="text-[9px] font-black uppercase tracking-widest text-primary truncate max-w-[150px]">${bookGenres.join(', ')}</span>
                                 <div class="text-amber-400 text-[10px] tracking-tighter">${stars}${book.averageRating ? `<span class="ml-1 text-slate-400">(${book.averageRating.toFixed(1)})</span>` : ''}</div>
                             </div>
-                            <h3 class="font-black text-lg leading-tight line-clamp-2 mt-1 group-hover:text-blue-600 transition-colors font-serif italic">${escapedTitle}</h3>
+                            <h3 class="font-black text-lg leading-tight line-clamp-2 mt-1 group-hover:text-blue-600 transition-colors font-serif italic">${escapedTitle}${book.seriesIndex ? ` <span class="text-xs font-black text-slate-400 font-sans not-italic">#${book.seriesIndex}</span>` : ''}</h3>
                             <div class="flex justify-between items-center gap-2">
                                 <button type="button" aria-label="Filter by author: ${escapedAuthor}" class="text-sm text-slate-500 dark:text-slate-400 mt-1 truncate font-medium hover:text-blue-500 transition-colors text-left" onclick="event.stopPropagation(); window.setAuthorFilter('${escapeHTML(jsAuthor)}')">${escapedAuthor}</button>
                                 ${book.owner ? `<button type="button" aria-label="Filter by owner: ${escapeHTML(book.owner)}" class="text-[10px] text-slate-400 font-medium truncate hover:text-blue-500 transition-colors text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${escapeHTML(book.owner.replace(/'/g, "\\'"))}')">Owner: ${escapeHTML(book.owner)}</button>` : ''}
@@ -2898,6 +2869,7 @@
                                 ${book.borrowedBy ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed by ${escapeHTML(book.borrowedBy)}</div>` : ''}
                                 ${addedByBadge}
                             </div>
+                            ${partnerReadingInfo ? `<div class="mt-2 space-y-1">${partnerReadingInfo}</div>` : ''}
                         </div>
                         <div class="flex items-center justify-between">
                             <span class="text-[10px] font-bold text-slate-400">${book.purchaseDate ? new Date(book.purchaseDate).toLocaleDateString() : ''}</span>
@@ -3046,21 +3018,43 @@
                         isStatusesLoaded = true;
                         snapshot.docChanges().forEach(change => {
                             const data = change.doc.data();
-                            // Only process this user's reading status documents
-                            if (data.userId !== currentUser.uid) return;
-                            
                             const bookId = change.doc.ref.parent.parent.id;
-                            if (change.type === 'removed') {
-                                delete readingStatuses[bookId];
+
+                            if (data.userId === currentUser.uid) {
+                                if (change.type === 'removed') {
+                                    delete readingStatuses[bookId];
+                                } else {
+                                    readingStatuses[bookId] = {
+                                        status: data.status === 'unread' ? 'want_to_read' : (data.status || 'want_to_read'),
+                                        rating: data.rating || 0,
+                                        progress: data.progress || 0,
+                                        comment: data.comment || '',
+                                        updatedAt: data.updatedAt
+                                    };
+                                }
                             } else {
-                                // Normalize data upon ingestion to reduce CPU overhead during renders
-                                readingStatuses[bookId] = {
-                                    status: data.status === 'unread' ? 'want_to_read' : (data.status || 'want_to_read'),
-                                    rating: data.rating || 0,
-                                    progress: data.progress || 0,
-                                    comment: data.comment || '',
-                                    updatedAt: data.updatedAt
-                                };
+                                // Partner status
+                                if (change.type === 'removed') {
+                                    if (partnerReadingStatuses[bookId]) {
+                                        delete partnerReadingStatuses[bookId][data.userId];
+                                    }
+                                } else {
+                                    if (!partnerReadingStatuses[bookId]) partnerReadingStatuses[bookId] = {};
+                                    partnerReadingStatuses[bookId][data.userId] = {
+                                        status: data.status,
+                                        progress: data.progress || 0,
+                                        updatedAt: data.updatedAt
+                                    };
+                                    // Pre-fetch partner name if not cached
+                                    if (!userProfileCache[data.userId]) {
+                                        db.collection('users').doc(data.userId).get().then(doc => {
+                                            if (doc.exists) {
+                                                userProfileCache[data.userId] = doc.data()?.displayName || doc.data()?.email || 'Partner';
+                                                renderLibraryOnly();
+                                            }
+                                        });
+                                    }
+                                }
                             }
                         });
                         updateLibraryCache();
@@ -3374,6 +3368,10 @@
                                     <label for="man-title" class="text-[10px] font-bold text-slate-400 uppercase ml-1 font-serif">Title *</label>
                                     <input id="man-title" placeholder="e.g. The Great Gatsby" value="${existingBook?.title || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
                                 </div>
+                                <div class="w-24">
+                                    <label for="man-series" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Series #</label>
+                                    <input id="man-series" type="number" placeholder="#" value="${existingBook?.seriesIndex || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                                </div>
                                 <button id="ai-suggest-btn" class="p-3.5 bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 rounded-xl hover:bg-violet-200 transition-colors shadow-sm" title="Suggest with AI" aria-label="Suggest with AI">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                                 </button>
@@ -3469,6 +3467,7 @@
                                     const span = destContainer.querySelector(`[data-partner-id="${p.userId}"]`);
                                     if (span && docs[idx].exists) {
                                         const name = docs[idx].data()?.displayName || docs[idx].data()?.email || 'Partner';
+                                userProfileCache[p.userId] = name;
                                         span.textContent = `${name}'s Library`;
                                     }
                                 });
@@ -3584,6 +3583,7 @@
                         isbn: existingBook?.isbn || code || '',
                         thumbnail: existingBook?.thumbnail || null,
                         source: existingBook?.source || (code ? 'scanned' : 'manual'),
+                        seriesIndex: document.getElementById('man-series').value ? parseInt(document.getElementById('man-series').value) : null,
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                     };
                     if (!bookData.title) {
@@ -4011,6 +4011,21 @@
             const chatForm = document.getElementById('ai-chat-form');
             const chatInput = document.getElementById('ai-chat-input');
             const chatMessages = document.getElementById('ai-chat-messages');
+
+            // Back to Top Logic
+            const backToTopBtn = document.getElementById('back-to-top');
+            window.addEventListener('scroll', () => {
+                if (window.scrollY > 500) {
+                    backToTopBtn.classList.remove('opacity-0', 'translate-y-10', 'pointer-events-none');
+                    backToTopBtn.classList.add('opacity-100', 'translate-y-0', 'pointer-events-auto');
+                } else {
+                    backToTopBtn.classList.add('opacity-0', 'translate-y-10', 'pointer-events-none');
+                    backToTopBtn.classList.remove('opacity-100', 'translate-y-0', 'pointer-events-auto');
+                }
+            });
+            backToTopBtn.addEventListener('click', () => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
 
             const handleChatEscape = (e) => {
                 if (e.key === 'Escape') {
@@ -4944,16 +4959,41 @@
                     currentSwipingCard.style.transform = `translateX(-${translate}px)`;
 
                     // Ensure overlay exists
-                    if (!currentSwipingCard.querySelector('.swipe-overlay')) {
-                        const overlay = document.createElement('div');
+                    let overlay = currentSwipingCard.querySelector('.swipe-overlay');
+                    if (!overlay) {
+                        overlay = document.createElement('div');
                         overlay.className = 'swipe-overlay';
+                        currentSwipingCard.appendChild(overlay);
+                    }
+
+                    const bookId = currentSwipingCard.dataset.bookId;
+                    const statusData = getStatusData(bookId);
+                    const currentStatus = statusData.status;
+
+                    if (currentStatus === 'want_to_read') {
+                        overlay.style.background = '#3b82f6'; // blue
+                        overlay.innerHTML = `
+                            <div class="flex flex-col items-center gap-1">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                                <span class="text-[8px] font-black uppercase">Mark Reading</span>
+                            </div>
+                        `;
+                    } else if (currentStatus === 'reading') {
+                        overlay.style.background = '#10b981'; // emerald
+                        overlay.innerHTML = `
+                            <div class="flex flex-col items-center gap-1">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                <span class="text-[8px] font-black uppercase">Mark Finished</span>
+                            </div>
+                        `;
+                    } else {
+                        overlay.style.background = '#64748b'; // slate
                         overlay.innerHTML = `
                             <div class="flex flex-col items-center gap-1">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
-                                <span class="text-[8px] font-black uppercase">Wishlist</span>
+                                <span class="text-[8px] font-black uppercase">Finished</span>
                             </div>
                         `;
-                        currentSwipingCard.appendChild(overlay);
                     }
                 } else {
                     currentSwipingCard.classList.remove('swiping');
@@ -4972,15 +5012,30 @@
                 currentSwipingCard = null;
 
                 if (diff > 80) { // Threshold met
-                    const book = books.find(b => b.id === bookId);
-                    if (book && !book.isWishlist) {
+                    const statusData = getStatusData(bookId);
+                    const currentStatus = statusData.status;
+                    let nextStatus = null;
+
+                    if (currentStatus === 'want_to_read') nextStatus = 'reading';
+                    else if (currentStatus === 'reading') nextStatus = 'finished';
+
+                    if (nextStatus) {
                         window.showLoading();
                         try {
-                            await db.collection('books').doc(bookId).update({ isWishlist: true });
-                            showToast(`"${book.title}" moved to Wishlist`, 'success');
+                            const updateData = {
+                                status: nextStatus,
+                                userId: currentUser.uid,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            };
+                            if (nextStatus === 'finished') updateData.progress = 100;
+
+                            await db.collection('books').doc(bookId)
+                                .collection('readingStatus').doc(currentUser.uid).set(updateData, { merge: true });
+
+                            showToast(`Marked as ${READING_STATUSES[nextStatus].label}`, 'success');
                             if (navigator.vibrate) navigator.vibrate([10, 30, 10]);
                         } catch (err) {
-                            showToast('Error moving to wishlist: ' + err.message, 'error');
+                            showToast('Error updating status: ' + err.message, 'error');
                         } finally {
                             window.hideLoading();
                         }
