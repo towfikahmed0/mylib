@@ -1729,7 +1729,7 @@
                                             <div class="book-card flex-shrink-0 w-64 glass p-4 rounded-[2rem] border border-blue-100/50 dark:border-slate-800 snap-start cursor-pointer hover:shadow-lg transition-all focus-visible:ring-4 focus-visible:ring-primary/50" data-book-id="${book.id}" role="button" tabindex="0" aria-label="View details for ${escapeHTML(book.title)} by ${escapeHTML(book.author || 'Unknown')}">
                                                 <div class="flex gap-3">
                                                     <div class="w-16 h-24 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 shadow-sm relative">
-                                                        ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover" alt="Cover for ${escapeHTML(book.title)}">` : `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 text-blue-300 dark:text-slate-500 p-2 text-center leading-tight"><span class="text-[8px] font-black uppercase font-serif italic line-clamp-3">${escapeHTML(book.title)}</span></div>`}
+                                                        ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover" alt="Cover for ${escapeHTML(book.title)}" loading="lazy" decoding="async">` : `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 text-blue-300 dark:text-slate-500 p-2 text-center leading-tight"><span class="text-[8px] font-black uppercase font-serif italic line-clamp-3">${escapeHTML(book.title)}</span></div>`}
                                                         <div class="absolute bottom-0 left-0 right-0 h-1 bg-slate-200/50">
                                                             <div class="h-full bg-blue-500" style="width: ${progress}%"></div>
                                                         </div>
@@ -2201,7 +2201,7 @@
                                 <div class="md:col-span-3 p-6 bg-violet-50 dark:bg-violet-900/10 rounded-3xl border-2 border-violet-100 dark:border-violet-900/30 animate-slide-up">
                                     <div class="flex flex-col md:flex-row gap-6 items-center">
                                         <div class="w-24 h-36 flex-shrink-0 rounded-xl overflow-hidden shadow-lg">
-                                            <img src="${book.coverUrl || book.thumbnail || 'https://via.placeholder.com/100x150'}" class="w-full h-full object-cover">
+                                            <img src="${book.coverUrl || book.thumbnail || 'https://via.placeholder.com/100x150'}" class="w-full h-full object-cover" loading="lazy" decoding="async">
                                         </div>
                                         <div class="flex-1 text-center md:text-left">
                                             <span class="px-3 py-1 bg-violet-100 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400 rounded-full text-[10px] font-black uppercase tracking-widest">${mood} Match</span>
@@ -2264,7 +2264,7 @@
                             return `
                                 <div class="bg-white dark:bg-slate-800/50 p-4 rounded-3xl border border-violet-100 dark:border-violet-900/20 flex flex-col group cursor-pointer hover:shadow-lg transition-all" onclick="window.jumpToBook('${book.id}')">
                                     <div class="aspect-[2/3] rounded-2xl overflow-hidden mb-3 shadow-sm">
-                                        <img src="${book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover'}" class="w-full h-full object-cover group-hover:scale-105 transition-transform">
+                                        <img src="${book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover'}" class="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy" decoding="async">
                                     </div>
                                     <h4 class="font-black font-serif text-sm line-clamp-1 italic">${book.title}</h4>
                                     <p class="text-[10px] text-slate-500 mb-2">${book.author}</p>
@@ -2745,6 +2745,7 @@
 
                 // Helpers for safe attribute injection
                 const jsAuthor = (book.author || 'Unknown').replace(/'/g, "\\'");
+                const jsOwner = (book.owner || '').replace(/'/g, "\\'");
                 const isNew = book._createdTime > (Date.now() - 30 * 24 * 60 * 60 * 1000);
                 const newBadge = isNew ? `<div class="absolute top-2 left-2 z-30 px-2 py-0.5 rounded-full text-[8px] font-black uppercase text-white bg-blue-500 shadow-lg ring-1 ring-white/20">New</div>` : '';
 
@@ -2755,7 +2756,7 @@
                         <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm relative">
                             ${newBadge}
                             ${book.coverUrl || book.thumbnail ?
-                            `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-105" alt="Cover for ${escapedTitle}">` :
+                            `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-105" alt="Cover for ${escapedTitle}" loading="lazy" decoding="async">` :
                             `<div class="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-blue-50 dark:bg-slate-800 text-blue-200 dark:text-slate-600">
                                     <span class="text-[8px] font-black uppercase font-serif line-clamp-3">${escapedTitle}</span>
                                 </div>`
@@ -2785,7 +2786,7 @@
                         </div>
                         <div class="w-12 h-16 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 relative">
                             ${isNew ? `<div class="absolute top-1 left-1 z-10 w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.8)]"></div>` : ''}
-                            ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 text-blue-300 dark:text-slate-500 p-1 text-center"><span class="text-[6px] font-black uppercase font-serif italic leading-tight line-clamp-3">${escapedTitle}</span></div>`}
+                            ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover" loading="lazy" decoding="async">` : `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 text-blue-300 dark:text-slate-500 p-1 text-center"><span class="text-[6px] font-black uppercase font-serif italic leading-tight line-clamp-3">${escapedTitle}</span></div>`}
                         </div>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2">
@@ -2804,7 +2805,7 @@
                         <div class="text-right flex-shrink-0 flex flex-col items-end">
                             <div class="text-amber-400 text-[10px]">${stars}</div>
                             <div class="text-[10px] font-bold text-blue-600 dark:text-blue-400 mt-1 truncate max-w-[120px]">${escapedGenres}</div>
-                            ${book.owner ? `<button type="button" aria-label="Filter by owner: ${escapeHTML(book.owner)}" class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors text-right block" onclick="event.stopPropagation(); window.setOwnerFilter('${escapeHTML(book.owner.replace(/'/g, "\\'"))}')">Owner: ${escapeHTML(book.owner)}</button>` : ''}
+                            ${book.owner ? `<button type="button" aria-label="Filter by owner: ${escapeHTML(book.owner)}" class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors text-right block" onclick="event.stopPropagation(); window.setOwnerFilter('${escapeHTML(jsOwner)}')">Owner: ${escapeHTML(book.owner)}</button>` : ''}
                             <div class="flex items-center gap-2 mt-1">
                                 <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Edit book details">
                                     <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
@@ -2831,7 +2832,7 @@
                             </div>
                         ` : ''}
                         ${book.coverUrl || book.thumbnail ?
-                        `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-110" alt="Cover for ${escapedTitle}">` :
+                        `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-110" alt="Cover for ${escapedTitle}" loading="lazy" decoding="async">` :
                         `<div class="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 text-blue-300 dark:text-slate-600 p-4 text-center">
                                 <span class="text-[10px] font-black uppercase font-serif italic leading-tight line-clamp-4 mb-2">${escapedTitle}</span>
                                 <div class="w-8 h-px bg-blue-200/50 dark:bg-slate-700"></div>
@@ -2848,7 +2849,7 @@
                             <h3 class="font-black text-lg leading-tight line-clamp-2 mt-1 group-hover:text-blue-600 transition-colors font-serif italic">${escapedTitle}${book.seriesIndex ? ` <span class="text-xs font-black text-slate-400 font-sans not-italic">#${book.seriesIndex}</span>` : ''}</h3>
                             <div class="flex justify-between items-center gap-2">
                                 <button type="button" aria-label="Filter by author: ${escapedAuthor}" class="text-sm text-slate-500 dark:text-slate-400 mt-1 truncate font-medium hover:text-blue-500 transition-colors text-left" onclick="event.stopPropagation(); window.setAuthorFilter('${escapeHTML(jsAuthor)}')">${escapedAuthor}</button>
-                                ${book.owner ? `<button type="button" aria-label="Filter by owner: ${escapeHTML(book.owner)}" class="text-[10px] text-slate-400 font-medium truncate hover:text-blue-500 transition-colors text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${escapeHTML(book.owner.replace(/'/g, "\\'"))}')">Owner: ${escapeHTML(book.owner)}</button>` : ''}
+                                ${book.owner ? `<button type="button" aria-label="Filter by owner: ${escapeHTML(book.owner)}" class="text-[10px] text-slate-400 font-medium truncate hover:text-blue-500 transition-colors text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${escapeHTML(jsOwner)}')">Owner: ${escapeHTML(book.owner)}</button>` : ''}
                             </div>
                             <div class="flex flex-wrap gap-1 mt-2">
                                 ${(book.tags || []).map(tag => {
@@ -4449,7 +4450,7 @@
                         <div class="flex flex-col md:flex-row gap-8">
                             <div class="flex-shrink-0 mx-auto md:mx-0">
                                 <div class="relative group">
-                                    <img src="${book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover'}" class="w-56 h-80 object-cover rounded-3xl shadow-2xl border border-white/20">
+                                    <img src="${book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover'}" class="w-56 h-80 object-cover rounded-3xl shadow-2xl border border-white/20" loading="lazy" decoding="async">
                                     ${book.isWishlist ? `
                                         <button id="move-to-lib-btn" title="Move to Library" class="absolute -top-3 -right-3 w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center shadow-lg border-4 border-white dark:border-slate-900 hover:scale-110 transition-transform active:scale-95" aria-label="Move to Library">
                                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
