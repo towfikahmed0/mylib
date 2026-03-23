@@ -781,7 +781,7 @@
                                                 <span class="text-xs font-black uppercase tracking-tight text-slate-500">${READING_STATUSES[status].label}</span>
                                                 <span class="text-lg font-black font-serif">${countToDisplay}</span>
                                             </div>
-                                            <div class="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-2">
+                                            <div class="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-2" role="progressbar" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100" aria-label="${READING_STATUSES[status].label} books percentage">
                                                 <div class="h-full ${color} transition-all duration-1000" style="width: ${percent}%"></div>
                                             </div>
                                             <span class="text-[10px] font-bold text-slate-400">${percent}% of library</span>
@@ -804,7 +804,7 @@
                                                 <span class="font-bold truncate mr-2 group-hover:text-primary transition-colors">${name}</span>
                                                 <span class="font-black text-xs text-slate-400">${count}</span>
                                             </div>
-                                            <div class="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                            <div class="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden" role="progressbar" aria-valuenow="${width}" aria-valuemin="0" aria-valuemax="100" aria-label="Percentage of books in ${name} genre">
                                                 <div class="h-full bg-blue-500/50 group-hover:bg-primary transition-all duration-500" style="width: ${width}%"></div>
                                             </div>
                                         </button>
@@ -823,7 +823,7 @@
                                                 <span class="font-bold truncate mr-2 group-hover:text-primary transition-colors">${name}</span>
                                                 <span class="font-black text-xs text-slate-400">${count}</span>
                                             </div>
-                                            <div class="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                            <div class="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden" role="progressbar" aria-valuenow="${width}" aria-valuemin="0" aria-valuemax="100" aria-label="Percentage of books by ${name}">
                                                 <div class="h-full bg-violet-500/50 group-hover:bg-violet-500 transition-all duration-500" style="width: ${width}%"></div>
                                             </div>
                                         </button>
@@ -3764,13 +3764,22 @@
             // ---------- Activity Tab ----------
             function renderActivity() {
                 if (activities.length === 0) {
+                    const noPartners = !allPartnerships || allPartnerships.length === 0;
                     return `
-                    <div class="flex flex-col items-center justify-center py-24 text-center">
+                    <div class="flex flex-col items-center justify-center py-24 text-center animate-slide-up">
                         <div class="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6">
                             <svg class="w-10 h-10 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
                         <h2 class="text-xl font-black font-serif italic text-slate-700 dark:text-slate-300">No Activity Yet</h2>
-                        <p class="text-slate-500 dark:text-slate-400 text-sm max-w-xs mt-2">When you or your partners update library books, those events will appear here.</p>
+                        <p class="text-slate-500 dark:text-slate-400 text-sm max-w-xs mt-2 ${noPartners ? 'mb-8' : ''}">
+                            ${noPartners ? 'Connect with partners to see their library updates here!' : 'When you or your partners update library books, those events will appear here.'}
+                        </p>
+                        ${noPartners ? `
+                            <button onclick="window.setTab('settings')" class="px-8 py-3 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 transition-transform active:scale-95 flex items-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+                                Invite Collaborator
+                            </button>
+                        ` : ''}
                     </div>
                     `;
                 }
