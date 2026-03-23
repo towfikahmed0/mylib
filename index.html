@@ -691,13 +691,13 @@
                                 <div class="text-[10px] font-bold uppercase text-slate-400 mb-1">Total Books</div>
                                 <div class="text-2xl font-black font-serif">${books.filter(b => !b.isWishlist).length}</div>
                             </div>
-                            <div class="glass p-6 rounded-[2.5rem] border border-emerald-100/50 dark:border-emerald-900/20 flex flex-col justify-center cursor-pointer hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 transition-colors" onclick="window.setTab('library'); window.clearAllFilters(); advancedFilters.minPrice = 0.01; renderLibraryOnly();">
+                            <button type="button" aria-label="View books with price in library" class="glass p-6 rounded-[2.5rem] border border-emerald-100/50 dark:border-emerald-900/20 flex flex-col justify-center cursor-pointer hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 transition-all text-left w-full focus-visible:ring-4 focus-visible:ring-emerald-500/20 focus-visible:outline-none" onclick="window.setTab('library'); window.clearAllFilters(); advancedFilters.minPrice = 0.01; renderLibraryOnly();">
                                 <div class="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center mb-3">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                 </div>
                                 <div class="text-[10px] font-bold uppercase text-slate-400 mb-1">Library Value</div>
                                 <div class="text-2xl font-black font-serif">$${Math.round(totalValue || 0)}</div>
-                            </div>
+                            </button>
                             <div class="glass p-6 rounded-[2.5rem] border border-amber-100/50 dark:border-amber-900/20 flex flex-col justify-center">
                                 <div class="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-xl flex items-center justify-center mb-3">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
@@ -776,7 +776,7 @@
                                     const color = status === 'finished' ? 'bg-emerald-500' : status === 'reading' ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600';
                                     const countToDisplay = status === 'finished' ? (userProfile?.completedBooksCount || count) : count;
                                     return `
-                                        <div class="relative p-5 bg-slate-50 dark:bg-slate-900/50 rounded-3xl border border-slate-100 dark:border-slate-800 group hover:border-primary/30 transition-colors cursor-pointer" onclick="window.applyInsightFilter('status', '${status}')">
+                                        <button type="button" aria-label="Filter by status: ${READING_STATUSES[status].label}" class="relative p-5 bg-slate-50 dark:bg-slate-900/50 rounded-3xl border border-slate-100 dark:border-slate-800 group hover:border-primary/30 transition-all cursor-pointer text-left w-full focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:outline-none" onclick="window.applyInsightFilter('status', '${status}')">
                                             <div class="flex justify-between items-start mb-4">
                                                 <span class="text-xs font-black uppercase tracking-tight text-slate-500">${READING_STATUSES[status].label}</span>
                                                 <span class="text-lg font-black font-serif">${countToDisplay}</span>
@@ -785,7 +785,7 @@
                                                 <div class="h-full ${color} transition-all duration-1000" style="width: ${percent}%"></div>
                                             </div>
                                             <span class="text-[10px] font-bold text-slate-400">${percent}% of library</span>
-                                        </div>
+                                        </button>
                                     `;
                                 }).join('')}
                             </div>
@@ -799,7 +799,7 @@
                                         const max = Math.max(...Object.values(genresCount));
                                         const width = Math.round((count / max) * 100);
                                         return `
-                                        <div class="group cursor-pointer" onclick="window.applyInsightFilter('genre', '${name.replace(/'/g, "\\'")}')">
+                                        <button type="button" aria-label="Filter by genre: ${name}" class="group cursor-pointer w-full text-left focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:outline-none rounded-lg p-1 transition-all" onclick="window.applyInsightFilter('genre', '${name.replace(/'/g, "\\'")}')">
                                             <div class="flex justify-between items-center text-sm mb-1">
                                                 <span class="font-bold truncate mr-2 group-hover:text-primary transition-colors">${name}</span>
                                                 <span class="font-black text-xs text-slate-400">${count}</span>
@@ -807,7 +807,7 @@
                                             <div class="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                                                 <div class="h-full bg-blue-500/50 group-hover:bg-primary transition-all duration-500" style="width: ${width}%"></div>
                                             </div>
-                                        </div>
+                                        </button>
                                     `}).join('')}
                                 </div>
                             </div>
@@ -818,7 +818,7 @@
                                         const max = Math.max(...Object.values(authorsCount));
                                         const width = Math.round((count / max) * 100);
                                         return `
-                                        <div class="group cursor-pointer" onclick="window.applyInsightFilter('author', '${name.replace(/'/g, "\\'")}')">
+                                        <button type="button" aria-label="Filter by author: ${name}" class="group cursor-pointer w-full text-left focus-visible:ring-4 focus-visible:ring-violet-500/20 focus-visible:outline-none rounded-lg p-1 transition-all" onclick="window.applyInsightFilter('author', '${name.replace(/'/g, "\\'")}')">
                                             <div class="flex justify-between items-center text-sm mb-1">
                                                 <span class="font-bold truncate mr-2 group-hover:text-primary transition-colors">${name}</span>
                                                 <span class="font-black text-xs text-slate-400">${count}</span>
@@ -826,7 +826,7 @@
                                             <div class="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                                                 <div class="h-full bg-violet-500/50 group-hover:bg-violet-500 transition-all duration-500" style="width: ${width}%"></div>
                                             </div>
-                                        </div>
+                                        </button>
                                     `}).join('')}
                                 </div>
                             </div>
@@ -848,10 +848,10 @@
                                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Top Owners</h3>
                                 <div class="space-y-2">
                                     ${Object.entries(ownersCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => `
-                                        <div class="flex justify-between items-center text-sm cursor-pointer group p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-colors" onclick="window.applyInsightFilter('owner', '${name.replace(/'/g, "\\'")}')">
+                                        <button type="button" aria-label="Filter by owner: ${name}" class="flex justify-between items-center text-sm cursor-pointer group p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all w-full text-left focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:outline-none" onclick="window.applyInsightFilter('owner', '${name.replace(/'/g, "\\'")}')">
                                             <span class="font-medium truncate mr-2 group-hover:text-primary transition-colors">${name}</span>
                                             <span class="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-lg font-bold text-xs">${count} books</span>
-                                        </div>
+                                        </button>
                                     `).join('')}
                                 </div>
                             </div>
