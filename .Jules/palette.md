@@ -31,3 +31,7 @@
 ## 2026-03-25 - [Contextual Empty States & ARIA Progress Indicators]
 **Learning:** Generic empty states are missed opportunities for user guidance. In a social/shared library app, the "Activity" feed is useless without partners; providing a direct CTA to "Invite Collaborator" (Settings) converts a "dead end" into a helpful prompt. Additionally, visual charts (bars/rings) are invisible to screen readers without `role="progressbar"` and standard `aria-` value attributes.
 **Action:** Always check if an empty state's root cause can be solved by a specific action and provide a direct CTA. Ensure all visual data representations have semantic ARIA roles and labels to maintain data accessibility.
+
+## 2026-03-24 - [Shortcut Scroll-to-Top & Universal Focus Feedback]
+**Learning:** In long-scrolling single-page libraries, users often get "lost" deep in a list. Implementing a "shortcut" where clicking an already-active tab triggers a smooth scroll-to-top (mirroring mobile OS patterns) provides a fast way to reset the view. Additionally, interactive text triggers (like author/genre filters) are often invisible to keyboard users; adding standardized 'focus-visible' rings across all such micro-interactions is critical for a truly accessible experience.
+**Action:** Always implement a "click active tab to scroll top" pattern in navigation. Ensure all secondary interactive elements (tags, metadata links, clear buttons) have high-visibility focus states that match the app's primary accent color.
