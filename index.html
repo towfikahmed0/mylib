@@ -652,7 +652,7 @@
 
             function renderInsights() {
                 // Performance optimization: Use pre-calculated libraryStats
-                const { authorsCount, ownersCount, genresCount, tagsCount, totalValue, statusCounts, monthlyActivity } = libraryStats;
+                const { authorsCount, ownersCount, genresCount, tagsCount, totalValue, statusCounts, monthlyActivity, libraryCount } = libraryStats;
 
                 const goal = readingGoal;
                 const finished = userProfile?.completedBooksCount || 0;
@@ -689,7 +689,7 @@
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
                                 </div>
                                 <div class="text-[10px] font-bold uppercase text-slate-400 mb-1">Total Books</div>
-                                <div class="text-2xl font-black font-serif">${books.filter(b => !b.isWishlist).length}</div>
+                                <div class="text-2xl font-black font-serif">${libraryCount}</div>
                             </div>
                             <button type="button" aria-label="View books with price in library" class="glass p-6 rounded-[2.5rem] border border-emerald-100/50 dark:border-emerald-900/20 flex flex-col justify-center cursor-pointer hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 transition-all text-left w-full focus-visible:ring-4 focus-visible:ring-emerald-500/20 focus-visible:outline-none" onclick="window.setTab('library'); window.clearAllFilters(); advancedFilters.minPrice = 0.01; renderLibraryOnly();">
                                 <div class="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center mb-3">
@@ -771,8 +771,7 @@
                             <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Reading Status Breakdown</h3>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 ${Object.entries(statusCounts).map(([status, count]) => {
-                                    const totalNonWishlist = books.filter(b => !b.isWishlist).length;
-                                    const percent = totalNonWishlist ? Math.round((count / totalNonWishlist) * 100) : 0;
+                                    const percent = libraryCount ? Math.round((count / libraryCount) * 100) : 0;
                                     const color = status === 'finished' ? 'bg-emerald-500' : status === 'reading' ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600';
                                     const countToDisplay = status === 'finished' ? (userProfile?.completedBooksCount || count) : count;
                                     return `
