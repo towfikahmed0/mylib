@@ -293,7 +293,7 @@
     <div id="app" class="min-h-screen flex flex-col"></div>
 
     <!-- Back to Top Button -->
-    <button id="back-to-top" class="fixed bottom-24 left-6 z-40 w-12 h-12 bg-white dark:bg-slate-800 text-primary rounded-full shadow-2xl flex items-center justify-center opacity-0 translate-y-10 pointer-events-none transition-all hover:scale-110 active:scale-95 border border-slate-200 dark:border-slate-700 md:bottom-8" aria-label="Back to top">
+    <button id="back-to-top" class="fixed bottom-24 left-6 z-40 w-12 h-12 bg-white dark:bg-slate-800 text-primary rounded-full shadow-2xl flex items-center justify-center opacity-0 translate-y-10 pointer-events-none transition-all hover:scale-110 active:scale-95 border border-slate-200 dark:border-slate-700 md:bottom-8 focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:outline-none" aria-label="Back to top">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7"/></svg>
     </button>
 
@@ -1616,44 +1616,44 @@
                     let activeCount = 0;
 
                     if (searchQuery) {
-                        html += `<span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold flex items-center gap-2">Search: ${escapeHTML(searchQuery)} <button onclick="window.clearAdvancedFilter('search')" aria-label="Clear search">×</button></span>`;
+                        html += `<span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold flex items-center gap-2">Search: ${escapeHTML(searchQuery)} <button onclick="window.clearAdvancedFilter('search')" class="focus-visible:ring-2 focus-visible:ring-blue-500/50 rounded-full outline-none" aria-label="Clear search">×</button></span>`;
                         activeCount++;
                     }
                     if (aiFilteredIds) {
-                        html += `<span class="px-3 py-1 bg-violet-100 text-violet-700 rounded-full text-[10px] font-bold flex items-center gap-2">AI Filtered <button onclick="window.clearAdvancedFilter('search')" aria-label="Clear AI filter">×</button></span>`;
+                        html += `<span class="px-3 py-1 bg-violet-100 text-violet-700 rounded-full text-[10px] font-bold flex items-center gap-2">AI Filtered <button onclick="window.clearAdvancedFilter('search')" class="focus-visible:ring-2 focus-visible:ring-violet-500/50 rounded-full outline-none" aria-label="Clear AI filter">×</button></span>`;
                         activeCount++;
                     }
                     if (categoryFilter !== 'all') {
-                        html += `<span class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-[10px] font-bold flex items-center gap-2">Genre: ${escapeHTML(categoryFilter)} <button onclick="window.clearAdvancedFilter('category')" aria-label="Clear genre filter">×</button></span>`;
+                        html += `<span class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-[10px] font-bold flex items-center gap-2">Genre: ${escapeHTML(categoryFilter)} <button onclick="window.clearAdvancedFilter('category')" class="focus-visible:ring-2 focus-visible:ring-indigo-500/50 rounded-full outline-none" aria-label="Clear genre filter">×</button></span>`;
                         activeCount++;
                     }
                     if (authorFilter !== 'all') {
-                        html += `<span class="px-3 py-1 bg-rose-100 text-rose-700 rounded-full text-[10px] font-bold flex items-center gap-2">Author: ${escapeHTML(authorFilter)} <button onclick="window.clearAdvancedFilter('author')" aria-label="Clear author filter">×</button></span>`;
+                        html += `<span class="px-3 py-1 bg-rose-100 text-rose-700 rounded-full text-[10px] font-bold flex items-center gap-2">Author: ${escapeHTML(authorFilter)} <button onclick="window.clearAdvancedFilter('author')" class="focus-visible:ring-2 focus-visible:ring-rose-500/50 rounded-full outline-none" aria-label="Clear author filter">×</button></span>`;
                         activeCount++;
                     }
                     if (ownerFilter !== 'all') {
-                        html += `<span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-bold flex items-center gap-2">Owner: ${escapeHTML(ownerFilter)} <button onclick="window.clearAdvancedFilter('owner')" aria-label="Clear owner filter">×</button></span>`;
+                        html += `<span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-bold flex items-center gap-2">Owner: ${escapeHTML(ownerFilter)} <button onclick="window.clearAdvancedFilter('owner')" class="focus-visible:ring-2 focus-visible:ring-amber-500/50 rounded-full outline-none" aria-label="Clear owner filter">×</button></span>`;
                         activeCount++;
                     }
                     if (statusFilter !== 'all') {
-                        html += `<span class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold flex items-center gap-2">Status: ${READING_STATUSES[statusFilter].label} <button onclick="window.clearAdvancedFilter('status')" aria-label="Clear status filter">×</button></span>`;
+                        html += `<span class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold flex items-center gap-2">Status: ${READING_STATUSES[statusFilter].label} <button onclick="window.clearAdvancedFilter('status')" class="focus-visible:ring-2 focus-visible:ring-emerald-500/50 rounded-full outline-none" aria-label="Clear status filter">×</button></span>`;
                         activeCount++;
                     }
                     if (tagFilter) {
-                        html += `<span class="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-[10px] font-bold flex items-center gap-2">Tag: ${escapeHTML(tagFilter)} <button onclick="window.clearAdvancedFilter('tag')" aria-label="Clear tag filter">×</button></span>`;
+                        html += `<span class="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-[10px] font-bold flex items-center gap-2">Tag: ${escapeHTML(tagFilter)} <button onclick="window.clearAdvancedFilter('tag')" class="focus-visible:ring-2 focus-visible:ring-slate-500/50 rounded-full outline-none" aria-label="Clear tag filter">×</button></span>`;
                         activeCount++;
                     }
                     if (advancedFilters.rating !== 'all') {
                         const ratingText = advancedFilters.rating === '0' ? 'Not Rated' : `${advancedFilters.rating}+ Stars`;
-                        html += `<span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-bold flex items-center gap-2">Rating: ${ratingText} <button onclick="window.clearAdvancedFilter('rating')" aria-label="Clear rating filter">×</button></span>`;
+                        html += `<span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-bold flex items-center gap-2">Rating: ${ratingText} <button onclick="window.clearAdvancedFilter('rating')" class="focus-visible:ring-2 focus-visible:ring-amber-500/50 rounded-full outline-none" aria-label="Clear rating filter">×</button></span>`;
                         activeCount++;
                     }
                     if (advancedFilters.minPrice || advancedFilters.maxPrice) {
-                        html += `<span class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold flex items-center gap-2">Price: $${advancedFilters.minPrice || 0} - $${advancedFilters.maxPrice || '∞'} <button onclick="window.clearAdvancedFilter('price')" aria-label="Clear price filter">×</button></span>`;
+                        html += `<span class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold flex items-center gap-2">Price: $${advancedFilters.minPrice || 0} - $${advancedFilters.maxPrice || '∞'} <button onclick="window.clearAdvancedFilter('price')" class="focus-visible:ring-2 focus-visible:ring-emerald-500/50 rounded-full outline-none" aria-label="Clear price filter">×</button></span>`;
                         activeCount++;
                     }
                     if (advancedFilters.startDate || advancedFilters.endDate) {
-                        html += `<span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold flex items-center gap-2">Date Range <button onclick="window.clearAdvancedFilter('date')" aria-label="Clear date filter">×</button></span>`;
+                        html += `<span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold flex items-center gap-2">Date Range <button onclick="window.clearAdvancedFilter('date')" class="focus-visible:ring-2 focus-visible:ring-blue-500/50 rounded-full outline-none" aria-label="Clear date filter">×</button></span>`;
                         activeCount++;
                     }
 
@@ -2139,6 +2139,7 @@
             }
 
             window.setTab = (tab) => {
+                const isSameTab = activeTab === tab;
                 activeTab = tab;
                 // Reset status filter when switching tabs to avoid confusing empty views
                 if (tab !== 'insights') {
@@ -2149,6 +2150,13 @@
 
                 if (tab === 'insights') {
                     attachInsightsListeners();
+                }
+
+                // Micro-UX: Scroll to top when switching tabs
+                if (isSameTab) {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                } else {
+                    window.scrollTo({ top: 0 });
                 }
             };
 
@@ -2381,6 +2389,7 @@
                 else if (type === 'owner') ownerFilter = value;
                 else if (type === 'status') statusFilter = value;
                 renderMainApp();
+                window.scrollTo({ top: 0 }); // Micro-UX: Scroll to top after applying filter
             };
 
             function openAdvancedSearch() {
@@ -2761,7 +2770,7 @@
                                 </div>`
                         }
                             <div class="absolute bottom-2 right-2 flex flex-col items-end gap-1">
-                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status" class="px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase text-white shadow-sm hover:scale-105 active:scale-95 transition-transform ${READING_STATUSES[bookStatus].badge.includes('emerald') ? 'bg-emerald-500' : READING_STATUSES[bookStatus].badge.includes('blue') ? 'bg-blue-500' : 'bg-slate-500'}" title="Quick toggle status">
+                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status" class="px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase text-white shadow-sm hover:scale-105 active:scale-95 transition-transform ${READING_STATUSES[bookStatus].badge.includes('emerald') ? 'bg-emerald-500' : READING_STATUSES[bookStatus].badge.includes('blue') ? 'bg-blue-500' : 'bg-slate-500'} focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none" title="Quick toggle status">
                                     ${READING_STATUSES[bookStatus].label === 'Want to Read' ? 'WTR' : READING_STATUSES[bookStatus].label}
                                 </button>
                             </div>
@@ -2771,7 +2780,7 @@
                         </div>
                         <div class="mt-2 px-1">
                             <h4 class="text-[10px] font-black font-serif truncate leading-tight">${escapedTitle}${book.seriesIndex ? ` <span class="text-[8px] font-black text-slate-400 font-sans not-italic">#${book.seriesIndex}</span>` : ''}</h4>
-                            <button type="button" aria-label="Filter by author: ${escapedAuthor}" class="text-[9px] text-slate-400 truncate w-full text-left block" onclick="event.stopPropagation(); window.setAuthorFilter('${escapeHTML(jsAuthor)}')">${escapedAuthor}</button>
+                            <button type="button" aria-label="Filter by author: ${escapedAuthor}" class="text-[9px] text-slate-400 truncate w-full text-left block hover:text-primary transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setAuthorFilter('${escapeHTML(jsAuthor)}')">${escapedAuthor}</button>
                         </div>
                     </div>
                     `;
@@ -2792,24 +2801,24 @@
                                 <h3 class="font-black text-sm truncate font-serif">${escapedTitle}${book.seriesIndex ? ` <span class="text-[10px] font-black text-slate-400 font-sans not-italic">#${book.seriesIndex}</span>` : ''}</h3>
                                 ${book.borrowedBy ? `<span class="px-2 py-0.5 rounded-full text-[8px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed</span>` : ''}
                             </div>
-                            <button type="button" aria-label="Filter by author: ${escapedAuthor}" class="text-xs text-slate-500 truncate hover:text-blue-500 transition-colors text-left w-full block" onclick="event.stopPropagation(); window.setAuthorFilter('${escapeHTML(jsAuthor)}')">${escapedAuthor}</button>
+                            <button type="button" aria-label="Filter by author: ${escapedAuthor}" class="text-xs text-slate-500 truncate hover:text-blue-500 transition-colors text-left w-full block focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setAuthorFilter('${escapeHTML(jsAuthor)}')">${escapedAuthor}</button>
                             <div class="flex flex-wrap gap-1 mt-1">
                                 ${(book.tags || []).map(tag => {
                                     const eTag = escapeHTML(tag);
                                     const jsTag = tag.replace(/'/g, "\\'");
-                                    return `<button type="button" aria-label="Filter by tag: ${eTag}" onclick="event.stopPropagation(); window.setTagFilter('${escapeHTML(jsTag)}')" class="text-[8px] bg-slate-100 dark:bg-slate-800 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors">${eTag}</button>`;
+                                    return `<button type="button" aria-label="Filter by tag: ${eTag}" onclick="event.stopPropagation(); window.setTagFilter('${escapeHTML(jsTag)}')" class="text-[8px] bg-slate-100 dark:bg-slate-800 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none">${eTag}</button>`;
                                 }).join('')}
                             </div>
                         </div>
                         <div class="text-right flex-shrink-0 flex flex-col items-end">
                             <div class="text-amber-400 text-[10px]">${stars}</div>
                             <div class="text-[10px] font-bold text-blue-600 dark:text-blue-400 mt-1 truncate max-w-[120px]">${escapedGenres}</div>
-                            ${book.owner ? `<button type="button" aria-label="Filter by owner: ${escapeHTML(book.owner)}" class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors text-right block" onclick="event.stopPropagation(); window.setOwnerFilter('${escapeHTML(jsOwner)}')">Owner: ${escapeHTML(book.owner)}</button>` : ''}
+                            ${book.owner ? `<button type="button" aria-label="Filter by owner: ${escapeHTML(book.owner)}" class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors text-right block focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setOwnerFilter('${escapeHTML(jsOwner)}')">Owner: ${escapeHTML(book.owner)}</button>` : ''}
                             <div class="flex items-center gap-2 mt-1">
-                                <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Edit book details">
+                                <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none" aria-label="Edit book details">
                                     <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
-                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status" class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm hover:scale-105 active:scale-95 transition-transform ${READING_STATUSES[bookStatus].badge}" title="Quick toggle status">
+                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status" class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm hover:scale-105 active:scale-95 transition-transform ${READING_STATUSES[bookStatus].badge} focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none" title="Quick toggle status">
                                     ${READING_STATUSES[bookStatus].label}${bookStatus === 'reading' ? ` (${userProgress || 0}%)` : ''}
                                 </button>
                             </div>
@@ -2847,18 +2856,18 @@
                             </div>
                             <h3 class="font-black text-lg leading-tight line-clamp-2 mt-1 group-hover:text-blue-600 transition-colors font-serif italic">${escapedTitle}${book.seriesIndex ? ` <span class="text-xs font-black text-slate-400 font-sans not-italic">#${book.seriesIndex}</span>` : ''}</h3>
                             <div class="flex justify-between items-center gap-2">
-                                <button type="button" aria-label="Filter by author: ${escapedAuthor}" class="text-sm text-slate-500 dark:text-slate-400 mt-1 truncate font-medium hover:text-blue-500 transition-colors text-left" onclick="event.stopPropagation(); window.setAuthorFilter('${escapeHTML(jsAuthor)}')">${escapedAuthor}</button>
-                                ${book.owner ? `<button type="button" aria-label="Filter by owner: ${escapeHTML(book.owner)}" class="text-[10px] text-slate-400 font-medium truncate hover:text-blue-500 transition-colors text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${escapeHTML(jsOwner)}')">Owner: ${escapeHTML(book.owner)}</button>` : ''}
+                                <button type="button" aria-label="Filter by author: ${escapedAuthor}" class="text-sm text-slate-500 dark:text-slate-400 mt-1 truncate font-medium hover:text-blue-500 transition-colors text-left focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setAuthorFilter('${escapeHTML(jsAuthor)}')">${escapedAuthor}</button>
+                                ${book.owner ? `<button type="button" aria-label="Filter by owner: ${escapeHTML(book.owner)}" class="text-[10px] text-slate-400 font-medium truncate hover:text-blue-500 transition-colors text-right focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setOwnerFilter('${escapeHTML(jsOwner)}')">Owner: ${escapeHTML(book.owner)}</button>` : ''}
                             </div>
                             <div class="flex flex-wrap gap-1 mt-2">
                                 ${(book.tags || []).map(tag => {
                                     const eTag = escapeHTML(tag);
                                     const jsTag = tag.replace(/'/g, "\\'");
-                                    return `<button type="button" aria-label="Filter by tag: ${eTag}" onclick="event.stopPropagation(); window.setTagFilter('${escapeHTML(jsTag)}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors">${eTag}</button>`;
+                                    return `<button type="button" aria-label="Filter by tag: ${eTag}" onclick="event.stopPropagation(); window.setTagFilter('${escapeHTML(jsTag)}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded">${eTag}</button>`;
                                 }).join('')}
                             </div>
                             <div class="mt-2 flex flex-wrap gap-1">
-                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status" class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm hover:scale-105 active:scale-95 transition-transform ${READING_STATUSES[bookStatus].badge}" title="Quick toggle status">
+                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status" class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm hover:scale-105 active:scale-95 transition-transform ${READING_STATUSES[bookStatus].badge} focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none" title="Quick toggle status">
                                     ${READING_STATUSES[bookStatus].label}${bookStatus === 'reading' ? ` (${userProgress || 0}%)` : ''}
                                 </button>
                                 ${book.borrowedBy ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed by ${escapeHTML(book.borrowedBy)}</div>` : ''}
