@@ -27,3 +27,7 @@
 ## 2026-03-24 - [Aesthetic Placeholders & Standardized Async Feedback]
 **Learning:** Generic "No Cover" text placeholders detract from the premium feel of a book-focused app. Using serif fonts and background gradients for placeholders maintains the visual rhythm of the library grid. Additionally, consistent "Saving..." states on all settings buttons (profile, AI, sharing) reduces user anxiety during network-bound operations.
 **Action:** For missing media, use stylized CSS placeholders that include semantic text (like the item title). Implement a standard "disable + text-swap" pattern for all buttons triggering async Firestore/AI operations.
+
+## 2026-03-25 - [Contextual Empty States & ARIA Progress Indicators]
+**Learning:** Generic empty states are missed opportunities for user guidance. In a social/shared library app, the "Activity" feed is useless without partners; providing a direct CTA to "Invite Collaborator" (Settings) converts a "dead end" into a helpful prompt. Additionally, visual charts (bars/rings) are invisible to screen readers without `role="progressbar"` and standard `aria-` value attributes.
+**Action:** Always check if an empty state's root cause can be solved by a specific action and provide a direct CTA. Ensure all visual data representations have semantic ARIA roles and labels to maintain data accessibility.
