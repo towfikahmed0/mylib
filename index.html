@@ -293,7 +293,7 @@
     <div id="app" class="min-h-screen flex flex-col"></div>
 
     <!-- Back to Top Button -->
-    <button id="back-to-top" class="fixed bottom-24 left-6 z-40 w-12 h-12 bg-white dark:bg-slate-800 text-primary rounded-full shadow-2xl flex items-center justify-center opacity-0 translate-y-10 pointer-events-none transition-all hover:scale-110 active:scale-95 border border-slate-200 dark:border-slate-700 md:bottom-8" aria-label="Back to top">
+    <button id="back-to-top" class="fixed bottom-24 left-6 z-40 w-12 h-12 bg-white dark:bg-slate-800 text-primary rounded-full shadow-2xl flex items-center justify-center opacity-0 translate-y-10 pointer-events-none transition-all hover:scale-110 active:scale-95 border border-slate-200 dark:border-slate-700 md:bottom-8 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" aria-label="Back to top">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7"/></svg>
     </button>
 
@@ -1325,13 +1325,13 @@
                                 <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'activity' ? 'bg-white dark:bg-slate-700 shadow-[0_8px_16px_rgba(var(--primary-rgb),0.15)] text-primary ring-2 ring-[rgba(var(--primary-rgb),0.1)]' : 'text-slate-500 hover:text-slate-700'}">Activity</button>
                             </nav>
                             <div class="flex items-center gap-1">
-                                <button id="manual-add-btn" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500" title="Add Book Manually" aria-label="Add Book Manually">
+                                <button id="manual-add-btn" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" title="Add Book Manually" aria-label="Add Book Manually">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                 </button>
-                                <button id="settings-btn" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500" title="Settings" aria-label="Settings">
+                                <button id="settings-btn" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" title="Settings" aria-label="Settings">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                 </button>
-                                <button id="scan-btn" class="bg-primary hover:opacity-90 text-white px-5 py-2.5 rounded-full text-sm font-bold flex items-center gap-2 transition-all shadow-md active:scale-95 ml-1" aria-label="Scan QR or Barcode" title="Scan QR or Barcode">
+                                <button id="scan-btn" class="bg-primary hover:opacity-90 text-white px-5 py-2.5 rounded-full text-sm font-bold flex items-center gap-2 transition-all shadow-md active:scale-95 ml-1 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" aria-label="Scan QR or Barcode" title="Scan QR or Barcode">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                     <span class="hidden lg:inline">Scan</span>
                                 </button>
@@ -1393,8 +1393,8 @@
                         <div id="bulk-actions-bar" class="mb-6 hidden animate-slide-up">
                             <div class="glass p-4 rounded-2xl border border-blue-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-4">
                                 <div class="flex items-center gap-3">
-                                    <span id="selected-count" class="text-sm font-black text-blue-600 px-3 py-1 bg-blue-100 dark:bg-blue-900/50 rounded-lg">0 Selected</span>
-                                    <button onclick="window.clearSelection()" class="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase">Clear</button>
+                                    <span id="selected-count" aria-live="polite" class="text-sm font-black text-blue-600 px-3 py-1 bg-blue-100 dark:bg-blue-900/50 rounded-lg">0 Selected</span>
+                                    <button onclick="window.clearSelection()" class="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 rounded">Clear</button>
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <select id="bulk-genre" class="bg-slate-100 dark:bg-slate-800 rounded-lg text-[10px] font-bold px-3 py-2 outline-none">
@@ -2326,6 +2326,22 @@
                     });
                 } else {
                     showToast('Clipboard API not supported', 'error');
+                }
+            };
+
+            window.shareBook = (title, author, btn) => {
+                const text = `${title} by ${author}`;
+                if (navigator.share) {
+                    navigator.share({ title, text }).catch(err => console.log('Share failed:', err));
+                } else if (navigator.clipboard) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        showToast('Book info copied to clipboard!', 'success');
+                        if (btn) {
+                            const originalHTML = btn.innerHTML;
+                            btn.innerHTML = '<svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>';
+                            setTimeout(() => { btn.innerHTML = originalHTML; }, 2000);
+                        }
+                    });
                 }
             };
 
@@ -4520,7 +4536,7 @@
                                 <p class="text-2xl text-slate-500 dark:text-slate-400 mt-2 font-medium italic">${escapeHTML(book.author)}</p>
                                 <div class="flex items-center gap-4 mt-6 justify-center md:justify-start">
                                     <div class="text-amber-400 text-2xl">${stars}</div>
-                                    ${averageRating ? `<span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-lg text-xs font-black">Avg: ${averageRating} ★</span>` : ''}
+                                    ${averageRating ? `<span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-lg text-xs font-black">Avg: ${averageRating} ★ ${book.ratingCount ? `(${book.ratingCount} reviews)` : ''}</span>` : ''}
                                 </div>
 
                                 ${book.about ? `
@@ -4537,7 +4553,7 @@
                                     <div class="bg-blue-50/50 dark:bg-slate-800/40 p-5 rounded-2xl border border-blue-100/50 dark:border-slate-700"><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Purchased</p><p class="text-2xl font-black font-serif">${book.purchaseDate ? new Date(book.purchaseDate).toLocaleDateString() : '—'}</p></div>
                                 </div>
 
-                                ${book.isbn ? `<div class="mt-8 px-1 flex items-center justify-between"><div class="flex-1"><label for="detail-isbn" class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">ISBN</label><p id="detail-isbn" class="text-sm font-mono tracking-wider">${book.isbn}</p></div><button onclick="window.copyISBN('${book.isbn.replace(/'/g, "\\'")}', this)" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-primary" title="Copy ISBN" aria-label="Copy ISBN"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg></button></div>` : ''}
+                                ${book.isbn ? `<div class="mt-8 px-1 flex items-center justify-between"><div class="flex-1"><label for="detail-isbn" class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">ISBN</label><p id="detail-isbn" class="text-sm font-mono tracking-wider">${book.isbn}</p></div><div class="flex gap-2"><button onclick="window.shareBook('${escapeHTML(book.title.replace(/'/g, "\\'"))}', '${escapeHTML(book.author.replace(/'/g, "\\'"))}', this)" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-primary focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" title="Share Book" aria-label="Share Book"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg></button><button onclick="window.copyISBN('${book.isbn.replace(/'/g, "\\'")}', this)" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-primary focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" title="Copy ISBN" aria-label="Copy ISBN"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg></button></div></div>` : ''}
                                 <div class="mt-6 px-1">
                                     <label for="detail-status-select" class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">My Reading Status</label>
                                     <div class="flex flex-col sm:flex-row gap-4">
