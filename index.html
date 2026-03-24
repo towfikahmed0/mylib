@@ -468,6 +468,27 @@
                 }
             });
             let viewMode = localStorage.getItem('mylib_viewMode') || 'grid';
+            // Helper to update card visual state without full re-render
+            const updateCardUI = (card, isSelected) => {
+                const checkbox = card.querySelector('input[type="checkbox"]');
+                if (checkbox) checkbox.checked = isSelected;
+
+                if (viewMode === 'list') {
+                    card.classList.toggle('border-blue-500', isSelected);
+                    card.classList.toggle('ring-2', isSelected);
+                    card.classList.toggle('ring-blue-500/20', isSelected);
+                    card.classList.toggle('shadow-lg', isSelected);
+                    card.classList.toggle('border-blue-100/50', !isSelected);
+                    card.classList.toggle('dark:border-slate-800', !isSelected);
+                } else if (viewMode === 'grid') {
+                    card.classList.toggle('border-primary', isSelected);
+                    card.classList.toggle('ring-4', isSelected);
+                    card.classList.toggle('ring-primary/10', isSelected);
+                    card.classList.toggle('shadow-xl', isSelected);
+                    card.classList.toggle('border-blue-100/50', !isSelected);
+                    card.classList.toggle('dark:border-slate-800', !isSelected);
+                }
+            };
             // Performance optimization: cache frequently accessed preferences in IIFE scope and initialize collator
             const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
             let cardDensity = localStorage.getItem('mylib_density') || 'normal';
@@ -1474,9 +1495,18 @@
             }
 
             window.clearSelection = () => {
+                // Performance optimization: Targeted DOM reset instead of full library re-render
+                // Impact: Reduces CPU time from O(TemplateCost * N) to O(ClassUpdateCost * N)
                 selectedBookIds.clear();
-                if (document.getElementById('bulk-actions-bar')) {
-                    renderLibraryOnly();
+
+                // Reset all visible book card states
+                document.querySelectorAll('.book-card').forEach(card => updateCardUI(card, false));
+
+                const bulkBar = document.getElementById('bulk-actions-bar');
+                if (bulkBar) {
+                    bulkBar.classList.add('hidden');
+                    const countEl = document.getElementById('selected-count');
+                    if (countEl) countEl.innerText = `0 Selected`;
                 }
             };
 
@@ -2340,9 +2370,22 @@
             window.setAccent(localStorage.getItem('mylib_accent') || 'blue');
 
             window.toggleSelection = (id) => {
-                if (selectedBookIds.has(id)) selectedBookIds.delete(id);
-                else selectedBookIds.add(id);
-                renderLibraryOnly();
+                // Performance optimization: Targeted DOM update instead of full library re-render
+                // Impact: Reduces CPU time from O(N) to O(1) during bulk selection
+                const isNowSelected = !selectedBookIds.has(id);
+                if (isNowSelected) selectedBookIds.add(id);
+                else selectedBookIds.delete(id);
+
+                const cards = document.querySelectorAll(`.book-card[data-book-id="${id}"]`);
+                cards.forEach(card => updateCardUI(card, isNowSelected));
+
+                // Update bulk actions bar directly
+                const bulkBar = document.getElementById('bulk-actions-bar');
+                if (bulkBar) {
+                    bulkBar.classList.toggle('hidden', selectedBookIds.size === 0);
+                    const countEl = document.getElementById('selected-count');
+                    if (countEl) countEl.innerText = `${selectedBookIds.size} Selected`;
+                }
             };
 
             window.clearAdvancedFilter = (type) => {
