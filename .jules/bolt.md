@@ -15,7 +15,3 @@
 ## 2025-05-14 - [The Attribute Escaping Trap]
 **Learning:** Escaping strings for HTML attributes that contain JavaScript (like `onclick`) is tricky. Standard HTML escaping (`'` to `&#39;`) breaks JavaScript's ability to handle apostrophes in string literals.
 **Action:** Always escape single quotes for JavaScript (replace `'` with `\'`) *before* wrapping the entire string in `escapeHTML()` when injecting data into `onclick` handlers.
-
-## 2025-05-14 - [Normalization as a Render Optimizer]
-**Learning:** In vanilla JS SPAs with large lists, the cost of string processing (escaping, regex) within the render loop can be significant. Moving this work to the data ingestion phase (normalization) makes each render significantly faster and more predictable.
-**Action:** Pre-calculate all escaped strings and static UI properties during book normalization so the render function only handles HTML construction.
