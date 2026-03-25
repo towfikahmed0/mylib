@@ -35,3 +35,7 @@
 ## 2026-03-24 - [Shortcut Scroll-to-Top & Universal Focus Feedback]
 **Learning:** In long-scrolling single-page libraries, users often get "lost" deep in a list. Implementing a "shortcut" where clicking an already-active tab triggers a smooth scroll-to-top (mirroring mobile OS patterns) provides a fast way to reset the view. Additionally, interactive text triggers (like author/genre filters) are often invisible to keyboard users; adding standardized 'focus-visible' rings across all such micro-interactions is critical for a truly accessible experience.
 **Action:** Always implement a "click active tab to scroll top" pattern in navigation. Ensure all secondary interactive elements (tags, metadata links, clear buttons) have high-visibility focus states that match the app's primary accent color.
+
+## 2026-03-26 - [Suggested Prompts & Interaction Discovery]
+**Learning:** In conversational AI interfaces, users often don't know where to start. Adding "Suggested Prompts" (Quick Actions) in the initial greeting significantly improves feature discovery and interaction speed. Implementing these as semantic buttons that programmatically trigger the main form's 'submit' event maintains a single source of truth for chat logic while providing a delightful "one-tap" experience.
+**Action:** For all AI-driven or complex search interfaces, provide 3-5 high-value suggested actions as immediate interaction triggers. Ensure these suggestions are context-aware and clean up after the first interaction to maintain a focused workspace.

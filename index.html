@@ -436,11 +436,26 @@
             // Performance optimization: Pre-normalize book data to avoid redundant work during renders
             function normalizeBook(id, data) {
                 const genres = Array.isArray(data.categories) ? data.categories : (data.category ? [data.category] : GENRE_FALLBACK);
+                const title = data.title || 'Untitled';
+                const author = data.author || 'Unknown';
+                const owner = data.owner || '';
+
+                // Pre-calculate escaped strings to minimize per-render overhead
+                const escTitle = escapeHTML(title);
+                const escAuthor = escapeHTML(author);
+                const jsAuthor = author.replace(/'/g, "\\'");
+                const jsOwner = owner.replace(/'/g, "\\'");
+
                 return {
                     id,
                     ...data,
                     _genres: genres,
-                    _searchBlob: `${data.title || ''} ${data.author || ''} ${genres.join(' ')} ${data.isbn || ''} ${(data.tags || []).join(' ')}`.toLowerCase(),
+                    _escTitle: escTitle,
+                    _escAuthor: escAuthor,
+                    _escGenres: genres.map(g => escapeHTML(g)).join(', '),
+                    _escJsAuthor: escapeHTML(jsAuthor),
+                    _escJsOwner: escapeHTML(jsOwner),
+                    _searchBlob: `${title} ${author} ${genres.join(' ')} ${data.isbn || ''} ${(data.tags || []).join(' ')}`.toLowerCase(),
                     _createdTime: data.createdAt?.toMillis() || 0,
                     _purchaseTime: data.purchaseDate ? new Date(data.purchaseDate).getTime() : 0
                 };
@@ -1760,17 +1775,17 @@
                                     ${readingBooks.map(book => {
                             const progress = getStatusData(book.id).progress || 0;
                             return `
-                                            <div class="book-card flex-shrink-0 w-64 glass p-4 rounded-[2rem] border border-blue-100/50 dark:border-slate-800 snap-start cursor-pointer hover:shadow-lg transition-all focus-visible:ring-4 focus-visible:ring-primary/50" data-book-id="${book.id}" role="button" tabindex="0" aria-label="View details for ${escapeHTML(book.title)} by ${escapeHTML(book.author || 'Unknown')}">
+                                            <div class="book-card flex-shrink-0 w-64 glass p-4 rounded-[2rem] border border-blue-100/50 dark:border-slate-800 snap-start cursor-pointer hover:shadow-lg transition-all focus-visible:ring-4 focus-visible:ring-primary/50" data-book-id="${book.id}" role="button" tabindex="0" aria-label="View details for ${book._escTitle} by ${book._escAuthor}">
                                                 <div class="flex gap-3">
                                                     <div class="w-16 h-24 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 shadow-sm relative">
-                                                        ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover" alt="Cover for ${escapeHTML(book.title)}" loading="lazy" decoding="async">` : `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 text-blue-300 dark:text-slate-500 p-2 text-center leading-tight"><span class="text-[8px] font-black uppercase font-serif italic line-clamp-3">${escapeHTML(book.title)}</span></div>`}
+                                                        ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover" alt="Cover for ${book._escTitle}" loading="lazy" decoding="async">` : `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 text-blue-300 dark:text-slate-500 p-2 text-center leading-tight"><span class="text-[8px] font-black uppercase font-serif italic line-clamp-3">${book._escTitle}</span></div>`}
                                                         <div class="absolute bottom-0 left-0 right-0 h-1 bg-slate-200/50">
                                                             <div class="h-full bg-blue-500" style="width: ${progress}%"></div>
                                                         </div>
                                                     </div>
                                                     <div class="flex-1 min-w-0 flex flex-col justify-center">
-                                                        <h3 class="font-black text-xs truncate leading-tight">${book.title}</h3>
-                                                        <p class="text-[10px] text-slate-500 truncate mt-1">${book.author}</p>
+                                                        <h3 class="font-black text-xs truncate leading-tight">${book._escTitle}</h3>
+                                                        <p class="text-[10px] text-slate-500 truncate mt-1">${book._escAuthor}</p>
                                                         <div class="mt-3">
                                                             <div class="flex justify-between items-center mb-1">
                                                                 <span class="text-[9px] font-black text-blue-600">${progress}%</span>
@@ -1877,7 +1892,9 @@
                     // Hoist container class calculation out of section template literals
                     const containerClass = viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3';
 
-                    let html = `<div class="${containerClass}">${filteredBooks.map(book => renderBookCard(book)).join('')}</div>`;
+                    // Optimization: Hoist current timestamp outside of map loop to minimize system clock calls
+                    const now = Date.now();
+                    let html = `<div class="${containerClass}">${filteredBooks.map(book => renderBookCard(book, now)).join('')}</div>`;
 
                     // Empty state
                     if (filteredBooks.length === 0) {
@@ -2783,7 +2800,7 @@
             }
 
             // Helper to render a single book card
-            function renderBookCard(book) {
+            function renderBookCard(book, now) {
                 const statusData = getStatusData(book.id);
                 const bookStatus = statusData.status;
                 const userRating = statusData.rating;
@@ -2793,7 +2810,6 @@
                 const stars = STAR_CACHE[displayRating] || '';
 
                 const isSelected = selectedBookIds.has(book.id);
-                const bookGenres = getBookGenres(book);
 
                 let ownerName = book.owner;
                 if (!ownerName && book.userId !== currentUser.uid) {
@@ -2810,15 +2826,12 @@
                     return '';
                 }).join('');
 
-                // Optimization: Pre-escape frequently used fields
-                const escapedTitle = escapeHTML(book.title);
-                const escapedAuthor = escapeHTML(book.author || 'Unknown');
-                const escapedGenres = bookGenres.map(g => escapeHTML(g)).join(', ');
+                // Performance Optimization: Use pre-calculated escaped fields
+                const escapedTitle = book._escTitle;
+                const escapedAuthor = book._escAuthor;
+                const escapedGenres = book._escGenres;
 
-                // Helpers for safe attribute injection
-                const jsAuthor = (book.author || 'Unknown').replace(/'/g, "\\'");
-                const jsOwner = (book.owner || '').replace(/'/g, "\\'");
-                const isNew = book._createdTime > (Date.now() - 30 * 24 * 60 * 60 * 1000);
+                const isNew = book._createdTime > (now - 30 * 24 * 60 * 60 * 1000);
                 const newBadge = isNew ? `<div class="absolute top-2 left-2 z-30 px-2 py-0.5 rounded-full text-[8px] font-black uppercase text-white bg-blue-500 shadow-lg ring-1 ring-white/20">New</div>` : '';
 
                 if (viewMode === 'compact') {
@@ -2844,7 +2857,7 @@
                         </div>
                         <div class="mt-2 px-1">
                             <h4 class="text-[10px] font-black font-serif truncate leading-tight">${escapedTitle}${book.seriesIndex ? ` <span class="text-[8px] font-black text-slate-400 font-sans not-italic">#${book.seriesIndex}</span>` : ''}</h4>
-                            <button type="button" aria-label="Filter by author: ${escapedAuthor}" class="text-[9px] text-slate-400 truncate w-full text-left block hover:text-primary transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setAuthorFilter('${escapeHTML(jsAuthor)}')">${escapedAuthor}</button>
+                            <button type="button" aria-label="Filter by author: ${escapedAuthor}" class="text-[9px] text-slate-400 truncate w-full text-left block hover:text-primary transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setAuthorFilter('${book._escJsAuthor}')">${escapedAuthor}</button>
                         </div>
                     </div>
                     `;
@@ -2865,7 +2878,7 @@
                                 <h3 class="font-black text-sm truncate font-serif">${escapedTitle}${book.seriesIndex ? ` <span class="text-[10px] font-black text-slate-400 font-sans not-italic">#${book.seriesIndex}</span>` : ''}</h3>
                                 ${book.borrowedBy ? `<span class="px-2 py-0.5 rounded-full text-[8px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed</span>` : ''}
                             </div>
-                            <button type="button" aria-label="Filter by author: ${escapedAuthor}" class="text-xs text-slate-500 truncate hover:text-blue-500 transition-colors text-left w-full block focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setAuthorFilter('${escapeHTML(jsAuthor)}')">${escapedAuthor}</button>
+                            <button type="button" aria-label="Filter by author: ${escapedAuthor}" class="text-xs text-slate-500 truncate hover:text-blue-500 transition-colors text-left w-full block focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setAuthorFilter('${book._escJsAuthor}')">${escapedAuthor}</button>
                             <div class="flex flex-wrap gap-1 mt-1">
                                 ${(book.tags || []).map(tag => {
                                     const eTag = escapeHTML(tag);
@@ -2877,7 +2890,7 @@
                         <div class="text-right flex-shrink-0 flex flex-col items-end">
                             <div class="text-amber-400 text-[10px]">${stars}</div>
                             <div class="text-[10px] font-bold text-blue-600 dark:text-blue-400 mt-1 truncate max-w-[120px]">${escapedGenres}</div>
-                            ${book.owner ? `<button type="button" aria-label="Filter by owner: ${escapeHTML(book.owner)}" class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors text-right block focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setOwnerFilter('${escapeHTML(jsOwner)}')">Owner: ${escapeHTML(book.owner)}</button>` : ''}
+                            ${book.owner ? `<button type="button" aria-label="Filter by owner: ${escapeHTML(book.owner)}" class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors text-right block focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setOwnerFilter('${book._escJsOwner}')">Owner: ${escapeHTML(book.owner)}</button>` : ''}
                             <div class="flex items-center gap-2 mt-1">
                                 <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none" aria-label="Edit book details">
                                     <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
@@ -2915,13 +2928,13 @@
                     <div class="flex-1 flex flex-col justify-between overflow-hidden py-1">
                         <div>
                             <div class="flex justify-between items-start gap-2">
-                                <span class="text-[9px] font-black uppercase tracking-widest text-primary truncate max-w-[150px]">${bookGenres.join(', ')}</span>
+                                <span class="text-[9px] font-black uppercase tracking-widest text-primary truncate max-w-[150px]">${escapedGenres}</span>
                                 <div class="text-amber-400 text-[10px] tracking-tighter">${stars}${book.averageRating ? `<span class="ml-1 text-slate-400">(${book.averageRating.toFixed(1)})</span>` : ''}</div>
                             </div>
                             <h3 class="font-black text-lg leading-tight line-clamp-2 mt-1 group-hover:text-blue-600 transition-colors font-serif italic">${escapedTitle}${book.seriesIndex ? ` <span class="text-xs font-black text-slate-400 font-sans not-italic">#${book.seriesIndex}</span>` : ''}</h3>
                             <div class="flex justify-between items-center gap-2">
-                                <button type="button" aria-label="Filter by author: ${escapedAuthor}" class="text-sm text-slate-500 dark:text-slate-400 mt-1 truncate font-medium hover:text-blue-500 transition-colors text-left focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setAuthorFilter('${escapeHTML(jsAuthor)}')">${escapedAuthor}</button>
-                                ${book.owner ? `<button type="button" aria-label="Filter by owner: ${escapeHTML(book.owner)}" class="text-[10px] text-slate-400 font-medium truncate hover:text-blue-500 transition-colors text-right focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setOwnerFilter('${escapeHTML(jsOwner)}')">Owner: ${escapeHTML(book.owner)}</button>` : ''}
+                                <button type="button" aria-label="Filter by author: ${escapedAuthor}" class="text-sm text-slate-500 dark:text-slate-400 mt-1 truncate font-medium hover:text-blue-500 transition-colors text-left focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setAuthorFilter('${book._escJsAuthor}')">${escapedAuthor}</button>
+                                ${book.owner ? `<button type="button" aria-label="Filter by owner: ${escapeHTML(book.owner)}" class="text-[10px] text-slate-400 font-medium truncate hover:text-blue-500 transition-colors text-right focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setOwnerFilter('${book._escJsOwner}')">Owner: ${escapeHTML(book.owner)}</button>` : ''}
                             </div>
                             <div class="flex flex-wrap gap-1 mt-2">
                                 ${(book.tags || []).map(tag => {
@@ -4088,6 +4101,12 @@
             const chatForm = document.getElementById('ai-chat-form');
             const chatInput = document.getElementById('ai-chat-input');
             const chatMessages = document.getElementById('ai-chat-messages');
+
+            window.sendAIChat = (text) => {
+                if (!chatInput || !chatForm) return;
+                chatInput.value = text;
+                chatForm.dispatchEvent(new Event('submit'));
+            };
 
             // Back to Top Logic
             const backToTopBtn = document.getElementById('back-to-top');
