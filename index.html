@@ -326,9 +326,9 @@
                 <div class="bg-violet-50 dark:bg-violet-900/20 p-4 rounded-2xl rounded-tl-none border border-violet-100 dark:border-violet-900/30">
                     <p class="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">Hello! I'm your AI Librarian. Ask me anything about your collection or for a recommendation!</p>
                     <div id="ai-suggestions" class="mt-4 flex flex-wrap gap-2">
-                        <button type="button" onclick="window.sendAIChat('What should I read next?')" class="px-3 py-1.5 bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-700 rounded-xl text-[10px] font-bold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/40 transition-all shadow-sm">What should I read next?</button>
-                        <button type="button" onclick="window.sendAIChat('Summarize my library')" class="px-3 py-1.5 bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-700 rounded-xl text-[10px] font-bold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/40 transition-all shadow-sm">Summarize my library</button>
-                        <button type="button" onclick="window.sendAIChat('Recommend a classic')" class="px-3 py-1.5 bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-700 rounded-xl text-[10px] font-bold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/40 transition-all shadow-sm">Recommend a classic</button>
+                        <button type="button" onclick="window.sendAIChat('Recommend a book from my library')" class="px-3 py-1.5 bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-800 rounded-xl text-[10px] font-bold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all">Recommend a book</button>
+                        <button type="button" onclick="window.sendAIChat('What are my top genres?')" class="px-3 py-1.5 bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-800 rounded-xl text-[10px] font-bold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all">My top genres</button>
+                        <button type="button" onclick="window.sendAIChat('Summarize my collection')" class="px-3 py-1.5 bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-800 rounded-xl text-[10px] font-bold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all">Summarize collection</button>
                     </div>
                 </div>
             </div>
@@ -4151,13 +4151,23 @@
             chatToggle.addEventListener('click', () => window.toggleAIChat(chatWindow.classList.contains('opacity-0')));
             chatClose.addEventListener('click', () => window.toggleAIChat(false));
 
+            window.sendAIChat = (text) => {
+                const input = document.getElementById('ai-chat-input');
+                const form = document.getElementById('ai-chat-form');
+                if (input && form) {
+                    input.value = text;
+                    form.dispatchEvent(new Event('submit'));
+                }
+            };
+
             chatForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const query = chatInput.value.trim();
                 if (!query) return;
 
-                // Remove suggestions on first interaction
-                document.getElementById('ai-suggestions')?.remove();
+                // Clear suggestions on first interaction
+                const suggestions = document.getElementById('ai-suggestions');
+                if (suggestions) suggestions.remove();
 
                 // Add user message
                 const userMsg = document.createElement('div');
