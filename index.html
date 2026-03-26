@@ -2383,16 +2383,19 @@
             window.setTagFilter = (tag) => {
                 tagFilter = tag;
                 renderMainApp();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
             window.setAuthorFilter = (author) => {
                 authorFilter = author;
                 renderMainApp();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
             window.setOwnerFilter = (owner) => {
                 ownerFilter = owner;
                 renderMainApp();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
             window.setTheme = (theme) => {
