@@ -15,7 +15,3 @@
 ## 2025-05-14 - [The Attribute Escaping Trap]
 **Learning:** Escaping strings for HTML attributes that contain JavaScript (like `onclick`) is tricky. Standard HTML escaping (`'` to `&#39;`) breaks JavaScript's ability to handle apostrophes in string literals.
 **Action:** Always escape single quotes for JavaScript (replace `'` with `\'`) *before* wrapping the entire string in `escapeHTML()` when injecting data into `onclick` handlers.
-
-## 2025-05-14 - [Pre-calculating UI Strings]
-**Learning:** In a high-frequency rendering path (like a search-as-you-type library view), looking up badge classes and labels from a constant mapping inside the template literal adds up. Pre-calculating these "UI strings" during the data ingestion/cache phase allows the renderer to simply perform string interpolation without any logic checks or object lookups.
-**Action:** Move all status-to-UI mappings into the `_cache` object during `updateLibraryCache` to ensure the `renderBookCard` function remains a pure, logic-less template.
