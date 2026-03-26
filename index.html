@@ -452,7 +452,6 @@
                     _genres: genres,
                     _escTitle: escTitle,
                     _escAuthor: escAuthor,
-                    _escBorrowedBy: data.borrowedBy ? escapeHTML(data.borrowedBy) : '',
                     _escGenres: genres.map(g => escapeHTML(g)).join(', '),
                     _escJsAuthor: escapeHTML(jsAuthor),
                     _escJsOwner: escapeHTML(jsOwner),
@@ -1902,10 +1901,9 @@
                     // Hoist container class calculation out of section template literals
                     const containerClass = viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3';
 
-                    // Optimization: Hoist current timestamp and density class outside of map loop
+                    // Optimization: Hoist current timestamp outside of map loop to minimize system clock calls
                     const now = Date.now();
-                    const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
-                    let html = `<div class="${containerClass}">${filteredBooks.map(book => renderBookCard(book, now, densityClass)).join('')}</div>`;
+                    let html = `<div class="${containerClass}">${filteredBooks.map(book => renderBookCard(book, now)).join('')}</div>`;
 
                     // Empty state
                     if (filteredBooks.length === 0) {
@@ -2820,7 +2818,6 @@
                         return '';
                     }).join('');
 
-                    const sInfo = READING_STATUSES[status] || READING_STATUSES.want_to_read;
                     b._cache = {
                         status,
                         rating: statusData.rating,
@@ -2828,11 +2825,7 @@
                         stars: STAR_CACHE[displayRating] || '',
                         escAvgRatingHtml: b.averageRating ? `<span class="ml-1 text-slate-400">(${b.averageRating.toFixed(1)})</span>` : '',
                         addedByBadge: ownerName ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">${escapeHTML(ownerName)}'s Book</div>` : '',
-                        partnerReadingInfo,
-                        statusLabel: sInfo.label,
-                        compactStatusLabel: (status === 'want_to_read' || status === 'unread') ? 'WTR' : sInfo.label,
-                        statusBadge: sInfo.badge,
-                        statusColor: sInfo.badge.includes('emerald') ? 'bg-emerald-500' : sInfo.badge.includes('blue') ? 'bg-blue-500' : 'bg-slate-500'
+                        partnerReadingInfo
                     };
                 });
 
@@ -2845,7 +2838,7 @@
             }
 
             // Helper to render a single book card
-            function renderBookCard(book, now, densityClass) {
+            function renderBookCard(book, now) {
                 const isSelected = selectedBookIds.has(book.id);
 
                 // Performance Optimization: Use pre-calculated escaped and cached fields
@@ -2870,8 +2863,8 @@
                                 </div>`
                         }
                             <div class="absolute bottom-2 right-2 flex flex-col items-end gap-1">
-                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status" class="px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase text-white shadow-sm hover:scale-105 active:scale-95 transition-transform ${cache.statusColor} focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none" title="Quick toggle status">
-                                    ${cache.compactStatusLabel}
+                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status" class="px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase text-white shadow-sm hover:scale-105 active:scale-95 transition-transform ${READING_STATUSES[cache.status].badge.includes('emerald') ? 'bg-emerald-500' : READING_STATUSES[cache.status].badge.includes('blue') ? 'bg-blue-500' : 'bg-slate-500'} focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none" title="Quick toggle status">
+                                    ${READING_STATUSES[cache.status].label === 'Want to Read' ? 'WTR' : READING_STATUSES[cache.status].label}
                                 </button>
                             </div>
                             <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
@@ -2916,8 +2909,8 @@
                                 <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" aria-label="Edit book details">
                                     <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
-                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status" class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm hover:scale-105 active:scale-95 transition-transform ${cache.statusBadge} focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none" title="Quick toggle status">
-                                    ${cache.statusLabel}${cache.status === 'reading' ? ` (${cache.progress || 0}%)` : ''}
+                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status" class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm hover:scale-105 active:scale-95 transition-transform ${READING_STATUSES[cache.status].badge} focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none" title="Quick toggle status">
+                                    ${READING_STATUSES[cache.status].label}${cache.status === 'reading' ? ` (${cache.progress || 0}%)` : ''}
                                 </button>
                             </div>
                         </div>
@@ -2925,6 +2918,7 @@
                 `;
                 }
 
+                const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
                 return `
                 <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-blue-100/50 dark:border-slate-800'} relative ${densityClass} focus-visible:ring-4 focus-visible:ring-primary/50" data-book-id="${book.id}" tabindex="0" role="button" aria-label="View details for ${escapedTitle} by ${escapedAuthor}">
                     <div class="absolute top-4 left-4 z-20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
@@ -2962,10 +2956,10 @@
                                 }).join('')}
                             </div>
                             <div class="mt-2 flex flex-wrap gap-1">
-                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status" class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm hover:scale-105 active:scale-95 transition-transform ${cache.statusBadge} focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none" title="Quick toggle status">
-                                    ${cache.statusLabel}${cache.status === 'reading' ? ` (${cache.progress || 0}%)` : ''}
+                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status" class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm hover:scale-105 active:scale-95 transition-transform ${READING_STATUSES[cache.status].badge} focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none" title="Quick toggle status">
+                                    ${READING_STATUSES[cache.status].label}${cache.status === 'reading' ? ` (${cache.progress || 0}%)` : ''}
                                 </button>
-                                ${book.borrowedBy ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed by ${book._escBorrowedBy}</div>` : ''}
+                                ${book.borrowedBy ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed by ${escapeHTML(book.borrowedBy)}</div>` : ''}
                                 ${cache.addedByBadge}
                             </div>
                             ${cache.partnerReadingInfo ? `<div class="mt-2 space-y-1">${cache.partnerReadingInfo}</div>` : ''}
