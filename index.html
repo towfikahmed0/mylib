@@ -1069,9 +1069,9 @@
                             <div>
                                 <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Theme Selection</label>
                                 <div class="grid grid-cols-3 gap-2 mt-1">
-                                    <button onclick="window.setTheme('light')" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') !== 'dark' && localStorage.getItem('mylib_theme') !== 'sepia' ? 'border-primary' : 'border-transparent'} bg-white text-slate-900 text-xs font-bold">Light</button>
-                                    <button onclick="window.setTheme('dark')" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'dark' ? 'border-primary' : 'border-transparent'} bg-slate-900 text-white text-xs font-bold">Dark</button>
-                                    <button onclick="window.setTheme('sepia')" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'sepia' ? 'border-primary' : 'border-transparent'} bg-sepia-100 text-sepia-900 text-xs font-bold">Sepia</button>
+                                    <button onclick="window.setTheme('light')" aria-pressed="${localStorage.getItem('mylib_theme') !== 'dark' && localStorage.getItem('mylib_theme') !== 'sepia'}" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') !== 'dark' && localStorage.getItem('mylib_theme') !== 'sepia' ? 'border-primary' : 'border-transparent'} bg-white text-slate-900 text-xs font-bold focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 transition-all">Light</button>
+                                    <button onclick="window.setTheme('dark')" aria-pressed="${localStorage.getItem('mylib_theme') === 'dark'}" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'dark' ? 'border-primary' : 'border-transparent'} bg-slate-900 text-white text-xs font-bold focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 transition-all">Dark</button>
+                                    <button onclick="window.setTheme('sepia')" aria-pressed="${localStorage.getItem('mylib_theme') === 'sepia'}" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'sepia' ? 'border-primary' : 'border-transparent'} bg-sepia-100 text-sepia-900 text-xs font-bold focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 transition-all">Sepia</button>
                                 </div>
                             </div>
                             <div>
@@ -1080,7 +1080,7 @@
                                     ${['blue', 'rose', 'emerald', 'amber', 'violet'].map(color => {
                     const bgClass = color === 'blue' ? 'bg-blue-500' : color === 'rose' ? 'bg-rose-500' : color === 'emerald' ? 'bg-emerald-500' : color === 'amber' ? 'bg-amber-500' : 'bg-violet-500';
                     const isSelected = (localStorage.getItem('mylib_accent') || 'blue') === color;
-                    return `<button onclick="window.setAccent('${color}')" class="w-8 h-8 rounded-full ${bgClass} ${isSelected ? 'ring-4 ring-offset-2 ring-slate-300 dark:ring-slate-600' : ''}" title="${color.charAt(0).toUpperCase() + color.slice(1)}" aria-label="Set accent color to ${color}"></button>`;
+                    return `<button onclick="window.setAccent('${color}')" aria-pressed="${isSelected}" class="w-8 h-8 rounded-full ${bgClass} ${isSelected ? 'ring-4 ring-offset-2 ring-slate-300 dark:ring-slate-600' : ''} focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 transition-all" title="${color.charAt(0).toUpperCase() + color.slice(1)}" aria-label="Set accent color to ${color}"></button>`;
                 }).join('')}
                                 </div>
                             </div>
@@ -1879,13 +1879,13 @@
                                 ${anyFilterActive ? `${filteredBooks.length} of ${totalInTab}` : filteredBooks.length} ${filteredBooks.length === 1 ? 'book' : 'books'} ${anyFilterActive ? 'found' : 'shown'}
                             </div>
                             <div class="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                                <button id="grid-view-btn" class="p-2 rounded-lg transition ${viewMode === 'grid' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}" aria-label="Grid view" title="Grid view">
+                                <button id="grid-view-btn" aria-pressed="${viewMode === 'grid'}" class="p-2 rounded-lg transition ${viewMode === 'grid' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'} focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" aria-label="Grid view" title="Grid view">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                                 </button>
-                                <button id="compact-view-btn" class="p-2 rounded-lg transition ${viewMode === 'compact' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}" aria-label="Compact grid view" title="Compact grid view">
+                                <button id="compact-view-btn" aria-pressed="${viewMode === 'compact'}" class="p-2 rounded-lg transition ${viewMode === 'compact' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'} focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" aria-label="Compact grid view" title="Compact grid view">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
                                 </button>
-                                <button id="list-view-btn" class="p-2 rounded-lg transition ${viewMode === 'list' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}" aria-label="List view" title="List view">
+                                <button id="list-view-btn" aria-pressed="${viewMode === 'list'}" class="p-2 rounded-lg transition ${viewMode === 'list' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'} focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" aria-label="List view" title="List view">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
                                 </button>
                             </div>
@@ -2492,7 +2492,7 @@
                 else if (type === 'owner') ownerFilter = value;
                 else if (type === 'status') statusFilter = value;
                 renderMainApp();
-                window.scrollTo({ top: 0 }); // Micro-UX: Scroll to top after applying filter
+                window.scrollTo({ top: 0, behavior: 'smooth' }); // Micro-UX: Scroll to top after applying filter
             };
 
             function openAdvancedSearch() {
