@@ -3998,6 +3998,37 @@
             }
 
 
+            window.updateStarRating = (rating) => {
+                const container = document.getElementById('star-rating-container');
+                if (!container) return;
+
+                container.dataset.rating = rating;
+                const stars = container.querySelectorAll('button[data-star]');
+                const clearBtn = document.getElementById('clear-rating-btn');
+
+                if (clearBtn) clearBtn.classList.toggle('hidden', rating === 0);
+
+                stars.forEach(star => {
+                    const starVal = parseInt(star.dataset.star);
+                    const svg = star.querySelector('svg');
+                    if (starVal <= rating) {
+                        star.classList.remove('text-slate-300', 'dark:text-slate-600');
+                        star.classList.add('text-amber-400');
+                        svg.classList.add('fill-current');
+                        svg.classList.remove('fill-none');
+                    } else {
+                        star.classList.add('text-slate-300', 'dark:text-slate-600');
+                        star.classList.remove('text-amber-400');
+                        svg.classList.remove('fill-current');
+                        svg.classList.add('fill-none');
+                    }
+                });
+
+                if (rating > 0 && navigator.vibrate) {
+                    navigator.vibrate([10]);
+                }
+            };
+
             window.cycleBookStatus = async (bookId, event) => {
                 if (event) event.stopPropagation();
                 if (!currentUser) return;
@@ -4648,16 +4679,23 @@
                                     </div>
                                 </div>
                                 <div class="mt-6 px-1">
-                                    <label for="detail-rating-select" class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">My Rating & Review</label>
+                                    <div class="flex items-center justify-between mb-2">
+                                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">My Rating & Review</label>
+                                        <button id="clear-rating-btn" type="button" class="text-[10px] font-black text-rose-500 uppercase hover:underline ${userRatingVal === 0 ? 'hidden' : ''}" onclick="window.updateStarRating(0)">Clear Rating</button>
+                                    </div>
                                     <div class="space-y-4">
-                                        <select id="detail-rating-select" class="w-full px-4 py-3 text-sm bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
-                                            <option value="0" ${userRatingVal === 0 ? 'selected' : ''}>No Rating</option>
-                                            <option value="1" ${userRatingVal === 1 ? 'selected' : ''}>1 Star</option>
-                                            <option value="2" ${userRatingVal === 2 ? 'selected' : ''}>2 Stars</option>
-                                            <option value="3" ${userRatingVal === 3 ? 'selected' : ''}>3 Star</option>
-                                            <option value="4" ${userRatingVal === 4 ? 'selected' : ''}>4 Stars</option>
-                                            <option value="5" ${userRatingVal === 5 ? 'selected' : ''}>5 Stars</option>
-                                        </select>
+                                        <div class="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/50 rounded-2xl w-fit" id="star-rating-container" data-rating="${userRatingVal}">
+                                            ${[1, 2, 3, 4, 5].map(i => `
+                                                <button type="button"
+                                                    data-star="${i}"
+                                                    aria-label="Rate ${i} stars"
+                                                    class="p-2 rounded-xl transition-all duration-200 group/star focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 ${i <= userRatingVal ? 'text-amber-400' : 'text-slate-300 dark:text-slate-600'}">
+                                                    <svg class="w-8 h-8 ${i <= userRatingVal ? 'fill-current' : 'fill-none'} stroke-current transition-all" stroke-width="2" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.54 1.118l-3.976-2.888a1 1 0 00-1.175 0l-3.976 2.888c-.784.57-1.838-.197-1.539-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                                                    </svg>
+                                                </button>
+                                            `).join('')}
+                                        </div>
                                         <div>
                                             <label for="detail-comment-textarea" class="text-[10px] font-bold text-slate-400 uppercase mb-2 block">Your Review</label>
                                             <textarea id="detail-comment-textarea" placeholder="What did you think of this book?" class="w-full px-4 py-3 text-sm bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none min-h-[100px] transition-all">${escapeHTML(userCommentVal)}</textarea>
@@ -4837,13 +4875,61 @@
                     }
                 });
 
+                const starRatingContainer = document.getElementById('star-rating-container');
+                if (starRatingContainer) {
+                    const stars = starRatingContainer.querySelectorAll('button[data-star]');
+                    stars.forEach(star => {
+                        star.addEventListener('mouseenter', () => {
+                            const hoverVal = parseInt(star.dataset.star);
+                            stars.forEach(s => {
+                                const sVal = parseInt(s.dataset.star);
+                                const svg = s.querySelector('svg');
+                                if (sVal <= hoverVal) {
+                                    s.classList.add('text-amber-400');
+                                    s.classList.remove('text-slate-300', 'dark:text-slate-600');
+                                    svg.classList.add('fill-current');
+                                    svg.classList.remove('fill-none');
+                                } else {
+                                    s.classList.remove('text-amber-400');
+                                    s.classList.add('text-slate-300', 'dark:text-slate-600');
+                                    svg.classList.remove('fill-current');
+                                    svg.classList.add('fill-none');
+                                }
+                            });
+                        });
+                        star.addEventListener('mouseleave', () => {
+                            const currentRating = parseInt(starRatingContainer.dataset.rating || 0);
+                            stars.forEach(s => {
+                                const sVal = parseInt(s.dataset.star);
+                                const svg = s.querySelector('svg');
+                                if (sVal <= currentRating) {
+                                    s.classList.add('text-amber-400');
+                                    s.classList.remove('text-slate-300', 'dark:text-slate-600');
+                                    svg.classList.add('fill-current');
+                                    svg.classList.remove('fill-none');
+                                } else {
+                                    s.classList.remove('text-amber-400');
+                                    s.classList.add('text-slate-300', 'dark:text-slate-600');
+                                    svg.classList.remove('fill-current');
+                                    svg.classList.add('fill-none');
+                                }
+                            });
+                        });
+                        star.addEventListener('click', () => {
+                            const newVal = parseInt(star.dataset.star);
+                            window.updateStarRating(newVal);
+                        });
+                    });
+                }
+
                 document.getElementById('save-rating-btn')?.addEventListener('click', async (e) => {
                     const btn = e.currentTarget;
                     const originalText = btn.innerText;
                     btn.disabled = true;
                     btn.innerText = 'Saving...';
                     window.showLoading();
-                    const rating = parseInt(document.getElementById('detail-rating-select').value);
+                    const ratingContainer = document.getElementById('star-rating-container');
+                    const rating = parseInt(ratingContainer?.dataset.rating || 0);
                     const comment = document.getElementById('detail-comment-textarea').value.trim();
                     try {
                         await db.collection('books').doc(book.id)
