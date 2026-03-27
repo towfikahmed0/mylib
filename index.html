@@ -455,6 +455,10 @@
                     _escGenres: genres.map(g => escapeHTML(g)).join(', '),
                     _escJsAuthor: escapeHTML(jsAuthor),
                     _escJsOwner: escapeHTML(jsOwner),
+                    _normalizedTags: (data.tags || []).map(tag => ({
+                        esc: escapeHTML(tag),
+                        escJs: escapeHTML(tag.replace(/'/g, "\\'"))
+                    })),
                     _searchBlob: `${title} ${author} ${genres.join(' ')} ${data.isbn || ''} ${(data.tags || []).join(' ')}`.toLowerCase(),
                     _createdTime: data.createdAt?.toMillis() || 0,
                     _purchaseTime: data.purchaseDate ? new Date(data.purchaseDate).getTime() : 0
@@ -1777,7 +1781,7 @@
                                 </div>
                                 <div class="flex gap-4 overflow-x-auto pb-4 custom-scrollbar snap-x snap-mandatory -mx-6 px-6">
                                     ${readingBooks.map(book => {
-                            const progress = getStatusData(book.id).progress || 0;
+                            const progress = book._cache.progress;
                             return `
                                             <div class="book-card flex-shrink-0 w-64 glass p-4 rounded-[2rem] border border-blue-100/50 dark:border-slate-800 snap-start cursor-pointer hover:shadow-lg transition-all focus-visible:ring-4 focus-visible:ring-primary/50" data-book-id="${book.id}" role="button" tabindex="0" aria-label="View details for ${book._escTitle} by ${book._escAuthor}">
                                                 <div class="flex gap-3">
@@ -1896,9 +1900,10 @@
                     // Hoist container class calculation out of section template literals
                     const containerClass = viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3';
 
-                    // Optimization: Hoist current timestamp outside of map loop to minimize system clock calls
+                    // Optimization: Hoist current timestamp and density calculation outside of map loop to minimize redundant work
                     const now = Date.now();
-                    let html = `<div class="${containerClass}">${filteredBooks.map(book => renderBookCard(book, now)).join('')}</div>`;
+                    const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
+                    let html = `<div class="${containerClass}">${filteredBooks.map(book => renderBookCard(book, now, densityClass)).join('')}</div>`;
 
                     // Empty state
                     if (filteredBooks.length === 0) {
@@ -2769,11 +2774,42 @@
                     if (b.isWishlist) stats.wishlistCount++;
                     else stats.libraryCount++;
 
+                    const statusData = getStatusData(b.id);
+                    const status = statusData.status;
+
+                    // Render Cache Pass: Pre-calculate status-dependent UI data
+                    const progress = statusData.progress || b.progress || 0;
+                    const displayRating = b.averageRating ? Math.round(b.averageRating) : (statusData.rating || b.rating || 0);
+
+                    let ownerName = b.owner;
+                    if (!ownerName && b.userId !== currentUser.uid) {
+                        ownerName = userProfileCache[b.userId] || 'Partner';
+                    }
+
+                    const pStatuses = partnerReadingStatuses[b.id] || {};
+                    const partnerReadingInfo = Object.entries(pStatuses).map(([uid, data]) => {
+                        if (data.status === 'reading') {
+                            const name = userProfileCache[uid] || 'Partner';
+                            return `<div class="flex items-center gap-1 text-[8px] text-blue-500 font-bold uppercase"><div class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div> ${escapeHTML(name)} reading (${data.progress}%)</div>`;
+                        }
+                        return '';
+                    }).join('');
+
+                    b._cache = {
+                        status,
+                        progress,
+                        stars: STAR_CACHE[displayRating] || '',
+                        statusLabel: READING_STATUSES[status].label,
+                        compactStatusLabel: status === 'want_to_read' ? 'WTR' : READING_STATUSES[status].label,
+                        statusBadge: READING_STATUSES[status].badge,
+                        statusColor: status === 'finished' ? 'bg-emerald-500' : status === 'reading' ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600',
+                        ownerBadge: ownerName ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">${escapeHTML(ownerName)}'s Book</div>` : '',
+                        partnerReadingInfo
+                    };
+
                     // Update Statistics (Skip wishlist for most stats)
                     if (b.isWishlist) return;
 
-                    const statusData = getStatusData(b.id);
-                    const status = statusData.status;
                     if (stats.statusCounts.hasOwnProperty(status)) stats.statusCounts[status]++;
 
                     if (status === 'reading') {
@@ -2819,31 +2855,9 @@
             }
 
             // Helper to render a single book card
-            function renderBookCard(book, now) {
-                const statusData = getStatusData(book.id);
-                const bookStatus = statusData.status;
-                const userRating = statusData.rating;
-                const userProgress = statusData.progress;
-
-                const displayRating = book.averageRating ? Math.round(book.averageRating) : (userRating || book.rating || 0);
-                const stars = STAR_CACHE[displayRating] || '';
-
+            function renderBookCard(book, now, densityClass) {
+                const cache = book._cache;
                 const isSelected = selectedBookIds.has(book.id);
-
-                let ownerName = book.owner;
-                if (!ownerName && book.userId !== currentUser.uid) {
-                    ownerName = userProfileCache[book.userId] || 'Partner';
-                }
-                const addedByBadge = ownerName ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">${escapeHTML(ownerName)}'s Book</div>` : '';
-
-                const pStatuses = partnerReadingStatuses[book.id] || {};
-                const partnerReadingInfo = Object.entries(pStatuses).map(([uid, data]) => {
-                    if (data.status === 'reading') {
-                        const name = userProfileCache[uid] || 'Partner';
-                        return `<div class="flex items-center gap-1 text-[8px] text-blue-500 font-bold uppercase"><div class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div> ${escapeHTML(name)} reading (${data.progress}%)</div>`;
-                    }
-                    return '';
-                }).join('');
 
                 // Performance Optimization: Use pre-calculated escaped fields
                 const escapedTitle = book._escTitle;
@@ -2866,8 +2880,8 @@
                                 </div>`
                         }
                             <div class="absolute bottom-2 right-2 flex flex-col items-end gap-1">
-                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status, currently ${READING_STATUSES[bookStatus].label}" class="px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase text-white shadow-sm hover:scale-105 active:scale-95 transition-transform ${READING_STATUSES[bookStatus].badge.includes('emerald') ? 'bg-emerald-500' : READING_STATUSES[bookStatus].badge.includes('blue') ? 'bg-blue-500' : 'bg-slate-500'} focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none" title="Quick toggle status">
-                                    ${READING_STATUSES[bookStatus].label === 'Want to Read' ? 'WTR' : READING_STATUSES[bookStatus].label}
+                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status, currently ${cache.statusLabel}" class="px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase text-white shadow-sm hover:scale-105 active:scale-95 transition-transform ${cache.statusColor} focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none" title="Quick toggle status">
+                                    ${cache.compactStatusLabel}
                                 </button>
                             </div>
                             <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
@@ -2899,23 +2913,19 @@
                             </div>
                             <button type="button" aria-label="Filter by author: ${escapedAuthor}" class="text-xs text-slate-500 truncate hover:text-blue-500 transition-colors text-left w-full block focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setAuthorFilter('${book._escJsAuthor}')">${escapedAuthor}</button>
                             <div class="flex flex-wrap gap-1 mt-1">
-                                ${(book.tags || []).map(tag => {
-                                    const eTag = escapeHTML(tag);
-                                    const jsTag = tag.replace(/'/g, "\\'");
-                                    return `<button type="button" aria-label="Filter by tag: ${eTag}" onclick="event.stopPropagation(); window.setTagFilter('${escapeHTML(jsTag)}')" class="text-[8px] bg-slate-100 dark:bg-slate-800 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none">${eTag}</button>`;
-                                }).join('')}
+                                ${book._normalizedTags.map(tag => `<button type="button" aria-label="Filter by tag: ${tag.esc}" onclick="event.stopPropagation(); window.setTagFilter('${tag.escJs}')" class="text-[8px] bg-slate-100 dark:bg-slate-800 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none">${tag.esc}</button>`).join('')}
                             </div>
                         </div>
                         <div class="text-right flex-shrink-0 flex flex-col items-end">
-                            <div class="text-amber-400 text-[10px]">${stars}</div>
+                            <div class="text-amber-400 text-[10px]">${cache.stars}</div>
                             <div class="text-[10px] font-bold text-blue-600 dark:text-blue-400 mt-1 truncate max-w-[120px]">${escapedGenres}</div>
                             ${book.owner ? `<button type="button" aria-label="Filter by owner: ${escapeHTML(book.owner)}" class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors text-right block focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setOwnerFilter('${book._escJsOwner}')">Owner: ${escapeHTML(book.owner)}</button>` : ''}
                             <div class="flex items-center gap-2 mt-1">
                                 <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" aria-label="Edit book details">
                                     <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
-                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status, currently ${READING_STATUSES[bookStatus].label}" class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm hover:scale-105 active:scale-95 transition-transform ${READING_STATUSES[bookStatus].badge} focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none" title="Quick toggle status">
-                                    ${READING_STATUSES[bookStatus].label}${bookStatus === 'reading' ? ` (${userProgress || 0}%)` : ''}
+                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status, currently ${cache.statusLabel}" class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm hover:scale-105 active:scale-95 transition-transform ${cache.statusBadge} focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none" title="Quick toggle status">
+                                    ${cache.compactStatusLabel}${cache.status === 'reading' ? ` (${cache.progress}%)` : ''}
                                 </button>
                             </div>
                         </div>
@@ -2923,16 +2933,15 @@
                 `;
                 }
 
-                const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
                 return `
                 <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-blue-100/50 dark:border-slate-800'} relative ${densityClass} focus-visible:ring-4 focus-visible:ring-primary/50" data-book-id="${book.id}" tabindex="0" role="button" aria-label="View details for ${escapedTitle} by ${escapedAuthor}">
                     <div class="absolute top-4 left-4 z-20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                         <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-6 h-6 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer" aria-label="Select ${escapedTitle}">
                     </div>
                     <div class="w-28 h-40 bg-slate-100 dark:bg-slate-800 rounded-3xl overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 relative shadow-lg">
-                        ${bookStatus === 'reading' ? `
+                        ${cache.status === 'reading' ? `
                             <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-slate-200/50 z-10">
-                                <div class="h-full bg-blue-500" style="width: ${userProgress || book.progress || 0}%"></div>
+                                <div class="h-full bg-blue-500" style="width: ${cache.progress}%"></div>
                             </div>
                         ` : ''}
                         ${book.coverUrl || book.thumbnail ?
@@ -2948,7 +2957,7 @@
                         <div>
                             <div class="flex justify-between items-start gap-2">
                                 <span class="text-[9px] font-black uppercase tracking-widest text-primary truncate max-w-[150px]">${escapedGenres}</span>
-                                <div class="text-amber-400 text-[10px] tracking-tighter">${stars}${book.averageRating ? `<span class="ml-1 text-slate-400">(${book.averageRating.toFixed(1)})</span>` : ''}</div>
+                                <div class="text-amber-400 text-[10px] tracking-tighter">${cache.stars}${book.averageRating ? `<span class="ml-1 text-slate-400">(${book.averageRating.toFixed(1)})</span>` : ''}</div>
                             </div>
                             <h3 class="font-black text-lg leading-tight line-clamp-2 mt-1 group-hover:text-blue-600 transition-colors font-serif italic">${escapedTitle}${book.seriesIndex ? ` <span class="text-xs font-black text-slate-400 font-sans not-italic">#${book.seriesIndex}</span>` : ''}</h3>
                             <div class="flex justify-between items-center gap-2">
@@ -2956,20 +2965,16 @@
                                 ${book.owner ? `<button type="button" aria-label="Filter by owner: ${escapeHTML(book.owner)}" class="text-[10px] text-slate-400 font-medium truncate hover:text-blue-500 transition-colors text-right focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setOwnerFilter('${book._escJsOwner}')">Owner: ${escapeHTML(book.owner)}</button>` : ''}
                             </div>
                             <div class="flex flex-wrap gap-1 mt-2">
-                                ${(book.tags || []).map(tag => {
-                                    const eTag = escapeHTML(tag);
-                                    const jsTag = tag.replace(/'/g, "\\'");
-                                    return `<button type="button" aria-label="Filter by tag: ${eTag}" onclick="event.stopPropagation(); window.setTagFilter('${escapeHTML(jsTag)}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded">${eTag}</button>`;
-                                }).join('')}
+                                ${book._normalizedTags.map(tag => `<button type="button" aria-label="Filter by tag: ${tag.esc}" onclick="event.stopPropagation(); window.setTagFilter('${tag.escJs}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded">${tag.esc}</button>`).join('')}
                             </div>
                             <div class="mt-2 flex flex-wrap gap-1">
-                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status, currently ${READING_STATUSES[bookStatus].label}" class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm hover:scale-105 active:scale-95 transition-transform ${READING_STATUSES[bookStatus].badge} focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none" title="Quick toggle status">
-                                    ${READING_STATUSES[bookStatus].label}${bookStatus === 'reading' ? ` (${userProgress || 0}%)` : ''}
+                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status, currently ${cache.statusLabel}" class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm hover:scale-105 active:scale-95 transition-transform ${cache.statusBadge} focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none" title="Quick toggle status">
+                                    ${cache.statusLabel}${cache.status === 'reading' ? ` (${cache.progress}%)` : ''}
                                 </button>
                                 ${book.borrowedBy ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed by ${escapeHTML(book.borrowedBy)}</div>` : ''}
-                                ${addedByBadge}
+                                ${cache.ownerBadge}
                             </div>
-                            ${partnerReadingInfo ? `<div class="mt-2 space-y-1">${partnerReadingInfo}</div>` : ''}
+                            ${cache.partnerReadingInfo ? `<div class="mt-2 space-y-1">${cache.partnerReadingInfo}</div>` : ''}
                         </div>
                         <div class="flex items-center justify-between">
                             <span class="text-[10px] font-bold text-slate-400">${book.purchaseDate ? new Date(book.purchaseDate).toLocaleDateString() : ''}</span>
@@ -3150,6 +3155,7 @@
                                         db.collection('users').doc(data.userId).get().then(doc => {
                                             if (doc.exists) {
                                                 userProfileCache[data.userId] = doc.data()?.displayName || doc.data()?.email || 'Partner';
+                                                updateLibraryCache(); // Refresh owner badges and partner labels
                                                 renderLibraryOnly();
                                             }
                                         });
