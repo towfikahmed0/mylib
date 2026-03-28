@@ -15,3 +15,7 @@
 ## 2025-05-14 - [The Attribute Escaping Trap]
 **Learning:** Escaping strings for HTML attributes that contain JavaScript (like `onclick`) is tricky. Standard HTML escaping (`'` to `&#39;`) breaks JavaScript's ability to handle apostrophes in string literals.
 **Action:** Always escape single quotes for JavaScript (replace `'` with `\'`) *before* wrapping the entire string in `escapeHTML()` when injecting data into `onclick` handlers.
+
+## 2025-05-14 - [Pre-rendering UI Fragments in Cache]
+**Learning:** In a vanilla JS application using large template literals for rendering, the overhead of repeated `.map()` and `.join()` operations for small UI fragments (like tags) inside the main render loop can become significant as the collection grows.
+**Action:** Pre-render these HTML fragments once during the data-processing/cache-update phase (`updateLibraryCache`) and store them in the `_cache` object. This transforms O(N * M) string operations into O(1) lookups during the critical render path.

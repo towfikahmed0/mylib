@@ -2795,6 +2795,10 @@
                         return '';
                     }).join('');
 
+                    // Pre-render tag HTML for both views
+                    const tagsHtml = b._normalizedTags.map(tag => `<button type="button" aria-label="Filter by tag: ${tag.esc}" onclick="event.stopPropagation(); window.setTagFilter('${tag.escJs}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded">${tag.esc}</button>`).join('');
+                    const compactTagsHtml = b._normalizedTags.map(tag => `<button type="button" aria-label="Filter by tag: ${tag.esc}" onclick="event.stopPropagation(); window.setTagFilter('${tag.escJs}')" class="text-[8px] bg-slate-100 dark:bg-slate-800 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none">${tag.esc}</button>`).join('');
+
                     b._cache = {
                         status,
                         progress,
@@ -2804,7 +2808,10 @@
                         statusBadge: READING_STATUSES[status].badge,
                         statusColor: status === 'finished' ? 'bg-emerald-500' : status === 'reading' ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600',
                         ownerBadge: ownerName ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">${escapeHTML(ownerName)}'s Book</div>` : '',
-                        partnerReadingInfo
+                        partnerReadingInfo,
+                        tagsHtml,
+                        compactTagsHtml,
+                        isNew: b._createdTime > (Date.now() - 30 * 24 * 60 * 60 * 1000)
                     };
 
                     // Update Statistics (Skip wishlist for most stats)
@@ -2864,8 +2871,7 @@
                 const escapedAuthor = book._escAuthor;
                 const escapedGenres = book._escGenres;
 
-                const isNew = book._createdTime > (now - 30 * 24 * 60 * 60 * 1000);
-                const newBadge = isNew ? `<div class="absolute top-2 left-2 z-30 px-2 py-0.5 rounded-full text-[8px] font-black uppercase text-white bg-blue-500 shadow-lg ring-1 ring-white/20">New</div>` : '';
+                const newBadge = cache.isNew ? `<div class="absolute top-2 left-2 z-30 px-2 py-0.5 rounded-full text-[8px] font-black uppercase text-white bg-blue-500 shadow-lg ring-1 ring-white/20">New</div>` : '';
 
                 if (viewMode === 'compact') {
                     return `
@@ -2903,7 +2909,7 @@
                             <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" aria-label="Select ${escapedTitle}">
                         </div>
                         <div class="w-12 h-16 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 relative">
-                            ${isNew ? `<div class="absolute top-1 left-1 z-10 w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.8)]"></div>` : ''}
+                            ${cache.isNew ? `<div class="absolute top-1 left-1 z-10 w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.8)]"></div>` : ''}
                             ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover" loading="lazy" decoding="async">` : `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 text-blue-300 dark:text-slate-500 p-1 text-center"><span class="text-[6px] font-black uppercase font-serif italic leading-tight line-clamp-3">${escapedTitle}</span></div>`}
                         </div>
                         <div class="flex-1 min-w-0">
@@ -2913,7 +2919,7 @@
                             </div>
                             <button type="button" aria-label="Filter by author: ${escapedAuthor}" class="text-xs text-slate-500 truncate hover:text-blue-500 transition-colors text-left w-full block focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setAuthorFilter('${book._escJsAuthor}')">${escapedAuthor}</button>
                             <div class="flex flex-wrap gap-1 mt-1">
-                                ${book._normalizedTags.map(tag => `<button type="button" aria-label="Filter by tag: ${tag.esc}" onclick="event.stopPropagation(); window.setTagFilter('${tag.escJs}')" class="text-[8px] bg-slate-100 dark:bg-slate-800 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none">${tag.esc}</button>`).join('')}
+                                ${cache.compactTagsHtml}
                             </div>
                         </div>
                         <div class="text-right flex-shrink-0 flex flex-col items-end">
@@ -2965,7 +2971,7 @@
                                 ${book.owner ? `<button type="button" aria-label="Filter by owner: ${escapeHTML(book.owner)}" class="text-[10px] text-slate-400 font-medium truncate hover:text-blue-500 transition-colors text-right focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setOwnerFilter('${book._escJsOwner}')">Owner: ${escapeHTML(book.owner)}</button>` : ''}
                             </div>
                             <div class="flex flex-wrap gap-1 mt-2">
-                                ${book._normalizedTags.map(tag => `<button type="button" aria-label="Filter by tag: ${tag.esc}" onclick="event.stopPropagation(); window.setTagFilter('${tag.escJs}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded">${tag.esc}</button>`).join('')}
+                                ${cache.tagsHtml}
                             </div>
                             <div class="mt-2 flex flex-wrap gap-1">
                                 <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status, currently ${cache.statusLabel}" class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm hover:scale-105 active:scale-95 transition-transform ${cache.statusBadge} focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none" title="Quick toggle status">
