@@ -294,7 +294,11 @@
 
     <!-- Back to Top Button -->
     <button id="back-to-top" class="fixed bottom-24 left-6 z-40 w-12 h-12 bg-white dark:bg-slate-800 text-primary rounded-full shadow-2xl flex items-center justify-center opacity-0 translate-y-10 pointer-events-none transition-all hover:scale-110 active:scale-95 border border-slate-200 dark:border-slate-700 md:bottom-8 focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:outline-none" aria-label="Back to top">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7"/></svg>
+        <svg class="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 48 48">
+            <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="3" fill="transparent" class="text-slate-100 dark:text-slate-700" />
+            <circle id="back-to-top-progress" cx="24" cy="24" r="20" stroke="currentColor" stroke-width="3" fill="transparent" stroke-dasharray="125.66" stroke-dashoffset="125.66" stroke-linecap="round" class="text-primary transition-all duration-100" />
+        </svg>
+        <svg class="w-5 h-5 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7"/></svg>
     </button>
 
     <!-- Toast & Modal containers (global) -->
@@ -307,7 +311,9 @@
     <div id="ai-chat-bubble" class="fixed bottom-24 right-6 z-40 transition-all duration-300 translate-y-20 opacity-0 pointer-events-none">
         <button id="ai-chat-toggle" aria-label="Open AI Librarian" aria-expanded="false" aria-haspopup="dialog" aria-controls="ai-chat-window" class="w-14 h-14 bg-violet-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all group pointer-events-auto focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-500 focus-visible:ring-offset-2">
             <svg class="w-7 h-7 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
-            <span class="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
+            <span class="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full flex items-center justify-center">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            </span>
         </button>
         <div id="ai-chat-window" role="dialog" aria-label="AI Librarian Chat" aria-hidden="true" class="absolute bottom-20 right-0 w-[calc(100vw-3rem)] sm:w-96 glass rounded-[2.5rem] shadow-2xl border border-violet-100 dark:border-violet-900/30 overflow-hidden flex flex-col transition-all duration-300 scale-90 opacity-0 pointer-events-none origin-bottom-right">
             <div class="p-5 bg-violet-600 text-white flex items-center justify-between">
@@ -1403,7 +1409,7 @@
                             <div class="relative group flex-1">
                                 <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                                 <input id="search-input" type="text" placeholder="Smart search by title, author, genre..." value="${searchQuery}" class="w-full pl-12 pr-14 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-[1.5rem] text-lg transition-all outline-none shadow-sm" aria-label="Search books">
-                                <div id="search-hint" class="absolute right-12 top-1/2 -translate-y-1/2 px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded text-[10px] font-bold text-slate-400 pointer-events-none transition-opacity duration-300 ${searchQuery ? 'opacity-0' : ''}">/</div>
+                                <kbd id="search-hint" class="absolute right-12 top-1/2 -translate-y-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-[10px] font-black text-slate-500 dark:text-slate-400 pointer-events-none transition-opacity duration-300 shadow-[inset_0_-2px_0_rgba(0,0,0,0.1)] dark:shadow-[inset_0_-2px_0_rgba(255,255,255,0.05)] ${searchQuery ? 'opacity-0' : ''}">/</kbd>
                                 <button id="clear-search-btn" class="${searchQuery ? '' : 'hidden'} absolute right-4 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors" aria-label="Clear search" title="Clear search">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                                 </button>
@@ -4177,8 +4183,18 @@
 
             // Back to Top Logic
             const backToTopBtn = document.getElementById('back-to-top');
+            const backToTopProgress = document.getElementById('back-to-top-progress');
             window.addEventListener('scroll', () => {
-                if (window.scrollY > 500) {
+                const scrollY = window.scrollY;
+                const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+                const progress = Math.min(100, Math.max(0, (scrollY / docHeight) * 100));
+
+                if (backToTopProgress) {
+                    const offset = 125.66 - (progress / 100) * 125.66;
+                    backToTopProgress.style.strokeDashoffset = offset;
+                }
+
+                if (scrollY > 500) {
                     backToTopBtn.classList.remove('opacity-0', 'translate-y-10', 'pointer-events-none');
                     backToTopBtn.classList.add('opacity-100', 'translate-y-0', 'pointer-events-auto');
                 } else {
