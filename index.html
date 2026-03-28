@@ -294,7 +294,11 @@
 
     <!-- Back to Top Button -->
     <button id="back-to-top" class="fixed bottom-24 left-6 z-40 w-12 h-12 bg-white dark:bg-slate-800 text-primary rounded-full shadow-2xl flex items-center justify-center opacity-0 translate-y-10 pointer-events-none transition-all hover:scale-110 active:scale-95 border border-slate-200 dark:border-slate-700 md:bottom-8 focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:outline-none" aria-label="Back to top">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7"/></svg>
+        <svg class="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 48 48">
+            <circle cx="24" cy="24" r="22" stroke="currentColor" stroke-width="2.5" fill="transparent" class="text-slate-100 dark:text-slate-700" />
+            <circle id="scroll-progress-ring" cx="24" cy="24" r="22" stroke="currentColor" stroke-width="2.5" fill="transparent" stroke-dasharray="138.23" stroke-dashoffset="138.23" stroke-linecap="round" class="text-primary transition-[stroke-dashoffset] duration-150" />
+        </svg>
+        <svg class="w-5 h-5 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7"/></svg>
     </button>
 
     <!-- Toast & Modal containers (global) -->
@@ -307,7 +311,9 @@
     <div id="ai-chat-bubble" class="fixed bottom-24 right-6 z-40 transition-all duration-300 translate-y-20 opacity-0 pointer-events-none">
         <button id="ai-chat-toggle" aria-label="Open AI Librarian" aria-expanded="false" aria-haspopup="dialog" aria-controls="ai-chat-window" class="w-14 h-14 bg-violet-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all group pointer-events-auto focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-500 focus-visible:ring-offset-2">
             <svg class="w-7 h-7 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
-            <span class="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
+            <span class="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full">
+                <span class="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75"></span>
+            </span>
         </button>
         <div id="ai-chat-window" role="dialog" aria-label="AI Librarian Chat" aria-hidden="true" class="absolute bottom-20 right-0 w-[calc(100vw-3rem)] sm:w-96 glass rounded-[2.5rem] shadow-2xl border border-violet-100 dark:border-violet-900/30 overflow-hidden flex flex-col transition-all duration-300 scale-90 opacity-0 pointer-events-none origin-bottom-right">
             <div class="p-5 bg-violet-600 text-white flex items-center justify-between">
@@ -326,9 +332,9 @@
                 <div class="bg-violet-50 dark:bg-violet-900/20 p-4 rounded-2xl rounded-tl-none border border-violet-100 dark:border-violet-900/30">
                     <p class="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">Hello! I'm your AI Librarian. Ask me anything about your collection or for a recommendation!</p>
                     <div id="ai-suggestions" class="mt-4 flex flex-wrap gap-2">
-                        <button type="button" onclick="window.sendAIChat('Recommend a book from my library')" class="px-3 py-1.5 bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-800 rounded-xl text-[10px] font-bold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all">Recommend a book</button>
-                        <button type="button" onclick="window.sendAIChat('What are my top genres?')" class="px-3 py-1.5 bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-800 rounded-xl text-[10px] font-bold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all">My top genres</button>
-                        <button type="button" onclick="window.sendAIChat('Summarize my collection')" class="px-3 py-1.5 bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-800 rounded-xl text-[10px] font-bold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all">Summarize collection</button>
+                        <button type="button" onclick="window.sendAIChat('Recommend a book from my library')" class="px-3 py-1.5 bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-800 rounded-xl text-[10px] font-bold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-500/20">Recommend a book</button>
+                        <button type="button" onclick="window.sendAIChat('What are my top genres?')" class="px-3 py-1.5 bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-800 rounded-xl text-[10px] font-bold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-500/20">My top genres</button>
+                        <button type="button" onclick="window.sendAIChat('Summarize my collection')" class="px-3 py-1.5 bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-800 rounded-xl text-[10px] font-bold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-500/20">Summarize collection</button>
                     </div>
                 </div>
             </div>
@@ -4177,8 +4183,19 @@
 
             // Back to Top Logic
             const backToTopBtn = document.getElementById('back-to-top');
+            const progressRing = document.getElementById('scroll-progress-ring');
             window.addEventListener('scroll', () => {
-                if (window.scrollY > 500) {
+                const scrollY = window.scrollY;
+                const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+                const scrollPercent = Math.min(100, (scrollY / (docHeight || 1)) * 100);
+
+                if (progressRing) {
+                    const circumference = 22 * 2 * Math.PI; // r=22
+                    const offset = circumference - (scrollPercent / 100) * circumference;
+                    progressRing.style.strokeDashoffset = offset;
+                }
+
+                if (scrollY > 500) {
                     backToTopBtn.classList.remove('opacity-0', 'translate-y-10', 'pointer-events-none');
                     backToTopBtn.classList.add('opacity-100', 'translate-y-0', 'pointer-events-auto');
                 } else {
