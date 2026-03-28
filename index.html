@@ -425,6 +425,7 @@
             let isStatusesLoaded = false;  // Flag to prevent premature sync before data is fetched
 
             const GENRE_FALLBACK = ['Other'];
+            const dateFormatter = new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'numeric', day: 'numeric' });
             // Helper to get book genres as an array - Optimized to use cached _genres if available
             function getBookGenres(book) {
                 if (book._genres) return book._genres;
@@ -443,8 +444,13 @@
                 // Pre-calculate escaped strings to minimize per-render overhead
                 const escTitle = escapeHTML(title);
                 const escAuthor = escapeHTML(author);
+                const escOwner = escapeHTML(owner);
                 const jsAuthor = author.replace(/'/g, "\\'");
                 const jsOwner = owner.replace(/'/g, "\\'");
+
+                // Pre-format purchase date
+                const purchaseDateObj = data.purchaseDate ? new Date(data.purchaseDate) : null;
+                const formattedPurchaseDate = (purchaseDateObj && !isNaN(purchaseDateObj.getTime())) ? dateFormatter.format(purchaseDateObj) : '';
 
                 return {
                     id,
@@ -452,9 +458,11 @@
                     _genres: genres,
                     _escTitle: escTitle,
                     _escAuthor: escAuthor,
+                    _escOwner: escOwner,
                     _escGenres: genres.map(g => escapeHTML(g)).join(', '),
                     _escJsAuthor: escapeHTML(jsAuthor),
                     _escJsOwner: escapeHTML(jsOwner),
+                    _formattedPurchaseDate: formattedPurchaseDate,
                     _normalizedTags: (data.tags || []).map(tag => ({
                         esc: escapeHTML(tag),
                         escJs: escapeHTML(tag.replace(/'/g, "\\'"))
@@ -2762,6 +2770,8 @@
                 };
 
                 const currentYear = new Date().getFullYear();
+                const now = Date.now();
+                const oneMonthAgo = now - 30 * 24 * 60 * 60 * 1000;
 
                 books.forEach(b => {
                     // Update Sets for dropdowns
@@ -2782,8 +2792,10 @@
                     const displayRating = b.averageRating ? Math.round(b.averageRating) : (statusData.rating || b.rating || 0);
 
                     let ownerName = b.owner;
+                    let escOwnerName = b._escOwner;
                     if (!ownerName && b.userId !== currentUser.uid) {
                         ownerName = userProfileCache[b.userId] || 'Partner';
+                        escOwnerName = escapeHTML(ownerName);
                     }
 
                     const pStatuses = partnerReadingStatuses[b.id] || {};
@@ -2799,6 +2811,8 @@
                     const tagsHtml = b._normalizedTags.map(tag => `<button type="button" aria-label="Filter by tag: ${tag.esc}" onclick="event.stopPropagation(); window.setTagFilter('${tag.escJs}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded">${tag.esc}</button>`).join('');
                     const compactTagsHtml = b._normalizedTags.map(tag => `<button type="button" aria-label="Filter by tag: ${tag.esc}" onclick="event.stopPropagation(); window.setTagFilter('${tag.escJs}')" class="text-[8px] bg-slate-100 dark:bg-slate-800 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none">${tag.esc}</button>`).join('');
 
+                    const isNew = b._createdTime > oneMonthAgo;
+
                     b._cache = {
                         status,
                         progress,
@@ -2807,11 +2821,14 @@
                         compactStatusLabel: status === 'want_to_read' ? 'WTR' : READING_STATUSES[status].label,
                         statusBadge: READING_STATUSES[status].badge,
                         statusColor: status === 'finished' ? 'bg-emerald-500' : status === 'reading' ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600',
-                        ownerBadge: ownerName ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">${escapeHTML(ownerName)}'s Book</div>` : '',
+                        ownerBadge: escOwnerName ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">${escOwnerName}'s Book</div>` : '',
                         partnerReadingInfo,
                         tagsHtml,
                         compactTagsHtml,
-                        isNew: b._createdTime > (Date.now() - 30 * 24 * 60 * 60 * 1000)
+                        isNew,
+                        newBadge: isNew ? `<div class="absolute top-2 left-2 z-30 px-2 py-0.5 rounded-full text-[8px] font-black uppercase text-white bg-blue-500 shadow-lg ring-1 ring-white/20">New</div>` : '',
+                        listNewBadge: isNew ? `<div class="absolute top-1 left-1 z-10 w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.8)]"></div>` : '',
+                        formattedPrice: b.price ? '$' + b.price : ''
                     };
 
                     // Update Statistics (Skip wishlist for most stats)
@@ -2871,14 +2888,12 @@
                 const escapedAuthor = book._escAuthor;
                 const escapedGenres = book._escGenres;
 
-                const newBadge = cache.isNew ? `<div class="absolute top-2 left-2 z-30 px-2 py-0.5 rounded-full text-[8px] font-black uppercase text-white bg-blue-500 shadow-lg ring-1 ring-white/20">New</div>` : '';
-
                 if (viewMode === 'compact') {
                     return `
                     <div class="book-card relative group cursor-pointer focus-visible:ring-4 focus-visible:ring-primary/50" data-book-id="${book.id}" tabindex="0" role="button" aria-label="View details for ${escapedTitle} by ${escapedAuthor}">
                         <div class="absolute inset-0 bg-blue-600/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity rounded-2xl"></div>
                         <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm relative">
-                            ${newBadge}
+                            ${cache.newBadge}
                             ${book.coverUrl || book.thumbnail ?
                             `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-105" alt="Cover for ${escapedTitle}" loading="lazy" decoding="async">` :
                             `<div class="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-blue-50 dark:bg-slate-800 text-blue-200 dark:text-slate-600">
@@ -2909,7 +2924,7 @@
                             <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" aria-label="Select ${escapedTitle}">
                         </div>
                         <div class="w-12 h-16 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 relative">
-                            ${cache.isNew ? `<div class="absolute top-1 left-1 z-10 w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.8)]"></div>` : ''}
+                            ${cache.listNewBadge}
                             ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover" loading="lazy" decoding="async">` : `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 text-blue-300 dark:text-slate-500 p-1 text-center"><span class="text-[6px] font-black uppercase font-serif italic leading-tight line-clamp-3">${escapedTitle}</span></div>`}
                         </div>
                         <div class="flex-1 min-w-0">
@@ -2925,7 +2940,7 @@
                         <div class="text-right flex-shrink-0 flex flex-col items-end">
                             <div class="text-amber-400 text-[10px]">${cache.stars}</div>
                             <div class="text-[10px] font-bold text-blue-600 dark:text-blue-400 mt-1 truncate max-w-[120px]">${escapedGenres}</div>
-                            ${book.owner ? `<button type="button" aria-label="Filter by owner: ${escapeHTML(book.owner)}" class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors text-right block focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setOwnerFilter('${book._escJsOwner}')">Owner: ${escapeHTML(book.owner)}</button>` : ''}
+                            ${book.owner ? `<button type="button" aria-label="Filter by owner: ${book._escOwner}" class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors text-right block focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setOwnerFilter('${book._escJsOwner}')">Owner: ${book._escOwner}</button>` : ''}
                             <div class="flex items-center gap-2 mt-1">
                                 <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" aria-label="Edit book details">
                                     <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
@@ -2957,7 +2972,7 @@
                                 <div class="w-8 h-px bg-blue-200/50 dark:bg-slate-700"></div>
                             </div>`
                     }
-                        ${newBadge}
+                        ${cache.newBadge}
                     </div>
                     <div class="flex-1 flex flex-col justify-between overflow-hidden py-1">
                         <div>
@@ -2968,7 +2983,7 @@
                             <h3 class="font-black text-lg leading-tight line-clamp-2 mt-1 group-hover:text-blue-600 transition-colors font-serif italic">${escapedTitle}${book.seriesIndex ? ` <span class="text-xs font-black text-slate-400 font-sans not-italic">#${book.seriesIndex}</span>` : ''}</h3>
                             <div class="flex justify-between items-center gap-2">
                                 <button type="button" aria-label="Filter by author: ${escapedAuthor}" class="text-sm text-slate-500 dark:text-slate-400 mt-1 truncate font-medium hover:text-blue-500 transition-colors text-left focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setAuthorFilter('${book._escJsAuthor}')">${escapedAuthor}</button>
-                                ${book.owner ? `<button type="button" aria-label="Filter by owner: ${escapeHTML(book.owner)}" class="text-[10px] text-slate-400 font-medium truncate hover:text-blue-500 transition-colors text-right focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setOwnerFilter('${book._escJsOwner}')">Owner: ${escapeHTML(book.owner)}</button>` : ''}
+                                ${book.owner ? `<button type="button" aria-label="Filter by owner: ${book._escOwner}" class="text-[10px] text-slate-400 font-medium truncate hover:text-blue-500 transition-colors text-right focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded" onclick="event.stopPropagation(); window.setOwnerFilter('${book._escJsOwner}')">Owner: ${book._escOwner}</button>` : ''}
                             </div>
                             <div class="flex flex-wrap gap-1 mt-2">
                                 ${cache.tagsHtml}
@@ -2983,9 +2998,9 @@
                             ${cache.partnerReadingInfo ? `<div class="mt-2 space-y-1">${cache.partnerReadingInfo}</div>` : ''}
                         </div>
                         <div class="flex items-center justify-between">
-                            <span class="text-[10px] font-bold text-slate-400">${book.purchaseDate ? new Date(book.purchaseDate).toLocaleDateString() : ''}</span>
+                            <span class="text-[10px] font-bold text-slate-400">${book._formattedPurchaseDate}</span>
                             <div class="flex items-center gap-2">
-                                <span class="text-slate-900 dark:text-white font-black text-sm">${book.price ? '$' + book.price : ''}</span>
+                                <span class="text-slate-900 dark:text-white font-black text-sm">${cache.formattedPrice}</span>
                                 <button class="p-2 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" aria-label="Edit book details">
                                     <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
