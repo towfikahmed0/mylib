@@ -550,6 +550,7 @@
             };
 
             let searchQuery = '';
+            let visitedLibrary = null; // {userId, email, displayName}
             let aiFilteredIds = null;
             let searchTimeout = null;
             let sortBy = localStorage.getItem('mylib_sortBy') || defaultSort;
@@ -589,7 +590,7 @@
             };
 
             function isAnyFilterActive() {
-                return !!(searchQuery || aiFilteredIds ||
+                return !!(searchQuery || aiFilteredIds || visitedLibrary ||
                     statusFilter !== 'all' || categoryFilter !== 'all' ||
                     authorFilter !== 'all' || ownerFilter !== 'all' || tagFilter ||
                     advancedFilters.rating !== 'all' || advancedFilters.minPrice !== null ||
@@ -1461,6 +1462,43 @@
 
                             if (searchTimeout) clearTimeout(searchTimeout);
                             searchTimeout = setTimeout(async () => {
+                                // Check for email search first
+                                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                                if (emailRegex.test(searchQuery.trim())) {
+                                    const email = searchQuery.trim().toLowerCase();
+                                    window.showLoading();
+                                    try {
+                                        const userSnapshot = await db.collection('users').where('email', '==', email).limit(1).get();
+                                        if (!userSnapshot.empty) {
+                                            const userData = userSnapshot.docs[0].data();
+                                            const userId = userSnapshot.docs[0].id;
+
+                                            // Check if collaborator
+                                            const isPartner = allPartnerships.some(p => p.userId1 === userId || p.userId2 === userId);
+                                            if (isPartner || userId === currentUser.uid) {
+                                                // Fetch books for this user specifically from Firestore
+                                                const booksSnapshot = await db.collection('books').where('userId', '==', userId).get();
+                                                const fetchedBooks = booksSnapshot.docs.map(doc => normalizeBook(doc.id, doc.data()));
+
+                                                visitedLibrary = { userId, email, displayName: userData.displayName || email, books: fetchedBooks };
+                                                searchQuery = '';
+                                                document.getElementById('search-input').value = '';
+                                                document.getElementById('clear-search-btn').classList.add('hidden');
+                                            } else {
+                                                visitedLibrary = { error: 'not_collaborating', email };
+                                            }
+                                        } else {
+                                            visitedLibrary = { error: 'user_not_found', email };
+                                        }
+                                    } catch (err) {
+                                        console.error("Email search error:", err);
+                                    } finally {
+                                        window.hideLoading();
+                                        renderLibraryOnly();
+                                    }
+                                    return;
+                                }
+
                                 // Smart AI Detection: if more than 3 words or starts with "find", "suggest", etc.
                                 const words = searchQuery.trim().split(/\s+/);
                                 const isNaturalLanguage = words.length > 3 || /^(find|suggest|recommend|search for|about|show me)\b/i.test(searchQuery);
@@ -1598,7 +1636,7 @@
                 const endTimestamp = advancedFilters.endDate ? new Date(advancedFilters.endDate).getTime() : null;
 
                 // AI filtering priority - Optimized path: Iterate only matching IDs instead of full collection
-                let sourceCollection = books;
+                let sourceCollection = visitedLibrary && visitedLibrary.books ? visitedLibrary.books : books;
                 if (aiFilteredIds && aiFilteredIds instanceof Set) {
                     sourceCollection = [];
                     aiFilteredIds.forEach(id => {
@@ -1608,6 +1646,7 @@
                 }
 
                 let filteredBooks = sourceCollection.filter(b => {
+
                     // 1. High-disqualification criteria first (tab, search, static filters)
                     if (activeTab === 'wishlist') {
                         if (!b.isWishlist) return false;
@@ -1685,6 +1724,11 @@
 
                     if (searchQuery) {
                         html += `<span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold flex items-center gap-2">Search: ${escapeHTML(searchQuery)} <button onclick="window.clearAdvancedFilter('search')" class="focus-visible:ring-2 focus-visible:ring-blue-500/50 rounded-full outline-none" aria-label="Clear search">×</button></span>`;
+                        activeCount++;
+                    }
+                    if (visitedLibrary) {
+                        const label = visitedLibrary.userId ? `Library: ${visitedLibrary.displayName}` : `Search: ${visitedLibrary.email}`;
+                        html += `<span class="px-3 py-1 bg-violet-100 text-violet-700 rounded-full text-[10px] font-bold flex items-center gap-2">${escapeHTML(label)} <button onclick="window.clearAdvancedFilter('visit')" class="focus-visible:ring-2 focus-visible:ring-violet-500/50 rounded-full outline-none" aria-label="Clear visit filter">×</button></span>`;
                         activeCount++;
                     }
                     if (aiFilteredIds) {
@@ -1911,13 +1955,48 @@
 
                 const libraryWrapper = document.getElementById('library-container-wrapper');
                 if (libraryWrapper) {
+                    // Group books by userId
+                    const groups = {};
+                    filteredBooks.forEach(book => {
+                        const uid = book.userId || currentUser.uid;
+                        if (!groups[uid]) groups[uid] = [];
+                        groups[uid].push(book);
+                    });
+
+                    // Ensure My Library is first
+                    const sortedUids = Object.keys(groups).sort((a, b) => {
+                        if (a === currentUser.uid) return -1;
+                        if (b === currentUser.uid) return 1;
+                        return 0;
+                    });
+
                     // Hoist container class calculation out of section template literals
                     const containerClass = viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3';
 
                     // Optimization: Hoist current timestamp and density calculation outside of map loop to minimize redundant work
                     const now = Date.now();
                     const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
-                    let html = `<div class="${containerClass}">${filteredBooks.map(book => renderBookCard(book, now, densityClass)).join('')}</div>`;
+
+                    let html = sortedUids.map(uid => {
+                        const groupBooks = groups[uid];
+                        const isMe = uid === currentUser.uid;
+                        const displayName = userProfileCache[uid] || (isMe ? 'My' : 'Collaborator');
+                        const headerTitle = isMe ? 'My Library' : `From ${displayName}'s Library`;
+
+                        return `
+                            <div class="mb-12">
+                                <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 px-1 flex items-center gap-3">
+                                    <span class="w-8 h-px bg-slate-200 dark:bg-slate-800"></span>
+                                    ${headerTitle}
+                                    <span class="flex-1 h-px bg-slate-200 dark:bg-slate-800"></span>
+                                    <span class="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-[10px] font-bold text-slate-500">${groupBooks.length}</span>
+                                </h3>
+                                <div class="${containerClass}">
+                                    ${groupBooks.map(book => renderBookCard(book, now, densityClass)).join('')}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
 
                     // Empty state
                     if (filteredBooks.length === 0) {
@@ -1943,6 +2022,26 @@
                                 </div>
                             `}
                         </div>
+                        `;
+                    }
+
+                    if (visitedLibrary && visitedLibrary.error) {
+                        const errorMsg = visitedLibrary.error === 'not_collaborating'
+                            ? `You are not collaborating with ${visitedLibrary.email}.`
+                            : `User with email ${visitedLibrary.email} not found.`;
+
+                        html = `
+                            <div class="py-32 text-center">
+                                <div class="bg-rose-50 dark:bg-rose-900/20 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <svg class="w-12 h-12 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                </div>
+                                <h3 class="text-xl font-black font-serif">${errorMsg}</h3>
+                                <p class="text-slate-400 max-w-xs mx-auto mt-2 text-sm">
+                                    Invite them to collaborate in settings to view their library.
+                                </p>
+                                <button onclick="window.setTab('settings')" class="mt-6 px-6 py-2 bg-primary text-white rounded-full font-bold text-sm shadow-lg active:scale-95 transition-transform">Go to Settings</button>
+                                <button onclick="window.clearAdvancedFilter('visit')" class="mt-6 ml-2 px-6 py-2 bg-slate-200 dark:bg-slate-700 rounded-full font-bold text-sm active:scale-95 transition-transform">Back to My Library</button>
+                            </div>
                         `;
                     }
 
@@ -2475,6 +2574,7 @@
                 else if (type === 'price') { advancedFilters.minPrice = null; advancedFilters.maxPrice = null; }
                 else if (type === 'date') { advancedFilters.startDate = null; advancedFilters.endDate = null; }
                 else if (type === 'search') { searchQuery = ''; aiFilteredIds = null; const si = document.getElementById('search-input'); if (si) si.value = ''; }
+                else if (type === 'visit') { visitedLibrary = null; }
                 else if (type === 'status') statusFilter = 'all';
                 else if (type === 'category') categoryFilter = 'all';
                 else if (type === 'author') authorFilter = 'all';
@@ -2485,6 +2585,7 @@
 
             window.clearAllFilters = (shouldRender = true) => {
                 searchQuery = '';
+                visitedLibrary = null;
                 aiFilteredIds = null;
                 tagFilter = null;
                 statusFilter = 'all';
@@ -3099,9 +3200,25 @@
                                 // Update global array and sort newest first by default
                                 books = Array.from(booksMap.values()).sort((a, b) => b._createdTime - a._createdTime);
 
-                                updateLibraryCache();
-                                syncCompletedBooksCount();
-                                renderMainApp();
+                                // Refresh user profiles for grouping display with deduplication
+                                const uidsToFetch = chunk.filter(uid => !userProfileCache[uid]);
+                                if (uidsToFetch.length > 0) {
+                                    Promise.all(uidsToFetch.map(uid => db.collection('users').doc(uid).get())).then(userDocs => {
+                                        userDocs.forEach(doc => {
+                                            if (doc.exists) {
+                                                const data = doc.data();
+                                                userProfileCache[doc.id] = data.displayName || data.email;
+                                            }
+                                        });
+                                        updateLibraryCache();
+                                        syncCompletedBooksCount();
+                                        renderMainApp();
+                                    });
+                                } else {
+                                    updateLibraryCache();
+                                    syncCompletedBooksCount();
+                                    renderMainApp();
+                                }
                             }, err => {
                                 console.error("Firestore Error for chunk:", chunk, err);
                             });
@@ -3530,7 +3647,7 @@
 
                             <div class="relative">
                                 <label for="man-owner" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Owner</label>
-                                <input id="man-owner" placeholder="Owner Name" value="${existingBook?.owner || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" autocomplete="off">
+                                <input id="man-owner" placeholder="Owner Name" value="${existingBook?.owner ?? (userProfile?.displayName || '')}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" autocomplete="off">
                                 <div id="owner-dropdown" class="dropdown-menu" role="listbox" aria-label="Owner suggestions"></div>
                             </div>
 
@@ -3709,7 +3826,9 @@
                         title: document.getElementById('man-title').value,
                         author: document.getElementById('man-author').value || 'Unknown',
                         categories: currentGenres.length > 0 ? currentGenres : ['Other'],
-                        owner: document.getElementById('man-owner').value || '',
+                        owner: document.getElementById('man-owner').value || (userProfile?.displayName || ''),
+                        ownerEmail: userProfile?.email || '',
+                        ownerId: userProfile?.uid || '',
                         tags: tags,
                         about: document.getElementById('man-about').value || '',
                         coverUrl: document.getElementById('man-cover').value || null,
@@ -3732,6 +3851,11 @@
                     if (isEdit) {
                         try {
                             await db.collection('books').doc(existingBook.id).update(bookData);
+                            await db.collection('books').doc(existingBook.id).collection('readingStatus').doc(currentUser.uid).set({
+                                ...personalData,
+                                userId: currentUser.uid,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            }, { merge: true });
                             showToast('Book updated!', 'success');
                             close();
                         } catch (err) {
@@ -3848,9 +3972,13 @@
                     // Save per-user reading status in subcollection
                     await docRef.collection('readingStatus').doc(currentUser.uid).set({
                         status: status,
-                        rating: finalData.rating || 0,
-                        progress: finalData.progress || 0,
-                        comment: finalData.comments || '',
+                        rating: bookData.rating || 0,
+                        progress: bookData.progress || 0,
+                        comment: bookData.comments || '',
+                        tags: bookData.tags || [],
+                        isWishlist: bookData.isWishlist || false,
+                        price: bookData.price || null,
+                        purchaseDate: bookData.purchaseDate || null,
                         userId: currentUser.uid,
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                     }, { merge: true });
@@ -3941,6 +4069,11 @@
                             icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>';
                             actionText = 'added a new book';
                             badgeColor = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400';
+                            break;
+                        case 'book_transferred':
+                            icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>';
+                            actionText = `transferred this book to <span class="font-bold">${escapeHTML(activity.toUserName)}</span>`;
+                            badgeColor = 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400';
                             break;
                         case 'status_updated':
                             icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
@@ -4060,6 +4193,104 @@
                 if (rating > 0 && navigator.vibrate) {
                     navigator.vibrate([10]);
                 }
+            };
+
+            window.transferBook = async (bookId) => {
+                const book = books.find(b => b.id === bookId);
+                if (!book || book.userId !== currentUser.uid) {
+                    showToast("Only the book owner can initiate a transfer.", "error");
+                    return;
+                }
+
+                const partners = allPartnerships.map(p => {
+                    const isUser1 = p.userId1 === currentUser.uid;
+                    const partnerId = isUser1 ? p.userId2 : p.userId1;
+                    return { userId: partnerId, isActive: isUser1 ? !p.user1Unsubscribed : !p.user2Unsubscribed };
+                }).filter(p => p.isActive);
+
+                if (partners.length === 0) {
+                    showToast("You need an active partnership to transfer books.", "info");
+                    return;
+                }
+
+                let transferHtml = `
+                    <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up">
+                        <h2 class="text-2xl font-black mb-2 font-serif italic">Transfer Book</h2>
+                        <p class="text-slate-500 text-sm mb-6">Transfer ownership of "${escapeHTML(book.title)}" to a collaborator. This action is permanent.</p>
+                        <div class="space-y-3 mb-8">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Select Recipient</p>
+                `;
+
+                partners.forEach((p, idx) => {
+                    transferHtml += `
+                        <label class="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors">
+                            <input type="radio" name="transfer-dest" value="${p.userId}" ${idx === 0 ? 'checked' : ''} class="w-5 h-5 text-primary">
+                            <span class="text-sm font-bold" data-partner-id="${p.userId}">Loading collaborator...</span>
+                        </label>
+                    `;
+                });
+
+                transferHtml += `
+                        </div>
+                        <div class="flex gap-4">
+                            <button data-close class="flex-1 px-4 py-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold">Cancel</button>
+                            <button id="confirm-transfer-btn" class="flex-1 px-4 py-4 bg-rose-600 text-white rounded-2xl font-bold shadow-lg shadow-rose-200 dark:shadow-none transition-transform active:scale-95">Transfer</button>
+                        </div>
+                    </div>
+                `;
+
+                const close = showModal(transferHtml);
+
+                // Fetch names
+                Promise.all(partners.map(p => db.collection('users').doc(p.userId).get())).then(docs => {
+                    partners.forEach((p, idx) => {
+                        const span = modalContainer.querySelector(`[data-partner-id="${p.userId}"]`);
+                        if (span && docs[idx].exists) {
+                            const data = docs[idx].data();
+                            span.textContent = data.displayName || data.email || "Collaborator";
+                        }
+                    });
+                });
+
+                document.getElementById('confirm-transfer-btn').addEventListener('click', async () => {
+                    const selected = modalContainer.querySelector('input[name="transfer-dest"]:checked');
+                    if (!selected) return;
+                    const targetUserId = selected.value;
+
+                    if (!confirm(`Are you sure you want to transfer "${book.title}"? You will no longer own this book.`)) return;
+
+                    window.showLoading();
+                    try {
+                        const targetUserDoc = await db.collection('users').doc(targetUserId).get();
+                        const targetName = targetUserDoc.exists ? (targetUserDoc.data().displayName || targetUserDoc.data().email) : "Collaborator";
+
+                        await db.collection('books').doc(bookId).update({
+                            userId: targetUserId,
+                            owner: targetName,
+                            ownerId: targetUserId,
+                            ownerEmail: targetUserDoc.data().email || '',
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+
+                        await db.collection('activityFeed').add({
+                            type: 'book_transferred',
+                            bookId: bookId,
+                            bookTitle: book.title,
+                            fromUserName: currentUser.displayName || currentUser.email,
+                            toUserName: targetName,
+                            userId: currentUser.uid,
+                            libraryId: targetUserId,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+
+                        showToast(`Successfully transferred to ${targetName}`, 'success');
+                        close();
+                    } catch (err) {
+                        showToast("Transfer failed: " + err.message, "error");
+                    } finally {
+                        window.hideLoading();
+                    }
+                });
             };
 
             window.cycleBookStatus = async (bookId, event) => {
@@ -4809,7 +5040,10 @@
                         ` : ''}
 
                         <div class="flex flex-col sm:flex-row items-center justify-between mt-10 gap-4">
-                            <button id="delete-book-btn" class="w-full sm:w-auto px-8 py-4 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-2xl font-bold transition-all">Delete</button>
+                            <div class="flex w-full sm:w-auto gap-2">
+                                <button id="delete-book-btn" class="px-6 py-4 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-2xl font-bold transition-all">Delete</button>
+                                ${book.userId === currentUser.uid ? `<button id="transfer-book-btn" class="px-6 py-4 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-2xl font-bold transition-all">Transfer</button>` : ''}
+                            </div>
                             <div class="flex w-full sm:w-auto gap-4">
                                 <button id="edit-book-btn" class="flex-1 sm:flex-none px-8 py-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition-all">Edit Details</button>
                                 <button data-close class="flex-1 sm:flex-none px-10 py-4 bg-primary dark:bg-white text-white dark:text-primary rounded-2xl font-bold shadow-xl shadow-primary/20 dark:shadow-none hover:scale-105 active:scale-95 transition-all" aria-label="Close details" title="Close details">Close</button>
@@ -4822,6 +5056,10 @@
                 document.getElementById('edit-book-btn').addEventListener('click', () => {
                     close();
                     openManualEntry(null, book);
+                });
+
+                document.getElementById('transfer-book-btn')?.addEventListener('click', () => {
+                    window.transferBook(book.id);
                 });
 
                 document.getElementById('generate-ai-details-btn')?.addEventListener('click', async () => {
@@ -4879,7 +5117,10 @@
                     const btn = e.currentTarget;
                     btn.disabled = true;
                     try {
-                        await db.collection('books').doc(book.id).update({ isWishlist: false });
+                        await db.collection('books').doc(book.id).collection('readingStatus').doc(currentUser.uid).set({
+                            isWishlist: false,
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }, { merge: true });
                         showToast('Moved to library!', 'success');
                         close();
                     } catch (err) {
