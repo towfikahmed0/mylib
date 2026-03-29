@@ -63,9 +63,11 @@ service cloud.firestore {
 
     // ========== READING STATUS SUBCOLLECTION (supports Collection Group) ==========
     match /{path=**}/readingStatus/{docId} {
-      // Allow any authenticated user to read (collection group queries need this)
-      // Client-side filtering ensures users only see their own status
-      allow read: if request.auth != null;
+      // Allow users to read their own status or statuses in a library they are a member of
+      allow read: if request.auth != null && (
+        request.auth.uid == docId ||
+        isLibraryMember(request.auth.uid, get(/databases/$(database)/documents/books/$(request.path[4])).data.userId)
+      );
       
       // Only allow write/update if writing to your own document
       allow create, update: if request.auth != null && 
