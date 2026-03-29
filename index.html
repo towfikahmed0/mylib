@@ -326,7 +326,7 @@
                         <p class="text-[10px] text-white/70 font-bold uppercase tracking-widest mt-1">Online & Ready</p>
                     </div>
                 </div>
-                <button id="ai-chat-close" aria-label="Close AI Librarian" class="p-2 hover:bg-white/10 rounded-full transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                <button id="ai-chat-close" aria-label="Close AI Librarian" class="p-2 hover:bg-white/10 rounded-full transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-white/20"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
             </div>
             <div id="ai-chat-messages" class="flex-1 p-5 space-y-4 overflow-y-auto max-h-[400px] min-h-[300px] custom-scrollbar">
                 <div class="bg-violet-50 dark:bg-violet-900/20 p-4 rounded-2xl rounded-tl-none border border-violet-100 dark:border-violet-900/30">
@@ -341,7 +341,7 @@
             <div class="p-4 border-t border-slate-100 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50">
                 <form id="ai-chat-form" class="flex gap-2">
                     <input id="ai-chat-input" type="text" placeholder="Ask about your books..." aria-label="Ask about your books" class="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-2xl focus:ring-2 focus:ring-violet-500 outline-none text-sm transition-all" autocomplete="off">
-                    <button type="submit" aria-label="Send message" class="p-3 bg-violet-600 text-white rounded-2xl hover:opacity-90 transition active:scale-95 shadow-lg shadow-violet-200 dark:shadow-none">
+                    <button type="submit" aria-label="Send message" class="p-3 bg-violet-600 text-white rounded-2xl hover:opacity-90 transition active:scale-95 shadow-lg shadow-violet-200 dark:shadow-none focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-500/50">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
                     </button>
                 </form>
@@ -482,7 +482,7 @@
 
             // Performance optimizations: pre-rendered star strings and frozen status constant
             const STAR_CACHE = Array.from({ length: 6 }, (_, i) => i === 0 ? '' : '★'.repeat(i) + '☆'.repeat(5 - i));
-            const DEFAULT_STATUS = Object.freeze({ status: 'want_to_read', rating: 0, progress: 0, comment: '' });
+            const DEFAULT_STATUS = Object.freeze({ status: 'want_to_read', rating: 0, progress: 0, comment: '', isWishlist: false, tags: [], price: null, purchaseDate: null });
             let unsubscribeBooks = null;
             let unsubscribeStatus = null;
             let allPartnerships = [];
@@ -1067,11 +1067,11 @@
                     <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
                         <h2 class="text-2xl font-black mb-6 font-serif">Data Management</h2>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <button id="import-btn" class="flex items-center justify-center gap-3 p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition text-sm">
+                            <button id="import-btn" class="flex items-center justify-center gap-3 p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition text-sm focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20">
                                 <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
                                 Import CSV
                             </button>
-                            <button id="export-btn" class="flex items-center justify-center gap-3 p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition text-sm">
+                            <button id="export-btn" class="flex items-center justify-center gap-3 p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition text-sm focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20">
                                 <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                 Export CSV
                             </button>
@@ -1358,10 +1358,10 @@
                             </button>
                             <div class="flex-1"></div>
                             <nav class="hidden md:flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                                <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'library' ? 'bg-white dark:bg-slate-700 shadow-[0_8px_16px_rgba(var(--primary-rgb),0.15)] text-primary ring-2 ring-[rgba(var(--primary-rgb),0.1)]' : 'text-slate-500 hover:text-slate-700'}">Library</button>
-                                <button onclick="window.setTab('wishlist')" ${activeTab === 'wishlist' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'wishlist' ? 'bg-white dark:bg-slate-700 shadow-[0_8px_16px_rgba(var(--primary-rgb),0.15)] text-primary ring-2 ring-[rgba(var(--primary-rgb),0.1)]' : 'text-slate-500 hover:text-slate-700'}">Wishlist</button>
-                                <button onclick="window.setTab('insights')" ${activeTab === 'insights' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'insights' ? 'bg-white dark:bg-slate-700 shadow-[0_8px_16px_rgba(var(--primary-rgb),0.15)] text-primary ring-2 ring-[rgba(var(--primary-rgb),0.1)]' : 'text-slate-500 hover:text-slate-700'}">Insights</button>
-                                <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'activity' ? 'bg-white dark:bg-slate-700 shadow-[0_8px_16px_rgba(var(--primary-rgb),0.15)] text-primary ring-2 ring-[rgba(var(--primary-rgb),0.1)]' : 'text-slate-500 hover:text-slate-700'}">Activity</button>
+                                <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 ${activeTab === 'library' ? 'bg-white dark:bg-slate-700 shadow-[0_8px_16px_rgba(var(--primary-color),0.15)] text-primary ring-2 ring-[rgba(var(--primary-color),0.1)]' : 'text-slate-500 hover:text-slate-700'}">Library</button>
+                                <button onclick="window.setTab('wishlist')" ${activeTab === 'wishlist' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 ${activeTab === 'wishlist' ? 'bg-white dark:bg-slate-700 shadow-[0_8px_16px_rgba(var(--primary-color),0.15)] text-primary ring-2 ring-[rgba(var(--primary-color),0.1)]' : 'text-slate-500 hover:text-slate-700'}">Wishlist</button>
+                                <button onclick="window.setTab('insights')" ${activeTab === 'insights' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 ${activeTab === 'insights' ? 'bg-white dark:bg-slate-700 shadow-[0_8px_16px_rgba(var(--primary-color),0.15)] text-primary ring-2 ring-[rgba(var(--primary-color),0.1)]' : 'text-slate-500 hover:text-slate-700'}">Insights</button>
+                                <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 ${activeTab === 'activity' ? 'bg-white dark:bg-slate-700 shadow-[0_8px_16px_rgba(var(--primary-color),0.15)] text-primary ring-2 ring-[rgba(var(--primary-color),0.1)]' : 'text-slate-500 hover:text-slate-700'}">Activity</button>
                             </nav>
                             <div class="flex items-center gap-1">
                                 <button id="manual-add-btn" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" title="Add Book Manually" aria-label="Add Book Manually">
@@ -1423,7 +1423,7 @@
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                                 </button>
                             </div>
-                            <button id="advanced-search-btn" class="px-6 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[1.5rem] font-bold text-slate-500 hover:text-blue-600 transition-all shadow-sm flex items-center gap-2" aria-label="Open Advanced Filters" aria-haspopup="dialog" aria-expanded="false">
+                            <button id="advanced-search-btn" class="px-6 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[1.5rem] font-bold text-slate-500 hover:text-blue-600 transition-all shadow-sm flex items-center gap-2 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" aria-label="Open Advanced Filters" aria-haspopup="dialog" aria-expanded="false">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
                                 <span class="hidden sm:inline">Filters</span>
                                 <span id="filter-dot" class="hidden w-2 h-2 bg-blue-500 rounded-full"></span>
@@ -1513,15 +1513,32 @@
 
                         async function performAISearch(query) {
                             window.showLoading();
-                            const bookList = books.map(b => ({ id: b.id, title: b.title, author: b.author, genres: b._genres.join(', ') }));
 
-                            const prompt = `Query: "${query}"
-                            Library: ${JSON.stringify(bookList)}
+                            // Optimization: Filter book list to send to AI to avoid hitting token limits
+                            // We use a simple keyword match to find a subset of potentially relevant books
+                            const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+                            let candidateBooks = books;
 
-                            Return ONLY a JSON array of book IDs that best match this query. Empty array if none.
+                            if (queryWords.length > 0) {
+                                candidateBooks = books.filter(b => {
+                                    return queryWords.some(word => b._searchBlob.includes(word));
+                                });
+                            }
+
+                            // If we still have too many, take the most recent 100
+                            if (candidateBooks.length > 100) {
+                                candidateBooks = candidateBooks.slice(0, 100);
+                            }
+
+                            const bookList = candidateBooks.map(b => ({ id: b.id, title: b.title, author: b.author, genres: b._genres.join(', ') }));
+
+                            const prompt = `User Query: "${query}"
+                            Available Books (Subset): ${JSON.stringify(bookList)}
+
+                            Return ONLY a JSON array of book IDs from the provided list that best match this query. Empty array if none.
                             Example: ["id1", "id2"]`;
 
-                            const systemInstruction = "You are a library search assistant. Analyze the user's natural language query and find relevant books from their specific collection. Return ONLY the JSON array of IDs.";
+                            const systemInstruction = "You are a library search assistant. Analyze the user's natural language query and find relevant books from their collection. Return ONLY the JSON array of IDs.";
 
                             const result = await askGemini(prompt, systemInstruction);
                             if (result) {
@@ -1646,12 +1663,14 @@
                 }
 
                 let filteredBooks = sourceCollection.filter(b => {
+                    const statusData = getStatusData(b.id);
+                    const isWishlist = statusData.hasOwnProperty('isWishlist') ? statusData.isWishlist : b.isWishlist;
 
                     // 1. High-disqualification criteria first (tab, search, static filters)
                     if (activeTab === 'wishlist') {
-                        if (!b.isWishlist) return false;
+                        if (!isWishlist) return false;
                     } else {
-                        if (b.isWishlist) return false;
+                        if (isWishlist) return false;
                     }
 
                     // Skip redundant search blob check if we already filtered by AI IDs
@@ -1664,11 +1683,12 @@
                     if (tagFilter && (!b.tags || !b.tags.includes(tagFilter))) return false;
 
                     // 2. Advanced filters (price, date) - avoid expensive ops if possible
-                    if (advancedFilters.minPrice !== null && b.price < advancedFilters.minPrice) return false;
-                    if (advancedFilters.maxPrice !== null && b.price > advancedFilters.maxPrice) return false;
+                    const price = statusData.price !== null && statusData.price !== undefined ? statusData.price : b.price;
+                    if (advancedFilters.minPrice !== null && price < advancedFilters.minPrice) return false;
+                    if (advancedFilters.maxPrice !== null && price > advancedFilters.maxPrice) return false;
 
                     if (startTimestamp !== null || endTimestamp !== null) {
-                        const bDate = b._purchaseTime;
+                        const bDate = statusData.purchaseDate ? new Date(statusData.purchaseDate).getTime() : b._purchaseTime;
                         if (startTimestamp !== null && bDate < startTimestamp) return false;
                         if (endTimestamp !== null && bDate > endTimestamp) return false;
                     }
@@ -1678,13 +1698,9 @@
                         if (statusFilter === 'borrowed') {
                             if (!b.borrowedBy) return false;
                         } else if (statusFilter === 'shared_wishlist') {
-                            if (!b.isWishlist) return false;
-                            // A book is in shared wishlist if it's on MY wishlist AND someone else also has it on theirs
-                            // Or in this case, since we unified the list, maybe it's just any book that is on wishlist and NOT owned by me?
-                            // Actually, let's define it as books on wishlist that are shared by partners.
+                            if (!isWishlist) return false;
                             if (b.userId === currentUser.uid) return false;
                         } else {
-                            const statusData = getStatusData(b.id);
                             if (statusFilter !== 'all' && statusData.status !== statusFilter) return false;
                             if (targetRating !== null) {
                                 if (targetRating === 0) {
@@ -2175,62 +2191,67 @@
                 showToast(`Updating ${type}...`, 'info');
                 window.showLoading();
 
-                if (type === 'Genre') {
-                    const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).get();
-                    const batch = db.batch();
-                    let count = 0;
-                    snapshot.docs.forEach(doc => {
-                        const data = doc.data();
-                        let updated = false;
-                        let categories = getBookGenres(data);
-                        if (categories.includes(oldVal)) {
-                            categories = categories.map(c => c === oldVal ? newVal : c);
-                            batch.update(doc.ref, { categories, category: firebase.firestore.FieldValue.delete() });
-                            updated = true;
+                try {
+                    // Update metadata across all libraries the user has permission to edit
+                    const editableUserIds = [currentUser.uid, ...allPartnerships.filter(p => p.allowAddBooks).map(p => p.userId1 === currentUser.uid ? p.userId2 : p.userId1)];
+
+                    let totalUpdated = 0;
+                    for (const targetUserId of editableUserIds) {
+                        if (type === 'Genre') {
+                            const snapshot = await db.collection('books').where('userId', '==', targetUserId).get();
+                            const batch = db.batch();
+                            let count = 0;
+                            snapshot.docs.forEach(doc => {
+                                const data = doc.data();
+                                let categories = getBookGenres(data);
+                                if (categories.includes(oldVal)) {
+                                    categories = categories.map(c => c === oldVal ? newVal : c);
+                                    batch.update(doc.ref, { categories, category: firebase.firestore.FieldValue.delete() });
+                                    count++;
+                                }
+                            });
+                            if (count > 0) {
+                                await batch.commit();
+                                totalUpdated += count;
+                                await db.collection('activityFeed').add({
+                                    type: 'metadata_updated',
+                                    metadataType: type,
+                                    oldValue: oldVal,
+                                    newValue: newVal,
+                                    userName: currentUser.displayName || currentUser.email || currentUser.uid,
+                                    userId: currentUser.uid,
+                                    addedTo: targetUserId === currentUser.uid ? 'My' : 'Partner',
+                                    libraryId: targetUserId,
+                                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                                });
+                            }
+                        } else {
+                            const field = type.toLowerCase();
+                            const snapshot = await db.collection('books').where('userId', '==', targetUserId).where(field, '==', oldVal).get();
+                            const batch = db.batch();
+                            snapshot.docs.forEach(doc => {
+                                batch.update(doc.ref, { [field]: newVal });
+                            });
+                            if (snapshot.size > 0) {
+                                await batch.commit();
+                                totalUpdated += snapshot.size;
+                                await db.collection('activityFeed').add({
+                                    type: 'metadata_updated',
+                                    metadataType: type,
+                                    oldValue: oldVal,
+                                    newValue: newVal,
+                                    userName: currentUser.displayName || currentUser.email || currentUser.uid,
+                                    userId: currentUser.uid,
+                                    addedTo: targetUserId === currentUser.uid ? 'My' : 'Partner',
+                                    libraryId: targetUserId,
+                                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                                });
+                            }
                         }
-                        if (updated) count++;
-                    });
-                    await batch.commit();
-
-                    if (count > 0) {
-                        await db.collection('activityFeed').add({
-                            type: 'metadata_updated',
-                            metadataType: type,
-                            oldValue: oldVal,
-                            newValue: newVal,
-                            userName: currentUser.displayName || currentUser.email || currentUser.uid,
-                            userId: currentUser.uid,
-                            addedTo: 'My',
-                            libraryId: currentUser.uid,
-                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                        });
                     }
-
-                    showToast(`Updated ${count} books`, 'success');
-                } else {
-                    const field = type.toLowerCase();
-                    const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).where(field, '==', oldVal).get();
-                    const batch = db.batch();
-                    snapshot.docs.forEach(doc => {
-                        batch.update(doc.ref, { [field]: newVal });
-                    });
-                    await batch.commit();
-
-                    if (snapshot.size > 0) {
-                        await db.collection('activityFeed').add({
-                            type: 'metadata_updated',
-                            metadataType: type,
-                            oldValue: oldVal,
-                            newValue: newVal,
-                            userName: currentUser.displayName || currentUser.email || currentUser.uid,
-                            userId: currentUser.uid,
-                            addedTo: 'My',
-                            libraryId: currentUser.uid,
-                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                    }
-
-                    showToast(`Updated ${snapshot.size} books`, 'success');
+                    showToast(`Updated ${totalUpdated} books across available libraries`, 'success');
+                } catch (err) {
+                    showToast(`Update failed: ${err.message}`, 'error');
                 }
                 window.hideLoading();
                 renderMainApp();
@@ -2238,35 +2259,49 @@
 
             window.deleteMetadata = async (type, val) => {
                 const fallback = type === 'Genre' ? 'Other' : 'Unknown';
-                if (!confirm(`Remove "${val}" from all books? (They will be set to "${fallback}" if no other genres remain)`)) return;
+                if (!confirm(`Remove "${val}" from all books in all editable libraries? (They will be set to "${fallback}" if no other values remain)`)) return;
 
                 showToast(`Updating books...`, 'info');
                 window.showLoading();
-                if (type === 'Genre') {
-                    const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).get();
-                    const batch = db.batch();
-                    let count = 0;
-                    snapshot.docs.forEach(doc => {
-                        const data = doc.data();
-                        let categories = getBookGenres(data);
-                        if (categories.includes(val)) {
-                            categories = categories.filter(c => c !== val);
-                            if (categories.length === 0) categories = [fallback];
-                            batch.update(doc.ref, { categories, category: firebase.firestore.FieldValue.delete() });
-                            count++;
+                try {
+                    const editableUserIds = [currentUser.uid, ...allPartnerships.filter(p => p.allowAddBooks).map(p => p.userId1 === currentUser.uid ? p.userId2 : p.userId1)];
+                    let totalUpdated = 0;
+
+                    for (const targetUserId of editableUserIds) {
+                        if (type === 'Genre') {
+                            const snapshot = await db.collection('books').where('userId', '==', targetUserId).get();
+                            const batch = db.batch();
+                            let count = 0;
+                            snapshot.docs.forEach(doc => {
+                                const data = doc.data();
+                                let categories = getBookGenres(data);
+                                if (categories.includes(val)) {
+                                    categories = categories.filter(c => c !== val);
+                                    if (categories.length === 0) categories = [fallback];
+                                    batch.update(doc.ref, { categories, category: firebase.firestore.FieldValue.delete() });
+                                    count++;
+                                }
+                            });
+                            if (count > 0) {
+                                await batch.commit();
+                                totalUpdated += count;
+                            }
+                        } else {
+                            const field = type.toLowerCase();
+                            const snapshot = await db.collection('books').where('userId', '==', targetUserId).where(field, '==', val).get();
+                            const batch = db.batch();
+                            snapshot.docs.forEach(doc => {
+                                batch.update(doc.ref, { [field]: fallback });
+                            });
+                            if (snapshot.size > 0) {
+                                await batch.commit();
+                                totalUpdated += snapshot.size;
+                            }
                         }
-                    });
-                    await batch.commit();
-                    showToast(`Updated ${count} books`, 'success');
-                } else {
-                    const field = type.toLowerCase();
-                    const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).where(field, '==', val).get();
-                    const batch = db.batch();
-                    snapshot.docs.forEach(doc => {
-                        batch.update(doc.ref, { [field]: fallback });
-                    });
-                    await batch.commit();
-                    showToast(`Updated ${snapshot.size} books`, 'success');
+                    }
+                    showToast(`Updated ${totalUpdated} books across available libraries`, 'success');
+                } catch (err) {
+                    showToast(`Delete failed: ${err.message}`, 'error');
                 }
                 window.hideLoading();
                 renderMainApp();
@@ -2764,10 +2799,11 @@
                 let selectedIndex = -1;
 
                 const renderMenu = (filter = '') => {
-                    const filtered = dataList.filter(item => item.toLowerCase().includes(filter.toLowerCase()));
+                    const filterLower = filter.toLowerCase();
+                    const filtered = dataList.filter(item => item.toLowerCase().includes(filterLower));
                     let items = filtered.map(item => ({ type: 'item', value: item }));
 
-                    if (filter && !filtered.some(item => item.toLowerCase() === filter.toLowerCase())) {
+                    if (filter && !filtered.some(item => item.toLowerCase() === filterLower)) {
                         items.push({ type: 'add', value: filter });
                     }
 
@@ -5316,9 +5352,8 @@
                                             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                                         };
                                         if (progress === 100) {
-                                            updateData.status = 'finished';
                                             if (navigator.vibrate) navigator.vibrate([10, 30, 10, 30, 10]);
-                                            showToast("Congratulations! You've finished this book! 📚✨", 'success', 5000);
+                                            showToast("Congratulations! You've reached 100%! 📚✨", 'success', 5000);
                                         } else {
                                             showToast('Progress updated!', 'success');
                                         }
@@ -5351,9 +5386,8 @@
                                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                                 };
                                 if (progress === 100) {
-                                    updateData.status = 'finished';
                                     if (navigator.vibrate) navigator.vibrate([10, 30, 10, 30, 10]);
-                                    showToast("Congratulations! You've finished this book! 📚✨", 'success', 5000);
+                                    showToast("Congratulations! You've reached 100%! 📚✨", 'success', 5000);
                                 } else {
                                     showToast('Progress updated!', 'success');
                                 }
