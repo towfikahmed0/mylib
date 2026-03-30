@@ -13,6 +13,11 @@ service cloud.firestore {
              exists(path('/databases/' + database + '/documents/partnerships/' + getPartnershipId(userId, libraryOwnerId)));
     }
 
+    // Check if a library is public
+    function isLibraryPublic(libraryOwnerId) {
+      return get(/databases/$(database)/documents/users/$(libraryOwnerId)).data.get('isPublic', false) == true;
+    }
+
     // Check if user has edit permissions in the library
     function canEditLibrary(userId, libraryOwnerId) {
       return userId == libraryOwnerId || (
@@ -50,9 +55,11 @@ service cloud.firestore {
 
     // ========== BOOKS COLLECTION ==========
     match /books/{bookId} {
-      // Allow read if user is the owner or a partner
-      allow read: if request.auth != null &&
-        isLibraryMember(request.auth.uid, resource.data.userId);
+      // Allow read if user is the owner, a partner, or if the library is public
+      allow read: if request.auth != null && (
+        isLibraryMember(request.auth.uid, resource.data.userId) ||
+        isLibraryPublic(resource.data.userId)
+      );
       
       allow create: if request.auth != null &&
         canEditLibrary(request.auth.uid, request.resource.data.userId);
@@ -63,10 +70,11 @@ service cloud.firestore {
 
     // ========== READING STATUS SUBCOLLECTION (supports Collection Group) ==========
     match /{path=**}/readingStatus/{docId} {
-      // Allow users to read their own status or statuses in a library they are a member of
+      // Allow users to read their own status, statuses in a library they are a member of, or public library statuses
       allow read: if request.auth != null && (
         request.auth.uid == docId ||
-        isLibraryMember(request.auth.uid, get(/databases/$(database)/documents/books/$(request.path[4])).data.userId)
+        isLibraryMember(request.auth.uid, get(/databases/$(database)/documents/books/$(request.path[4])).data.userId) ||
+        isLibraryPublic(get(/databases/$(database)/documents/books/$(request.path[4])).data.userId)
       );
       
       // Only allow write/update if writing to your own document
@@ -75,6 +83,24 @@ service cloud.firestore {
         request.resource.data.userId == request.auth.uid;
       
       allow delete: if request.auth != null && request.auth.uid == docId;
+    }
+
+    // ========== TRANSFER REQUESTS COLLECTION ==========
+    match /transferRequests/{requestId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.fromUserId ||
+        request.auth.uid == resource.data.toUserId
+      );
+      allow create: if request.auth != null &&
+        request.auth.uid == request.resource.data.fromUserId;
+      allow update: if request.auth != null && (
+        request.auth.uid == resource.data.fromUserId ||
+        request.auth.uid == resource.data.toUserId
+      );
+      allow delete: if request.auth != null && (
+        request.auth.uid == resource.data.fromUserId ||
+        request.auth.uid == resource.data.toUserId
+      );
     }
 
     // ========== ACTIVITY FEED COLLECTION ==========
