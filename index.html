@@ -781,12 +781,87 @@
                 });
             }
 
-            function renderInsights() {
-                // Performance optimization: Use pre-calculated libraryStats
-                const { authorsCount, ownersCount, genresCount, tagsCount, totalValue, statusCounts, monthlyActivity, libraryCount } = libraryStats;
+            let insightsUserId = null;
+            let insightsUserName = null;
+            let insightsStats = null;
 
-                const goal = readingGoal;
-                const finished = userProfile?.completedBooksCount || 0;
+            window.showCollaboratorInsights = async (userId, userName) => {
+                insightsUserId = userId;
+                insightsUserName = userName;
+                insightsStats = null;
+                activeTab = 'insights';
+                renderMainApp();
+            };
+
+            async function renderInsights() {
+                // Performance optimization: Use pre-calculated libraryStats if viewing own library
+                let stats = libraryStats;
+                let finished = userProfile?.completedBooksCount || 0;
+                let goal = readingGoal;
+                let name = "My";
+
+                if (insightsUserId && insightsUserId !== currentUser.uid) {
+                    if (!insightsStats) {
+                        window.showLoading();
+                        try {
+                            const booksSnapshot = await db.collection('books').where('userId', '==', insightsUserId).get();
+                            const fetchedBooks = booksSnapshot.docs.map(doc => normalizeBook(doc.id, doc.data()));
+
+                            // Minimal status fetch for the other user
+                            // We only need finished count for their goal if we wanted to show it
+                            // For now, let's just calculate stats from their books
+                            const tempStats = {
+                                currentlyReading: [],
+                                libraryCount: 0,
+                                wishlistCount: 0,
+                                statusCounts: { finished: 0, reading: 0, want_to_read: 0 },
+                                authorsCount: {},
+                                ownersCount: {},
+                                genresCount: {},
+                                tagsCount: {},
+                                totalValue: 0,
+                                monthlyActivity: new Array(12).fill(0)
+                            };
+
+                            const currentYear = new Date().getFullYear();
+                            fetchedBooks.forEach(b => {
+                                if (b.isWishlist) tempStats.wishlistCount++;
+                                else {
+                                    tempStats.libraryCount++;
+                                    const author = b.author || 'Unknown';
+                                    tempStats.authorsCount[author] = (tempStats.authorsCount[author] || 0) + 1;
+                                    const owner = b.owner || 'Unknown';
+                                    tempStats.ownersCount[owner] = (tempStats.ownersCount[owner] || 0) + 1;
+                                    const bGenres = getBookGenres(b);
+                                    bGenres.forEach(g => { tempStats.genresCount[g] = (tempStats.genresCount[g] || 0) + 1; });
+                                    (b.tags || []).forEach(t => { tempStats.tagsCount[t] = (tempStats.tagsCount[t] || 0) + 1; });
+                                    tempStats.totalValue += (parseFloat(b.price) || 0);
+
+                                    // For other users, we might not have easy access to their status subcollection
+                                    // unless we're a collaborator. But for stats, let's assume 'finished' if it was marked so.
+                                    // Actually, let's just show what we can from the book document.
+                                }
+                            });
+                            insightsStats = tempStats;
+                        } catch (err) {
+                            console.error("Error fetching insights for user:", err);
+                        } finally {
+                            window.hideLoading();
+                        }
+                    }
+                    stats = insightsStats || libraryStats;
+                    // Try to get finished count from their profile
+                    const profileDoc = await db.collection('users').doc(insightsUserId).get();
+                    if (profileDoc.exists) {
+                        finished = profileDoc.data().completedBooksCount || 0;
+                    } else {
+                        finished = stats.statusCounts.finished;
+                    }
+                    goal = 50; // Default
+                    name = insightsUserName;
+                }
+
+                const { authorsCount, ownersCount, genresCount, tagsCount, totalValue, statusCounts, monthlyActivity, libraryCount } = stats;
                 const goalPercent = Math.min(100, Math.round((finished / goal) * 100));
 
                 // SVG Progress Ring Constants
@@ -796,10 +871,22 @@
 
                 return `
                 <div class="max-w-4xl mx-auto space-y-8 animate-slide-up">
+                        ${insightsUserId && insightsUserId !== currentUser.uid ? `
+                            <div class="flex items-center gap-4 mb-8 bg-blue-50 dark:bg-blue-900/20 p-6 rounded-[2rem] border border-blue-200 dark:border-blue-800">
+                                <button onclick="window.setTab('insights')" class="p-3 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:bg-slate-100 transition-colors text-blue-600" title="Back to My Insights" aria-label="Back to My Insights">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                                </button>
+                                <div>
+                                    <h2 class="text-2xl font-black font-serif italic text-blue-600 dark:text-blue-400">${escapeHTML(insightsUserName)}'s Insights</h2>
+                                    <p class="text-xs text-slate-500">You are viewing another user's library statistics</p>
+                                </div>
+                            </div>
+                        ` : ''}
+
                     <div class="flex flex-col md:flex-row gap-8">
                         <!-- Goal Progress Card -->
                         <div class="glass flex-1 p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800 flex flex-col items-center justify-center text-center">
-                            <h2 class="text-xl font-black mb-6 font-serif italic text-blue-600 dark:text-blue-400">Reading Goal</h2>
+                                <h2 class="text-xl font-black mb-6 font-serif italic text-blue-600 dark:text-blue-400">${name} Reading Goal</h2>
                             <div class="relative w-48 h-48 mb-6">
                                 <svg class="w-full h-full -rotate-90">
                                     <circle cx="96" cy="96" r="${radius}" stroke="currentColor" stroke-width="12" fill="transparent" class="text-slate-100 dark:text-slate-800" />
@@ -846,8 +933,19 @@
                         </div>
                     </div>
 
+                    <!-- Collaborators Quick Links -->
+                    ${!insightsUserId || insightsUserId === currentUser.uid ? `
+                        <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
+                            <h2 class="text-xl font-black font-serif italic text-blue-600 dark:text-blue-400 mb-4">Partner Insights</h2>
+                            <div id="partner-insights-links" class="flex flex-wrap gap-4">
+                                <!-- Populated via renderPartnershipsInInsights() -->
+                                <p class="text-xs text-slate-400 italic">Connect with partners in Settings to view their insights here.</p>
+                            </div>
+                        </div>
+                    ` : ''}
+
                     <!-- AI Recommendations Section -->
-                    <div id="ai-recs-container" class="glass p-8 rounded-[2.5rem] border border-violet-100 dark:border-violet-900/30 bg-gradient-to-br from-white to-violet-50/30 dark:from-slate-900 dark:to-violet-900/10">
+                    <div id="ai-recs-container" class="glass p-8 rounded-[2.5rem] border border-violet-100 dark:border-violet-900/30 bg-gradient-to-br from-white to-violet-50/30 dark:from-slate-900 dark:to-violet-900/10 ${insightsUserId && insightsUserId !== currentUser.uid ? 'hidden' : ''}">
                         <div class="flex items-center justify-between mb-6">
                             <div>
                                 <h2 class="text-xl font-black font-serif italic text-violet-600 dark:text-violet-400">AI Curator</h2>
@@ -885,8 +983,8 @@
                             const height = (count / max) * 100;
                             const isCurrentMonth = new Date().getMonth() === i;
                             return `
-                                        <div class="flex-1 flex flex-col items-center gap-2 group">
-                                            <div class="relative w-full">
+                                        <div class="flex-1 h-full flex flex-col items-center gap-2 group">
+                                            <div class="relative w-full flex-1 flex flex-col justify-end">
                                                 <div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[8px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">${count} books</div>
                                                 <div class="w-full ${isCurrentMonth ? 'bg-primary shadow-lg shadow-primary/20' : 'bg-blue-100 dark:bg-blue-900/40 group-hover:bg-blue-200 dark:group-hover:bg-blue-900/60'} rounded-t-lg transition-all duration-1000 ease-out" style="height: ${height}%"></div>
                                             </div>
@@ -1004,6 +1102,16 @@
                                     <button id="save-profile-btn" class="sm:px-6 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 dark:shadow-none">Save Profile</button>
                                 </div>
                             </div>
+                            <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                <div>
+                                    <h3 class="text-sm font-bold">Public Collection</h3>
+                                    <p class="text-[10px] text-slate-500">Allow anyone to find your library by searching for your email.</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="profile-public-toggle" class="sr-only peer" ${userProfile?.isPublic ? 'checked' : ''}>
+                                    <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                                </label>
+                            </div>
                         </div>
                     </div>
 
@@ -1021,6 +1129,13 @@
                             <div id="collaborators-list" class="space-y-2">
                                 <!-- Collaborators will be rendered here -->
                             </div>
+                        </div>
+                    </div>
+
+                    <div id="transfer-requests-container" class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800 hidden">
+                        <h2 class="text-2xl font-black mb-6 font-serif italic text-blue-600 dark:text-blue-400">Transfer Requests</h2>
+                        <div id="transfer-requests-list" class="space-y-4">
+                            <!-- Requests will be rendered here -->
                         </div>
                     </div>
 
@@ -1301,8 +1416,104 @@
                 }
             };
 
+            function renderTransferRequests() {
+                const listEl = document.getElementById('transfer-requests-list');
+                const containerEl = document.getElementById('transfer-requests-container');
+                const dotEl = document.getElementById('settings-notification-dot');
+                if (!listEl) return;
+
+                if (unsubscribeTransferRequests) unsubscribeTransferRequests();
+
+                unsubscribeTransferRequests = db.collection('transferRequests')
+                    .where('toUserId', '==', currentUser.uid)
+                    .where('status', '==', 'pending')
+                    .onSnapshot(snapshot => {
+                        const requests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                        if (requests.length > 0) {
+                            containerEl?.classList.remove('hidden');
+                            dotEl?.classList.remove('hidden');
+
+                            listEl.innerHTML = requests.map(req => `
+                                <div class="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-blue-100 dark:border-blue-900/30">
+                                    <div class="flex justify-between items-start mb-3">
+                                        <div>
+                                            <span class="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest block mb-1">Transfer Request</span>
+                                            <p class="text-sm">
+                                                <span class="font-bold text-primary">${escapeHTML(req.fromUserName)}</span>
+                                                wants to transfer <span class="font-bold">${req.bookIds.length} books</span> to you.
+                                            </p>
+                                        </div>
+                                        <span class="text-[8px] font-bold text-slate-400 uppercase">${req.createdAt ? formatDate(req.createdAt.toDate()) : ''}</span>
+                                    </div>
+                                    <div class="mb-4 max-h-24 overflow-y-auto pr-2 custom-scrollbar">
+                                        <p class="text-[10px] font-bold text-slate-400 uppercase mb-2">Books included:</p>
+                                        <ul class="text-xs space-y-1">
+                                            ${req.bookDetails.map(b => `<li class="flex items-center gap-2"><svg class="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>${escapeHTML(b.title)}</li>`).join('')}
+                                        </ul>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <button onclick="window.handleTransferRequest('${req.id}', 'decline')" class="flex-1 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-xs font-bold hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:text-rose-600 transition-all">Decline</button>
+                                        <button onclick="window.handleTransferRequest('${req.id}', 'accept')" class="flex-1 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:opacity-90 shadow-lg shadow-blue-200 dark:shadow-none transition-all">Accept Transfer</button>
+                                    </div>
+                                </div>
+                            `).join('');
+                        } else {
+                            containerEl?.classList.add('hidden');
+                            dotEl?.classList.add('hidden');
+                        }
+                    });
+            }
+
+            window.handleTransferRequest = async (requestId, action) => {
+                window.showLoading();
+                try {
+                    const reqDoc = await db.collection('transferRequests').doc(requestId).get();
+                    if (!reqDoc.exists) throw new Error("Request no longer exists");
+                    const req = reqDoc.data();
+
+                    if (action === 'accept') {
+                        const batch = db.batch();
+                        const targetName = userProfile?.displayName || currentUser.email;
+
+                        for (const bookId of req.bookIds) {
+                            batch.update(db.collection('books').doc(bookId), {
+                                userId: currentUser.uid,
+                                owner: targetName,
+                                ownerId: currentUser.uid,
+                                ownerEmail: currentUser.email,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+
+                            batch.set(db.collection('activityFeed').doc(), {
+                                type: 'book_transferred',
+                                bookId: bookId,
+                                bookTitle: req.bookDetails.find(b => b.id === bookId)?.title || 'Unknown',
+                                fromUserName: req.fromUserName,
+                                toUserName: targetName,
+                                userId: req.fromUserId,
+                                libraryId: currentUser.uid,
+                                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        }
+
+                        batch.update(db.collection('transferRequests').doc(requestId), { status: 'accepted' });
+                        await batch.commit();
+                        showToast(`Successfully accepted ${req.bookIds.length} books!`, 'success');
+                    } else {
+                        await db.collection('transferRequests').doc(requestId).update({ status: 'declined' });
+                        showToast('Transfer request declined', 'info');
+                    }
+                } catch (err) {
+                    showToast('Error: ' + err.message, 'error');
+                } finally {
+                    window.hideLoading();
+                }
+            };
+
             let unsubscribePartners1 = null;
             let unsubscribePartners2 = null;
+            let unsubscribeTransferRequests = null;
 
             function renderPartners() {
                 const listEl = document.getElementById('collaborators-list');
@@ -1438,8 +1649,9 @@
                                 <button id="manual-add-btn" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" title="Add Book Manually" aria-label="Add Book Manually">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                 </button>
-                                <button id="settings-btn" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" title="Settings" aria-label="Settings">
+                                <button id="settings-btn" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 relative" title="Settings" aria-label="Settings">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                    <div id="settings-notification-dot" class="hidden absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border border-white dark:border-slate-900"></div>
                                 </button>
                                 <button id="scan-btn" class="bg-primary hover:opacity-90 text-white px-5 py-2.5 rounded-full text-sm font-bold flex items-center gap-2 transition-all shadow-md active:scale-95 ml-1 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" aria-label="Scan QR or Barcode" title="Scan QR or Barcode">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -1476,8 +1688,11 @@
                     mainContentEl.innerHTML = renderSettings();
                     attachSettingsListeners();
                 } else if (activeTab === 'insights') {
-                    mainContentEl.innerHTML = renderInsights();
-                    attachInsightsListeners();
+                    (async () => {
+                        const content = await renderInsights();
+                        mainContentEl.innerHTML = content;
+                        attachInsightsListeners();
+                    })();
                 } else if (activeTab === 'activity') {
                     mainContentEl.innerHTML = renderActivity();
                     attachActivityListeners();
@@ -1511,6 +1726,9 @@
                                         <option value="">Change Genre...</option>
                                         ${metadataCache.genres.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
                                     </select>
+                                    <button onclick="window.bulkTransfer()" class="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" title="Bulk Transfer" aria-label="Transfer selected books">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                                    </button>
                                     <button onclick="window.bulkDelete()" class="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors" title="Delete Selected" aria-label="Delete selected books">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                     </button>
@@ -1544,14 +1762,15 @@
                                             const userData = userSnapshot.docs[0].data();
                                             const userId = userSnapshot.docs[0].id;
 
-                                            // Check if collaborator
+                                            // Check if collaborator or public
                                             const isPartner = allPartnerships.some(p => p.userId1 === userId || p.userId2 === userId);
-                                            if (isPartner || userId === currentUser.uid) {
+                                            const isPublic = userData.isPublic === true;
+                                            if (isPartner || userId === currentUser.uid || isPublic) {
                                                 // Fetch books for this user specifically from Firestore
                                                 const booksSnapshot = await db.collection('books').where('userId', '==', userId).get();
                                                 const fetchedBooks = booksSnapshot.docs.map(doc => normalizeBook(doc.id, doc.data()));
 
-                                                visitedLibrary = { userId, email, displayName: userData.displayName || email, books: fetchedBooks };
+                                                visitedLibrary = { userId, email, displayName: userData.displayName || email, books: fetchedBooks, isPublic, isPartner: isPartner || userId === currentUser.uid };
                                                 searchQuery = '';
                                                 document.getElementById('search-input').value = '';
                                                 document.getElementById('clear-search-btn').classList.add('hidden');
@@ -1815,7 +2034,14 @@
                     }
                     if (visitedLibrary) {
                         const label = visitedLibrary.userId ? `Library: ${visitedLibrary.displayName}` : `Search: ${visitedLibrary.email}`;
-                        html += `<span class="px-3 py-1 bg-violet-100 text-violet-700 rounded-full text-[10px] font-bold flex items-center gap-2">${escapeHTML(label)} <button onclick="window.clearAdvancedFilter('visit')" class="focus-visible:ring-2 focus-visible:ring-violet-500/50 rounded-full outline-none" aria-label="Clear visit filter">×</button></span>`;
+                        let badgeHtml = `<span class="px-3 py-1 bg-violet-100 text-violet-700 rounded-full text-[10px] font-bold flex items-center gap-2">${escapeHTML(label)} <button onclick="window.clearAdvancedFilter('visit')" class="focus-visible:ring-2 focus-visible:ring-violet-500/50 rounded-full outline-none" aria-label="Clear visit filter">×</button></span>`;
+
+                        // Add Insights button if we've successfully found a library
+                        if (visitedLibrary.userId) {
+                            badgeHtml += `<button onclick="window.showCollaboratorInsights('${visitedLibrary.userId}', '${escapeHTML(visitedLibrary.displayName.replace(/'/g, "\\'"))}')" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold hover:bg-blue-200 transition-colors flex items-center gap-1 focus-visible:ring-2 focus-visible:ring-blue-500/50 outline-none"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg> View Insights</button>`;
+                        }
+
+                        html += badgeHtml;
                         activeCount++;
                     }
                     if (aiFilteredIds) {
@@ -2205,14 +2431,17 @@
                     btn.disabled = true;
                     btn.innerText = 'Saving...';
                     const displayName = document.getElementById('profile-display-name').value.trim();
+                    const isPublic = document.getElementById('profile-public-toggle')?.checked || false;
                     window.showLoading();
                     try {
                         await db.collection('users').doc(currentUser.uid).update({
                             displayName,
+                            isPublic,
                             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                         });
                         await currentUser.updateProfile({ displayName });
                         userProfile.displayName = displayName;
+                        userProfile.isPublic = isPublic;
                         showToast('Profile updated!', 'success');
                         renderMainApp();
                     } catch (err) {
@@ -2253,6 +2482,7 @@
                 });
 
                 renderPartners();
+                renderTransferRequests();
             }
 
             window.editMetadata = async (type, oldVal) => {
@@ -2421,6 +2651,11 @@
             window.setTab = (tab) => {
                 const isSameTab = activeTab === tab;
                 activeTab = tab;
+                if (tab !== 'insights') {
+                    insightsUserId = null;
+                    insightsUserName = null;
+                    insightsStats = null;
+                }
                 // Reset status filter when switching tabs to avoid confusing empty views
                 if (tab !== 'insights') {
                     statusFilter = 'all';
@@ -2429,7 +2664,12 @@
                 renderMainApp();
 
                 if (tab === 'insights') {
-                    attachInsightsListeners();
+                    (async () => {
+                        const content = await renderInsights();
+                        const mainEl = document.getElementById('main-content');
+                        if (mainEl) mainEl.innerHTML = content;
+                        attachInsightsListeners();
+                    })();
                 }
 
                 // Micro-UX: Scroll to top when switching tabs
@@ -2444,6 +2684,47 @@
                 const refreshBtn = document.getElementById('refresh-ai-recs-btn');
                 if (refreshBtn) {
                     refreshBtn.onclick = generateAIRecommendations;
+                }
+                renderPartnershipsInInsights();
+            }
+
+            async function renderPartnershipsInInsights() {
+                const container = document.getElementById('partner-insights-links');
+                if (!container || !allPartnerships || allPartnerships.length === 0) return;
+
+                // Fetch partner user details
+                const partnerIds = allPartnerships.map(doc => {
+                    const data = doc;
+                    return data.userId1 === currentUser.uid ? data.userId2 : data.userId1;
+                });
+
+                const userDocs = await Promise.all(
+                    partnerIds.map(id => db.collection('users').doc(id).get())
+                );
+
+                const activePartners = allPartnerships.map((partnership, idx) => {
+                    const isUser1 = partnership.userId1 === currentUser.uid;
+                    const isUnsubscribed = isUser1 ? partnership.user1Unsubscribed : partnership.user2Unsubscribed;
+                    if (isUnsubscribed) return null;
+
+                    const partnerName = userDocs[idx].data()?.displayName || userDocs[idx].data()?.email || 'Partner';
+                    const partnerId = partnerIds[idx];
+
+                    return { id: partnerId, name: partnerName };
+                }).filter(Boolean);
+
+                if (activePartners.length > 0) {
+                    container.innerHTML = activePartners.map(p => `
+                        <button onclick="window.showCollaboratorInsights('${p.id}', '${escapeHTML(p.name.replace(/'/g, "\\'"))}')" class="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all group focus-visible:ring-4 focus-visible:ring-blue-500/20 outline-none">
+                            <div class="w-10 h-10 bg-white dark:bg-slate-800 rounded-xl flex items-center justify-center text-blue-600 shadow-sm group-hover:scale-110 transition-transform">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                            </div>
+                            <div class="text-left">
+                                <p class="text-xs font-black uppercase tracking-tight text-blue-600 dark:text-blue-400">${escapeHTML(p.name)}</p>
+                                <p class="text-[9px] font-bold text-slate-500">View Library Stats</p>
+                            </div>
+                        </button>
+                    `).join('');
                 }
             }
 
@@ -4308,6 +4589,23 @@
                     showToast("Only the book owner can initiate a transfer.", "error");
                     return;
                 }
+                window.bulkTransfer([bookId]);
+            };
+
+            window.bulkTransfer = async (bookIdsArg = null) => {
+                const selectedIds = bookIdsArg || Array.from(selectedBookIds);
+                if (!selectedIds.length) return;
+
+                // Ensure all selected books belong to current user
+                const myBooksToTransfer = selectedIds.filter(id => {
+                    const book = books.find(b => b.id === id);
+                    return book && book.userId === currentUser.uid;
+                });
+
+                if (myBooksToTransfer.length === 0) {
+                    showToast("Only books you own can be transferred.", "error");
+                    return;
+                }
 
                 const partners = allPartnerships.map(p => {
                     const isUser1 = p.userId1 === currentUser.uid;
@@ -4322,8 +4620,8 @@
 
                 let transferHtml = `
                     <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up">
-                        <h2 class="text-2xl font-black mb-2 font-serif italic">Transfer Book</h2>
-                        <p class="text-slate-500 text-sm mb-6">Transfer ownership of "${escapeHTML(book.title)}" to a collaborator. This action is permanent.</p>
+                        <h2 class="text-2xl font-black mb-2 font-serif italic">Transfer ${myBooksToTransfer.length > 1 ? myBooksToTransfer.length + ' Books' : 'Book'}</h2>
+                        <p class="text-slate-500 text-sm mb-6">Transfer ownership to a collaborator. They will need to accept the transfer.</p>
                         <div class="space-y-3 mb-8">
                             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Select Recipient</p>
                 `;
@@ -4341,7 +4639,7 @@
                         </div>
                         <div class="flex gap-4">
                             <button data-close class="flex-1 px-4 py-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold">Cancel</button>
-                            <button id="confirm-transfer-btn" class="flex-1 px-4 py-4 bg-rose-600 text-white rounded-2xl font-bold shadow-lg shadow-rose-200 dark:shadow-none transition-transform active:scale-95">Transfer</button>
+                            <button id="confirm-transfer-btn" class="flex-1 px-4 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none transition-transform active:scale-95">Send Request</button>
                         </div>
                     </div>
                 `;
@@ -4364,36 +4662,34 @@
                     if (!selected) return;
                     const targetUserId = selected.value;
 
-                    if (!confirm(`Are you sure you want to transfer "${book.title}"? You will no longer own this book.`)) return;
+                    if (!confirm(`Send transfer request for ${myBooksToTransfer.length} books?`)) return;
 
                     window.showLoading();
                     try {
                         const targetUserDoc = await db.collection('users').doc(targetUserId).get();
                         const targetName = targetUserDoc.exists ? (targetUserDoc.data().displayName || targetUserDoc.data().email) : "Collaborator";
 
-                        await db.collection('books').doc(bookId).update({
-                            userId: targetUserId,
-                            owner: targetName,
-                            ownerId: targetUserId,
-                            ownerEmail: targetUserDoc.data().email || '',
-                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        const bookDetails = myBooksToTransfer.map(id => {
+                            const b = books.find(book => book.id === id);
+                            return { id, title: b.title };
                         });
 
-                        await db.collection('activityFeed').add({
-                            type: 'book_transferred',
-                            bookId: bookId,
-                            bookTitle: book.title,
+                        await db.collection('transferRequests').add({
+                            fromUserId: currentUser.uid,
                             fromUserName: currentUser.displayName || currentUser.email,
+                            toUserId: targetUserId,
                             toUserName: targetName,
-                            userId: currentUser.uid,
-                            libraryId: targetUserId,
-                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                            bookIds: myBooksToTransfer,
+                            bookDetails: bookDetails,
+                            status: 'pending',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
                         });
 
-                        showToast(`Successfully transferred to ${targetName}`, 'success');
+                        showToast(`Transfer request sent to ${targetName}`, 'success');
+                        if (!bookIdsArg) window.clearSelection();
                         close();
                     } catch (err) {
-                        showToast("Transfer failed: " + err.message, "error");
+                        showToast("Failed to send request: " + err.message, "error");
                     } finally {
                         window.hideLoading();
                     }
@@ -5005,7 +5301,11 @@
                                         <button id="move-to-lib-btn" title="Move to Library" class="absolute -top-3 -right-3 w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center shadow-lg border-4 border-white dark:border-slate-900 hover:scale-110 transition-transform active:scale-95" aria-label="Move to Library">
                                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                         </button>
-                                    ` : ''}
+                                    ` : (visitedLibrary && visitedLibrary.userId === book.userId && visitedLibrary.userId !== currentUser.uid ? `
+                                        <button id="add-to-wishlist-btn" title="Add to My Wishlist" class="absolute -top-3 -right-3 w-12 h-12 bg-violet-600 text-white rounded-full flex items-center justify-center shadow-lg border-4 border-white dark:border-slate-900 hover:scale-110 transition-transform active:scale-95" aria-label="Add to My Wishlist">
+                                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+                                        </button>
+                                    ` : '')}
                                 </div>
                             </div>
                             <div class="flex-1 text-center md:text-left">
@@ -5233,6 +5533,45 @@
                     } catch (err) {
                         showToast('Error: ' + err.message, 'error');
                         btn.disabled = false;
+                    }
+                });
+
+                document.getElementById('add-to-wishlist-btn')?.addEventListener('click', async (e) => {
+                    const btn = e.currentTarget;
+                    btn.disabled = true;
+                    window.showLoading();
+                    try {
+                        const newBookData = { ...book };
+                        delete newBookData.id;
+                        delete newBookData._genres;
+                        delete newBookData._escTitle;
+                        delete newBookData._escAuthor;
+                        delete newBookData._escOwner;
+                        delete newBookData._escGenres;
+                        delete newBookData._escJsAuthor;
+                        delete newBookData._escJsOwner;
+                        delete newBookData._formattedPurchaseDate;
+                        delete newBookData._normalizedTags;
+                        delete newBookData._searchBlob;
+                        delete newBookData._createdTime;
+                        delete newBookData._purchaseTime;
+                        delete newBookData._cache;
+
+                        // Set current user as owner for their wishlist
+                        newBookData.userId = currentUser.uid;
+                        newBookData.isWishlist = true;
+                        newBookData.owner = userProfile?.displayName || currentUser.email;
+                        newBookData.ownerId = currentUser.uid;
+                        newBookData.ownerEmail = currentUser.email;
+
+                        await addBookToFirestore(newBookData, 'want_to_read', currentUser.uid);
+                        showToast('Added to your wishlist!', 'success');
+                        close();
+                    } catch (err) {
+                        showToast('Error: ' + err.message, 'error');
+                        btn.disabled = false;
+                    } finally {
+                        window.hideLoading();
                     }
                 });
 
