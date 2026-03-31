@@ -632,9 +632,13 @@
                 loadingBar.classList.add('-translate-y-full');
             };
 
-            function getStatusData(bookId) {
+            function getStatusData(bookId, userId = null) {
                 // Optimized for O(1) performance using pre-normalized data and frozen constant fallback
-                return readingStatuses[bookId] || DEFAULT_STATUS;
+                if (!userId || userId === currentUser.uid) {
+                    return readingStatuses[bookId] || DEFAULT_STATUS;
+                }
+                // Fetch status for specific user if available in partner cache
+                return (partnerReadingStatuses[bookId] && partnerReadingStatuses[bookId][userId]) || DEFAULT_STATUS;
             }
 
             // ---------- Utility: Escape HTML ----------
@@ -695,6 +699,7 @@
             }
 
             // ---------- Firebase Auth UI ----------
+            window.renderAuth = renderAuth;
             function renderAuth() {
                 appEl.innerHTML = `
                 <div class="flex-1 flex flex-col lg:flex-row min-h-screen">
@@ -796,7 +801,7 @@
             async function renderInsights() {
                 // Performance optimization: Use pre-calculated libraryStats if viewing own library
                 let stats = libraryStats;
-                let finished = userProfile?.completedBooksCount || 0;
+                let finished = stats.statusCounts.finished;
                 let goal = readingGoal;
                 let name = "My";
 
@@ -850,13 +855,7 @@
                         }
                     }
                     stats = insightsStats || libraryStats;
-                    // Try to get finished count from their profile
-                    const profileDoc = await db.collection('users').doc(insightsUserId).get();
-                    if (profileDoc.exists) {
-                        finished = profileDoc.data().completedBooksCount || 0;
-                    } else {
-                        finished = stats.statusCounts.finished;
-                    }
+                    finished = stats.statusCounts.finished;
                     goal = 50; // Default
                     name = insightsUserName;
                 }
@@ -1002,7 +1001,7 @@
                                 ${Object.entries(statusCounts).map(([status, count]) => {
                                     const percent = libraryCount ? Math.round((count / libraryCount) * 100) : 0;
                                     const color = status === 'finished' ? 'bg-emerald-500' : status === 'reading' ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600';
-                                    const countToDisplay = status === 'finished' ? (userProfile?.completedBooksCount || count) : count;
+                                    const countToDisplay = count;
                                     return `
                                         <button type="button" aria-label="Filter by status: ${READING_STATUSES[status].label}" class="relative p-5 bg-slate-50 dark:bg-slate-900/50 rounded-3xl border border-slate-100 dark:border-slate-800 group hover:border-primary/30 transition-all cursor-pointer focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/50 text-left" onclick="window.applyInsightFilter('status', '${status}')">
                                             <div class="flex justify-between items-start mb-4">
@@ -1639,7 +1638,7 @@
                                     <span class="flex items-center gap-2">
                                         <span class="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-widest">${currentUser.email}</span>
                                         <span class="text-[10px] text-slate-300">|</span>
-                                        <span class="text-[10px] font-black text-primary">${userProfile?.completedBooksCount || 0}/${readingGoal}</span>
+                                        <span class="text-[10px] font-black text-primary">${libraryStats.statusCounts.finished || 0}/${readingGoal}</span>
                                     </span>
                                 </span>
                             </button>
@@ -1779,11 +1778,14 @@
                                                 searchQuery = '';
                                                 document.getElementById('search-input').value = '';
                                                 document.getElementById('clear-search-btn').classList.add('hidden');
+                                                showToast(`Viewing ${userData.displayName || email}'s library`, 'success');
                                             } else {
                                                 visitedLibrary = { error: 'not_collaborating', email };
+                                                showToast("This library is private or you're not a collaborator.", "error");
                                             }
                                         } else {
                                             visitedLibrary = { error: 'user_not_found', email };
+                                            showToast("User not found.", "error");
                                         }
                                     } catch (err) {
                                         console.error("Email search error:", err);
@@ -1958,7 +1960,7 @@
                 }
 
                 let filteredBooks = sourceCollection.filter(b => {
-                    const statusData = getStatusData(b.id);
+                    const statusData = getStatusData(b.id, b.userId);
                     const isWishlist = statusData.hasOwnProperty('isWishlist') ? statusData.isWishlist : b.isWishlist;
 
                     // 1. High-disqualification criteria first (tab, search, static filters)
@@ -1969,9 +1971,13 @@
                     }
 
                     // Skip redundant search blob check if we already filtered by AI IDs
-                    if (sourceCollection !== books) return true;
+                    if (sourceCollection !== books) {
+                        if (searchLower && !b._searchBlob.includes(searchLower)) return false;
+                        // For visited/AI collections, we still want to apply genre, author, etc. filters below
+                    } else {
+                        if (searchLower && !b._searchBlob.includes(searchLower)) return false;
+                    }
 
-                    if (searchLower && !b._searchBlob.includes(searchLower)) return false;
                     if (categoryFilter !== 'all' && !b._genres.includes(categoryFilter)) return false;
                     if (authorFilter !== 'all' && b.author !== authorFilter) return false;
                     if (ownerFilter !== 'all' && b.owner !== ownerFilter) return false;
@@ -2039,11 +2045,12 @@
                     }
                     if (visitedLibrary) {
                         const label = visitedLibrary.userId ? `Library: ${visitedLibrary.displayName}` : `Search: ${visitedLibrary.email}`;
-                        let badgeHtml = `<span class="px-3 py-1 bg-violet-100 text-violet-700 rounded-full text-[10px] font-bold flex items-center gap-2">${escapeHTML(label)} <button onclick="window.clearAdvancedFilter('visit')" class="focus-visible:ring-2 focus-visible:ring-violet-500/50 rounded-full outline-none" aria-label="Clear visit filter">×</button></span>`;
+                        let badgeHtml = `<button onclick="window.clearAdvancedFilter('visit')" class="px-4 py-1.5 bg-violet-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-violet-700 transition-all shadow-lg shadow-violet-200 dark:shadow-none focus-visible:ring-4 focus-visible:ring-violet-500/50 outline-none"><svg aria-hidden="true" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg> Back to My Library</button>`;
+                        badgeHtml += `<span class="px-3 py-1.5 bg-violet-100 text-violet-700 rounded-full text-[10px] font-bold flex items-center gap-2 border border-violet-200">${escapeHTML(label)}</span>`;
 
                         // Add Insights button if we've successfully found a library
                         if (visitedLibrary.userId) {
-                            badgeHtml += `<button onclick="window.showCollaboratorInsights('${visitedLibrary.userId}', '${escapeHTML(visitedLibrary.displayName.replace(/'/g, "\\'"))}')" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold hover:bg-blue-200 transition-colors flex items-center gap-1 focus-visible:ring-2 focus-visible:ring-blue-500/50 outline-none"><svg aria-hidden="true" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg> View Insights</button>`;
+                            badgeHtml += `<button onclick="window.showCollaboratorInsights('${visitedLibrary.userId}', '${escapeHTML(visitedLibrary.displayName.replace(/'/g, "\\'"))}')" class="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold hover:bg-blue-200 transition-colors flex items-center gap-1 focus-visible:ring-2 focus-visible:ring-blue-500/50 outline-none"><svg aria-hidden="true" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg> View Insights</button>`;
                         }
 
                         html += badgeHtml;
@@ -3290,11 +3297,13 @@
                     const bGenres = getBookGenres(b);
                     bGenres.forEach(g => { if (g) genresSet.add(g); });
 
+                    const statusData = getStatusData(b.id, b.userId);
+                    const isWishlist = statusData.hasOwnProperty('isWishlist') ? statusData.isWishlist : b.isWishlist;
+
                     // Update total counts for Library and Wishlist (Pre-calculation for O(1) retrieval)
-                    if (b.isWishlist) stats.wishlistCount++;
+                    if (isWishlist) stats.wishlistCount++;
                     else stats.libraryCount++;
 
-                    const statusData = getStatusData(b.id);
                     const status = statusData.status;
 
                     // Render Cache Pass: Pre-calculate status-dependent UI data
@@ -3342,7 +3351,7 @@
                     };
 
                     // Update Statistics (Skip wishlist for most stats)
-                    if (b.isWishlist) return;
+                    if (isWishlist) return;
 
                     if (stats.statusCounts.hasOwnProperty(status)) stats.statusCounts[status]++;
 
