@@ -18,8 +18,8 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(libraryOwnerId)).data.get('isPublic', false) == true;
     }
 
-    // Check if user has edit permissions in the library
-    function canEditLibrary(userId, libraryOwnerId) {
+    // Check if user has permission to ADD books to the library
+    function canAddBook(userId, libraryOwnerId) {
       return userId == libraryOwnerId || (
         exists(path('/databases/' + database + '/documents/partnerships/' + getPartnershipId(userId, libraryOwnerId))) &&
         get(path('/databases/' + database + '/documents/partnerships/' + getPartnershipId(userId, libraryOwnerId))).data.get('allowAddBooks', false) == true
@@ -53,6 +53,23 @@ service cloud.firestore {
          request.auth.uid == resource.data.userId2);
     }
 
+    // ========== COLLABORATION REQUESTS COLLECTION ==========
+    match /collaborationRequests/{requestId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.fromUserId ||
+        request.auth.uid == resource.data.toUserId
+      );
+      allow create: if request.auth != null &&
+        request.auth.uid == request.resource.data.fromUserId;
+      allow update: if request.auth != null && (
+        request.auth.uid == resource.data.toUserId // Receiver can accept/reject
+      );
+      allow delete: if request.auth != null && (
+        request.auth.uid == resource.data.fromUserId ||
+        request.auth.uid == resource.data.toUserId
+      );
+    }
+
     // ========== BOOKS COLLECTION ==========
     match /books/{bookId} {
       // Allow read if user is the owner, a partner, or if the library is public
@@ -62,10 +79,11 @@ service cloud.firestore {
       );
       
       allow create: if request.auth != null &&
-        canEditLibrary(request.auth.uid, request.resource.data.userId);
+        canAddBook(request.auth.uid, request.resource.data.userId);
 
+      // STRICT OWNERSHIP: Only the library owner can update or delete
       allow update, delete: if request.auth != null &&
-        canEditLibrary(request.auth.uid, resource.data.userId);
+        request.auth.uid == resource.data.userId;
     }
 
     // ========== READING STATUS SUBCOLLECTION (supports Collection Group) ==========
