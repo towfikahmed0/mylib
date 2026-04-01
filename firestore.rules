@@ -91,14 +91,14 @@ service cloud.firestore {
       // Allow users to read their own status, statuses in a library they are a member of, or public library statuses
       allow read: if request.auth != null && (
         request.auth.uid == docId ||
-        isLibraryMember(request.auth.uid, get(/databases/$(database)/documents/books/$(request.path[4])).data.userId) ||
-        isLibraryPublic(get(/databases/$(database)/documents/books/$(request.path[4])).data.userId)
+        (resource != null && request.auth.uid == resource.data.userId) ||
+        (request.path.size() >= 5 && isLibraryMember(request.auth.uid, get(/databases/$(database)/documents/books/$(request.path[4])).data.userId)) ||
+        (request.path.size() >= 5 && isLibraryPublic(get(/databases/$(database)/documents/books/$(request.path[4])).data.userId))
       );
       
       // Only allow write/update if writing to your own document
       allow create, update: if request.auth != null && 
-        request.auth.uid == docId && 
-        request.resource.data.userId == request.auth.uid;
+        (request.auth.uid == docId || request.resource.data.userId == request.auth.uid);
       
       allow delete: if request.auth != null && request.auth.uid == docId;
     }

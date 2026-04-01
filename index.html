@@ -284,14 +284,15 @@
 
     <!-- ==================== FIREBASE INIT (REPLACE WITH YOUR CONFIG) ==================== -->
     <script type="module">
+        const env = (import.meta && import.meta.env) || {};
         const firebaseConfig = {
-            apiKey: import.meta.env.VITE_API_KEY,
-            authDomain: import.meta.env.VITE_AUTH_DOMAIN,
-            projectId: import.meta.env.VITE_PROJECT_ID,
-            storageBucket: import.meta.env.VITE_STORAGE_BUCKET,
-            messagingSenderId: import.meta.env.VITE_MESSAGING_SENDER_ID,
-            appId: import.meta.env.VITE_APP_ID,
-            measurementId: import.meta.env.VITE_MEASUREMENT_ID
+            apiKey: env.VITE_API_KEY || 'mock-key',
+            authDomain: env.VITE_AUTH_DOMAIN || 'mock-domain',
+            projectId: env.VITE_PROJECT_ID || 'mock-project',
+            storageBucket: env.VITE_STORAGE_BUCKET || 'mock-bucket',
+            messagingSenderId: env.VITE_MESSAGING_SENDER_ID || 'mock-sender',
+            appId: env.VITE_APP_ID || 'mock-app',
+            measurementId: env.VITE_MEASUREMENT_ID || 'mock-measure'
         };
         firebase.initializeApp(firebaseConfig);
         window.auth = firebase.auth();
@@ -512,7 +513,7 @@
 
             // Performance optimizations: pre-rendered star strings and frozen status constant
             const STAR_CACHE = Array.from({ length: 6 }, (_, i) => i === 0 ? '' : '★'.repeat(i) + '☆'.repeat(5 - i));
-            const DEFAULT_STATUS = Object.freeze({ status: 'want_to_read', rating: 0, progress: 0, comment: '', isWishlist: false, tags: [], price: null, purchaseDate: null });
+            const DEFAULT_STATUS = Object.freeze({ status: 'want_to_read', rating: 0, progress: 0, comment: '', isWishlist: null, tags: [], price: null, purchaseDate: null });
             let unsubscribeBooks = null;
             let unsubscribeStatus = null;
             let allPartnerships = [];
@@ -801,9 +802,9 @@
             async function renderInsights() {
                 // Performance optimization: Use pre-calculated libraryStats if viewing own library
                 let stats = libraryStats;
+                let name = "My";
                 let finished = stats.statusCounts.finished;
                 let goal = readingGoal;
-                let name = "My";
 
                 if (insightsUserId && insightsUserId !== currentUser.uid) {
                     if (!insightsStats) {
@@ -872,7 +873,7 @@
                 <div class="max-w-4xl mx-auto space-y-8 animate-slide-up">
                         ${insightsUserId && insightsUserId !== currentUser.uid ? `
                             <div class="flex items-center gap-4 mb-8 bg-blue-50 dark:bg-blue-900/20 p-6 rounded-[2rem] border border-blue-200 dark:border-blue-800">
-                                <button onclick="window.setTab('insights')" class="p-3 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:bg-slate-100 transition-colors text-blue-600" title="Back to My Insights" aria-label="Back to My Insights">
+                                <button onclick="insightsUserId = null; insightsUserName = null; insightsStats = null; visitedLibrary = null; activeTab = 'insights'; renderMainApp();" class="p-3 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:bg-slate-100 transition-colors text-blue-600" title="Back to My Insights" aria-label="Back to My Insights">
                                     <svg aria-hidden="true" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                                 </button>
                                 <div>
@@ -1771,7 +1772,7 @@
                             <div class="relative group flex-1">
                                 <svg aria-hidden="true" class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                                 <input id="search-input" type="text" placeholder="Smart search by title, author, genre..." value="${searchQuery}" class="w-full pl-12 pr-14 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-[1.5rem] text-lg transition-all outline-none shadow-sm" aria-label="Search books">
-                                <kbd id="search-hint" class="absolute right-12 top-1/2 -translate-y-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-[10px] font-black text-slate-500 dark:text-slate-400 pointer-events-none transition-opacity duration-300 shadow-[inset_0_-2px_0_rgba(0,0,0,0.1)] dark:shadow-[inset_0_-2px_0_rgba(255,255,255,0.05)] ${searchQuery ? 'opacity-0' : ''}">/</kbd>
+                                <kbd id="search-hint" class="absolute right-12 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-[10px] font-black text-slate-500 dark:text-slate-400 pointer-events-none transition-all duration-300 shadow-[0_2px_0_rgba(0,0,0,0.05)] dark:shadow-none group-focus-within:opacity-0 ${searchQuery ? 'opacity-0' : ''}">/</kbd>
                                 <button id="clear-search-btn" class="${searchQuery ? '' : 'hidden'} absolute right-4 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors" aria-label="Clear search" title="Clear search">
                                     <svg aria-hidden="true" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                                 </button>
@@ -1818,10 +1819,11 @@
 
                             if (searchTimeout) clearTimeout(searchTimeout);
                             searchTimeout = setTimeout(async () => {
-                                // Check for email search first
-                                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                                if (emailRegex.test(searchQuery.trim())) {
-                                    const email = searchQuery.trim().toLowerCase();
+                                // Check for email search first (Triggered by / prefix or direct email pattern)
+                                const trimmedQuery = searchQuery.trim();
+                                const isEmailSearch = trimmedQuery.startsWith('/') || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedQuery);
+                                if (isEmailSearch) {
+                                    const email = (trimmedQuery.startsWith('/') ? trimmedQuery.slice(1) : trimmedQuery).toLowerCase();
                                     window.showLoading();
                                     try {
                                         const userSnapshot = await db.collection('users').where('email', '==', email).limit(1).get();
@@ -1857,8 +1859,14 @@
                                                 const fetchedBooks = booksSnapshot.docs.map(doc => normalizeBook(doc.id, doc.data()));
 
                                                 visitedLibrary = { userId, email, displayName: userData.displayName || email, books: fetchedBooks, isPublic, isPartner: isPartner || userId === currentUser.uid };
+                                                // Clear search state so results aren't filtered by the email/query itself
                                                 searchQuery = '';
-                                                document.getElementById('search-input').value = '';
+                                                aiFilteredIds = null;
+                                                const si = document.getElementById('search-input');
+                                                if (si) {
+                                                    si.value = '';
+                                                    si.blur();
+                                                }
                                                 document.getElementById('clear-search-btn').classList.add('hidden');
                                                 showToast(`Viewing ${userData.displayName || email}'s library`, 'success');
                                             } else {
@@ -2044,22 +2052,17 @@
                 let filteredBooks = sourceCollection.filter(b => {
                     const statusData = getStatusData(b.id, b.userId);
                     // Standardize wishlist check: status subcollection takes absolute precedence
-                    const isWishlist = (statusData && typeof statusData.isWishlist === 'boolean') ? statusData.isWishlist : !!b.isWishlist;
+                    const isWishlist = (statusData && (statusData.isWishlist === true || statusData.isWishlist === false)) ? statusData.isWishlist : !!b.isWishlist;
 
                     // 1. High-disqualification criteria first (tab, search, static filters)
                     if (activeTab === 'wishlist') {
                         if (!isWishlist) return false;
                     } else {
+                        // Main Library tab: strictly exclude wishlist items
                         if (isWishlist) return false;
                     }
 
-                    // Skip redundant search blob check if we already filtered by AI IDs
-                    if (sourceCollection !== books) {
-                        if (searchLower && !b._searchBlob.includes(searchLower)) return false;
-                        // For visited/AI collections, we still want to apply genre, author, etc. filters below
-                    } else {
-                        if (searchLower && !b._searchBlob.includes(searchLower)) return false;
-                    }
+                    if (searchLower && !b._searchBlob.includes(searchLower)) return false;
 
                     if (categoryFilter !== 'all' && !b._genres.includes(categoryFilter)) return false;
                     if (authorFilter !== 'all' && b.author !== authorFilter) return false;
@@ -2122,12 +2125,14 @@
                     if (activeTab === 'wishlist') {
                         totalInTab = visitedLibrary.books.filter(b => {
                             const sd = getStatusData(b.id, b.userId);
-                            return sd.isWishlist || b.isWishlist;
+                            const iW = (sd && (sd.isWishlist === true || sd.isWishlist === false)) ? sd.isWishlist : !!b.isWishlist;
+                            return iW;
                         }).length;
                     } else {
                         totalInTab = visitedLibrary.books.filter(b => {
                             const sd = getStatusData(b.id, b.userId);
-                            return !(sd.isWishlist || b.isWishlist);
+                            const iW = (sd && (sd.isWishlist === true || sd.isWishlist === false)) ? sd.isWishlist : !!b.isWishlist;
+                            return !iW;
                         }).length;
                     }
                 }
@@ -2776,24 +2781,17 @@
                 const isSameTab = activeTab === tab;
                 activeTab = tab;
                 // Clear any visitor/insights context when switching tabs
-                insightsUserId = null;
-                insightsUserName = null;
-                insightsStats = null;
+                if (!isSameTab || tab !== 'insights') {
+                    insightsUserId = null;
+                    insightsUserName = null;
+                    insightsStats = null;
+                }
                 // Reset status filter when switching tabs to avoid confusing empty views
                 if (tab !== 'insights') {
                     statusFilter = 'all';
                     localStorage.setItem('mylib_statusFilter', 'all');
                 }
                 renderMainApp();
-
-                if (tab === 'insights') {
-                    (async () => {
-                        const content = await renderInsights();
-                        const mainEl = document.getElementById('main-content');
-                        if (mainEl) mainEl.innerHTML = content;
-                        attachInsightsListeners();
-                    })();
-                }
 
                 // Micro-UX: Scroll to top when switching tabs
                 if (isSameTab) {
@@ -3400,11 +3398,14 @@
 
                     const statusData = getStatusData(b.id, b.userId);
                     // Standardize wishlist check: status subcollection takes absolute precedence
-                    const isWishlist = (statusData && typeof statusData.isWishlist === 'boolean') ? statusData.isWishlist : !!b.isWishlist;
+                    const isWishlist = (statusData && (statusData.isWishlist === true || statusData.isWishlist === false)) ? statusData.isWishlist : !!b.isWishlist;
 
                     // Update total counts for Library and Wishlist (Pre-calculation for O(1) retrieval)
-                    if (isWishlist) stats.wishlistCount++;
-                    else stats.libraryCount++;
+                    if (isWishlist) {
+                        stats.wishlistCount++;
+                    } else {
+                        stats.libraryCount++;
+                    }
 
                     const status = statusData.status;
 
@@ -3501,7 +3502,23 @@
 
             // Helper to render a single book card
             function renderBookCard(book, now, densityClass) {
-                const cache = book._cache;
+                const cache = book._cache || {
+                    status: 'want_to_read',
+                    progress: 0,
+                    stars: '',
+                    statusLabel: 'Want to Read',
+                    compactStatusLabel: 'WTR',
+                    statusBadge: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
+                    statusColor: 'bg-slate-300 dark:bg-slate-600',
+                    ownerBadge: '',
+                    partnerReadingInfo: '',
+                    tagsHtml: '',
+                    compactTagsHtml: '',
+                    isNew: false,
+                    newBadge: '',
+                    listNewBadge: '',
+                    formattedPrice: ''
+                };
                 const isSelected = selectedBookIds.has(book.id);
                 const isCollaboratorBook = book.userId !== currentUser.uid;
 
@@ -5428,22 +5445,14 @@
                 }
 
                 try {
-                    // 1. Fetch all reading statuses for the current user
-                    const statusSnapshot = await db.collectionGroup('readingStatus')
-                        .where('userId', '==', currentUser.uid)
-                        .where('status', '==', 'finished')
-                        .get();
+                    // Use local libraryStats which is already aggregated from real-time readingStatus subcollections
+                    const finishedCount = libraryStats.statusCounts.finished || 0;
 
-                    const finishedCount = statusSnapshot.size;
-
-                    // 2. Update Firestore profile
+                    // Update Firestore profile
                     await db.collection('users').doc(currentUser.uid).update({
                         completedBooksCount: finishedCount,
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
-
-                    // 3. Update local library stats to reflect the sync immediately
-                    libraryStats.statusCounts.finished = finishedCount;
 
                     showToast(`Successfully synced! You have finished ${finishedCount} books.`, 'success');
                     renderMainApp();
