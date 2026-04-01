@@ -1260,6 +1260,10 @@
                                 <svg aria-hidden="true" class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                 Export CSV
                             </button>
+                            <button id="sync-finished-btn" class="sm:col-span-2 flex items-center justify-center gap-3 p-4 bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 rounded-2xl font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/20 transition text-sm focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20">
+                                <svg aria-hidden="true" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                Sync Finished Books
+                            </button>
                         </div>
                     </div>
 
@@ -1831,6 +1835,25 @@
                                             if (isPartner || userId === currentUser.uid || isPublic) {
                                                 // Fetch books for this user specifically from Firestore
                                                 const booksSnapshot = await db.collection('books').where('userId', '==', userId).get();
+
+                                                // Fetch this user's reading statuses as well to ensure correct tab filtering (Library vs Wishlist)
+                                                const statusSnapshot = await db.collectionGroup('readingStatus').where('userId', '==', userId).get();
+                                                statusSnapshot.docs.forEach(doc => {
+                                                    const data = doc.data();
+                                                    const bookId = doc.ref.parent.parent.id;
+                                                    if (!partnerReadingStatuses[bookId]) partnerReadingStatuses[bookId] = {};
+                                                    partnerReadingStatuses[bookId][userId] = {
+                                                        status: data.status,
+                                                        rating: data.rating || 0,
+                                                        progress: data.progress || 0,
+                                                        comment: data.comment || '',
+                                                        isWishlist: data.isWishlist || false,
+                                                        price: data.price || null,
+                                                        purchaseDate: data.purchaseDate || null,
+                                                        updatedAt: data.updatedAt
+                                                    };
+                                                });
+
                                                 const fetchedBooks = booksSnapshot.docs.map(doc => normalizeBook(doc.id, doc.data()));
 
                                                 visitedLibrary = { userId, email, displayName: userData.displayName || email, books: fetchedBooks, isPublic, isPartner: isPartner || userId === currentUser.uid };
@@ -2020,7 +2043,8 @@
 
                 let filteredBooks = sourceCollection.filter(b => {
                     const statusData = getStatusData(b.id, b.userId);
-                    const isWishlist = statusData.hasOwnProperty('isWishlist') ? statusData.isWishlist : b.isWishlist;
+                    // Standardize wishlist check: status subcollection takes absolute precedence
+                    const isWishlist = (statusData && typeof statusData.isWishlist === 'boolean') ? statusData.isWishlist : !!b.isWishlist;
 
                     // 1. High-disqualification criteria first (tab, search, static filters)
                     if (activeTab === 'wishlist') {
@@ -2091,7 +2115,22 @@
 
                 // Optimization: Use pre-calculated tab counts from libraryStats
                 // Impact: Reduces complexity from O(N) to O(1) in the render path
-                const totalInTab = activeTab === 'wishlist' ? libraryStats.wishlistCount : libraryStats.libraryCount;
+                let totalInTab = activeTab === 'wishlist' ? libraryStats.wishlistCount : libraryStats.libraryCount;
+
+                // When visiting another library, totalInTab should reflect that user's collection size
+                if (visitedLibrary && !visitedLibrary.error && visitedLibrary.books) {
+                    if (activeTab === 'wishlist') {
+                        totalInTab = visitedLibrary.books.filter(b => {
+                            const sd = getStatusData(b.id, b.userId);
+                            return sd.isWishlist || b.isWishlist;
+                        }).length;
+                    } else {
+                        totalInTab = visitedLibrary.books.filter(b => {
+                            const sd = getStatusData(b.id, b.userId);
+                            return !(sd.isWishlist || b.isWishlist);
+                        }).length;
+                    }
+                }
 
                 const activeFiltersContainer = document.getElementById('active-filters-bar');
                 if (activeFiltersContainer) {
@@ -2459,6 +2498,7 @@
                 });
                 document.getElementById('import-btn')?.addEventListener('click', importCSV);
                 document.getElementById('export-btn')?.addEventListener('click', exportCSV);
+                document.getElementById('sync-finished-btn')?.addEventListener('click', window.manualSyncFinishedBooks);
                 document.getElementById('notify-btn')?.addEventListener('click', requestNotificationPermission);
                 document.getElementById('save-sharing-btn')?.addEventListener('click', saveSharingSettings);
 
@@ -2735,11 +2775,10 @@
             window.setTab = (tab) => {
                 const isSameTab = activeTab === tab;
                 activeTab = tab;
-                if (tab !== 'insights') {
-                    insightsUserId = null;
-                    insightsUserName = null;
-                    insightsStats = null;
-                }
+                // Clear any visitor/insights context when switching tabs
+                insightsUserId = null;
+                insightsUserName = null;
+                insightsStats = null;
                 // Reset status filter when switching tabs to avoid confusing empty views
                 if (tab !== 'insights') {
                     statusFilter = 'all';
@@ -3360,7 +3399,8 @@
                     bGenres.forEach(g => { if (g) genresSet.add(g); });
 
                     const statusData = getStatusData(b.id, b.userId);
-                    const isWishlist = statusData.hasOwnProperty('isWishlist') ? statusData.isWishlist : b.isWishlist;
+                    // Standardize wishlist check: status subcollection takes absolute precedence
+                    const isWishlist = (statusData && typeof statusData.isWishlist === 'boolean') ? statusData.isWishlist : !!b.isWishlist;
 
                     // Update total counts for Library and Wishlist (Pre-calculation for O(1) retrieval)
                     if (isWishlist) stats.wishlistCount++;
@@ -5377,12 +5417,56 @@
                 }, 1000);
             }
 
+            window.manualSyncFinishedBooks = async () => {
+                if (!currentUser) return;
+                window.showLoading();
+                const btn = document.getElementById('sync-finished-btn');
+                const originalText = btn ? btn.innerText : 'Sync Finished Books';
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerText = 'Syncing...';
+                }
+
+                try {
+                    // 1. Fetch all reading statuses for the current user
+                    const statusSnapshot = await db.collectionGroup('readingStatus')
+                        .where('userId', '==', currentUser.uid)
+                        .where('status', '==', 'finished')
+                        .get();
+
+                    const finishedCount = statusSnapshot.size;
+
+                    // 2. Update Firestore profile
+                    await db.collection('users').doc(currentUser.uid).update({
+                        completedBooksCount: finishedCount,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    // 3. Update local library stats to reflect the sync immediately
+                    libraryStats.statusCounts.finished = finishedCount;
+
+                    showToast(`Successfully synced! You have finished ${finishedCount} books.`, 'success');
+                    renderMainApp();
+                } catch (err) {
+                    console.error("Manual sync error:", err);
+                    showToast('Sync error: ' + err.message, 'error');
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerText = originalText;
+                    }
+                    window.hideLoading();
+                }
+            };
+
             // ---------- Auth State Observer ----------
             window.startApp = function() {
-                if (authObserverStarted) return;
-                authObserverStarted = true;
+                if (window.authObserverStarted) return;
+                window.authObserverStarted = true;
 
-                auth.onAuthStateChanged(async (user) => {
+                const authInstance = window.auth || (typeof auth !== 'undefined' ? auth : null);
+                if (!authInstance) return;
+                authInstance.onAuthStateChanged(async (user) => {
                     currentUser = user;
                     if (user) {
                         // Subscribe to user profile for real-time updates
