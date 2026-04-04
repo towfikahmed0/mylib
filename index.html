@@ -516,6 +516,7 @@
             const DEFAULT_STATUS = Object.freeze({ status: 'want_to_read', rating: 0, progress: 0, comment: '', isWishlist: null, tags: [], price: null, purchaseDate: null });
             let unsubscribeBooks = null;
             let unsubscribeStatus = null;
+            let unsubscribePartnerStatus = null;
             let allPartnerships = [];
             let activeTab = 'library';     // 'library', 'wishlist', 'insights', 'activity', 'settings'
 
@@ -571,7 +572,7 @@
                 currentlyReading: [],
                 libraryCount: 0,
                 wishlistCount: 0,
-                statusCounts: { finished: 0, reading: 0, want_to_read: 0 },
+                statusCounts: { finished: 0, reading: 0, want_to_read: 0, borrowed: 0, shared_wishlist: 0 },
                 authorsCount: {},
                 ownersCount: {},
                 genresCount: {},
@@ -3376,7 +3377,7 @@
                     currentlyReading: [],
                     libraryCount: 0,
                     wishlistCount: 0,
-                    statusCounts: { finished: 0, reading: 0, want_to_read: 0 },
+                    statusCounts: { finished: 0, reading: 0, want_to_read: 0, borrowed: 0, shared_wishlist: 0 },
                     authorsCount: {},
                     ownersCount: {},
                     genresCount: {},
@@ -3791,63 +3792,85 @@
                         activityUnsubs.push(unsub);
                     }
                     unsubscribeActivity = activityUnsubs;
+
+                    // Subscribe to partner reading statuses separately to comply with security rules
+                    if (unsubscribePartnerStatus) {
+                        if (Array.isArray(unsubscribePartnerStatus)) unsubscribePartnerStatus.forEach(unsub => unsub());
+                        else unsubscribePartnerStatus();
+                    }
+
+                    const partnerStatusUnsubs = [];
+                    const partnerIds = userIdsToFetch.filter(id => id !== currentUser.uid);
+
+                    for (let i = 0; i < partnerIds.length; i += 10) {
+                        const chunk = partnerIds.slice(i, i + 10);
+                        const unsub = db.collectionGroup('readingStatus')
+                            .where('userId', 'in', chunk)
+                            .onSnapshot(snapshot => {
+                                snapshot.docChanges().forEach(change => {
+                                    const data = change.doc.data();
+                                    const bookId = change.doc.ref.parent.parent.id;
+                                    if (change.type === 'removed') {
+                                        if (partnerReadingStatuses[bookId]) {
+                                            delete partnerReadingStatuses[bookId][data.userId];
+                                        }
+                                    } else {
+                                        if (!partnerReadingStatuses[bookId]) partnerReadingStatuses[bookId] = {};
+                                        partnerReadingStatuses[bookId][data.userId] = {
+                                            status: data.status,
+                                            progress: data.progress || 0,
+                                            updatedAt: data.updatedAt
+                                        };
+                                        // Pre-fetch partner name if not cached
+                                        if (!userProfileCache[data.userId]) {
+                                            db.collection('users').doc(data.userId).get().then(doc => {
+                                                if (doc.exists) {
+                                                    userProfileCache[data.userId] = doc.data()?.displayName || doc.data()?.email || 'Partner';
+                                                    updateLibraryCache();
+                                                    renderMainApp();
+                                                }
+                                            });
+                                        }
+                                    }
+                                });
+                                updateLibraryCache();
+                                renderMainApp();
+                            }, err => {
+                                console.error("Partner Status Listener Error:", err);
+                            });
+                        partnerStatusUnsubs.push(unsub);
+                    }
+                    unsubscribePartnerStatus = partnerStatusUnsubs;
                 }
 
                 // Use a collection group listener to get reading statuses for THIS user efficiently.
-                // Removed .where() clause to avoid needing a collection group index
-                // Filter on client-side instead for better performance
                 unsubscribeStatus = db.collectionGroup('readingStatus')
+                    .where('userId', '==', currentUser.uid)
                     .onSnapshot(snapshot => {
                         isStatusesLoaded = true;
                         snapshot.docChanges().forEach(change => {
                             const data = change.doc.data();
                             const bookId = change.doc.ref.parent.parent.id;
 
-                            if (data.userId === currentUser.uid) {
-                                if (change.type === 'removed') {
-                                    delete readingStatuses[bookId];
-                                } else {
-                                    readingStatuses[bookId] = {
-                                        status: data.status === 'unread' ? 'want_to_read' : (data.status || 'want_to_read'),
-                                        rating: data.rating || 0,
-                                        progress: data.progress || 0,
-                                        comment: data.comment || '',
-                                        tags: data.tags || [],
-                                        isWishlist: data.isWishlist || false,
-                                        price: data.price || null,
-                                        purchaseDate: data.purchaseDate || null,
-                                        updatedAt: data.updatedAt
-                                    };
-                                }
+                            if (change.type === 'removed') {
+                                delete readingStatuses[bookId];
                             } else {
-                                // Partner status
-                                if (change.type === 'removed') {
-                                    if (partnerReadingStatuses[bookId]) {
-                                        delete partnerReadingStatuses[bookId][data.userId];
-                                    }
-                                } else {
-                                    if (!partnerReadingStatuses[bookId]) partnerReadingStatuses[bookId] = {};
-                                    partnerReadingStatuses[bookId][data.userId] = {
-                                        status: data.status,
-                                        progress: data.progress || 0,
-                                        updatedAt: data.updatedAt
-                                    };
-                                    // Pre-fetch partner name if not cached
-                                    if (!userProfileCache[data.userId]) {
-                                        db.collection('users').doc(data.userId).get().then(doc => {
-                                            if (doc.exists) {
-                                                userProfileCache[data.userId] = doc.data()?.displayName || doc.data()?.email || 'Partner';
-                                                updateLibraryCache(); // Refresh owner badges and partner labels
-                                                renderLibraryOnly();
-                                            }
-                                        });
-                                    }
-                                }
+                                readingStatuses[bookId] = {
+                                    status: data.status === 'unread' ? 'want_to_read' : (data.status || 'want_to_read'),
+                                    rating: data.rating || 0,
+                                    progress: data.progress || 0,
+                                    comment: data.comment || '',
+                                    tags: data.tags || [],
+                                    isWishlist: data.isWishlist || false,
+                                    price: data.price || null,
+                                    purchaseDate: data.purchaseDate || null,
+                                    updatedAt: data.updatedAt
+                                };
                             }
                         });
                         updateLibraryCache();
                         syncCompletedBooksCount();
-                        renderLibraryOnly();
+                        renderMainApp();
                     }, err => {
                         console.error("Status Listener Error (Reading Status sync failed):", err);
                         if (err.message.includes("requires an index")) {
@@ -5505,6 +5528,10 @@
                     } else {
                         if (unsubscribeBooks) unsubscribeBooks();
                         if (unsubscribeStatus) unsubscribeStatus();
+                        if (unsubscribePartnerStatus) {
+                            if (Array.isArray(unsubscribePartnerStatus)) unsubscribePartnerStatus.forEach(u => u());
+                            else unsubscribePartnerStatus();
+                        }
                         if (unsubscribeProfile) unsubscribeProfile();
                         if (unsubscribePartners1) unsubscribePartners1();
                         if (unsubscribePartners2) unsubscribePartners2();
