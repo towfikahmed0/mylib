@@ -5468,8 +5468,35 @@
                 }
 
                 try {
-                    // Use local libraryStats which is already aggregated from real-time readingStatus subcollections
-                    const finishedCount = libraryStats.statusCounts.finished || 0;
+                    // Perform a fresh query to the database to count finished books
+                    let finishedCount = 0;
+                    const processedBookIds = new Set();
+
+                    // 1. Check readingStatus subcollections (modern architecture)
+                    // We only filter by userId to use the existing index
+                    const statusSnapshot = await db.collectionGroup('readingStatus')
+                        .where('userId', '==', currentUser.uid)
+                        .get();
+
+                    statusSnapshot.forEach(doc => {
+                        const data = doc.data();
+                        if (data.status === 'finished' && data.isWishlist !== true) {
+                            finishedCount++;
+                            processedBookIds.add(doc.ref.parent.parent.id);
+                        }
+                    });
+
+                    // 2. Check main books collection for legacy data (owned by user)
+                    const legacySnapshot = await db.collection('books')
+                        .where('userId', '==', currentUser.uid)
+                        .get();
+
+                    legacySnapshot.forEach(doc => {
+                        const data = doc.data();
+                        if (data.status === 'finished' && data.isWishlist !== true && !processedBookIds.has(doc.id)) {
+                            finishedCount++;
+                        }
+                    });
 
                     // Update Firestore profile
                     await db.collection('users').doc(currentUser.uid).update({
