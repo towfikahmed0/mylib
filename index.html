@@ -305,12 +305,12 @@
         db.enablePersistence({ synchronizeTabs: true })
             .then(() => {
                 persistenceInitialized = true;
-                startApp();
+                window.startApp();
             })
             .catch(err => {
                 console.warn("Offline persistence error:", err);
                 persistenceInitialized = true;
-                startApp();
+                window.startApp();
             });
     </script>
     <!-- ============================================================================== -->
@@ -5469,7 +5469,7 @@
             };
 
             // ---------- Auth State Observer ----------
-            window.startApp = function() {
+            function startApp() {
                 if (window.authObserverStarted) return;
                 window.authObserverStarted = true;
 
@@ -6167,151 +6167,152 @@
                             window.hideLoading();
                         }
                     }
-                } catch (err) {
-                    console.error('Error opening book details:', err);
-                    showToast('Could not open book details: ' + err.message, 'error');
+                });
+            } catch (err) {
+                console.error('Error opening book details:', err);
+                showToast('Could not open book details: ' + err.message, 'error');
+            }
+        }
+
+        // ---------- Global document click listener for book cards (added once) ----------
+        document.addEventListener('click', e => {
+            const card = e.target.closest('[data-book-id]');
+            if (!card) return;
+
+            const bookId = card.dataset.bookId;
+            const book = books.find(b => b.id === bookId);
+            if (!book) return;
+
+            // If edit button on card clicked
+            if (e.target.closest('button')) {
+                e.stopPropagation();
+                openManualEntry(null, book);
+                return;
+            }
+            openBookDetails(book);
+        });
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                const card = e.target.closest('.book-card');
+                if (card && e.target === card) {
+                    e.preventDefault();
+                    const bookId = card.dataset.bookId;
+                    const book = books.find(b => b.id === bookId);
+                    if (book) openBookDetails(book);
                 }
             }
+        });
 
-            // ---------- Global document click listener for book cards (added once) ----------
-            document.addEventListener('click', e => {
-                const card = e.target.closest('[data-book-id]');
-                if (!card) return;
+        // Swipe Gestures
+        let touchStartX = 0;
+        let touchCurrentX = 0;
+        let currentSwipingCard = null;
 
-                const bookId = card.dataset.bookId;
-                const book = books.find(b => b.id === bookId);
-                if (!book) return;
+        document.addEventListener('touchstart', e => {
+            const card = e.target.closest('.book-card');
+            if (!card || activeTab === 'wishlist') return;
+            touchStartX = e.touches[0].clientX;
+            touchCurrentX = touchStartX;
+            currentSwipingCard = card;
+        }, { passive: true });
 
-                // If edit button on card clicked
-                if (e.target.closest('button')) {
-                    e.stopPropagation();
-                    openManualEntry(null, book);
-                    return;
+        document.addEventListener('touchmove', e => {
+            if (!currentSwipingCard) return;
+            touchCurrentX = e.touches[0].clientX;
+            const diff = touchStartX - touchCurrentX;
+
+            if (diff > 20) { // Swiping left
+                currentSwipingCard.classList.add('swiping');
+                const translate = Math.min(diff, 100);
+                currentSwipingCard.style.transform = `translateX(-${translate}px)`;
+
+                // Ensure overlay exists
+                let overlay = currentSwipingCard.querySelector('.swipe-overlay');
+                if (!overlay) {
+                    overlay = document.createElement('div');
+                    overlay.className = 'swipe-overlay';
+                    currentSwipingCard.appendChild(overlay);
                 }
-                openBookDetails(book);
-            });
 
-            document.addEventListener('keydown', e => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    const card = e.target.closest('.book-card');
-                    if (card && e.target === card) {
-                        e.preventDefault();
-                        const bookId = card.dataset.bookId;
-                        const book = books.find(b => b.id === bookId);
-                        if (book) openBookDetails(book);
-                    }
-                }
-            });
+                const bookId = currentSwipingCard.dataset.bookId;
+                const statusData = getStatusData(bookId);
+                const currentStatus = statusData.status;
 
-            // Swipe Gestures
-            let touchStartX = 0;
-            let touchCurrentX = 0;
-            let currentSwipingCard = null;
-
-            document.addEventListener('touchstart', e => {
-                const card = e.target.closest('.book-card');
-                if (!card || activeTab === 'wishlist') return;
-                touchStartX = e.touches[0].clientX;
-                touchCurrentX = touchStartX;
-                currentSwipingCard = card;
-            }, { passive: true });
-
-            document.addEventListener('touchmove', e => {
-                if (!currentSwipingCard) return;
-                touchCurrentX = e.touches[0].clientX;
-                const diff = touchStartX - touchCurrentX;
-
-                if (diff > 20) { // Swiping left
-                    currentSwipingCard.classList.add('swiping');
-                    const translate = Math.min(diff, 100);
-                    currentSwipingCard.style.transform = `translateX(-${translate}px)`;
-
-                    // Ensure overlay exists
-                    let overlay = currentSwipingCard.querySelector('.swipe-overlay');
-                    if (!overlay) {
-                        overlay = document.createElement('div');
-                        overlay.className = 'swipe-overlay';
-                        currentSwipingCard.appendChild(overlay);
-                    }
-
-                    const bookId = currentSwipingCard.dataset.bookId;
-                    const statusData = getStatusData(bookId);
-                    const currentStatus = statusData.status;
-
-                    if (currentStatus === 'want_to_read') {
-                        overlay.style.background = '#3b82f6'; // blue
-                        overlay.innerHTML = `
+                if (currentStatus === 'want_to_read') {
+                    overlay.style.background = '#3b82f6'; // blue
+                    overlay.innerHTML = `
                             <div class="flex flex-col items-center gap-1">
                                 <svg aria-hidden="true" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
                                 <span class="text-[8px] font-black uppercase">Mark Reading</span>
                             </div>
                         `;
-                    } else if (currentStatus === 'reading') {
-                        overlay.style.background = '#10b981'; // emerald
-                        overlay.innerHTML = `
+                } else if (currentStatus === 'reading') {
+                    overlay.style.background = '#10b981'; // emerald
+                    overlay.innerHTML = `
                             <div class="flex flex-col items-center gap-1">
                                 <svg aria-hidden="true" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                                 <span class="text-[8px] font-black uppercase">Mark Finished</span>
                             </div>
                         `;
-                    } else {
-                        overlay.style.background = '#64748b'; // slate
-                        overlay.innerHTML = `
+                } else {
+                    overlay.style.background = '#64748b'; // slate
+                    overlay.innerHTML = `
                             <div class="flex flex-col items-center gap-1">
                                 <svg aria-hidden="true" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                                 <span class="text-[8px] font-black uppercase">Finished</span>
                             </div>
                         `;
-                    }
-                } else {
-                    currentSwipingCard.classList.remove('swiping');
-                    currentSwipingCard.style.transform = '';
                 }
-            }, { passive: true });
+            } else {
+                currentSwipingCard.classList.remove('swiping');
+                currentSwipingCard.style.transform = '';
+            }
+        }, { passive: true });
 
-            document.addEventListener('touchend', async e => {
-                if (!currentSwipingCard) return;
-                const diff = touchStartX - touchCurrentX;
-                const card = currentSwipingCard;
-                const bookId = card.dataset.bookId;
+        document.addEventListener('touchend', async e => {
+            if (!currentSwipingCard) return;
+            const diff = touchStartX - touchCurrentX;
+            const card = currentSwipingCard;
+            const bookId = card.dataset.bookId;
 
-                card.classList.remove('swiping');
-                card.style.transform = '';
-                currentSwipingCard = null;
+            card.classList.remove('swiping');
+            card.style.transform = '';
+            currentSwipingCard = null;
 
-                if (diff > 80) { // Threshold met
-                    const statusData = getStatusData(bookId);
-                    const currentStatus = statusData.status;
-                    let nextStatus = null;
+            if (diff > 80) { // Threshold met
+                const statusData = getStatusData(bookId);
+                const currentStatus = statusData.status;
+                let nextStatus = null;
 
-                    if (currentStatus === 'want_to_read') nextStatus = 'reading';
-                    else if (currentStatus === 'reading') nextStatus = 'finished';
+                if (currentStatus === 'want_to_read') nextStatus = 'reading';
+                else if (currentStatus === 'reading') nextStatus = 'finished';
 
-                    if (nextStatus) {
-                        window.showLoading();
-                        try {
-                            const updateData = {
-                                status: nextStatus,
-                                userId: currentUser.uid,
-                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                            };
-                            if (nextStatus === 'finished') updateData.progress = 100;
+                if (nextStatus) {
+                    window.showLoading();
+                    try {
+                        const updateData = {
+                            status: nextStatus,
+                            userId: currentUser.uid,
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        };
+                        if (nextStatus === 'finished') updateData.progress = 100;
 
-                            await db.collection('books').doc(bookId)
-                                .collection('readingStatus').doc(currentUser.uid).set(updateData, { merge: true });
+                        await db.collection('books').doc(bookId)
+                            .collection('readingStatus').doc(currentUser.uid).set(updateData, { merge: true });
 
-                            showToast(`Marked as ${READING_STATUSES[nextStatus].label}`, 'success');
-                            if (navigator.vibrate) navigator.vibrate([10, 30, 10]);
-                        } catch (err) {
-                            showToast('Error updating status: ' + err.message, 'error');
-                        } finally {
-                            window.hideLoading();
-                        }
+                        showToast(`Marked as ${READING_STATUSES[nextStatus].label}`, 'success');
+                        if (navigator.vibrate) navigator.vibrate([10, 30, 10]);
+                    } catch (err) {
+                        showToast('Error updating status: ' + err.message, 'error');
+                    } finally {
+                        window.hideLoading();
                     }
                 }
-                touchStartX = 0;
-                touchCurrentX = 0;
-            }, { passive: true });
+            }
+            touchStartX = 0;
+            touchCurrentX = 0;
+        }, { passive: true });
 
         })();
     </script>
