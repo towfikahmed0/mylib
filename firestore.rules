@@ -81,26 +81,36 @@ service cloud.firestore {
       allow create: if request.auth != null &&
         canAddBook(request.auth.uid, request.resource.data.userId);
 
-      // STRICT OWNERSHIP: Only the library owner can update or delete
-      allow update, delete: if request.auth != null &&
+      // Only the library owner can delete
+      allow delete: if request.auth != null &&
         request.auth.uid == resource.data.userId;
+
+      // Only the library owner can update, EXCEPT for returning a book
+      allow update: if request.auth != null && (
+        request.auth.uid == resource.data.userId ||
+        (isLibraryMember(request.auth.uid, resource.data.userId) &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['borrowedBy', 'borrowDate']))
+      );
     }
 
-    // ========== READING STATUS SUBCOLLECTION (supports Collection Group) ==========
-    match /{path=**}/readingStatus/{docId} {
-      // Allow users to read their own status, statuses in a library they are a member of, or public library statuses
+    // ========== READING STATUS SUBCOLLECTION ==========
+    match /books/{bookId}/readingStatus/{userId} {
+      // Allow users to read their own status, or all statuses if they are library members or the library is public
       allow read: if request.auth != null && (
-        request.auth.uid == docId ||
-        (resource != null && request.auth.uid == resource.data.userId) ||
-        (request.path.size() >= 5 && isLibraryMember(request.auth.uid, get(/databases/$(database)/documents/books/$(request.path[4])).data.userId)) ||
-        (request.path.size() >= 5 && isLibraryPublic(get(/databases/$(database)/documents/books/$(request.path[4])).data.userId))
+        request.auth.uid == userId ||
+        isLibraryMember(request.auth.uid, get(/databases/$(database)/documents/books/$(bookId)).data.userId) ||
+        isLibraryPublic(get(/databases/$(database)/documents/books/$(bookId)).data.userId)
       );
       
-      // Only allow write/update if writing to your own document
       allow create, update: if request.auth != null && 
-        (request.auth.uid == docId || request.resource.data.userId == request.auth.uid);
+        (request.auth.uid == userId || request.resource.data.userId == request.auth.uid);
       
-      allow delete: if request.auth != null && request.auth.uid == docId;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Support Collection Group queries for readingStatus
+    match /{path=**}/readingStatus/{docId} {
+      allow read: if request.auth != null && (request.auth.uid == docId || (resource != null && resource.data.userId == request.auth.uid));
     }
 
     // ========== TRANSFER REQUESTS COLLECTION ==========
