@@ -890,12 +890,6 @@
                 }
 
                 const { authorsCount, ownersCount, genresCount, tagsCount, totalValue, statusCounts, monthlyActivity, libraryCount } = stats;
-                const goalPercent = Math.min(100, Math.round((finished / goal) * 100));
-
-                // SVG Progress Ring Constants
-                const radius = 70;
-                const circumference = 2 * Math.PI * radius;
-                const offset = circumference - (goalPercent / 100) * circumference;
 
                 return `
                 <div class="max-w-4xl mx-auto space-y-8 animate-slide-up">
@@ -911,25 +905,9 @@
                             </div>
                         ` : ''}
 
-                    <div class="flex flex-col md:flex-row gap-8">
-                        <!-- Goal Progress Card -->
-                        <div class="glass flex-1 p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800 flex flex-col items-center justify-center text-center">
-                                <h2 class="text-xl font-black mb-6 font-serif italic text-blue-600 dark:text-blue-400">${name} Reading Goal</h2>
-                            <div class="relative w-48 h-48 mb-6">
-                                <svg aria-hidden="true" class="w-full h-full -rotate-90">
-                                    <circle cx="96" cy="96" r="${radius}" stroke="currentColor" stroke-width="12" fill="transparent" class="text-slate-100 dark:text-slate-800" />
-                                    <circle cx="96" cy="96" r="${radius}" stroke="currentColor" stroke-width="12" fill="transparent" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" stroke-linecap="round" class="text-primary transition-all duration-1000" />
-                                </svg>
-                                <div class="absolute inset-0 flex flex-col items-center justify-center">
-                                    <span class="text-4xl font-black font-serif">${finished}</span>
-                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">of ${goal} Books</span>
-                                </div>
-                            </div>
-                            <p class="text-sm font-medium text-slate-500">${goalPercent}% of your yearly goal completed!</p>
-                        </div>
-
+                    <div class="space-y-8">
                         <!-- High Level Stats -->
-                        <div class="grid grid-cols-2 gap-4 flex-[1.5]">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div class="glass p-6 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800 flex flex-col justify-center">
                                 <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center mb-3">
                                     <svg aria-hidden="true" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
@@ -2101,9 +2079,8 @@
                     } else if (activeTab === 'wishlist') {
                         if (!isWishlist) return false;
                     } else {
-                        // Main Library tab: strictly exclude wishlist items AND finished books owned by user
+                        // Main Library tab: strictly exclude wishlist items
                         if (isWishlist) return false;
-                        if (status === 'finished' && b.userId === currentUser.uid) return false;
                     }
 
                     if (searchLower && !b._searchBlob.includes(searchLower)) return false;
@@ -2162,7 +2139,8 @@
 
                 // Optimization: Use pre-calculated tab counts from libraryStats
                 // Impact: Reduces complexity from O(N) to O(1) in the render path
-                let totalInTab = (activeTab === 'my_books' && myBooksSubTab === 'wishlist') || activeTab === 'wishlist' ? libraryStats.wishlistCount : libraryStats.libraryCount;
+                let totalInTab = (activeTab === 'my_books' && myBooksSubTab === 'wishlist') || activeTab === 'wishlist' ? libraryStats.wishlistCount :
+                                 (activeTab === 'my_books' && myBooksSubTab === 'finished') ? libraryStats.finishedCount : libraryStats.libraryCount;
 
                 // When visiting another library, totalInTab should reflect that user's collection size
                 if (visitedLibrary && !visitedLibrary.error && visitedLibrary.books) {
@@ -2614,7 +2592,7 @@
                                 </div>
                             </div>
                             <div id="my-books-content">
-                                ${renderLibraryOnly()}
+                                <div id="library-container-wrapper"></div>
                             </div>
                         </div>
                     </div>
@@ -2627,6 +2605,7 @@
             };
 
             function attachMyBooksListeners() {
+                renderLibraryOnly();
                 attachGlobalListeners();
             }
 
@@ -3573,18 +3552,19 @@
                     // Update total counts for Library and Wishlist (Pre-calculation for O(1) retrieval)
                     if (isWishlist) {
                         stats.wishlistCount++;
-                    } else if (isFinished) {
-                        stats.finishedCount++;
-                        bGenres.forEach(g => {
-                            if (g) stats.myBooksGenresCount[g] = (stats.myBooksGenresCount[g] || 0) + 1;
-                        });
                     } else {
                         stats.libraryCount++;
+                        if (isFinished) {
+                            stats.finishedCount++;
+                            bGenres.forEach(g => {
+                                if (g) stats.myBooksGenresCount[g] = (stats.myBooksGenresCount[g] || 0) + 1;
+                            });
+                        }
                     }
 
                     // Count finished books for collaborators
                     if (status === 'finished' && b.userId !== currentUser.uid) {
-                        const cName = (userProfileCache[b.userId] && (userProfileCache[b.userId].displayName || userProfileCache[b.userId].email)) || 'Partner';
+                        const cName = userProfileCache[b.userId] || 'Partner';
                         stats.collaboratorFinishedCounts[cName] = (stats.collaboratorFinishedCounts[cName] || 0) + 1;
                     }
 
@@ -3632,8 +3612,8 @@
                         formattedPrice: b.price ? '$' + b.price : ''
                     };
 
-                    // Update Statistics (Skip wishlist and finished books for main stats)
-                    if (isWishlist || isFinished) return;
+                    // Update Statistics (Skip wishlist items)
+                    if (isWishlist) return;
 
                     if (stats.statusCounts.hasOwnProperty(status)) stats.statusCounts[status]++;
 
