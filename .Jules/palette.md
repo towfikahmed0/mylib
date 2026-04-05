@@ -47,3 +47,6 @@
 ## 2026-03-28 - [Scroll-Linked Feedback & Pulsing Status Indicators]
 **Learning:** Adding a scroll progress ring to the "Back to Top" button provides intuitive, passive feedback on a user's document position without requiring dedicated UI space. Additionally, a subtle pulsing animation (`animate-ping`) on a status indicator (like the AI Librarian's "Online" dot) successfully draws the user's eye to a feature's availability in a way that feels "alive" rather than intrusive.
 **Action:** Use SVG `stroke-dashoffset` for performant scroll-linked progress indicators. Apply subtle animations to secondary status dots to improve feature discovery and delight.
+## 2025-05-14 - Reusable Copy Utility with Visual Feedback
+**Learning:** Centralizing clipboard operations into a single utility function (`window.copyText`) that handles both the logic and the UI feedback (icon swapping, toast, ARIA updates) ensures consistency and reduces code duplication across the app.
+**Action:** Always look for patterns where immediate feedback is needed (like copying or sharing) and abstract them into a helper that manages the transition states (Original -> Feedback -> Original) to provide a polished experience.
