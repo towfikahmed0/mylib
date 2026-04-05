@@ -110,7 +110,11 @@ service cloud.firestore {
 
     // Support Collection Group queries for readingStatus
     match /{path=**}/readingStatus/{docId} {
-      allow read: if request.auth != null && (request.auth.uid == docId || (resource != null && resource.data.userId == request.auth.uid));
+      allow read: if request.auth != null && (
+        request.auth.uid == docId ||
+        (resource != null && resource.data.userId == request.auth.uid) ||
+        exists(path('/databases/' + database + '/documents/partnerships/' + getPartnershipId(request.auth.uid, docId)))
+      );
     }
 
     // ========== TRANSFER REQUESTS COLLECTION ==========
