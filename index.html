@@ -2905,14 +2905,17 @@
                 document.getElementById('category-filter')?.addEventListener('change', e => {
                     categoryFilter = e.target.value;
                     renderLibraryOnly();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
                 document.getElementById('author-filter')?.addEventListener('change', e => {
                     authorFilter = e.target.value;
                     renderLibraryOnly();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
                 document.getElementById('owner-filter')?.addEventListener('change', e => {
                     ownerFilter = e.target.value;
                     renderLibraryOnly();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
                 document.getElementById('grid-view-btn')?.addEventListener('click', () => {
                     viewMode = 'grid';
@@ -3233,6 +3236,7 @@
                 else if (type === 'owner') ownerFilter = 'all';
                 else if (type === 'tag') tagFilter = null;
                 renderLibraryOnly();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
             window.clearAllFilters = (shouldRender = true) => {
@@ -3254,6 +3258,7 @@
                     activeTab = 'library';
                     myBooksSubTab = 'finished';
                     renderMainApp();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
             };
 
@@ -3603,11 +3608,18 @@
 
                     const isNew = b._createdTime > oneMonthAgo;
 
+                    const statusSequence = ['want_to_read', 'reading', 'finished'];
+                    let nextIdx = statusSequence.indexOf(status);
+                    if (nextIdx === -1) nextIdx = 0;
+                    else nextIdx = (nextIdx + 1) % statusSequence.length;
+                    const nextStatus = statusSequence[nextIdx];
+
                     b._cache = {
                         status,
                         progress,
                         stars: STAR_CACHE[displayRating] || '',
                         statusLabel: READING_STATUSES[status].label,
+                        nextStatusLabel: READING_STATUSES[nextStatus].label,
                         compactStatusLabel: status === 'want_to_read' ? 'WTR' : READING_STATUSES[status].label,
                         statusBadge: READING_STATUSES[status].badge,
                         statusColor: status === 'finished' ? 'bg-emerald-500' : status === 'reading' ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600',
@@ -3708,7 +3720,7 @@
                                 </div>`
                         }
                             <div class="absolute bottom-2 right-2 flex flex-col items-end gap-1">
-                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status, currently ${cache.statusLabel}" class="px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase text-white shadow-sm hover:scale-105 active:scale-95 transition-transform ${cache.statusColor} focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none" title="Quick toggle status">
+                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle status to ${cache.nextStatusLabel}" class="px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase text-white shadow-sm hover:scale-105 active:scale-95 transition-transform ${cache.statusColor} focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none" title="Mark as ${cache.nextStatusLabel}">
                                     ${cache.compactStatusLabel}
                                 </button>
                             </div>
@@ -3752,7 +3764,7 @@
                                 <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" aria-label="Edit book details">
                                     <svg aria-hidden="true" class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
-                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status, currently ${cache.statusLabel}" class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm hover:scale-105 active:scale-95 transition-transform ${cache.statusBadge} focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none" title="Quick toggle status">
+                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle status to ${cache.nextStatusLabel}" class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm hover:scale-105 active:scale-95 transition-transform ${cache.statusBadge} focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none" title="Mark as ${cache.nextStatusLabel}">
                                     ${cache.compactStatusLabel}${cache.status === 'reading' ? ` (${cache.progress}%)` : ''}
                                 </button>
                                 ${isCollaboratorBook ? `<span class="w-2 h-2 bg-violet-500 rounded-full" title="Collaborator Book"></span>` : ''}
@@ -3769,7 +3781,7 @@
                     </div>
                     <div class="w-28 h-40 bg-slate-100 dark:bg-slate-800 rounded-3xl overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 relative shadow-lg">
                         ${cache.status === 'reading' ? `
-                            <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-slate-200/50 z-10">
+                            <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-slate-200/50 z-10" role="progressbar" aria-valuenow="${cache.progress}" aria-valuemin="0" aria-valuemax="100" aria-label="Reading progress: ${cache.progress}%">
                                 <div class="h-full bg-blue-500" style="width: ${cache.progress}%"></div>
                             </div>
                         ` : ''}
@@ -3797,7 +3809,7 @@
                                 ${cache.tagsHtml}
                             </div>
                             <div class="mt-2 flex flex-wrap gap-1">
-                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle reading status, currently ${cache.statusLabel}" class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm hover:scale-105 active:scale-95 transition-transform ${cache.statusBadge} focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none" title="Quick toggle status">
+                                <button onclick="window.cycleBookStatus('${book.id}', event)" aria-label="Cycle status to ${cache.nextStatusLabel}" class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold shadow-sm hover:scale-105 active:scale-95 transition-transform ${cache.statusBadge} focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none" title="Mark as ${cache.nextStatusLabel}">
                                     ${cache.statusLabel}${cache.status === 'reading' ? ` (${cache.progress}%)` : ''}
                                 </button>
                                 ${book.borrowedBy ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed by ${escapeHTML(book.borrowedBy)}</div>` : ''}
