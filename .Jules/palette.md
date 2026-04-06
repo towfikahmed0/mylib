@@ -47,3 +47,7 @@
 ## 2026-03-28 - [Scroll-Linked Feedback & Pulsing Status Indicators]
 **Learning:** Adding a scroll progress ring to the "Back to Top" button provides intuitive, passive feedback on a user's document position without requiring dedicated UI space. Additionally, a subtle pulsing animation (`animate-ping`) on a status indicator (like the AI Librarian's "Online" dot) successfully draws the user's eye to a feature's availability in a way that feels "alive" rather than intrusive.
 **Action:** Use SVG `stroke-dashoffset` for performant scroll-linked progress indicators. Apply subtle animations to secondary status dots to improve feature discovery and delight.
+
+## 2026-04-10 - [Centralized Clipboard Feedback & Contextual Utility]
+**Learning:** Centralizing repeated micro-interactions (like clipboard copy with visual feedback) into a single utility ensures UI consistency and reduces maintenance overhead in large single-file SPAs. Additionally, when dealing with dynamically rendered AI content, using DOM traversal (`this.previousElementSibling.innerText`) for the copy target is more resilient than passing complex, potentially nested strings through template literal event handlers.
+**Action:** Always centralize high-frequency feedback patterns (toast + icon swap) into global utilities. Prefer DOM-based content retrieval for interactive elements within complex templates to avoid escaping pitfalls.
