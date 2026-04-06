@@ -500,10 +500,21 @@
                     _escJsAuthor: escapeHTML(jsAuthor),
                     _escJsOwner: escapeHTML(jsOwner),
                     _formattedPurchaseDate: formattedPurchaseDate,
-                    _normalizedTags: (data.tags || []).map(tag => ({
-                        esc: escapeHTML(tag),
-                        escJs: escapeHTML(tag.replace(/'/g, "\\'"))
-                    })),
+                    _normalizedTags: (data.tags || []).map(tag => {
+                        const esc = escapeHTML(tag);
+                        const escJs = escapeHTML(tag.replace(/'/g, "\\'"));
+                        return { esc, escJs };
+                    }),
+                    _tagsHtml: (data.tags || []).map(tag => {
+                        const esc = escapeHTML(tag);
+                        const escJs = escapeHTML(tag.replace(/'/g, "\\'"));
+                        return `<button type="button" aria-label="Filter by tag: ${esc}" onclick="event.stopPropagation(); window.setTagFilter('${escJs}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded">${esc}</button>`;
+                    }).join(''),
+                    _compactTagsHtml: (data.tags || []).map(tag => {
+                        const esc = escapeHTML(tag);
+                        const escJs = escapeHTML(tag.replace(/'/g, "\\'"));
+                        return `<button type="button" aria-label="Filter by tag: ${esc}" onclick="event.stopPropagation(); window.setTagFilter('${escJs}')" class="text-[8px] bg-slate-100 dark:bg-slate-800 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none">${esc}</button>`;
+                    }).join(''),
                     _searchBlob: `${title} ${author} ${genres.join(' ')} ${data.isbn || ''} ${(data.tags || []).join(' ')}`.toLowerCase(),
                     _createdTime: data.createdAt?.toMillis() || 0,
                     _purchaseTime: data.purchaseDate ? new Date(data.purchaseDate).getTime() : 0
@@ -2087,10 +2098,10 @@
                 }
 
                 let filteredBooks = sourceCollection.filter(b => {
-                    const statusData = getStatusData(b.id, currentUser.uid);
+                    const cache = b._cache || {};
                     // Standardize wishlist check: status subcollection takes absolute precedence
-                    const isWishlist = (statusData && (statusData.isWishlist === true || statusData.isWishlist === false)) ? statusData.isWishlist : !!b.isWishlist;
-                    const status = statusData.status;
+                    const isWishlist = cache.isWishlist !== undefined ? cache.isWishlist : !!b.isWishlist;
+                    const status = cache.status || 'want_to_read';
 
                     // 1. High-disqualification criteria first (tab, search, static filters)
                     if (activeTab === 'my_books') {
@@ -2116,14 +2127,14 @@
                     if (tagFilter && (!b.tags || !b.tags.includes(tagFilter))) return false;
 
                     // 2. Advanced filters (price, date) - avoid expensive ops if possible
-                    const price = statusData.price !== null && statusData.price !== undefined ? statusData.price : b.price;
+                    const price = cache.price !== undefined && cache.price !== null ? cache.price : b.price;
                     if (advancedFilters.minPrice !== null && price < advancedFilters.minPrice) return false;
                     if (advancedFilters.maxPrice !== null && price > advancedFilters.maxPrice) return false;
 
                     if (startTimestamp !== null || endTimestamp !== null) {
-                        const bDate = statusData.purchaseDate ? new Date(statusData.purchaseDate).getTime() : b._purchaseTime;
-                        if (startTimestamp !== null && bDate < startTimestamp) return false;
-                        if (endTimestamp !== null && bDate > endTimestamp) return false;
+                        const purchaseTime = cache.purchaseTime || b._purchaseTime;
+                        if (startTimestamp !== null && purchaseTime < startTimestamp) return false;
+                        if (endTimestamp !== null && purchaseTime > endTimestamp) return false;
                     }
 
                     // 3. Conditional data fetching: Only fetch status data if needed for filtering
@@ -2134,12 +2145,12 @@
                             if (!isWishlist) return false;
                             if (b.userId === currentUser.uid) return false;
                         } else {
-                            if (statusFilter !== 'all' && statusData.status !== statusFilter) return false;
+                            if (statusFilter !== 'all' && status !== statusFilter) return false;
                             if (targetRating !== null) {
                                 if (targetRating === 0) {
-                                    if (statusData.rating !== 0) return false;
+                                    if (cache.rating !== 0) return false;
                                 } else {
-                                    if (statusData.rating < targetRating) return false;
+                                    if (cache.rating < targetRating) return false;
                                 }
                             }
                         }
@@ -3524,6 +3535,8 @@
 
             // Performance optimization: Update metadata cache in a single pass over the books array
             // Performance optimization: Consolidated single-pass for metadata and library statistics
+            const nextStatusMap = { 'want_to_read': 'reading', 'reading': 'finished', 'finished': 'want_to_read' };
+
             function updateLibraryCache() {
                 const authorsSet = new Set();
                 const genresSet = new Set();
@@ -3576,18 +3589,25 @@
                         }
                     }
 
-                    // Count finished books for collaborators (Iterate all partner statuses for this book)
+                    // Count finished books for collaborators and generate reading info in a single pass
                     const pStatuses = partnerReadingStatuses[b.id] || {};
-                    Object.entries(pStatuses).forEach(([uid, data]) => {
-                        if (uid !== currentUser.uid && data.status === 'finished') {
+                    let partnerReadingInfo = '';
+                    for (const uid in pStatuses) {
+                        if (uid === currentUser.uid) continue;
+                        const data = pStatuses[uid];
+                        if (data.status === 'finished') {
                             const cName = userProfileCache[uid] || 'Partner';
                             stats.collaboratorFinishedCounts[cName] = (stats.collaboratorFinishedCounts[cName] || 0) + 1;
+                        } else if (data.status === 'reading') {
+                            const cName = userProfileCache[uid] || 'Partner';
+                            partnerReadingInfo += `<div class="flex items-center gap-1 text-[8px] text-blue-500 font-bold uppercase"><div class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div> ${escapeHTML(cName)} reading (${data.progress}%)</div>`;
                         }
-                    });
+                    }
 
                     // Render Cache Pass: Pre-calculate status-dependent UI data
                     const progress = statusData.progress || b.progress || 0;
-                    const displayRating = b.averageRating ? Math.round(b.averageRating) : (statusData.rating || b.rating || 0);
+                    const rating = statusData.rating || 0;
+                    const displayRating = b.averageRating ? Math.round(b.averageRating) : (rating || b.rating || 0);
 
                     let ownerName = b.owner;
                     let escOwnerName = b._escOwner;
@@ -3596,30 +3616,20 @@
                         escOwnerName = escapeHTML(ownerName);
                     }
 
-                    const pStatuses = partnerReadingStatuses[b.id] || {};
-                    const partnerReadingInfo = Object.entries(pStatuses).map(([uid, data]) => {
-                        if (data.status === 'reading') {
-                            const name = userProfileCache[uid] || 'Partner';
-                            return `<div class="flex items-center gap-1 text-[8px] text-blue-500 font-bold uppercase"><div class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div> ${escapeHTML(name)} reading (${data.progress}%)</div>`;
-                        }
-                        return '';
-                    }).join('');
-
-                    // Pre-render tag HTML for both views
-                    const tagsHtml = b._normalizedTags.map(tag => `<button type="button" aria-label="Filter by tag: ${tag.esc}" onclick="event.stopPropagation(); window.setTagFilter('${tag.escJs}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded">${tag.esc}</button>`).join('');
-                    const compactTagsHtml = b._normalizedTags.map(tag => `<button type="button" aria-label="Filter by tag: ${tag.esc}" onclick="event.stopPropagation(); window.setTagFilter('${tag.escJs}')" class="text-[8px] bg-slate-100 dark:bg-slate-800 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none">${tag.esc}</button>`).join('');
-
                     const isNew = b._createdTime > oneMonthAgo;
+                    const nextStatus = nextStatusMap[status] || 'want_to_read';
 
-                    const statusSequence = ['want_to_read', 'reading', 'finished'];
-                    let nextIdx = statusSequence.indexOf(status);
-                    if (nextIdx === -1) nextIdx = 0;
-                    else nextIdx = (nextIdx + 1) % statusSequence.length;
-                    const nextStatus = statusSequence[nextIdx];
+                    // Pre-calculate purchase time for filtering
+                    const purchaseTime = statusData.purchaseDate ? new Date(statusData.purchaseDate).getTime() : b._purchaseTime;
+                    const price = statusData.price !== null && statusData.price !== undefined ? statusData.price : b.price;
 
                     b._cache = {
                         status,
                         progress,
+                        rating,
+                        price,
+                        purchaseTime,
+                        isWishlist,
                         stars: STAR_CACHE[displayRating] || '',
                         statusLabel: READING_STATUSES[status].label,
                         nextStatusLabel: READING_STATUSES[nextStatus].label,
@@ -3628,8 +3638,8 @@
                         statusColor: status === 'finished' ? 'bg-emerald-500' : status === 'reading' ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600',
                         ownerBadge: escOwnerName ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">${escOwnerName}'s Book</div>` : '',
                         partnerReadingInfo,
-                        tagsHtml,
-                        compactTagsHtml,
+                        tagsHtml: b._tagsHtml,
+                        compactTagsHtml: b._compactTagsHtml,
                         isNew,
                         newBadge: isNew ? `<div class="absolute top-2 left-2 z-30 px-2 py-0.5 rounded-full text-[8px] font-black uppercase text-white bg-blue-500 shadow-lg ring-1 ring-white/20">New</div>` : '',
                         listNewBadge: isNew ? `<div class="absolute top-1 left-1 z-10 w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.8)]"></div>` : '',
