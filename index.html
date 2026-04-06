@@ -1125,7 +1125,7 @@
                                 <label for="profile-display-name" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Display Name</label>
                                 <div class="flex flex-col sm:flex-row gap-2">
                                     <input id="profile-display-name" type="text" placeholder="Your Name" value="${escapeHTML(userProfile?.displayName || '')}" class="flex-1 min-w-0 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
-                                    <button id="save-profile-btn" class="sm:px-6 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 dark:shadow-none">Save Profile</button>
+                                    <button id="save-profile-btn" class="sm:px-6 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 dark:shadow-none focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20">Save Profile</button>
                                 </div>
                             </div>
                             <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
@@ -1149,7 +1149,7 @@
                                 <label for="share-email" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Collaborator Email</label>
                                 <div class="flex flex-col sm:flex-row gap-2">
                                     <input id="share-email" type="email" placeholder="email@example.com" class="flex-1 min-w-0 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
-                                    <button id="save-sharing-btn" class="sm:px-6 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 dark:shadow-none">Add Collaborator</button>
+                                    <button id="save-sharing-btn" class="sm:px-6 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 dark:shadow-none focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20">Add Collaborator</button>
                                 </div>
                             </div>
                             <div id="collaborators-list" class="space-y-2">
@@ -1275,7 +1275,7 @@
                                 <input id="gemini-custom-model" type="text" placeholder="e.g. gemini-1.5-pro-exp-0827" value="${localStorage.getItem('mylib_gemini_model') || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
                             </div>
 
-                            <button id="save-ai-settings-btn" class="w-full py-4 bg-violet-600 text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-violet-200 dark:shadow-none">Save AI Settings</button>
+                            <button id="save-ai-settings-btn" class="w-full py-4 bg-violet-600 text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-violet-200 dark:shadow-none focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-500/50">Save AI Settings</button>
 
                             <p class="text-[10px] text-slate-400 px-1">Your settings are stored locally in your browser and used only to communicate with Google Gemini AI.</p>
                         </div>
@@ -4329,7 +4329,7 @@
                         return `
                         <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
                             ${escapedG}
-                            <button onclick="window.removeGenre(${i})" aria-label="Remove genre: ${escapedG}" class="ml-2 hover:text-blue-900 dark:hover:text-blue-100">&times;</button>
+                            <button onclick="window.removeGenre(${i})" aria-label="Remove genre: ${escapedG}" class="ml-2 hover:text-blue-900 dark:hover:text-blue-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 rounded-full">&times;</button>
                         </span>
                     `;
                     }).join('');
@@ -4345,7 +4345,7 @@
                     <div class="max-w-2xl mx-auto w-full">
                         <div class="flex justify-between items-center mb-8">
                             <h2 class="text-3xl font-black font-serif italic">${isEdit ? 'Edit Book' : 'Add Manually'}</h2>
-                            <button data-close class="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm hover:bg-slate-100 transition-colors" aria-label="Close modal" title="Close modal"><svg aria-hidden="true" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                            <button data-close class="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" aria-label="Close modal" title="Close modal"><svg aria-hidden="true" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                         </div>
                         ${code ? `<p class="text-slate-500 text-sm mb-6">Code: ${code.substring(0, 20)}</p>` : ''}
                         ${!isEdit ? `
@@ -4366,7 +4366,7 @@
                                     <label for="man-series" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Series #</label>
                                     <input id="man-series" type="number" placeholder="#" value="${existingBook?.seriesIndex || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
                                 </div>
-                                <button id="ai-suggest-btn" class="p-3.5 bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 rounded-xl hover:bg-violet-200 transition-colors shadow-sm" title="Suggest with AI" aria-label="Suggest with AI">
+                                <button id="ai-suggest-btn" class="p-3.5 bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 rounded-xl hover:bg-violet-200 transition-colors shadow-sm focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-500/50" title="Suggest with AI" aria-label="Suggest with AI">
                                     <svg aria-hidden="true" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                                 </button>
                             </div>
@@ -4417,8 +4417,8 @@
                             </div>
                         </div>
                         <div class="flex gap-4 mt-10 pb-10">
-                            <button data-close class="flex-1 px-4 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold">Cancel</button>
-                            <button id="save-manual" class="flex-1 px-4 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none transition-transform active:scale-95">${isEdit ? 'Update' : 'Save'}</button>
+                            <button data-close class="flex-1 px-4 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20">Cancel</button>
+                            <button id="save-manual" class="flex-1 px-4 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none transition-transform active:scale-95 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20">${isEdit ? 'Update' : 'Save'}</button>
                         </div>
                     </div>
                 </div>
@@ -5844,18 +5844,18 @@
                 <div class="w-full h-full flex flex-col p-6 overflow-y-auto bg-slate-50 dark:bg-slate-900">
                     <div class="max-w-4xl mx-auto w-full">
                         <div class="flex justify-end mb-4">
-                            <button data-close class="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm hover:bg-slate-100 transition-colors" aria-label="Close details" title="Close details"><svg aria-hidden="true" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                            <button data-close class="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" aria-label="Close details" title="Close details"><svg aria-hidden="true" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                         </div>
                         <div class="flex flex-col md:flex-row gap-8">
                             <div class="flex-shrink-0 mx-auto md:mx-0">
                                 <div class="relative group">
                                     <img src="${book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover'}" class="w-56 h-80 object-cover rounded-3xl shadow-2xl border border-white/20" loading="lazy" decoding="async">
                                     ${book.isWishlist ? `
-                                        <button id="move-to-lib-btn" title="Move to Library" class="absolute -top-3 -right-3 w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center shadow-lg border-4 border-white dark:border-slate-900 hover:scale-110 transition-transform active:scale-95" aria-label="Move to Library">
+                                        <button id="move-to-lib-btn" title="Move to Library" class="absolute -top-3 -right-3 w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center shadow-lg border-4 border-white dark:border-slate-900 hover:scale-110 transition-transform active:scale-95 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/50" aria-label="Move to Library">
                                             <svg aria-hidden="true" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                         </button>
                                     ` : (visitedLibrary && visitedLibrary.userId === book.userId && visitedLibrary.userId !== currentUser.uid ? `
-                                        <button id="add-to-wishlist-btn" title="Add to My Wishlist" class="absolute -top-3 -right-3 w-12 h-12 bg-violet-600 text-white rounded-full flex items-center justify-center shadow-lg border-4 border-white dark:border-slate-900 hover:scale-110 transition-transform active:scale-95" aria-label="Add to My Wishlist">
+                                        <button id="add-to-wishlist-btn" title="Add to My Wishlist" class="absolute -top-3 -right-3 w-12 h-12 bg-violet-600 text-white rounded-full flex items-center justify-center shadow-lg border-4 border-white dark:border-slate-900 hover:scale-110 transition-transform active:scale-95 focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-500/50" aria-label="Add to My Wishlist">
                                             <svg aria-hidden="true" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                                         </button>
                                     ` : '')}
@@ -5918,13 +5918,13 @@
                                     ${isCollaboratorBook ? `<span class="px-2 py-0.5 bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300 rounded text-[8px] font-black uppercase tracking-widest border border-violet-200 dark:border-violet-800">Collaborator Book</span>` : ''}
                                 </div>
                                     <div class="flex flex-wrap gap-2">
-                                        ${(book.tags || []).map(tag => `<button type="button" aria-label="Filter by tag: ${escapeHTML(tag)}" onclick="window.setTagFilter('${tag}'); document.querySelector('[data-close]').click();" class="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-bold cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors">${tag}</button>`).join('')}
+                                        ${(book.tags || []).map(tag => `<button type="button" aria-label="Filter by tag: ${escapeHTML(tag)}" onclick="window.setTagFilter('${tag}'); document.querySelector('[data-close]').click();" class="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-bold cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20">${tag}</button>`).join('')}
                                     </div>
                                 </div>
                                 <div class="mt-6 px-1">
                                     <div class="flex items-center justify-between mb-2">
                                         <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">My Rating & Review</label>
-                                        <button id="clear-rating-btn" type="button" class="text-[10px] font-black text-rose-500 uppercase hover:underline ${userRatingVal === 0 ? 'hidden' : ''}" onclick="window.updateStarRating(0)">Clear Rating</button>
+                                        <button id="clear-rating-btn" type="button" class="text-[10px] font-black text-rose-500 uppercase hover:underline ${userRatingVal === 0 ? 'hidden' : ''} focus:outline-none focus-visible:ring-4 focus-visible:ring-rose-500/50 rounded px-1" onclick="window.updateStarRating(0)">Clear Rating</button>
                                     </div>
                                     <div class="space-y-4">
                                         <div class="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/50 rounded-2xl w-fit" id="star-rating-container" data-rating="${userRatingVal}">
@@ -5943,7 +5943,7 @@
                                             <label for="detail-comment-textarea" class="text-[10px] font-bold text-slate-400 uppercase mb-2 block">Your Review</label>
                                             <textarea id="detail-comment-textarea" placeholder="What did you think of this book?" class="w-full px-4 py-3 text-sm bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none min-h-[100px] transition-all">${escapeHTML(userCommentVal)}</textarea>
                                         </div>
-                                        <button id="save-rating-btn" class="w-full py-4 bg-primary text-white text-xs font-black uppercase rounded-xl shadow-lg shadow-primary/20 hover:opacity-90 transition-all active:scale-95">Save Review</button>
+                                        <button id="save-rating-btn" class="w-full py-4 bg-primary text-white text-xs font-black uppercase rounded-xl shadow-lg shadow-primary/20 hover:opacity-90 transition-all active:scale-95 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20">Save Review</button>
                                     </div>
                                 </div>
                                 <div class="mt-6 px-1">
@@ -5954,14 +5954,14 @@
                                                 <span class="font-bold text-amber-900 dark:text-amber-200">${book.borrowedBy}</span>
                                                 <span class="text-amber-700 dark:text-amber-400 text-xs">on ${new Date(book.borrowDate).toLocaleDateString()}</span>
                                             </div>
-                                            <button id="return-book-btn" class="text-[10px] font-black uppercase text-amber-600 hover:text-amber-700">Return</button>
+                                            <button id="return-book-btn" class="text-[10px] font-black uppercase text-amber-600 hover:text-amber-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-500/50 rounded px-1">Return</button>
                                         </div>
                                     ` : `
                                         <div class="flex flex-col gap-2">
                                             <div class="flex flex-col sm:flex-row gap-3">
                                                 <label for="borrower-name" class="sr-only">Borrower Name</label>
                                                 <input id="borrower-name" type="text" placeholder="Borrower Name" class="flex-1 px-4 py-3 text-sm bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
-                                                <button id="borrow-book-btn" class="w-full sm:w-auto px-6 py-3 bg-primary text-white text-[10px] font-black uppercase rounded-xl shadow-lg shadow-primary/20 transition-all active:scale-95">Borrow</button>
+                                                <button id="borrow-book-btn" class="w-full sm:w-auto px-6 py-3 bg-primary text-white text-[10px] font-black uppercase rounded-xl shadow-lg shadow-primary/20 transition-all active:scale-95 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20">Borrow</button>
                                             </div>
                                             <p class="text-[9px] text-slate-400 ml-1">Leave name empty to borrow as yourself (${currentUser.displayName || currentUser.email})</p>
                                         </div>
@@ -5991,7 +5991,7 @@
                         <div id="ai-details-container" class="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800">
                             <div class="flex items-center justify-between mb-4">
                                 <p class="text-[10px] font-bold text-slate-400 uppercase">AI Insights</p>
-                                <button id="generate-ai-details-btn" class="text-[10px] font-black uppercase text-violet-600 dark:text-violet-400 hover:underline">✨ Generate</button>
+                                <button id="generate-ai-details-btn" class="text-[10px] font-black uppercase text-violet-600 dark:text-violet-400 hover:underline focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-500/50 rounded px-1">✨ Generate</button>
                             </div>
                             <div id="ai-details-content" class="space-y-4 hidden">
                                 <!-- AI Content here -->
@@ -6007,12 +6007,12 @@
 
                         <div class="flex flex-col sm:flex-row items-center justify-between mt-10 gap-4">
                             <div class="flex w-full sm:w-auto gap-2">
-                                <button id="delete-book-btn" class="px-6 py-4 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-2xl font-bold transition-all">Delete</button>
-                                ${book.userId === currentUser.uid ? `<button id="transfer-book-btn" class="px-6 py-4 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-2xl font-bold transition-all">Transfer</button>` : ''}
+                                <button id="delete-book-btn" class="px-6 py-4 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-2xl font-bold transition-all focus:outline-none focus-visible:ring-4 focus-visible:ring-rose-500/50">Delete</button>
+                                ${book.userId === currentUser.uid ? `<button id="transfer-book-btn" class="px-6 py-4 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-2xl font-bold transition-all focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/50">Transfer</button>` : ''}
                             </div>
                             <div class="flex w-full sm:w-auto gap-4">
-                                <button id="edit-book-btn" class="flex-1 sm:flex-none px-8 py-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition-all">Edit Details</button>
-                                <button data-close class="flex-1 sm:flex-none px-10 py-4 bg-primary dark:bg-white text-white dark:text-primary rounded-2xl font-bold shadow-xl shadow-primary/20 dark:shadow-none hover:scale-105 active:scale-95 transition-all" aria-label="Close details" title="Close details">Close</button>
+                                <button id="edit-book-btn" class="flex-1 sm:flex-none px-8 py-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition-all focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20">Edit Details</button>
+                                <button data-close class="flex-1 sm:flex-none px-10 py-4 bg-primary dark:bg-white text-white dark:text-primary rounded-2xl font-bold shadow-xl shadow-primary/20 dark:shadow-none hover:scale-105 active:scale-95 transition-all focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20" aria-label="Close details" title="Close details">Close</button>
                             </div>
                         </div>
                     </div>
