@@ -2087,7 +2087,7 @@
                 }
 
                 let filteredBooks = sourceCollection.filter(b => {
-                    const statusData = getStatusData(b.id, b.userId);
+                    const statusData = getStatusData(b.id, currentUser.uid);
                     // Standardize wishlist check: status subcollection takes absolute precedence
                     const isWishlist = (statusData && (statusData.isWishlist === true || statusData.isWishlist === false)) ? statusData.isWishlist : !!b.isWishlist;
                     const status = statusData.status;
@@ -2099,7 +2099,7 @@
                             if (!isWishlist) return false;
                         } else {
                             // Finished Books sub-tab
-                            if (isWishlist || status !== 'finished' || b.userId !== currentUser.uid) return false;
+                            if (isWishlist || status !== 'finished') return false;
                         }
                     } else if (activeTab === 'wishlist') {
                         if (!isWishlist) return false;
@@ -3556,12 +3556,12 @@
                     const bGenres = getBookGenres(b);
                     bGenres.forEach(g => { if (g) genresSet.add(g); });
 
-                    const statusData = getStatusData(b.id, b.userId);
+                    const statusData = getStatusData(b.id, currentUser.uid);
                     // Standardize wishlist check: status subcollection takes absolute precedence
                     const isWishlist = (statusData && (statusData.isWishlist === true || statusData.isWishlist === false)) ? statusData.isWishlist : !!b.isWishlist;
 
                     const status = statusData.status;
-                    const isFinished = status === 'finished' && b.userId === currentUser.uid;
+                    const isFinished = status === 'finished';
 
                     // Update total counts for Library and Wishlist (Pre-calculation for O(1) retrieval)
                     if (isWishlist) {
@@ -3576,11 +3576,14 @@
                         }
                     }
 
-                    // Count finished books for collaborators
-                    if (status === 'finished' && b.userId !== currentUser.uid) {
-                        const cName = userProfileCache[b.userId] || 'Partner';
-                        stats.collaboratorFinishedCounts[cName] = (stats.collaboratorFinishedCounts[cName] || 0) + 1;
-                    }
+                    // Count finished books for collaborators (Iterate all partner statuses for this book)
+                    const pStatuses = partnerReadingStatuses[b.id] || {};
+                    Object.entries(pStatuses).forEach(([uid, data]) => {
+                        if (uid !== currentUser.uid && data.status === 'finished') {
+                            const cName = userProfileCache[uid] || 'Partner';
+                            stats.collaboratorFinishedCounts[cName] = (stats.collaboratorFinishedCounts[cName] || 0) + 1;
+                        }
+                    });
 
                     // Render Cache Pass: Pre-calculate status-dependent UI data
                     const progress = statusData.progress || b.progress || 0;
@@ -5174,6 +5177,14 @@
                     await db.collection('books').doc(bookId)
                         .collection('readingStatus').doc(currentUser.uid).set(updateData, { merge: true });
 
+                    // Immediate local update for UI reactivity
+                    readingStatuses[bookId] = {
+                        ...readingStatuses[bookId],
+                        ...updateData
+                    };
+                    updateLibraryCache();
+                    renderMainApp();
+
                     if (nextStatus === 'finished') {
                         manualSyncFinishedBooks();
                     }
@@ -6292,6 +6303,14 @@
                         await db.collection('books').doc(book.id)
                             .collection('readingStatus').doc(currentUser.uid).set(updateData, { merge: true });
 
+                        // Immediate local update for UI reactivity
+                        readingStatuses[book.id] = {
+                            ...readingStatuses[book.id],
+                            ...updateData
+                        };
+                        updateLibraryCache();
+                        renderMainApp();
+
                         await db.collection('activityFeed').add({
                             type: 'status_updated',
                             bookId: book.id,
@@ -6332,6 +6351,14 @@
                                         }
                                         await db.collection('books').doc(book.id)
                                             .collection('readingStatus').doc(currentUser.uid).set(updateData, { merge: true });
+
+                                        // Immediate local update for UI reactivity
+                                        readingStatuses[book.id] = {
+                                            ...readingStatuses[book.id],
+                                            ...updateData
+                                        };
+                                        updateLibraryCache();
+                                        renderMainApp();
                                     } catch (err) { showToast('Error: ' + err.message, 'error'); }
                                 });
                             }
@@ -6366,6 +6393,14 @@
                                 }
                                 await db.collection('books').doc(book.id)
                                     .collection('readingStatus').doc(currentUser.uid).set(updateData, { merge: true });
+
+                                // Immediate local update for UI reactivity
+                                readingStatuses[book.id] = {
+                                    ...readingStatuses[book.id],
+                                    ...updateData
+                                };
+                                updateLibraryCache();
+                                renderMainApp();
                             } catch (err) { showToast('Error: ' + err.message, 'error'); }
                         });
                     });
