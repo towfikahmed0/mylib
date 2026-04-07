@@ -1,0 +1,10 @@
+
+> @ dev /app
+> vite
+
+
+  VITE v5.4.21  ready in 222 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+12:43:23 AM [vite] page reload index.html

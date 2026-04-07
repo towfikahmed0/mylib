@@ -3596,7 +3596,6 @@
                         escOwnerName = escapeHTML(ownerName);
                     }
 
-                    const pStatuses = partnerReadingStatuses[b.id] || {};
                     const partnerReadingInfo = Object.entries(pStatuses).map(([uid, data]) => {
                         if (data.status === 'reading') {
                             const name = userProfileCache[uid] || 'Partner';
