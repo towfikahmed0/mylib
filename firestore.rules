@@ -62,19 +62,12 @@ service cloud.firestore {
     }
 
     // ========== READING STATUS SUBCOLLECTION (supports Collection Group) ==========
-    match /{path=**}/readingStatus/{docId} {
-      // Allow users to read their own status or statuses in a library they are a member of
+    match /{path=**}/readingStatus/{userId} {
       allow read: if request.auth != null && (
-        request.auth.uid == docId ||
-        isLibraryMember(request.auth.uid, get(/databases/$(database)/documents/books/$(request.path[4])).data.userId)
+        request.auth.uid == userId ||
+        isLibraryMember(request.auth.uid, get(/databases/$(database)/documents/$(path)).data.userId)
       );
-      
-      // Only allow write/update if writing to your own document
-      allow create, update: if request.auth != null && 
-        request.auth.uid == docId && 
-        request.resource.data.userId == request.auth.uid;
-      
-      allow delete: if request.auth != null && request.auth.uid == docId;
+      allow write: if request.auth.uid == userId;
     }
 
     // ========== ACTIVITY FEED COLLECTION ==========
