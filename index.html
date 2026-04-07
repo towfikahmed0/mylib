@@ -161,13 +161,16 @@
                     return originalStartApp.apply(this, arguments);
                 }
                 console.warn('startApp called before full initialization, will retry...');
+                let retryCount = 0;
                 const retry = setInterval(() => {
-                    if (typeof window.startApp === 'function' && window.startApp !== arguments.callee) {
+                    retryCount++;
+                    if (retryCount > 50) { clearInterval(retry); return; } // 5s timeout
+                    // startApp will have been replaced by the real implementation by now
+                    if (window.__appReady) {
                         window.startApp();
                         clearInterval(retry);
                     }
                 }, 100);
-                setTimeout(() => clearInterval(retry), 5000);
             };
 
             // ---------- AI Utility ----------
@@ -400,7 +403,9 @@
 
             // ---------- Utilities ----------
 
+            let loadingDepth = 0;
             window.showLoading = () => {
+                loadingDepth++;
                 loadingBar.classList.remove('-translate-y-full');
             };
 
@@ -414,7 +419,10 @@
             }
 
             window.hideLoading = () => {
-                loadingBar.classList.add('-translate-y-full');
+                loadingDepth = Math.max(0, loadingDepth - 1);
+                if (loadingDepth === 0) {
+                    loadingBar.classList.add('-translate-y-full');
+                }
             };
 
             function getStatusData(bookId, userId = null) {
@@ -1799,15 +1807,27 @@
 
             window.bulkDelete = async () => {
                 if (!selectedBookIds.size) return;
-                if (confirm(`Delete ${selectedBookIds.size} selected books?`)) {
-                    showToast(`Deleting ${selectedBookIds.size} books...`, 'info');
+                const ownedIds = Array.from(selectedBookIds).filter(id => {
+                    const b = booksMap.get(id);
+                    return b && b.userId === currentUser.uid;
+                });
+                const skipped = selectedBookIds.size - ownedIds.length;
+                if (ownedIds.length === 0) {
+                    showToast("You can only delete books you own.", "error");
+                    return;
+                }
+                const msg = skipped > 0
+                    ? `Delete ${ownedIds.length} books? (${skipped} collaborator books will be skipped)`
+                    : `Delete ${ownedIds.length} selected books?`;
+
+                if (confirm(msg)) {
+                    showToast(`Deleting ${ownedIds.length} books...`, 'info');
                     window.showLoading();
 
                     try {
-                        const ids = Array.from(selectedBookIds);
                         // Firestore batches are limited to 500 operations. Each delete is 2 operations here.
-                        for (let i = 0; i < ids.length; i += 200) {
-                            const chunk = ids.slice(i, i + 200);
+                        for (let i = 0; i < ownedIds.length; i += 200) {
+                            const chunk = ownedIds.slice(i, i + 200);
                             const batch = db.batch();
                             chunk.forEach(id => {
                                 batch.delete(db.collection('books').doc(id));
@@ -2243,8 +2263,43 @@
                         `;
                     }).join('');
 
+                    // Skeleton state
+                    if (filteredBooks.length === 0 && !isStatusesLoaded) {
+                        const skeletonCounts = { 'grid': 6, 'list': 8, 'compact': 12 };
+                        const count = skeletonCounts[viewMode] || 6;
+                        const containerClass = viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6'
+                            : viewMode === 'list' ? 'flex flex-col gap-3'
+                            : 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3';
+
+                        let skeletonHtml = '';
+                        for (let i = 0; i < count; i++) {
+                            if (viewMode === 'grid') {
+                                skeletonHtml += `
+                                <div class="animate-pulse flex gap-4 p-4 bg-slate-100/50 dark:bg-slate-800/50 rounded-[2.5rem]">
+                                    <div class="w-24 h-36 bg-slate-200 dark:bg-slate-700 rounded-2xl flex-shrink-0"></div>
+                                    <div class="flex-1 py-2">
+                                        <div class="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4 mb-3"></div>
+                                        <div class="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/2 mb-6"></div>
+                                        <div class="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/4"></div>
+                                    </div>
+                                </div>`;
+                            } else if (viewMode === 'list') {
+                                skeletonHtml += `
+                                <div class="animate-pulse flex items-center gap-4 p-3 bg-slate-100/50 dark:bg-slate-800/50 rounded-2xl">
+                                    <div class="w-10 h-14 bg-slate-200 dark:bg-slate-700 rounded-lg flex-shrink-0"></div>
+                                    <div class="flex-1">
+                                        <div class="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/3 mb-2"></div>
+                                        <div class="h-2 bg-slate-200 dark:bg-slate-700 rounded w-1/4"></div>
+                                    </div>
+                                </div>`;
+                            } else {
+                                skeletonHtml += `<div class="animate-pulse aspect-[2/3] bg-slate-200 dark:bg-slate-700 rounded-2xl"></div>`;
+                            }
+                        }
+                        html = `<div class="${containerClass}">${skeletonHtml}</div>`;
+                    }
                     // Empty state
-                    if (filteredBooks.length === 0) {
+                    else if (filteredBooks.length === 0) {
                         html = `
                         <div class="py-32 text-center">
                             <div class="bg-blue-50 dark:bg-slate-800 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -2747,7 +2802,10 @@
                 });
 
                 const userDocs = await Promise.all(
-                    partnerIds.map(id => db.collection('users').doc(id).get())
+                    partnerIds.map(async id => {
+                        if (userProfileCache[id]) return { id, data: () => ({ displayName: userProfileCache[id] }), exists: true };
+                        return db.collection('users').doc(id).get();
+                    })
                 );
 
                 const activePartners = allPartnerships.map((partnership, idx) => {
@@ -2755,7 +2813,9 @@
                     const isUnsubscribed = isUser1 ? partnership.user1Unsubscribed : partnership.user2Unsubscribed;
                     if (isUnsubscribed) return null;
 
-                    const partnerName = userDocs[idx].data()?.displayName || userDocs[idx].data()?.email || 'Partner';
+                    const doc = userDocs[idx];
+                    const data = typeof doc.data === 'function' ? doc.data() : null;
+                    const partnerName = data?.displayName || data?.email || 'Partner';
                     const partnerId = partnerIds[idx];
 
                     return { id: partnerId, name: partnerName };
@@ -4117,6 +4177,12 @@
             }
 
             function openManualEntry(code, existingBook = null, isWishlist = false) {
+                if (existingBook && existingBook.userId !== currentUser.uid) {
+                    showToast("Only the book owner can edit details", "error");
+                    const closeBtn = document.querySelector('[data-close]');
+                    if (closeBtn) closeBtn.focus();
+                    return;
+                }
                 const isEdit = !!existingBook;
                 let currentGenres = getBookGenres(existingBook || {});
                 if (currentGenres.length === 1 && currentGenres[0] === 'Other' && !isEdit) currentGenres = [];
@@ -5460,7 +5526,7 @@
                 if (syncTimeout) clearTimeout(syncTimeout);
                 syncTimeout = setTimeout(async () => {
                     const finishedCount = libraryStats.statusCounts.finished || 0;
-                    if (userProfile && userProfile.completedBooksCount !== finishedCount) {
+                    if (userProfile && (userProfile.completedBooksCount ?? -1) !== finishedCount) {
                         try {
                             await db.collection('users').doc(currentUser.uid).update({
                                 completedBooksCount: finishedCount,
@@ -5630,6 +5696,10 @@
                     const userStatusDoc = await db.collection('books').doc(book.id).collection('readingStatus').doc(currentUser.uid).get();
                     const userData = userStatusDoc.exists ? userStatusDoc.data() : null;
 
+                    const effectiveIsWishlist = (readingStatuses[book.id]?.isWishlist !== undefined)
+                        ? readingStatuses[book.id].isWishlist
+                        : !!book.isWishlist;
+
                     const bookStatus = userData?.status || statusData.status;
                     const userRatingVal = userData?.rating ?? statusData.rating;
                     const userCommentVal = userData?.comment ?? statusData.comment;
@@ -5647,15 +5717,10 @@
                     const userIds = [...new Set(allStatuses.map(s => s.uid))];
                     const userProfiles = {};
                     if (userIds.length > 0) {
-                        // Firestore 'in' query supports up to 10 items
-                        for (let i = 0; i < userIds.length; i += 10) {
-                            const chunk = userIds.slice(i, i + 10);
-                            if (chunk.length === 0) continue;
-                            const usersSnapshot = await db.collection('users').where('uid', 'in', chunk).get();
-                            usersSnapshot.docs.forEach(doc => {
-                                userProfiles[doc.id] = doc.data();
-                            });
-                        }
+                        const userDocs = await Promise.all(userIds.map(uid => db.collection('users').doc(uid).get()));
+                        userDocs.forEach(doc => {
+                            if (doc.exists) userProfiles[doc.id] = doc.data();
+                        });
                     }
 
                     // Calculate average rating
@@ -5672,7 +5737,7 @@
                             <div class="flex-shrink-0 mx-auto md:mx-0">
                                 <div class="relative group">
                                     <img src="${book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover'}" class="w-56 h-80 object-cover rounded-3xl shadow-2xl border border-white/20" loading="lazy" decoding="async">
-                                    ${book.isWishlist ? `
+                                    ${effectiveIsWishlist ? `
                                         <button id="move-to-lib-btn" title="Move to Library" class="absolute -top-3 -right-3 w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center shadow-lg border-4 border-white dark:border-slate-900 hover:scale-110 transition-transform active:scale-95 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/50" aria-label="Move to Library">
                                             <svg aria-hidden="true" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                         </button>
@@ -5722,6 +5787,8 @@
                                             <option value="want_to_read" ${bookStatus === 'want_to_read' ? 'selected' : ''}>Want to Read</option>
                                             <option value="reading" ${bookStatus === 'reading' ? 'selected' : ''}>Reading</option>
                                             <option value="finished" ${bookStatus === 'finished' ? 'selected' : ''}>Finished</option>
+                                            <option value="borrowed" ${bookStatus === 'borrowed' ? 'selected' : ''}>Borrowed</option>
+                                            <option value="shared_wishlist" ${bookStatus === 'shared_wishlist' ? 'selected' : ''}>Shared Wishlist</option>
                                         </select>
                                         ${bookStatus === 'reading' ? `
                                             <div class="flex-1 flex items-center gap-4 bg-slate-100 dark:bg-slate-800 p-3 rounded-xl">
@@ -5740,7 +5807,11 @@
                                     ${isCollaboratorBook ? `<span class="px-2 py-0.5 bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300 rounded text-[8px] font-black uppercase tracking-widest border border-violet-200 dark:border-violet-800">Collaborator Book</span>` : ''}
                                 </div>
                                     <div class="flex flex-wrap gap-2">
-                                        ${(book.tags || []).map(tag => `<button type="button" aria-label="Filter by tag: ${escapeHTML(tag)}" onclick="window.setTagFilter('${tag}'); document.querySelector('[data-close]').click();" class="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-bold cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20">${tag}</button>`).join('')}
+                                        ${(book.tags || []).map(tag => {
+                                            const escTag = escapeHTML(tag);
+                                            const jsTag = escapeHTML(tag.replace(/'/g, "\\'"));
+                                            return `<button type="button" aria-label="Filter by tag: ${escTag}" onclick="window.setTagFilter('${jsTag}'); document.querySelector('[data-close]').click();" class="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-bold cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/20">${escTag}</button>`;
+                                        }).join('')}
                                     </div>
                                 </div>
                                 <div class="mt-6 px-1">
@@ -6295,10 +6366,14 @@
             const book = books.find(b => b.id === bookId);
             if (!book) return;
 
-            // If edit button on card clicked
-            if (e.target.closest('button')) {
+            // Only intercept the dedicated edit button; all other buttons handle themselves
+            if (e.target.closest('button[aria-label="Edit book details"]')) {
                 e.stopPropagation();
                 openManualEntry(null, book);
+                return;
+            }
+            // For any other button inside the card, do NOT open details — let the button's own handler fire
+            if (e.target.closest('button') || e.target.closest('input[type="checkbox"]')) {
                 return;
             }
             openBookDetails(book);
