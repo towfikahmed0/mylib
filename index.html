@@ -290,6 +290,8 @@
             let unsubscribeBooks = null;
             let unsubscribeStatus = null;
             let activeTab = 'library';     // 'library', 'wishlist', 'activity', 'settings'
+            let lastActiveTab = null;
+            let myBooksSubTab = 'finished';
             let currentModalCloseHandler = null;
 
             // Global keyboard shortcuts (attached once)
@@ -851,7 +853,8 @@
                 });
 
                 // Only rebuild the whole app shell if we've switched tabs or the container is empty
-                if (!appEl.querySelector('header') || (activeTab === 'settings' && !appEl.querySelector('#logout-btn')) || (activeTab !== 'settings' && appEl.querySelector('#logout-btn'))) {
+                if (!appEl.querySelector('header') || activeTab !== lastActiveTab) {
+                    lastActiveTab = activeTab;
                     appEl.innerHTML = `
                     <div class="fixed inset-0 bg-blue-50/30 dark:bg-slate-900 pointer-events-none -z-10"></div>
                     <header class="sticky top-0 z-40 glass border-b border-slate-200 dark:border-slate-800">
@@ -875,11 +878,13 @@
                                 <button onclick="window.setTab('mybooks')" ${activeTab === 'mybooks' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'mybooks' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">My Books</button>
                                 <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'activity' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Activity</button>
                                 <button onclick="window.setTab('insight')" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'insight' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Library Insight</button>
-                                <button onclick="window.setTab('settings')" ${activeTab === 'settings' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'settings' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Settings</button>
                             </nav>
                             <div class="flex items-center gap-1">
                                 <button id="manual-add-btn" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500" title="Add Book Manually" aria-label="Add Book Manually">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                </button>
+                                <button onclick="window.setTab('settings')" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition ${activeTab === 'settings' ? 'text-primary bg-blue-50 dark:bg-blue-900/20' : 'text-slate-500'}" title="Settings" aria-label="Settings">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                 </button>
                                 <button id="scan-btn" class="bg-primary hover:opacity-90 text-white px-5 py-2.5 rounded-full text-sm font-bold flex items-center gap-2 transition-all shadow-md active:scale-95" aria-label="Scan QR or Barcode" title="Scan QR or Barcode">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -889,7 +894,7 @@
                         </div>
                     </header>
                     <main id="main-content" class="max-w-6xl mx-auto p-6 pb-32 w-full flex-1"></main>
-                    <nav id="mobile-nav" class="md:hidden fixed bottom-0 left-0 right-0 glass border-t border-slate-200 dark:border-slate-800 px-3 py-3 grid grid-cols-5 gap-2 z-40">
+                    <nav id="mobile-nav" class="md:hidden fixed bottom-0 left-0 right-0 glass border-t border-slate-200 dark:border-slate-800 px-3 py-3 grid grid-cols-4 gap-2 z-40">
                         <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'library' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></svg>
                             <span class="text-[9px] font-bold">Library</span>
@@ -905,10 +910,6 @@
                         <button onclick="window.setTab('insight')" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'insight' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                             <span class="text-[9px] font-bold text-center">Library Insight</span>
-                        </button>
-                        <button onclick="window.setTab('settings')" ${activeTab === 'settings' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-0.5 ${activeTab === 'settings' ? 'text-primary' : 'text-slate-400'}">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                            <span class="text-[9px] font-bold">Settings</span>
                         </button>
                     </nav>
                 `;
@@ -1258,20 +1259,16 @@
                 if (libraryWrapper) {
                     // Performance optimization: Single-pass O(N) grouping of books
                     const myOwnBooks = [];
-                    const sharedFromPartners = [];
-                    const groupedByContributor = {};
+                    const partnerLibraries = {};
 
                     filteredBooks.forEach(b => {
-                        if (b.userId !== currentUser.uid) {
-                            sharedFromPartners.push(b);
-                        } else if (!b.addedBy) {
+                        if (b.userId === currentUser.uid) {
                             myOwnBooks.push(b);
                         } else {
-                            const contributor = b.addedBy || 'unknown';
-                            if (!groupedByContributor[contributor]) {
-                                groupedByContributor[contributor] = [];
+                            if (!partnerLibraries[b.userId]) {
+                                partnerLibraries[b.userId] = [];
                             }
-                            groupedByContributor[contributor].push(b);
+                            partnerLibraries[b.userId].push(b);
                         }
                     });
 
@@ -1289,13 +1286,13 @@
                         `;
                     }
 
-                    // Books added by others - grouped by contributor
-                    Object.entries(groupedByContributor).forEach(([contributorId, books]) => {
+                    // Partner libraries
+                    Object.entries(partnerLibraries).forEach(([ownerId, books]) => {
                         if (books.length > 0) {
                             html += `
-                            <div ${myOwnBooks.length > 0 || html ? 'class="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800"' : ''}>
-                                <h3 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200" data-contributor-id="${contributorId}">
-                                    Shared with Me by <span data-name="loading...">loading...</span> (${books.length})
+                            <div ${html ? 'class="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800"' : ''}>
+                                <h3 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200" data-owner-id="${ownerId}">
+                                    From <span data-name="loading...">loading...</span>'s Library (${books.length})
                                 </h3>
                                 <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3'}">
                                     ${books.map(book => renderBookCard(book)).join('')}
@@ -1304,18 +1301,6 @@
                             `;
                         }
                     });
-
-                    // Books from shared partners' libraries
-                    if (sharedFromPartners.length > 0) {
-                        html += `
-                        <div ${(myOwnBooks.length > 0 || Object.keys(groupedByContributor).length > 0) ? 'class="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800"' : ''}>
-                            <h2 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200">Shared with Me (${sharedFromPartners.length})</h2>
-                            <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3'}">
-                                ${sharedFromPartners.map(book => renderBookCard(book)).join('')}
-                            </div>
-                        </div>
-                        `;
-                    }
 
                     // Empty state
                     if (filteredBooks.length === 0) {
@@ -1335,12 +1320,12 @@
 
                     libraryWrapper.innerHTML = `<div>${html}</div>`;
 
-                    // Fetch contributor names
-                    Object.keys(groupedByContributor).forEach(contributorId => {
-                        db.collection('users').doc(contributorId).get().then(doc => {
+                    // Fetch owner names for partner libraries
+                    Object.keys(partnerLibraries).forEach(ownerId => {
+                        db.collection('users').doc(ownerId).get().then(doc => {
                             if (doc.exists) {
                                 const name = doc.data()?.displayName || doc.data()?.email || 'Unknown';
-                                const heading = libraryWrapper.querySelector(`[data-contributor-id="${contributorId}"] [data-name]`);
+                                const heading = libraryWrapper.querySelector(`[data-owner-id="${ownerId}"] [data-name]`);
                                 if (heading) heading.textContent = name;
                             }
                         });
@@ -1527,6 +1512,11 @@
 
             window.setTab = (tab) => {
                 activeTab = tab;
+                renderMainApp();
+            };
+
+            window.setMyBooksSubTab = (tab) => {
+                myBooksSubTab = tab;
                 renderMainApp();
             };
 
