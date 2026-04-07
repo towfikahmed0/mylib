@@ -500,10 +500,21 @@
                     _escJsAuthor: escapeHTML(jsAuthor),
                     _escJsOwner: escapeHTML(jsOwner),
                     _formattedPurchaseDate: formattedPurchaseDate,
-                    _normalizedTags: (data.tags || []).map(tag => ({
-                        esc: escapeHTML(tag),
-                        escJs: escapeHTML(tag.replace(/'/g, "\\'"))
-                    })),
+                    _normalizedTags: (data.tags || []).map(tag => {
+                        const esc = escapeHTML(tag);
+                        const escJs = escapeHTML(tag.replace(/'/g, "\\'"));
+                        return { esc, escJs };
+                    }),
+                    _tagsHtml: (data.tags || []).map(tag => {
+                        const esc = escapeHTML(tag);
+                        const escJs = escapeHTML(tag.replace(/'/g, "\\'"));
+                        return `<button type="button" aria-label="Filter by tag: ${esc}" onclick="event.stopPropagation(); window.setTagFilter('${escJs}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none rounded">${esc}</button>`;
+                    }).join(''),
+                    _compactTagsHtml: (data.tags || []).map(tag => {
+                        const esc = escapeHTML(tag);
+                        const escJs = escapeHTML(tag.replace(/'/g, "\\'"));
+                        return `<button type="button" aria-label="Filter by tag: ${esc}" onclick="event.stopPropagation(); window.setTagFilter('${escJs}')" class="text-[8px] bg-slate-100 dark:bg-slate-800 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none">${esc}</button>`;
+                    }).join(''),
                     _searchBlob: `${title} ${author} ${genres.join(' ')} ${data.isbn || ''} ${(data.tags || []).join(' ')}`.toLowerCase(),
                     _createdTime: data.createdAt?.toMillis() || 0,
                     _purchaseTime: data.purchaseDate ? new Date(data.purchaseDate).getTime() : 0
@@ -1808,7 +1819,7 @@
                         <div class="mb-6 flex gap-2">
                             <div class="relative group flex-1">
                                 <svg aria-hidden="true" class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                <input id="search-input" type="text" placeholder="Smart search by title, author, genre..." value="${searchQuery}" class="w-full pl-12 pr-14 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-[1.5rem] text-lg transition-all outline-none shadow-sm" aria-label="Search books">
+                                <input id="search-input" type="text" placeholder="Smart search by title, author, genre..." value="${searchQuery}" class="w-full pl-12 pr-14 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-[1.5rem] text-lg transition-all outline-none shadow-sm" aria-label="Search books" autocomplete="off" spellcheck="false">
                                 <kbd id="search-hint" class="absolute right-12 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-[10px] font-black text-slate-500 dark:text-slate-400 pointer-events-none transition-all duration-300 shadow-[0_2px_0_rgba(0,0,0,0.05)] dark:shadow-none group-focus-within:opacity-0 ${searchQuery ? 'opacity-0' : ''}">/</kbd>
                                 <button id="clear-search-btn" class="${searchQuery ? '' : 'hidden'} absolute right-4 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors" aria-label="Clear search" title="Clear search">
                                     <svg aria-hidden="true" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -1988,22 +1999,13 @@
                         });
                         searchInput.addEventListener('keydown', (e) => {
                             if (e.key === 'Escape') {
-                                searchQuery = '';
-                                aiFilteredIds = null;
-                                searchInput.value = '';
+                                window.clearAdvancedFilter('search');
                                 searchInput.blur();
-                                document.getElementById('clear-search-btn').classList.add('hidden');
-                                renderLibraryOnly();
                             }
                         });
                         document.getElementById('clear-search-btn').addEventListener('click', () => {
-                            searchQuery = '';
-                            aiFilteredIds = null;
-                            const input = document.getElementById('search-input');
-                            input.value = '';
-                            input.focus();
-                            document.getElementById('clear-search-btn').classList.add('hidden');
-                            renderLibraryOnly();
+                            window.clearAdvancedFilter('search');
+                            document.getElementById('search-input')?.focus();
                         });
                         document.getElementById('advanced-search-btn').addEventListener('click', openAdvancedSearch);
                     }
@@ -2087,10 +2089,10 @@
                 }
 
                 let filteredBooks = sourceCollection.filter(b => {
-                    const statusData = getStatusData(b.id, currentUser.uid);
+                    const cache = b._cache || {};
                     // Standardize wishlist check: status subcollection takes absolute precedence
-                    const isWishlist = (statusData && (statusData.isWishlist === true || statusData.isWishlist === false)) ? statusData.isWishlist : !!b.isWishlist;
-                    const status = statusData.status;
+                    const isWishlist = cache.isWishlist !== undefined ? cache.isWishlist : !!b.isWishlist;
+                    const status = cache.status || 'want_to_read';
 
                     // 1. High-disqualification criteria first (tab, search, static filters)
                     if (activeTab === 'my_books') {
@@ -2116,14 +2118,14 @@
                     if (tagFilter && (!b.tags || !b.tags.includes(tagFilter))) return false;
 
                     // 2. Advanced filters (price, date) - avoid expensive ops if possible
-                    const price = statusData.price !== null && statusData.price !== undefined ? statusData.price : b.price;
+                    const price = cache.price !== undefined && cache.price !== null ? cache.price : b.price;
                     if (advancedFilters.minPrice !== null && price < advancedFilters.minPrice) return false;
                     if (advancedFilters.maxPrice !== null && price > advancedFilters.maxPrice) return false;
 
                     if (startTimestamp !== null || endTimestamp !== null) {
-                        const bDate = statusData.purchaseDate ? new Date(statusData.purchaseDate).getTime() : b._purchaseTime;
-                        if (startTimestamp !== null && bDate < startTimestamp) return false;
-                        if (endTimestamp !== null && bDate > endTimestamp) return false;
+                        const purchaseTime = cache.purchaseTime || b._purchaseTime;
+                        if (startTimestamp !== null && purchaseTime < startTimestamp) return false;
+                        if (endTimestamp !== null && purchaseTime > endTimestamp) return false;
                     }
 
                     // 3. Conditional data fetching: Only fetch status data if needed for filtering
@@ -2134,12 +2136,12 @@
                             if (!isWishlist) return false;
                             if (b.userId === currentUser.uid) return false;
                         } else {
-                            if (statusFilter !== 'all' && statusData.status !== statusFilter) return false;
+                            if (statusFilter !== 'all' && status !== statusFilter) return false;
                             if (targetRating !== null) {
                                 if (targetRating === 0) {
-                                    if (statusData.rating !== 0) return false;
+                                    if (cache.rating !== 0) return false;
                                 } else {
-                                    if (statusData.rating < targetRating) return false;
+                                    if (cache.rating < targetRating) return false;
                                 }
                             }
                         }
@@ -2356,7 +2358,7 @@
                         <div class="glass rounded-2xl p-4 border border-slate-200 dark:border-slate-700 mb-6 hidden md:block">
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
                                 <div class="flex flex-col gap-2">
-                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sort by</span>
+                                    <label for="sort-select" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sort by</label>
                                     <select id="sort-select" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
                                         <option value="newest" ${sortBy === 'newest' ? 'selected' : ''}>Recently Added</option>
                                         <option value="oldest" ${sortBy === 'oldest' ? 'selected' : ''}>Oldest First</option>
@@ -2366,7 +2368,7 @@
                                     </select>
                                 </div>
                                 <div class="flex flex-col gap-2">
-                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Genre</span>
+                                    <label for="category-filter" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Genre</label>
                                     <select id="category-filter" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
                                         <option value="all" ${categoryFilter === 'all' ? 'selected' : ''}>All Genres</option>
                                         ${metadataCache.genres.map(cat => `
@@ -2375,7 +2377,7 @@
                                     </select>
                                 </div>
                                 <div class="flex flex-col gap-2">
-                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</span>
+                                    <label for="status-filter" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</label>
                                     <select id="status-filter" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
                                         <option value="all" ${statusFilter === 'all' ? 'selected' : ''}>All</option>
                                         <option value="want_to_read" ${statusFilter === 'want_to_read' ? 'selected' : ''}>Want to Read</option>
@@ -2386,7 +2388,7 @@
                                     </select>
                                 </div>
                                 <div class="flex flex-col gap-2">
-                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Author</span>
+                                    <label for="author-filter" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Author</label>
                                     <select id="author-filter" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
                                         <option value="all" ${authorFilter === 'all' ? 'selected' : ''}>All Authors</option>
                                         ${metadataCache.authors.map(author => `
@@ -2395,7 +2397,7 @@
                                     </select>
                                 </div>
                                 <div class="flex flex-col gap-2">
-                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Owner</span>
+                                    <label for="owner-filter" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Owner</label>
                                     <select id="owner-filter" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
                                         <option value="all" ${ownerFilter === 'all' ? 'selected' : ''}>All Owners</option>
                                         ${metadataCache.owners.map(owner => `
@@ -3143,14 +3145,38 @@
                 }
             };
 
-            window.copyISBN = (isbn, btn) => {
-                window.copyText(isbn, btn, 'ISBN copied to clipboard!');
+            window.copyText = (text, btn, successMessage = 'Copied to clipboard!') => {
+                if (!text) return;
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        showToast(successMessage, 'success');
+                        if (btn) {
+                            const originalHTML = btn.innerHTML;
+                            const originalAria = btn.getAttribute('aria-label');
+                            btn.innerHTML = '<svg aria-hidden="true" class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>';
+                            btn.setAttribute('aria-label', 'Copied!');
+                            setTimeout(() => {
+                                btn.innerHTML = originalHTML;
+                                btn.setAttribute('aria-label', originalAria);
+                            }, 2000);
+                        }
+                    }).catch(err => {
+                        showToast('Failed to copy', 'error');
+                        console.error('Clipboard error:', err);
+                    });
+                } else {
+                    showToast('Clipboard API not supported', 'error');
+                }
             };
+
+            window.copyISBN = (isbn, btn) => window.copyText(isbn, btn, 'ISBN copied to clipboard!');
 
             window.shareBook = (title, author, btn) => {
                 const text = `${title} by ${author}`;
                 if (navigator.share) {
-                    navigator.share({ title, text }).catch(err => console.log('Share failed:', err));
+                    navigator.share({ title, text }).catch(err => {
+                        if (err.name !== 'AbortError') console.log('Share failed:', err);
+                    });
                 } else {
                     window.copyText(text, btn, 'Book info copied to clipboard!');
                 }
@@ -3524,6 +3550,8 @@
 
             // Performance optimization: Update metadata cache in a single pass over the books array
             // Performance optimization: Consolidated single-pass for metadata and library statistics
+            const nextStatusMap = { 'want_to_read': 'reading', 'reading': 'finished', 'finished': 'want_to_read' };
+
             function updateLibraryCache() {
                 const authorsSet = new Set();
                 const genresSet = new Set();
@@ -3576,18 +3604,25 @@
                         }
                     }
 
-                    // Count finished books for collaborators (Iterate all partner statuses for this book)
+                    // Count finished books for collaborators and generate reading info in a single pass
                     const pStatuses = partnerReadingStatuses[b.id] || {};
-                    Object.entries(pStatuses).forEach(([uid, data]) => {
-                        if (uid !== currentUser.uid && data.status === 'finished') {
+                    let partnerReadingInfo = '';
+                    for (const uid in pStatuses) {
+                        if (uid === currentUser.uid) continue;
+                        const data = pStatuses[uid];
+                        if (data.status === 'finished') {
                             const cName = userProfileCache[uid] || 'Partner';
                             stats.collaboratorFinishedCounts[cName] = (stats.collaboratorFinishedCounts[cName] || 0) + 1;
+                        } else if (data.status === 'reading') {
+                            const cName = userProfileCache[uid] || 'Partner';
+                            partnerReadingInfo += `<div class="flex items-center gap-1 text-[8px] text-blue-500 font-bold uppercase"><div class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div> ${escapeHTML(cName)} reading (${data.progress}%)</div>`;
                         }
-                    });
+                    }
 
                     // Render Cache Pass: Pre-calculate status-dependent UI data
                     const progress = statusData.progress || b.progress || 0;
-                    const displayRating = b.averageRating ? Math.round(b.averageRating) : (statusData.rating || b.rating || 0);
+                    const rating = statusData.rating || 0;
+                    const displayRating = b.averageRating ? Math.round(b.averageRating) : (rating || b.rating || 0);
 
                     let ownerName = b.owner;
                     let escOwnerName = b._escOwner;
@@ -3609,16 +3644,19 @@
                     const compactTagsHtml = b._normalizedTags.map(tag => `<button type="button" aria-label="Filter by tag: ${tag.esc}" onclick="event.stopPropagation(); window.setTagFilter('${tag.escJs}')" class="text-[8px] bg-slate-100 dark:bg-slate-800 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:outline-none">${tag.esc}</button>`).join('');
 
                     const isNew = b._createdTime > oneMonthAgo;
+                    const nextStatus = nextStatusMap[status] || 'want_to_read';
 
-                    const statusSequence = ['want_to_read', 'reading', 'finished'];
-                    let nextIdx = statusSequence.indexOf(status);
-                    if (nextIdx === -1) nextIdx = 0;
-                    else nextIdx = (nextIdx + 1) % statusSequence.length;
-                    const nextStatus = statusSequence[nextIdx];
+                    // Pre-calculate purchase time for filtering
+                    const purchaseTime = statusData.purchaseDate ? new Date(statusData.purchaseDate).getTime() : b._purchaseTime;
+                    const price = statusData.price !== null && statusData.price !== undefined ? statusData.price : b.price;
 
                     b._cache = {
                         status,
                         progress,
+                        rating,
+                        price,
+                        purchaseTime,
+                        isWishlist,
                         stars: STAR_CACHE[displayRating] || '',
                         statusLabel: READING_STATUSES[status].label,
                         nextStatusLabel: READING_STATUSES[nextStatus].label,
@@ -3627,8 +3665,8 @@
                         statusColor: status === 'finished' ? 'bg-emerald-500' : status === 'reading' ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600',
                         ownerBadge: escOwnerName ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">${escOwnerName}'s Book</div>` : '',
                         partnerReadingInfo,
-                        tagsHtml,
-                        compactTagsHtml,
+                        tagsHtml: b._tagsHtml,
+                        compactTagsHtml: b._compactTagsHtml,
                         isNew,
                         newBadge: isNew ? `<div class="absolute top-2 left-2 z-30 px-2 py-0.5 rounded-full text-[8px] font-black uppercase text-white bg-blue-500 shadow-lg ring-1 ring-white/20">New</div>` : '',
                         listNewBadge: isNew ? `<div class="absolute top-1 left-1 z-10 w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.8)]"></div>` : '',
@@ -5359,6 +5397,10 @@
                 const query = chatInput.value.trim();
                 if (!query) return;
 
+                const submitBtn = chatForm.querySelector('button[type="submit"]');
+                chatInput.disabled = true;
+                if (submitBtn) submitBtn.disabled = true;
+
                 // Clear suggestions on first interaction
                 const suggestions = document.getElementById('ai-suggestions');
                 if (suggestions) suggestions.remove();
@@ -5369,14 +5411,19 @@
                 userMsg.innerHTML = `<div class="bg-violet-600 text-white p-4 rounded-2xl rounded-tr-none shadow-sm max-w-[85%]"><p class="text-sm leading-relaxed">${escapeHTML(query)}</p></div>`;
                 chatMessages.appendChild(userMsg);
                 chatInput.value = '';
-                chatMessages.scrollTop = chatMessages.scrollHeight;
+                chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
 
                 // Loading state
                 const loadingMsg = document.createElement('div');
                 loadingMsg.className = 'flex justify-start';
-                loadingMsg.innerHTML = `<div class="bg-violet-50 dark:bg-violet-900/20 p-4 rounded-2xl rounded-tl-none border border-violet-100 dark:border-violet-900/30 animate-pulse"><p class="text-sm italic text-slate-400">Thinking...</p></div>`;
+                loadingMsg.innerHTML = `
+                    <div class="bg-violet-50 dark:bg-violet-900/20 p-4 rounded-2xl rounded-tl-none border border-violet-100 dark:border-violet-900/30 flex items-center gap-1.5" aria-label="AI is thinking">
+                        <div class="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                        <div class="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                        <div class="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce"></div>
+                    </div>`;
                 chatMessages.appendChild(loadingMsg);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
+                chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
 
                 const libraryContext = books.map(b => ({
                     title: b.title,
@@ -5395,19 +5442,24 @@
                 const result = await askGemini(prompt, "You are a helpful, professional AI librarian for the user's personal book collection.");
 
                 loadingMsg.remove();
+                chatInput.disabled = false;
+                if (submitBtn) submitBtn.disabled = false;
+                chatInput.focus();
 
                 const botMsg = document.createElement('div');
                 botMsg.className = 'flex justify-start';
+                const botResult = result || "I'm sorry, I'm having trouble connecting right now. Please try again.";
+                const escapedResult = escapeHTML(botResult);
+                const jsEscapedResult = escapedResult.replace(/'/g, "\\'");
                 botMsg.innerHTML = `
-                    <div class="group relative bg-violet-50 dark:bg-violet-900/20 p-4 rounded-2xl rounded-tl-none border border-violet-100 dark:border-violet-900/30 shadow-sm max-w-[85%]">
-                        <p class="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">${result || "I'm sorry, I'm having trouble connecting right now. Please try again."}</p>
-                        <button onclick="window.copyText(this.previousElementSibling.innerText, this, 'Response copied!')" class="absolute top-2 right-2 p-1.5 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-violet-100 dark:border-violet-800 text-violet-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all hover:text-violet-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500" title="Copy response" aria-label="Copy response">
+                    <div class="bg-violet-50 dark:bg-violet-900/20 p-4 rounded-2xl rounded-tl-none border border-violet-100 dark:border-violet-900/30 shadow-sm max-w-[85%] relative group/bot">
+                        <p class="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">${escapedResult}</p>
+                        <button onclick="window.copyText('${jsEscapedResult}', this)" class="absolute -top-2 -right-2 p-2 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-violet-100 dark:border-violet-900/30 text-violet-600 opacity-0 group-hover/bot:opacity-100 group-focus-within/bot:opacity-100 transition-all hover:scale-110 active:scale-95 focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-500/20" aria-label="Copy response" title="Copy response">
                             <svg aria-hidden="true" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
                         </button>
-                    </div>
-                `;
+                    </div>`;
                 chatMessages.appendChild(botMsg);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
+                chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
             });
 
             window.jumpToBook = async (bookId) => {
