@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+    --primary-color: 59, 130, 246; /* blue-500 */
+    --primary-rgb: 59 130 246;
+}
+
+[data-accent="rose"] { --primary-rgb: 244 63 94; --primary-color: 244, 63, 94; }
+[data-accent="emerald"] { --primary-rgb: 16 185 129; --primary-color: 16, 185, 129; }
+[data-accent="amber"] { --primary-rgb: 245 158 11; --primary-color: 245, 158, 11; }
+[data-accent="violet"] { --primary-rgb: 139 92 246; --primary-color: 139, 92, 246; }
+
+@layer base {
+    body {
+        @apply transition-colors duration-300;
+    }
+}
+
+@layer components {
+    .glass {
+        @apply bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl;
+    }
+    .text-primary {
+        color: rgb(var(--primary-rgb));
+    }
+    .bg-primary {
+        background-color: rgb(var(--primary-rgb));
+    }
+    .border-primary {
+        border-color: rgb(var(--primary-rgb));
+    }
+    .ring-primary {
+        --tw-ring-color: rgb(var(--primary-rgb));
+    }
+    .mesh-gradient {
+        background: radial-gradient(at 0% 0%, hsla(225, 39%, 30%, 1) 0, transparent 50%),
+                    radial-gradient(at 50% 0%, hsla(225, 39%, 20%, 1) 0, transparent 50%),
+                    radial-gradient(at 100% 0%, hsla(225, 39%, 10%, 1) 0, transparent 50%);
+    }
+    .book-card.swiping {
+        @apply pointer-events-none transition-none;
+    }
+    .swipe-overlay {
+        @apply absolute inset-0 flex items-center justify-center text-white font-black z-30 transition-opacity;
+    }
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { @apply bg-transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { @apply bg-slate-200 dark:bg-slate-700 rounded-full; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { @apply bg-slate-300 dark:bg-slate-600; }
+
+input[type="range"]::-webkit-slider-thumb {
+    @apply w-4 h-4 bg-primary rounded-full appearance-none shadow-lg border-2 border-white dark:border-slate-900 cursor-pointer transition-transform hover:scale-125;
+}
+
+@media (max-width: 640px) {
+    .book-card.density-compact { @apply p-3 gap-3 rounded-[1.5rem]; }
+    .book-card.density-compact .w-28 { @apply w-16 h-24 rounded-xl; }
+}
+
+.animate-loading-bar {
+    animation: loadingBar 2s infinite linear;
+}
+
+@keyframes loadingBar {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.sepia body {
+    background-color: #fbf0e3;
+    color: #433422;
+}
+
+.sepia .glass {
+    background-color: rgba(251, 240, 227, 0.7);
+    border-color: #f1dbc1;
+}
+
+.sepia .bg-slate-50 { background-color: #fbf0e3; }
+.sepia .bg-white { background-color: #fdf6ee; }
+.sepia .text-slate-900 { color: #433422; }
+.sepia .text-slate-600 { color: #5f4a32; }
+.sepia .text-slate-500 { color: #7c6245; }
+.sepia .border-slate-200 { border-color: #f1dbc1; }
+.sepia .bg-slate-100 { background-color: #f1dbc1; }
