@@ -3596,7 +3596,6 @@
                         escOwnerName = escapeHTML(ownerName);
                     }
 
-                    const pStatuses = partnerReadingStatuses[b.id] || {};
                     const partnerReadingInfo = Object.entries(pStatuses).map(([uid, data]) => {
                         if (data.status === 'reading') {
                             const name = userProfileCache[uid] || 'Partner';
@@ -5360,6 +5359,10 @@
                 const query = chatInput.value.trim();
                 if (!query) return;
 
+                const submitBtn = chatForm.querySelector('button[type="submit"]');
+                chatInput.disabled = true;
+                if (submitBtn) submitBtn.disabled = true;
+
                 // Clear suggestions on first interaction
                 const suggestions = document.getElementById('ai-suggestions');
                 if (suggestions) suggestions.remove();
@@ -5370,14 +5373,19 @@
                 userMsg.innerHTML = `<div class="bg-violet-600 text-white p-4 rounded-2xl rounded-tr-none shadow-sm max-w-[85%]"><p class="text-sm leading-relaxed">${escapeHTML(query)}</p></div>`;
                 chatMessages.appendChild(userMsg);
                 chatInput.value = '';
-                chatMessages.scrollTop = chatMessages.scrollHeight;
+                chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
 
                 // Loading state
                 const loadingMsg = document.createElement('div');
                 loadingMsg.className = 'flex justify-start';
-                loadingMsg.innerHTML = `<div class="bg-violet-50 dark:bg-violet-900/20 p-4 rounded-2xl rounded-tl-none border border-violet-100 dark:border-violet-900/30 animate-pulse"><p class="text-sm italic text-slate-400">Thinking...</p></div>`;
+                loadingMsg.innerHTML = `
+                    <div class="bg-violet-50 dark:bg-violet-900/20 p-4 rounded-2xl rounded-tl-none border border-violet-100 dark:border-violet-900/30 flex items-center gap-1.5" aria-label="AI is thinking">
+                        <div class="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                        <div class="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                        <div class="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce"></div>
+                    </div>`;
                 chatMessages.appendChild(loadingMsg);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
+                chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
 
                 const libraryContext = books.map(b => ({
                     title: b.title,
@@ -5396,6 +5404,9 @@
                 const result = await askGemini(prompt, "You are a helpful, professional AI librarian for the user's personal book collection.");
 
                 loadingMsg.remove();
+                chatInput.disabled = false;
+                if (submitBtn) submitBtn.disabled = false;
+                chatInput.focus();
 
                 const botMsg = document.createElement('div');
                 botMsg.className = 'flex justify-start';
@@ -5408,7 +5419,7 @@
                     </div>
                 `;
                 chatMessages.appendChild(botMsg);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
+                chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
             });
 
             window.jumpToBook = async (bookId) => {
