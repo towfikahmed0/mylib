@@ -7,3 +7,7 @@
 ## 2026-03-14 - [Global State for Modals & Shortcuts]
 **Learning:** In applications with multiple global keyboard shortcuts (like `/` for search and `Escape` for close), managing an active modal state via a global close handler ensures that shortcuts don't conflict. Implementing "click-to-copy" for secondary metadata like ISBN, combined with immediate toast feedback, provides a high-value utility for users who frequently manage book data.
 **Action:** Use a `currentModalCloseHandler` variable to track the active modal. Gate global shortcuts by checking this handler. Always provide haptic/visual feedback (toasts) for clipboard actions.
+
+## 2025-05-14 - [Keyboard Accessibility for Card-based UIs]
+**Learning:** For interactive card elements that trigger details or actions, adding `tabindex="0"` and `role="button"` is not enough; a global `keydown` listener for `Enter`/`Space` is required for parity with mouse clicks. Additionally, using `group-focus-within:opacity-100` on hover-only actions within cards ensures they remain accessible to keyboard users when they navigate into the card.
+**Action:** Always pair `tabindex="0"` on cards with a keyboard listener and ensure hover-states for sub-actions are also triggered by focus.
