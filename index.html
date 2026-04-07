@@ -1067,7 +1067,6 @@
                     // ⚡ Bolt: Use pre-normalized _searchStr for O(1) string check per book
                     const matchesSearch = !searchQuery || b._searchStr.includes(searchLower);
 
-                    const statusData = getStatusData(b.id);
                     const bookStatus = statusData.status;
 
                     const matchesStatus = statusFilter === 'all' || bookStatus === statusFilter;
