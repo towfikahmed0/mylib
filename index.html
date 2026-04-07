@@ -298,6 +298,11 @@
                     currentModalCloseHandler();
                     return;
                 }
+                if ((e.key === 'Enter' || e.key === ' ') && document.activeElement && document.activeElement.classList.contains('book-card')) {
+                    e.preventDefault();
+                    document.activeElement.click();
+                    return;
+                }
                 if (e.key === '/' && !currentModalCloseHandler && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
                     e.preventDefault();
                     if (activeTab !== 'library') {
@@ -1643,26 +1648,31 @@
             window.setTab = (tab) => {
                 activeTab = tab;
                 renderMainApp();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
             window.setTagFilter = (tag) => {
                 tagFilter = tag;
                 renderMainApp();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
             window.setAuthorFilter = (author) => {
                 authorFilter = author;
                 renderMainApp();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
             window.setOwnerFilter = (owner) => {
                 ownerFilter = owner;
                 renderMainApp();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
             window.setCategoryFilter = (category) => {
                 categoryFilter = category;
                 renderMainApp();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
             window.applyInsightFilter = (type, value) => {
@@ -1674,6 +1684,7 @@
                 ownerFilter = type === 'owner' ? value : 'all';
                 advancedFilters = { rating: 'all', minPrice: null, maxPrice: null, startDate: null, endDate: null };
                 renderMainApp();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
             window.setTheme = (theme) => {
@@ -1711,6 +1722,7 @@
                 if (type === 'price') { advancedFilters.minPrice = null; advancedFilters.maxPrice = null; }
                 if (type === 'date') { advancedFilters.startDate = null; advancedFilters.endDate = null; }
                 renderLibraryOnly();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
             window.clearAllFilters = () => {
@@ -1723,6 +1735,7 @@
                 const searchInput = document.getElementById('search-input');
                 if (searchInput) searchInput.value = '';
                 renderMainApp();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
             function openAdvancedSearch() {
@@ -2016,8 +2029,8 @@
 
                 if (viewMode === 'compact') {
                     return `
-                    <div class="book-card relative group cursor-pointer" data-book-id="${book.id}">
-                        <div class="absolute inset-0 bg-blue-600/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl"></div>
+                    <div class="book-card relative group cursor-pointer focus-visible:ring-4 focus-visible:ring-primary/20 outline-none rounded-2xl" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${escapeHTML(book.title)} by ${escapeHTML(book.author || 'Unknown author')}">
+                        <div class="absolute inset-0 bg-blue-600/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity rounded-2xl"></div>
                         <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm relative">
                             ${book.coverUrl || book.thumbnail ?
                             `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-105" alt="cover">` :
@@ -2030,7 +2043,7 @@
                                     ${READING_STATUSES[bookStatus].label === 'Want to Read' ? 'WTR' : (bookStatus === 'reading' ? `Reading (${userProgress || book.progress || 0}%)` : READING_STATUSES[bookStatus].label)}
                                 </div>
                             </div>
-                            <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                                 <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-5 h-5 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer">
                             </div>
                         </div>
@@ -2044,8 +2057,8 @@
 
                 if (viewMode === 'list') {
                     return `
-                    <div class="book-card glass px-6 py-4 rounded-2xl flex items-center gap-4 cursor-pointer hover:bg-white dark:hover:bg-slate-800 transition-all border ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-lg' : 'border-blue-100/50 dark:border-slate-800'} group relative" data-book-id="${book.id}">
-                        <div class="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div class="book-card glass px-6 py-4 rounded-2xl flex items-center gap-4 cursor-pointer hover:bg-white dark:hover:bg-slate-800 transition-all border ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-lg' : 'border-blue-100/50 dark:border-slate-800'} group relative focus-visible:ring-4 focus-visible:ring-primary/20 outline-none" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${escapeHTML(book.title)} by ${escapeHTML(book.author || 'Unknown author')}">
+                        <div class="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                             <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
                         </div>
                         <div class="w-12 h-16 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700">
@@ -2066,7 +2079,7 @@
                             <div class="text-[10px] font-bold text-blue-600 dark:text-blue-400 mt-1 truncate max-w-[120px]">${bookGenres.join(', ')}</div>
                             ${book.owner ? `<div class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors" onclick="event.stopPropagation(); window.setOwnerFilter('${(book.owner).replace(/'/g, "\\'")}')">Owner: ${book.owner}</div>` : ''}
                             <div class="flex items-center gap-2 mt-1">
-                                <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100" aria-label="Edit book details">
+                                <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Edit book details">
                                     <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
                                 <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge}">
@@ -2080,8 +2093,8 @@
 
                 const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
                 return `
-                <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-blue-100/50 dark:border-slate-800'} relative ${densityClass}" data-book-id="${book.id}">
-                    <div class="absolute top-4 left-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-blue-100/50 dark:border-slate-800'} relative ${densityClass} focus-visible:ring-4 focus-visible:ring-primary/20 outline-none" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${escapeHTML(book.title)} by ${escapeHTML(book.author || 'Unknown author')}">
+                    <div class="absolute top-4 left-4 z-20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                         <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-6 h-6 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer">
                     </div>
                     <div class="w-28 h-40 bg-slate-100 dark:bg-slate-800 rounded-3xl overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 relative shadow-lg">
@@ -2124,7 +2137,7 @@
                             <span class="text-[10px] font-bold text-slate-400">${book.purchaseDate ? new Date(book.purchaseDate).toLocaleDateString() : ''}</span>
                             <div class="flex items-center gap-2">
                                 <span class="text-slate-900 dark:text-white font-black text-sm">${book.price ? '$' + book.price : ''}</span>
-                                <button class="p-2 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100" aria-label="Edit book details">
+                                <button class="p-2 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Edit book details">
                                     <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
                             </div>
@@ -3322,7 +3335,7 @@
                                 ${book.isbn ? `
                                     <div class="mt-6 px-4">
                                         <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">ISBN</p>
-                                        <button onclick="window.copyISBN('${book.isbn.replace(/'/g, "\\'")}')" class="flex items-center gap-2 group/isbn hover:text-blue-600 transition-colors" title="Copy ISBN" aria-label="Copy ISBN">
+                                        <button onclick="window.copyISBN('${book.isbn.replace(/'/g, "\\'")}')" class="flex items-center gap-2 group/isbn hover:text-blue-600 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500/50 outline-none rounded-lg px-2 -ml-2" title="Copy ISBN" aria-label="Copy ISBN">
                                             <span class="text-sm font-mono tracking-wider">${book.isbn}</span>
                                             <svg class="w-3.5 h-3.5 opacity-0 group-hover/isbn:opacity-100 transition-opacity" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
                                         </button>
