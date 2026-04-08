@@ -951,7 +951,7 @@
                                 <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'library' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Library</button>
                                 <button onclick="window.setTab('mybooks')" ${activeTab === 'mybooks' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'mybooks' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">My Books</button>
                                 <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'activity' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Activity</button>
-                                <button onclick="window.setTab('insight')" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'insight' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Library Insight</button>
+                                <button onclick="window.setTab('insight')" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'insight' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Insights</button>
                             </nav>
                             <div class="flex items-center gap-1">
                                 <button id="manual-add-btn" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" title="Add Book Manually" aria-label="Add Book Manually">
@@ -1010,7 +1010,7 @@
                             <div class="relative group flex-1">
                                 <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                                 <input id="search-input" type="text" placeholder="Smart search by title, author, genre..." value="${searchQuery}" class="w-full pl-12 pr-14 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-[1.5rem] text-lg transition-all outline-none shadow-sm" aria-label="Search books">
-                                <div id="search-hint" class="absolute right-12 top-1/2 -translate-y-1/2 px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded text-[10px] font-bold text-slate-400 pointer-events-none transition-opacity duration-300 ${searchQuery ? 'opacity-0' : ''}">/</div>
+                                <div id="search-hint" aria-hidden="true" class="absolute right-12 top-1/2 -translate-y-1/2 px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded text-[10px] font-bold text-slate-400 pointer-events-none transition-opacity duration-300 ${searchQuery ? 'opacity-0' : ''}">/</div>
                                 <button id="clear-search-btn" class="${searchQuery ? '' : 'hidden'} absolute right-4 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors" aria-label="Clear search">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                                 </button>
@@ -1260,7 +1260,7 @@
                         <div class="glass rounded-2xl p-4 border border-slate-200 dark:border-slate-700 mb-6 hidden md:block">
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
                                 <div class="flex flex-col gap-2">
-                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sort by</span>
+                                    <label for="sort-select" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sort by</label>
                                     <select id="sort-select" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
                                         <option value="newest" ${sortBy === 'newest' ? 'selected' : ''}>Recently Added</option>
                                         <option value="oldest" ${sortBy === 'oldest' ? 'selected' : ''}>Oldest First</option>
@@ -1269,7 +1269,7 @@
                                     </select>
                                 </div>
                                 <div class="flex flex-col gap-2">
-                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Genre</span>
+                                    <label for="category-filter" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Genre</label>
                                     <select id="category-filter" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
                                         <option value="all" ${categoryFilter === 'all' ? 'selected' : ''}>All Genres</option>
                                         ${metadataCache.genres.map(cat => `
@@ -1278,7 +1278,7 @@
                                     </select>
                                 </div>
                                 <div class="flex flex-col gap-2">
-                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</span>
+                                    <label for="status-filter" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</label>
                                     <select id="status-filter" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
                                         <option value="all" ${statusFilter === 'all' ? 'selected' : ''}>All</option>
                                         <option value="want_to_read" ${statusFilter === 'want_to_read' ? 'selected' : ''}>Want to Read</option>
@@ -1287,7 +1287,7 @@
                                     </select>
                                 </div>
                                 <div class="flex flex-col gap-2">
-                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Author</span>
+                                    <label for="author-filter" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Author</label>
                                     <select id="author-filter" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
                                         <option value="all" ${authorFilter === 'all' ? 'selected' : ''}>All Authors</option>
                                         ${metadataCache.authors.map(author => `
@@ -1296,7 +1296,7 @@
                                     </select>
                                 </div>
                                 <div class="flex flex-col gap-2">
-                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Owner</span>
+                                    <label for="owner-filter" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Owner</label>
                                     <select id="owner-filter" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
                                         <option value="all" ${ownerFilter === 'all' ? 'selected' : ''}>All Owners</option>
                                         ${metadataCache.owners.map(owner => `
@@ -1387,7 +1387,13 @@
                             <p class="text-slate-400 max-w-xs mx-auto mt-2 text-sm">
                                 ${searchQuery || advancedFilters.rating !== 'all' || tagFilter ? 'Try adjusting your search or filters to find what you are looking for.' : 'Scan a book or add manually to start building your collection.'}
                             </p>
-                            ${searchQuery || advancedFilters.rating !== 'all' || tagFilter ? `<button onclick="window.clearAllFilters()" class="mt-6 px-6 py-2 bg-blue-600 text-white rounded-full font-bold text-sm shadow-lg">Clear All Filters</button>` : ''}
+                            <div class="mt-8 flex items-center justify-center gap-4">
+                                ${searchQuery || advancedFilters.rating !== 'all' || tagFilter ?
+                                    `<button onclick="window.clearAllFilters()" class="px-6 py-2 bg-blue-600 text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95">Clear All Filters</button>` :
+                                    `<button onclick="document.getElementById('scan-btn').click()" class="px-6 py-2 bg-primary text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95">Scan Book</button>
+                                     <button onclick="document.getElementById('manual-add-btn').click()" class="px-6 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-full font-bold text-sm shadow-md transition-transform active:scale-95">Add Manually</button>`
+                                }
+                            </div>
                         </div>
                         `;
                     }
@@ -1593,6 +1599,7 @@
             window.setMyBooksSubTab = (tab) => {
                 myBooksSubTab = tab;
                 renderMainApp();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
             window.setTagFilter = (tag) => {
@@ -2043,7 +2050,7 @@
                     </div>
                     <div class="w-28 h-40 bg-slate-100 dark:bg-slate-800 rounded-3xl overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 relative shadow-lg">
                         ${bookStatus === 'reading' ? `
-                            <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-slate-200/50 z-10">
+                            <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-slate-200/50 z-10" role="progressbar" aria-valuenow="${userProgress || book.progress || 0}" aria-valuemin="0" aria-valuemax="100" aria-label="Reading progress: ${userProgress || book.progress || 0}%">
                                 <div class="h-full bg-blue-500" style="width: ${userProgress || book.progress || 0}%"></div>
                             </div>
                         ` : ''}
@@ -2886,6 +2893,7 @@
                                 </div>
                                 <h3 class="text-lg font-black font-serif italic">No books in this section</h3>
                                 <p class="text-slate-400 text-sm mt-1">Start by marking some books as ${myBooksSubTab === 'finished' ? 'finished' : 'wishlist item'}.</p>
+                                <button onclick="window.setTab('library')" class="mt-6 px-6 py-2 bg-primary text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95">Browse Library</button>
                             </div>
                         `}
                     </div>
@@ -3084,7 +3092,7 @@
                                                     <span>${READING_STATUSES[status].label}</span>
                                                     <span class="text-slate-400">${count} (${percent}%)</span>
                                                 </div>
-                                                <div class="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                                <div class="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden" role="progressbar" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100" aria-label="${READING_STATUSES[status].label}: ${percent}%">
                                                     <div class="h-full ${color} transition-all duration-1000" style="width: ${percent}%"></div>
                                                 </div>
                                             </div>
@@ -3102,7 +3110,7 @@
                                         return `
                                             <div class="flex items-center gap-3">
                                                 <span class="text-xs font-bold w-4">${star}★</span>
-                                                <div class="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                                <div class="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden" role="progressbar" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100" aria-label="${star} stars: ${percent}%">
                                                     <div class="h-full bg-amber-400" style="width: ${percent}%"></div>
                                                 </div>
                                                 <span class="text-[10px] font-bold text-slate-400 w-8 text-right">${count}</span>
