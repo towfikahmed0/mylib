@@ -742,7 +742,7 @@
                         </div>
                     </div>
 
-                    <button id="logout-btn" class="w-full p-4 bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 rounded-2xl font-bold hover:bg-rose-100 dark:hover:bg-rose-900/20 transition">
+                    <button id="logout-btn" class="w-full p-4 bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 rounded-2xl font-bold hover:bg-rose-100 dark:hover:bg-rose-900/20 transition focus-visible:ring-2 focus-visible:ring-rose-500 outline-none">
                         Sign Out
                     </button>
 
@@ -948,16 +948,16 @@
                             </div>
                             <div class="flex-1"></div>
                             <nav class="hidden md:flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                                <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'library' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Library</button>
-                                <button onclick="window.setTab('mybooks')" ${activeTab === 'mybooks' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'mybooks' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">My Books</button>
-                                <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'activity' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Activity</button>
-                                <button onclick="window.setTab('insight')" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'insight' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Insights</button>
+                                <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${activeTab === 'library' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Library</button>
+                                <button onclick="window.setTab('mybooks')" ${activeTab === 'mybooks' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${activeTab === 'mybooks' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">My Books</button>
+                                <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${activeTab === 'activity' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Activity</button>
+                                <button onclick="window.setTab('insight')" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${activeTab === 'insight' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Insights</button>
                             </nav>
                             <div class="flex items-center gap-1">
                                 <button id="manual-add-btn" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" title="Add Book Manually" aria-label="Add Book Manually">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                 </button>
-                                <button onclick="window.setTab('settings')" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition ${activeTab === 'settings' ? 'text-primary bg-blue-50 dark:bg-blue-900/20' : 'text-slate-500'}" title="Settings" aria-label="Settings">
+                                <button onclick="window.setTab('settings')" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${activeTab === 'settings' ? 'text-primary bg-blue-50 dark:bg-blue-900/20' : 'text-slate-500'}" title="Settings" aria-label="Settings">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                 </button>
                                 <button id="scan-btn" class="bg-primary hover:opacity-90 text-white px-5 py-2.5 rounded-full text-sm font-bold flex items-center gap-2 transition-all shadow-md active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Scan QR or Barcode" title="Scan QR or Barcode">
@@ -969,19 +969,19 @@
                     </header>
                     <main id="main-content" class="max-w-6xl mx-auto p-6 pb-32 w-full flex-1"></main>
                     <nav id="mobile-nav" class="md:hidden fixed bottom-0 left-0 right-0 glass border-t border-slate-200 dark:border-slate-800 px-3 py-3 grid grid-cols-4 gap-1 z-40">
-                        <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 ${activeTab === 'library' ? 'text-primary' : 'text-slate-400'}">
+                        <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${activeTab === 'library' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></svg>
                             <span class="text-[8px] font-bold">Library</span>
                         </button>
-                        <button onclick="window.setTab('mybooks')" ${activeTab === 'mybooks' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 ${activeTab === 'mybooks' ? 'text-primary' : 'text-slate-400'}">
+                        <button onclick="window.setTab('mybooks')" ${activeTab === 'mybooks' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${activeTab === 'mybooks' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                             <span class="text-[8px] font-bold">My Books</span>
                         </button>
-                        <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 ${activeTab === 'activity' ? 'text-primary' : 'text-slate-400'}">
+                        <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${activeTab === 'activity' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             <span class="text-[8px] font-bold">Activity</span>
                         </button>
-                        <button onclick="window.setTab('insight')" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 ${activeTab === 'insight' ? 'text-primary' : 'text-slate-400'}">
+                        <button onclick="window.setTab('insight')" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${activeTab === 'insight' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                             <span class="text-[8px] font-bold text-center">Insights</span>
                         </button>
@@ -2020,15 +2020,15 @@
                                 <h3 class="font-black text-sm truncate font-serif">${book.title}</h3>
                                 ${book.borrowedBy ? `<span class="px-2 py-0.5 rounded-full text-[8px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed</span>` : ''}
                             </div>
-                            <p class="text-xs text-slate-500 truncate hover:text-blue-500 transition-colors" onclick="event.stopPropagation(); window.setAuthorFilter('${(book.author || 'Unknown').replace(/'/g, "\\'")}')">${book.author || 'Unknown'}</p>
+                            <button class="text-xs text-slate-500 truncate hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none text-left" onclick="event.stopPropagation(); window.setAuthorFilter('${(book.author || 'Unknown').replace(/'/g, "\\'")}')" aria-label="Filter by author: ${book.author || 'Unknown'}">${book.author || 'Unknown'}</button>
                             <div class="flex flex-wrap gap-1 mt-1">
-                                ${(book.tags || []).map(tag => `<span onclick="event.stopPropagation(); window.setTagFilter('${tag}')" class="text-[8px] bg-slate-100 dark:bg-slate-700 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors">${tag}</span>`).join('')}
+                                ${(book.tags || []).map(tag => `<button onclick="event.stopPropagation(); window.setTagFilter('${tag}')" class="text-[8px] bg-slate-100 dark:bg-slate-700 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Filter by tag: ${tag}">${tag}</button>`).join('')}
                             </div>
                         </div>
                         <div class="text-right flex-shrink-0 flex flex-col items-end">
                             <div class="text-amber-400 text-[10px]">${stars}</div>
-                            <div class="text-[10px] font-bold text-blue-600 dark:text-blue-400 mt-1 truncate max-w-[120px]">${bookGenres.join(', ')}</div>
-                            ${book.owner ? `<div class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors" onclick="event.stopPropagation(); window.setOwnerFilter('${(book.owner).replace(/'/g, "\\'")}')">Owner: ${book.owner}</div>` : ''}
+                            <div class="text-[10px] font-bold text-blue-600 dark:text-blue-400 mt-1 truncate max-w-[120px] text-right">${bookGenres.join(', ')}</div>
+                            ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${(book.owner).replace(/'/g, "\\'")}')" aria-label="Filter by owner: ${book.owner}">Owner: ${book.owner}</button>` : ''}
                             <div class="flex items-center gap-2 mt-1">
                                 <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Edit book details">
                                     <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
@@ -2068,11 +2068,11 @@
                             </div>
                             <h3 class="font-black text-lg leading-tight line-clamp-2 mt-1 group-hover:text-blue-600 transition-colors font-serif italic">${book.title}</h3>
                             <div class="flex justify-between items-center gap-2">
-                                <p class="text-sm text-slate-500 dark:text-slate-400 mt-1 truncate font-medium hover:text-blue-500 transition-colors" onclick="event.stopPropagation(); window.setAuthorFilter('${(book.author || 'Unknown').replace(/'/g, "\\'")}')">${book.author || 'Unknown'}</p>
-                                ${book.owner ? `<span class="text-[10px] text-slate-400 font-medium truncate hover:text-blue-500 transition-colors" onclick="event.stopPropagation(); window.setOwnerFilter('${(book.owner).replace(/'/g, "\\'")}')">Owner: ${book.owner}</span>` : ''}
+                                <button class="text-sm text-slate-500 dark:text-slate-400 mt-1 truncate font-medium hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none text-left" onclick="event.stopPropagation(); window.setAuthorFilter('${(book.author || 'Unknown').replace(/'/g, "\\'")}')" aria-label="Filter by author: ${book.author || 'Unknown'}">${book.author || 'Unknown'}</button>
+                                ${book.owner ? `<button class="text-[10px] text-slate-400 font-medium truncate hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${(book.owner).replace(/'/g, "\\'")}')" aria-label="Filter by owner: ${book.owner}">Owner: ${book.owner}</button>` : ''}
                             </div>
                             <div class="flex flex-wrap gap-1 mt-2">
-                                ${(book.tags || []).map(tag => `<span onclick="event.stopPropagation(); window.setTagFilter('${tag}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors">${tag}</span>`).join('')}
+                                ${(book.tags || []).map(tag => `<button onclick="event.stopPropagation(); window.setTagFilter('${tag}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Filter by tag: ${tag}">${tag}</button>`).join('')}
                             </div>
                             <div class="mt-2 flex flex-wrap gap-1">
                                 <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge}">
@@ -2873,11 +2873,11 @@
                     <!-- Sub-tab Navigation -->
                     <div class="flex items-center justify-center">
                         <div class="bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl flex gap-1 shadow-inner">
-                            <button onclick="window.setMyBooksSubTab('finished')" class="px-8 py-3 rounded-xl text-sm font-bold transition-all ${myBooksSubTab === 'finished' ? 'bg-white dark:bg-slate-700 shadow-md text-primary' : 'text-slate-500 hover:text-slate-700'}">
+                            <button onclick="window.setMyBooksSubTab('finished')" class="px-8 py-3 rounded-xl text-sm font-bold transition-all focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${myBooksSubTab === 'finished' ? 'bg-white dark:bg-slate-700 shadow-md text-primary' : 'text-slate-500 hover:text-slate-700'}">
                                 Finished Books
                                 <span class="ml-2 px-2 py-0.5 bg-slate-200 dark:bg-slate-600 rounded-lg text-[10px]">${finishedBooks.length}</span>
                             </button>
-                            <button onclick="window.setMyBooksSubTab('wishlist')" class="px-8 py-3 rounded-xl text-sm font-bold transition-all ${myBooksSubTab === 'wishlist' ? 'bg-white dark:bg-slate-700 shadow-md text-primary' : 'text-slate-500 hover:text-slate-700'}">
+                            <button onclick="window.setMyBooksSubTab('wishlist')" class="px-8 py-3 rounded-xl text-sm font-bold transition-all focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${myBooksSubTab === 'wishlist' ? 'bg-white dark:bg-slate-700 shadow-md text-primary' : 'text-slate-500 hover:text-slate-700'}">
                                 Wishlist
                                 <span class="ml-2 px-2 py-0.5 bg-slate-200 dark:bg-slate-600 rounded-lg text-[10px]">${wishlistBooks.length}</span>
                             </button>
@@ -3126,13 +3126,13 @@
                                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Top Genres</h3>
                                 <div class="grid gap-2">
                                     ${Object.entries(genresCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => `
-                                        <div class="flex justify-between items-center group cursor-pointer" onclick='window.applyInsightFilter("genre", "${name.replace(/"/g, "&quot;")}")'>
+                                        <button class="w-full flex justify-between items-center group cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded-lg text-left" onclick='window.applyInsightFilter("genre", "${name.replace(/"/g, "&quot;")}")' aria-label="Filter by genre: ${name}">
                                             <div class="flex items-center gap-3">
                                                 <div class="w-1 h-1 rounded-full bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                                 <span class="text-sm font-medium text-slate-600 dark:text-slate-300 group-hover:text-blue-600 transition-colors">${name}</span>
                                             </div>
                                             <span class="text-xs font-black text-slate-400">${count}</span>
-                                        </div>
+                                        </button>
                                     `).join('')}
                                 </div>
                             </div>
@@ -3140,13 +3140,13 @@
                                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Top Tags</h3>
                                 <div class="grid gap-2">
                                     ${Object.entries(tagsCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => `
-                                        <div class="flex justify-between items-center group cursor-pointer" onclick='window.applyInsightFilter("tag", "${name.replace(/"/g, "&quot;")}")'>
+                                        <button class="w-full flex justify-between items-center group cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded-lg text-left" onclick='window.applyInsightFilter("tag", "${name.replace(/"/g, "&quot;")}")' aria-label="Filter by tag: ${name}">
                                             <div class="flex items-center gap-3">
                                                 <div class="w-1 h-1 rounded-full bg-amber-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                                 <span class="text-sm font-medium text-slate-600 dark:text-slate-300 group-hover:text-amber-600 transition-colors">${name}</span>
                                             </div>
                                             <span class="text-xs font-black text-slate-400">${count}</span>
-                                        </div>
+                                        </button>
                                     `).join('')}
                                 </div>
                             </div>
@@ -3157,13 +3157,13 @@
                                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Top Authors</h3>
                                 <div class="grid gap-2">
                                     ${Object.entries(authorsCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => `
-                                        <div class="flex justify-between items-center group cursor-pointer" onclick='window.applyInsightFilter("author", "${name.replace(/"/g, "&quot;")}")'>
+                                        <button class="w-full flex justify-between items-center group cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded-lg text-left" onclick='window.applyInsightFilter("author", "${name.replace(/"/g, "&quot;")}")' aria-label="Filter by author: ${name}">
                                             <div class="flex items-center gap-3">
                                                 <div class="w-1 h-1 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                                 <span class="text-sm font-medium text-slate-600 dark:text-slate-300 group-hover:text-primary transition-colors">${name}</span>
                                             </div>
                                             <span class="text-xs font-black text-slate-400">${count}</span>
-                                        </div>
+                                        </button>
                                     `).join('')}
                                 </div>
                             </div>
@@ -3171,13 +3171,13 @@
                                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Top Owners</h3>
                                 <div class="grid gap-2">
                                     ${Object.entries(ownersCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => `
-                                        <div class="flex justify-between items-center group cursor-pointer" onclick='window.applyInsightFilter("owner", "${name.replace(/"/g, "&quot;")}")'>
+                                        <button class="w-full flex justify-between items-center group cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded-lg text-left" onclick='window.applyInsightFilter("owner", "${name.replace(/"/g, "&quot;")}")' aria-label="Filter by owner: ${name}">
                                             <div class="flex items-center gap-3">
                                                 <div class="w-1 h-1 rounded-full bg-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                                 <span class="text-sm font-medium text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">${name}</span>
                                             </div>
                                             <span class="text-xs font-black text-slate-400">${count}</span>
-                                        </div>
+                                        </button>
                                     `).join('')}
                                 </div>
                             </div>
@@ -3682,7 +3682,7 @@
                                 <div class="mt-4 px-4">
                                     <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Tags</p>
                                     <div class="flex flex-wrap gap-2">
-                                        ${(book.tags || []).map(tag => `<span onclick="window.setTagFilter('${tag}'); document.querySelector('[data-close]').click();" class="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-bold cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors">${tag}</span>`).join('')}
+                                        ${(book.tags || []).map(tag => `<button onclick="window.setTagFilter('${tag}'); document.querySelector('[data-close]').click();" class="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-bold cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Filter by tag: ${tag}">${tag}</button>`).join('')}
                                     </div>
                                 </div>
                                 <div class="mt-4 px-4">
