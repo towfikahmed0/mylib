@@ -11,3 +11,7 @@
 ## 2025-05-14 - [Keyboard Accessibility for Card-based UIs]
 **Learning:** For interactive card elements that trigger details or actions, adding `tabindex="0"` and `role="button"` is not enough; a global `keydown` listener for `Enter`/`Space` is required for parity with mouse clicks. Additionally, using `group-focus-within:opacity-100` on hover-only actions within cards ensures they remain accessible to keyboard users when they navigate into the card.
 **Action:** Always pair `tabindex="0"` on cards with a keyboard listener and ensure hover-states for sub-actions are also triggered by focus.
+
+## 2025-05-20 - [Semantic Interactive Elements & Focus Rings]
+**Learning:** Attaching `onclick` handlers to non-semantic elements like `<span>` or `<div>` (e.g., for filters or tags) creates an accessibility gap where keyboard users cannot interact with or even see these elements. Converting them to `<button>` elements with `focus-visible:ring-2` provides immediate keyboard support and visual feedback without requiring custom JavaScript listeners.
+**Action:** Always use `<button>` for interactive data filters and tags. Ensure every interactive element has a clear `focus-visible` state.
