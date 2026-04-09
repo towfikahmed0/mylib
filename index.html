@@ -1144,8 +1144,8 @@
                     const statusData = getStatusData(b.id);
                     const isWishlist = statusData.isWishlist || false;
                     const matchesTab = (activeTab === 'mybooks')
-                        ? (myBooksSubTab === 'wishlist' ? isWishlist : (statusData.status === 'finished' && !isWishlist))
-                        : !isWishlist;
+                        ? (myBooksSubTab === 'wishlist' ? isWishlist : statusData.status === 'finished')
+                        : (!isWishlist && !b.excludeFromLibrary);
 
                     // ⚡ Bolt: Use pre-normalized _searchStr for O(1) string check per book
                     const matchesSearch = !searchQuery || b._searchStr.includes(searchLower);
@@ -2510,7 +2510,7 @@
                 });
             }
 
-            function openManualEntry(code, existingBook = null) {
+            function openManualEntry(code, existingBook = null, options = {}) {
                 const isEdit = !!existingBook;
                 let currentGenres = getBookGenres(existingBook || {});
                 if (currentGenres.length === 1 && currentGenres[0] === 'Other' && !isEdit) currentGenres = [];
@@ -2688,7 +2688,8 @@
                             isbn: existingBook?.isbn || code || '',
                             thumbnail: existingBook?.thumbnail || null,
                             source: existingBook?.source || (code ? 'scanned' : 'manual'),
-                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            ...options
                         };
                         if (!bookData.title) {
                             showToast('Title is required', 'error');
@@ -2703,7 +2704,8 @@
                             // Get selected library destination
                             const selectedDest = document.querySelector('input[name="library-dest"]:checked');
                             const targetUserId = selectedDest ? selectedDest.value : currentUser.uid;
-                            const result = await addBookToFirestore(bookData, 'want_to_read', targetUserId);
+                            const status = options.status || 'want_to_read';
+                            const result = await addBookToFirestore(bookData, status, targetUserId);
                             if (result) close();
                         }
                     } catch (err) {
@@ -2713,6 +2715,128 @@
                         btn.innerText = originalText;
                     }
                 });
+            }
+
+            window.openAddFinishedBookModal = () => {
+                const modalHtml = `
+                <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up">
+                    <h2 class="text-2xl font-black mb-6 font-serif italic text-primary">Add a Finished Book</h2>
+                    <div class="grid grid-cols-1 gap-4">
+                        <button id="select-existing-btn" class="w-full p-6 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition flex flex-col items-center gap-2 group focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">
+                            <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/50 rounded-xl flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+                            </div>
+                            <span class="text-sm">Select from existing library</span>
+                            <span class="text-[10px] font-medium text-slate-400">Mark a book you already have as finished</span>
+                        </button>
+                        <button id="add-new-finished-btn" class="w-full p-6 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-emerald-50 dark:hover:bg-slate-700 transition flex flex-col items-center gap-2 group focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">
+                            <div class="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/50 rounded-xl flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            </div>
+                            <span class="text-sm">Add a new book</span>
+                            <span class="text-[10px] font-medium text-slate-400">Add a book that won't show in the main library</span>
+                        </button>
+                    </div>
+                    <div class="mt-8 flex justify-center">
+                        <button data-close class="px-8 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold transition active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Cancel</button>
+                    </div>
+                </div>
+                `;
+
+                const close = showModal(modalHtml);
+
+                document.getElementById('select-existing-btn').addEventListener('click', () => {
+                    close();
+                    openSelectFromLibraryModal();
+                });
+
+                document.getElementById('add-new-finished-btn').addEventListener('click', () => {
+                    close();
+                    openManualEntry('', null, { status: 'finished', excludeFromLibrary: true });
+                });
+            };
+
+            function openSelectFromLibraryModal() {
+                const myBooks = books.filter(b => b.userId === currentUser.uid && getStatusData(b.id).status !== 'finished');
+
+                const modalHtml = `
+                <div class="glass max-w-2xl w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up overflow-hidden flex flex-col max-h-[90vh]">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-black font-serif italic">Select from Library</h2>
+                        <button data-close class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                    </div>
+                    <div class="relative mb-6">
+                        <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <input id="select-book-search" type="text" placeholder="Search by title or author..." class="w-full pl-12 pr-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                    </div>
+                    <div id="select-book-list" class="flex-1 overflow-y-auto space-y-3 pr-2">
+                        ${myBooks.length > 0 ? myBooks.map(b => `
+                            <button onclick="window.markAsFinished('${b.id}')" class="w-full flex items-center gap-4 p-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all text-left group focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">
+                                <img src="${b.coverUrl || b.thumbnail || 'https://via.placeholder.com/40x60?text=No+Cover'}" class="w-12 h-16 object-cover rounded-lg shadow-sm">
+                                <div class="flex-1 min-w-0">
+                                    <h4 class="font-bold text-sm truncate group-hover:text-blue-600 transition-colors">${escapeHTML(b.title)}</h4>
+                                    <p class="text-xs text-slate-500 truncate">${escapeHTML(b.author)}</p>
+                                </div>
+                                <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                </div>
+                            </button>
+                        `).join('') : '<p class="text-center py-10 text-slate-400 italic">No books found in your library that aren\'t finished yet.</p>'}
+                    </div>
+                </div>
+                `;
+
+                const close = showModal(modalHtml);
+
+                const searchInput = document.getElementById('select-book-search');
+                const listContainer = document.getElementById('select-book-list');
+
+                if (searchInput && listContainer) {
+                    searchInput.addEventListener('input', (e) => {
+                        const q = e.target.value.toLowerCase();
+                        const filtered = myBooks.filter(b => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q));
+                        listContainer.innerHTML = filtered.length > 0 ? filtered.map(b => `
+                            <button onclick="window.markAsFinished('${b.id}')" class="w-full flex items-center gap-4 p-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all text-left group focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">
+                                <img src="${b.coverUrl || b.thumbnail || 'https://via.placeholder.com/40x60?text=No+Cover'}" class="w-12 h-16 object-cover rounded-lg shadow-sm">
+                                <div class="flex-1 min-w-0">
+                                    <h4 class="font-bold text-sm truncate group-hover:text-blue-600 transition-colors">${escapeHTML(b.title)}</h4>
+                                    <p class="text-xs text-slate-500 truncate">${escapeHTML(b.author)}</p>
+                                </div>
+                                <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                </div>
+                            </button>
+                        `).join('') : '<p class="text-center py-10 text-slate-400 italic">No matching books found.</p>';
+                    });
+                }
+
+                window.markAsFinished = async (id) => {
+                    try {
+                        const b = books.find(book => book.id === id);
+                        await db.collection('books').doc(id).collection('readingStatus').doc(currentUser.uid).set({
+                            status: 'finished',
+                            userId: currentUser.uid,
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }, { merge: true });
+
+                        await db.collection('activityFeed').add({
+                            type: 'status_updated',
+                            bookId: id,
+                            bookTitle: b.title,
+                            userName: currentUser.displayName || currentUser.email || currentUser.uid,
+                            userId: currentUser.uid,
+                            status: 'finished',
+                            addedTo: 'My',
+                            libraryId: currentUser.uid,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+
+                        showToast(`"${b.title}" marked as finished!`, 'success');
+                        close();
+                    } catch (err) {
+                        showToast('Error: ' + err.message, 'error');
+                    }
+                };
             }
 
             // Helper for duplicate detection within a specific user's library
@@ -2856,7 +2980,7 @@
             function renderMyBooks() {
                 const finishedBooks = books.filter(b => {
                     const statusData = getStatusData(b.id);
-                    return statusData.status === 'finished' && !statusData.isWishlist;
+                    return statusData.status === 'finished';
                 });
 
                 const wishlistBooks = books.filter(b => {
@@ -2887,6 +3011,15 @@
                         </div>
                     </div>
 
+                    ${myBooksSubTab === 'finished' ? `
+                    <div class="flex justify-center">
+                        <button onclick="window.openAddFinishedBookModal()" class="px-6 py-3 bg-primary text-white rounded-2xl font-bold flex items-center gap-2 hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            Add a finished book
+                        </button>
+                    </div>
+                    ` : ''}
+
                     <!-- Filtered List -->
                     <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3'}">
                         ${displayBooks.length > 0 ? displayBooks.map(b => renderBookCard(b)).join('') : `
@@ -2904,6 +3037,49 @@
                 `;
             }
 
+            function renderPieChart(entries, total, colors, centerValue, centerLabel, title, filterType) {
+                let currentPercent = 0;
+                const chartSegments = entries.map(([label, count], i) => {
+                    if (total === 0) return '';
+                    const percent = (count / total) * 100;
+                    const offset = currentPercent;
+                    currentPercent += percent;
+
+                    return `<circle cx="50" cy="50" r="40" fill="none" stroke="${colors[i % colors.length]}" stroke-width="12" stroke-dasharray="${percent} ${100 - percent}" stroke-dashoffset="${-offset}" pathLength="100" />`;
+                }).join('');
+
+                return `
+                    <div class="relative w-40 h-40 flex-shrink-0 mx-auto sm:mx-0">
+                        <svg viewBox="0 0 100 100" class="w-full h-full transform -rotate-90">
+                            <circle cx="50" cy="50" r="40" fill="none" stroke="#f1f5f9" stroke-width="12" class="dark:stroke-slate-800" />
+                            ${chartSegments}
+                            <circle cx="50" cy="50" r="28" fill="white" class="dark:fill-slate-900" />
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                            <span class="text-2xl font-black font-serif italic text-primary">${centerValue}</span>
+                            <span class="text-[8px] font-bold text-slate-400 uppercase tracking-widest">${centerLabel}</span>
+                        </div>
+                    </div>
+                    <div class="flex-1 w-full text-left">
+                        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">${title}</h3>
+                        <div class="grid grid-cols-1 gap-x-6 gap-y-2">
+                            ${entries.slice(0, 6).map(([label, count], i) => {
+                                const clickHandler = filterType ? `onclick='window.applyInsightFilter("${filterType}", "${label.replace(/"/g, "&quot;")}")'` : '';
+                                return `
+                                <div class="flex items-center justify-between text-sm py-1 border-b border-slate-50 dark:border-slate-800/50 ${filterType ? 'cursor-pointer group' : ''}" ${clickHandler}>
+                                    <div class="flex items-center gap-2 truncate">
+                                        <div class="w-2 h-2 rounded-full" style="background-color: ${colors[i % colors.length]}"></div>
+                                        <span class="font-medium truncate ${filterType ? 'group-hover:text-primary transition-colors' : ''}">${label}</span>
+                                    </div>
+                                    <span class="font-bold text-slate-400">${count}</span>
+                                </div>
+                            `;}).join('')}
+                            ${entries.length === 0 ? '<p class="text-xs text-slate-400 italic">No data available.</p>' : ''}
+                        </div>
+                    </div>
+                `;
+            }
+
             function renderMyBooksStats(finishedBooks) {
                 const genresCount = {};
                 finishedBooks.forEach(b => {
@@ -2914,55 +3090,12 @@
 
                 const genreEntries = Object.entries(genresCount).sort((a, b) => b[1] - a[1]);
                 const total = finishedBooks.length;
-
                 const colors = ['#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316'];
-
-                let currentPercent = 0;
-                const chartPaths = genreEntries.map(([genre, count], i) => {
-                    const percent = (count / total) * 100;
-                    const startAngle = (currentPercent / 100) * 360;
-                    currentPercent += percent;
-                    const endAngle = (currentPercent / 100) * 360;
-
-                    const x1 = 50 + 40 * Math.cos((Math.PI * (startAngle - 90)) / 180);
-                    const y1 = 50 + 40 * Math.sin((Math.PI * (startAngle - 90)) / 180);
-                    const x2 = 50 + 40 * Math.cos((Math.PI * (endAngle - 90)) / 180);
-                    const y2 = 50 + 40 * Math.sin((Math.PI * (endAngle - 90)) / 180);
-
-                    const largeArcFlag = percent > 50 ? 1 : 0;
-
-                    return `<path d="M ${x1} ${y1} A 40 40 0 ${largeArcFlag} 1 ${x2} ${y2}" fill="none" stroke="${colors[i % colors.length]}" stroke-width="12" />`;
-                }).join('');
 
                 return `
                 <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
                     <div class="flex flex-col md:flex-row items-center gap-12">
-                        <div class="relative w-48 h-48 flex-shrink-0">
-                            <svg viewBox="0 0 100 100" class="w-full h-full transform -rotate-90">
-                                <circle cx="50" cy="50" r="40" fill="none" stroke="#f1f5f9" stroke-width="12" class="dark:stroke-slate-800" />
-                                ${chartPaths}
-                                <circle cx="50" cy="50" r="28" fill="white" />
-                            </svg>
-                            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                <span class="text-4xl font-black font-serif italic text-primary">${total}</span>
-                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Finished</span>
-                            </div>
-                        </div>
-                        <div class="flex-1 w-full text-left">
-                            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Finished by Genre</h3>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
-                                ${genreEntries.slice(0, 8).map(([genre, count], i) => `
-                                    <div class="flex items-center justify-between text-sm py-1 border-b border-slate-50 dark:border-slate-800/50">
-                                        <div class="flex items-center gap-2 truncate">
-                                            <div class="w-2 h-2 rounded-full" style="background-color: ${colors[i % colors.length]}"></div>
-                                            <span class="font-medium truncate">${genre}</span>
-                                        </div>
-                                        <span class="font-bold text-slate-400">${count}</span>
-                                    </div>
-                                `).join('')}
-                                ${genreEntries.length === 0 ? '<p class="text-xs text-slate-400 italic">No finished books yet.</p>' : ''}
-                            </div>
-                        </div>
+                        ${renderPieChart(genreEntries, total, colors, total, 'Finished', 'Finished by Genre')}
                     </div>
                     <div id="collaborator-stats-container" class="mt-12 pt-8 border-t border-slate-100 dark:border-slate-800">
                         ${renderCollaboratorStats()}
@@ -3023,7 +3156,7 @@
                 const statusCounts = { finished: 0, reading: 0, want_to_read: 0 };
                 const ratingDist = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
 
-                const libBooks = books.filter(b => !getStatusData(b.id).isWishlist);
+                const libBooks = books.filter(b => !getStatusData(b.id).isWishlist && !b.excludeFromLibrary);
 
                 libBooks.forEach(b => {
                     const statusData = getStatusData(b.id);
@@ -3136,20 +3269,30 @@
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-10 pt-10 border-t border-slate-100 dark:border-slate-800">
-                            <div>
-                                <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Top Genres</h3>
-                                <div class="grid gap-2">
-                                    ${Object.entries(genresCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => `
-                                        <button class="w-full flex justify-between items-center group cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded-lg text-left" onclick='window.applyInsightFilter("genre", "${name.replace(/"/g, "&quot;")}")' aria-label="Filter by genre: ${name}">
-                                            <div class="flex items-center gap-3">
-                                                <div class="w-1 h-1 rounded-full bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                                <span class="text-sm font-medium text-slate-600 dark:text-slate-300 group-hover:text-blue-600 transition-colors">${name}</span>
-                                            </div>
-                                            <span class="text-xs font-black text-slate-400">${count}</span>
-                                        </button>
-                                    `).join('')}
-                                </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-10 mb-10 pt-10 border-t border-slate-100 dark:border-slate-800">
+                            <div class="flex flex-col sm:flex-row items-center gap-8">
+                                ${(() => {
+                                    const entries = Object.entries(genresCount).sort((a, b) => b[1] - a[1]);
+                                    const totalEntries = entries.reduce((acc, [_, count]) => acc + count, 0);
+                                    return renderPieChart(entries, totalEntries, ['#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6'], libBooks.length, 'Books', 'Genre Distribution', 'genre');
+                                })()}
+                            </div>
+                            <div class="flex flex-col sm:flex-row items-center gap-8">
+                                ${(() => {
+                                    const entries = Object.entries(authorsCount).sort((a, b) => b[1] - a[1]);
+                                    const totalEntries = entries.reduce((acc, [_, count]) => acc + count, 0);
+                                    return renderPieChart(entries, totalEntries, ['#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6'], libBooks.length, 'Books', 'Author Distribution', 'author');
+                                })()}
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-10 mb-10 pt-10 border-t border-slate-100 dark:border-slate-800">
+                            <div class="flex flex-col sm:flex-row items-center gap-8">
+                                ${(() => {
+                                    const entries = Object.entries(ownersCount).sort((a, b) => b[1] - a[1]);
+                                    const totalEntries = entries.reduce((acc, [_, count]) => acc + count, 0);
+                                    return renderPieChart(entries, totalEntries, ['#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6'], libBooks.length, 'Books', 'Owner Distribution', 'owner');
+                                })()}
                             </div>
                             <div>
                                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Top Tags</h3>
@@ -3159,37 +3302,6 @@
                                             <div class="flex items-center gap-3">
                                                 <div class="w-1 h-1 rounded-full bg-amber-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                                 <span class="text-sm font-medium text-slate-600 dark:text-slate-300 group-hover:text-amber-600 transition-colors">${name}</span>
-                                            </div>
-                                            <span class="text-xs font-black text-slate-400">${count}</span>
-                                        </button>
-                                    `).join('')}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-10 mt-10 pt-10 border-t border-slate-100 dark:border-slate-800">
-                            <div>
-                                <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Top Authors</h3>
-                                <div class="grid gap-2">
-                                    ${Object.entries(authorsCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => `
-                                        <button class="w-full flex justify-between items-center group cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded-lg text-left" onclick='window.applyInsightFilter("author", "${name.replace(/"/g, "&quot;")}")' aria-label="Filter by author: ${name}">
-                                            <div class="flex items-center gap-3">
-                                                <div class="w-1 h-1 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                                <span class="text-sm font-medium text-slate-600 dark:text-slate-300 group-hover:text-primary transition-colors">${name}</span>
-                                            </div>
-                                            <span class="text-xs font-black text-slate-400">${count}</span>
-                                        </button>
-                                    `).join('')}
-                                </div>
-                            </div>
-                            <div>
-                                <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Top Owners</h3>
-                                <div class="grid gap-2">
-                                    ${Object.entries(ownersCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => `
-                                        <button class="w-full flex justify-between items-center group cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded-lg text-left" onclick='window.applyInsightFilter("owner", "${name.replace(/"/g, "&quot;")}")' aria-label="Filter by owner: ${name}">
-                                            <div class="flex items-center gap-3">
-                                                <div class="w-1 h-1 rounded-full bg-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                                <span class="text-sm font-medium text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">${name}</span>
                                             </div>
                                             <span class="text-xs font-black text-slate-400">${count}</span>
                                         </button>
