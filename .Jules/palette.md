@@ -15,3 +15,7 @@
 ## 2025-05-20 - [Semantic Interactive Elements & Focus Rings]
 **Learning:** Attaching `onclick` handlers to non-semantic elements like `<span>` or `<div>` (e.g., for filters or tags) creates an accessibility gap where keyboard users cannot interact with or even see these elements. Converting them to `<button>` elements with `focus-visible:ring-2` provides immediate keyboard support and visual feedback without requiring custom JavaScript listeners.
 **Action:** Always use `<button>` for interactive data filters and tags. Ensure every interactive element has a clear `focus-visible` state.
+
+## 2025-05-22 - [Responsive Summary Cards & Decorative Icons]
+**Learning:** In text-heavy summary cards (like library insights), using responsive padding (`p-3` to `p-6`) and responsive font sizes (`text-xl` to `text-4xl`) is critical to prevent overflow on mobile devices. Additionally, "watermark" style background icons with low opacity (`opacity-5`) and scale-on-hover effects (`group-hover:scale-110`) provide visual delight and section context without compromising readability.
+**Action:** Use responsive scaling for large numbers in summary components. Add subtle decorative icons to background layers to enhance visual hierarchy.
