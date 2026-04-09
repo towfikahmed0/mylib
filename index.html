@@ -762,6 +762,11 @@
                 const email = document.getElementById('share-email').value.trim().toLowerCase();
                 if (!email) return;
 
+                const btn = document.getElementById('save-sharing-btn');
+                const originalText = btn.innerText;
+                btn.disabled = true;
+                btn.innerText = 'Adding...';
+
                 try {
                     // Find the user by email
                     const userSnapshot = await db.collection('users').where('email', '==', email).limit(1).get();
@@ -794,6 +799,9 @@
                     document.getElementById('share-email').value = '';
                 } catch (err) {
                     showToast('Error creating partnership: ' + err.message, 'error');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = originalText;
                 }
             }
 
@@ -1436,8 +1444,12 @@
                 document.getElementById('notify-btn')?.addEventListener('click', requestNotificationPermission);
                 document.getElementById('save-sharing-btn')?.addEventListener('click', saveSharingSettings);
 
-                document.getElementById('save-profile-btn')?.addEventListener('click', async () => {
+                document.getElementById('save-profile-btn')?.addEventListener('click', async (e) => {
+                    const btn = e.currentTarget;
+                    const originalText = btn.innerText;
                     const displayName = document.getElementById('profile-display-name').value.trim();
+                    btn.disabled = true;
+                    btn.innerText = 'Saving...';
                     try {
                         await db.collection('users').doc(currentUser.uid).update({
                             displayName,
@@ -1449,6 +1461,9 @@
                         renderMainApp();
                     } catch (err) {
                         showToast('Error updating profile: ' + err.message, 'error');
+                    } finally {
+                        btn.disabled = false;
+                        btn.innerText = originalText;
                     }
                 });
 
@@ -2651,63 +2666,51 @@
                     const originalText = btn.innerText;
                     btn.disabled = true;
                     btn.innerText = 'Saving...';
-                    const tagsRaw = document.getElementById('man-tags').value;
-                    const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+                    try {
+                        const tagsRaw = document.getElementById('man-tags').value;
+                        const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
 
-                    const safeDate = (val) => {
-                        const d = new Date(val);
-                        return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
-                    };
+                        const safeDate = (val) => {
+                            const d = new Date(val);
+                            return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+                        };
 
-                    const bookData = {
-                        title: document.getElementById('man-title').value,
-                        author: document.getElementById('man-author').value || 'Unknown',
-                        categories: currentGenres.length > 0 ? currentGenres : ['Other'],
-                        owner: document.getElementById('man-owner').value || '',
-                        tags: tags,
-                        coverUrl: document.getElementById('man-cover').value || null,
-                        isWishlist: document.getElementById('man-wishlist').checked,
-                        price: document.getElementById('man-price').value ? parseFloat(document.getElementById('man-price').value) : null,
-                        purchaseDate: safeDate(document.getElementById('man-date').value),
-                        isbn: existingBook?.isbn || code || '',
-                        thumbnail: existingBook?.thumbnail || null,
-                        source: existingBook?.source || (code ? 'scanned' : 'manual'),
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    };
-                    if (!bookData.title) {
-                        showToast('Title is required', 'error');
-                        btn.disabled = false;
-                        btn.innerText = originalText;
-                        return;
-                    }
+                        const bookData = {
+                            title: document.getElementById('man-title').value,
+                            author: document.getElementById('man-author').value || 'Unknown',
+                            categories: currentGenres.length > 0 ? currentGenres : ['Other'],
+                            owner: document.getElementById('man-owner').value || '',
+                            tags: tags,
+                            coverUrl: document.getElementById('man-cover').value || null,
+                            isWishlist: document.getElementById('man-wishlist').checked,
+                            price: document.getElementById('man-price').value ? parseFloat(document.getElementById('man-price').value) : null,
+                            purchaseDate: safeDate(document.getElementById('man-date').value),
+                            isbn: existingBook?.isbn || code || '',
+                            thumbnail: existingBook?.thumbnail || null,
+                            source: existingBook?.source || (code ? 'scanned' : 'manual'),
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        };
+                        if (!bookData.title) {
+                            showToast('Title is required', 'error');
+                            return;
+                        }
 
-                    if (isEdit) {
-                        try {
+                        if (isEdit) {
                             await db.collection('books').doc(existingBook.id).update(bookData);
                             showToast('Book updated!', 'success');
                             close();
-                        } catch (err) {
-                            showToast('Error updating: ' + err.message, 'error');
-                            btn.disabled = false;
-                            btn.innerText = originalText;
-                        }
-                    } else {
-                        try {
+                        } else {
                             // Get selected library destination
                             const selectedDest = document.querySelector('input[name="library-dest"]:checked');
                             const targetUserId = selectedDest ? selectedDest.value : currentUser.uid;
                             const result = await addBookToFirestore(bookData, 'want_to_read', targetUserId);
-                            if (result) {
-                                close();
-                            } else {
-                                btn.disabled = false;
-                                btn.innerText = originalText;
-                            }
-                        } catch (err) {
-                            showToast('Error: ' + err.message, 'error');
-                            btn.disabled = false;
-                            btn.innerText = originalText;
+                            if (result) close();
                         }
+                    } catch (err) {
+                        showToast('Error: ' + err.message, 'error');
+                    } finally {
+                        btn.disabled = false;
+                        btn.innerText = originalText;
                     }
                 });
             }
@@ -3060,22 +3063,34 @@
                             <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 dark:bg-slate-800 px-4 py-2 rounded-full">Updated ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
                         </div>
 
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
-                            <div class="bg-primary p-6 rounded-3xl text-white shadow-lg shadow-primary/20 dark:shadow-none">
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-10">
+                            <div class="bg-primary p-3 sm:p-6 rounded-3xl text-white shadow-lg shadow-primary/20 dark:shadow-none relative overflow-hidden group">
+                                <div class="absolute -right-2 -bottom-2 opacity-10 group-hover:scale-110 transition-transform duration-500">
+                                    <svg class="w-16 h-16 sm:w-20 sm:h-20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3z"/><path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg>
+                                </div>
                                 <div class="text-[10px] font-bold uppercase opacity-80 mb-1">Total Books</div>
-                                <div class="text-4xl font-black font-sans">${libBooks.length}</div>
+                                <div class="text-xl sm:text-4xl font-black font-sans relative z-10">${libBooks.length}</div>
                             </div>
-                            <div class="bg-emerald-600 p-6 rounded-3xl text-white shadow-lg shadow-emerald-200 dark:shadow-none">
+                            <div class="bg-emerald-600 p-3 sm:p-6 rounded-3xl text-white shadow-lg shadow-emerald-200 dark:shadow-none relative overflow-hidden group">
+                                <div class="absolute -right-2 -bottom-2 opacity-10 group-hover:scale-110 transition-transform duration-500">
+                                    <svg class="w-16 h-16 sm:w-20 sm:h-20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.16-1.46-3.27-3.4h1.96c.1 1.05.82 1.87 2.21 1.87 1.32 0 2.14-.65 2.14-1.51 0-.9-.61-1.57-2.33-1.99-2.12-.52-3.83-1.26-3.83-3.48 0-1.9 1.43-3.09 3.12-3.44V5h2.67v1.9c1.47.3 2.72 1.14 2.91 2.94h-1.89c-.11-.88-.72-1.46-1.88-1.46-1.12 0-1.87.53-1.87 1.45 0 .84.71 1.34 2.51 1.8 2.22.56 3.8 1.47 3.8 3.53-.01 2.12-1.51 3.23-3.39 3.46z"/></svg>
+                                </div>
                                 <div class="text-[10px] font-bold uppercase opacity-80 mb-1">Collection Value</div>
-                                <div class="text-3xl font-black font-sans">$${Math.round(totalValue)}</div>
+                                <div class="text-xl sm:text-3xl font-black font-sans relative z-10">$${Math.round(totalValue)}</div>
                             </div>
-                            <div class="bg-slate-100 dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700">
+                            <div class="bg-white dark:bg-slate-800 p-3 sm:p-6 rounded-3xl border border-slate-100 dark:border-slate-700 relative overflow-hidden group shadow-sm">
+                                <div class="absolute -right-2 -bottom-2 opacity-5 dark:opacity-10 group-hover:scale-110 transition-transform duration-500 text-slate-900 dark:text-white">
+                                    <svg class="w-16 h-16 sm:w-20 sm:h-20" fill="currentColor" viewBox="0 0 24 24"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/></svg>
+                                </div>
                                 <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Avg. Price</div>
-                                <div class="text-3xl font-black font-sans">$${avgPrice}</div>
+                                <div class="text-xl sm:text-3xl font-black font-sans relative z-10 text-slate-900 dark:text-white">$${avgPrice}</div>
                             </div>
-                            <div class="bg-slate-100 dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700">
+                            <div class="bg-white dark:bg-slate-800 p-3 sm:p-6 rounded-3xl border border-slate-100 dark:border-slate-700 relative overflow-hidden group shadow-sm">
+                                <div class="absolute -right-2 -bottom-2 opacity-5 dark:opacity-10 group-hover:scale-110 transition-transform duration-500 text-slate-900 dark:text-white">
+                                    <svg class="w-16 h-16 sm:w-20 sm:h-20" fill="currentColor" viewBox="0 0 24 24"><path d="M4 9h16v2H4zm0 4h10v2H4z"/></svg>
+                                </div>
                                 <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Tags / Book</div>
-                                <div class="text-3xl font-black font-sans">${avgTags}</div>
+                                <div class="text-xl sm:text-3xl font-black font-sans relative z-10 text-slate-900 dark:text-white">${avgTags}</div>
                             </div>
                         </div>
 
@@ -3785,8 +3800,12 @@
                     } catch (err) { showToast('Error: ' + err.message, 'error'); }
                 });
 
-                document.getElementById('borrow-book-btn')?.addEventListener('click', async () => {
+                document.getElementById('borrow-book-btn')?.addEventListener('click', async (e) => {
+                    const btn = e.currentTarget;
+                    const originalText = btn.innerText;
                     const name = document.getElementById('borrower-name').value.trim() || (currentUser.displayName || currentUser.email);
+                    btn.disabled = true;
+                    btn.innerText = 'Borrowing...';
                     try {
                         await db.collection('books').doc(book.id).update({
                             borrowedBy: name,
@@ -3807,7 +3826,12 @@
 
                         showToast(`Marked as borrowed by ${name}`, 'success');
                         close();
-                    } catch (err) { showToast('Error: ' + err.message, 'error'); }
+                    } catch (err) {
+                        showToast('Error: ' + err.message, 'error');
+                    } finally {
+                        btn.disabled = false;
+                        btn.innerText = originalText;
+                    }
                 });
 
                 document.getElementById('save-rating-btn')?.addEventListener('click', async (e) => {
@@ -3859,6 +3883,7 @@
                         setTimeout(() => openBookDetails(books.find(b => b.id === book.id)), 100);
                     } catch (err) {
                         showToast('Error: ' + err.message, 'error');
+                    } finally {
                         btn.disabled = false;
                         btn.innerText = originalText;
                     }
@@ -3908,7 +3933,11 @@
                     } catch (err) { showToast('Error: ' + err.message, 'error'); }
                 });
 
-                document.getElementById('return-book-btn')?.addEventListener('click', async () => {
+                document.getElementById('return-book-btn')?.addEventListener('click', async (e) => {
+                    const btn = e.currentTarget;
+                    const originalText = btn.innerText;
+                    btn.disabled = true;
+                    btn.innerText = 'Returning...';
                     try {
                         await db.collection('books').doc(book.id).update({
                             borrowedBy: firebase.firestore.FieldValue.delete(),
@@ -3928,7 +3957,12 @@
 
                         showToast('Book returned!', 'success');
                         close();
-                    } catch (err) { showToast('Error: ' + err.message, 'error'); }
+                    } catch (err) {
+                        showToast('Error: ' + err.message, 'error');
+                    } finally {
+                        btn.disabled = false;
+                        btn.innerText = originalText;
+                    }
                 });
 
                 document.getElementById('delete-book-btn').addEventListener('click', async () => {
