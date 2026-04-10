@@ -19,3 +19,7 @@
 ## 2025-05-22 - [Responsive Summary Cards & Decorative Icons]
 **Learning:** In text-heavy summary cards (like library insights), using responsive padding (`p-3` to `p-6`) and responsive font sizes (`text-xl` to `text-4xl`) is critical to prevent overflow on mobile devices. Additionally, "watermark" style background icons with low opacity (`opacity-5`) and scale-on-hover effects (`group-hover:scale-110`) provide visual delight and section context without compromising readability.
 **Action:** Use responsive scaling for large numbers in summary components. Add subtle decorative icons to background layers to enhance visual hierarchy.
+
+## 2025-05-24 - [Interactive Data Cards & Content-Aware Labels]
+**Learning:** In high-density feeds like an Activity Log, converting individual row items into interactive cards significantly improves touch/click targets. By shifting click handlers to the container and stripping HTML tags to generate `aria-label` values, we provide screen reader users with concise, meaningful summaries of complex nested data (e.g., "User added Book Title") without redundant focus stops.
+**Action:** Use full-card interaction for feed items. Generate text-only `aria-label` attributes from template content to ensure semantic clarity for non-visual users.
