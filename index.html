@@ -676,9 +676,9 @@
                             <div>
                                 <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Theme Selection</label>
                                 <div class="grid grid-cols-3 gap-2 mt-1">
-                                    <button onclick="window.setTheme('light')" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') !== 'dark' && localStorage.getItem('mylib_theme') !== 'sepia' ? 'border-primary' : 'border-transparent'} bg-white text-slate-900 text-xs font-bold">Light</button>
-                                    <button onclick="window.setTheme('dark')" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'dark' ? 'border-primary' : 'border-transparent'} bg-slate-900 text-white text-xs font-bold">Dark</button>
-                                    <button onclick="window.setTheme('sepia')" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'sepia' ? 'border-primary' : 'border-transparent'} bg-sepia-100 text-sepia-900 text-xs font-bold">Sepia</button>
+                                    <button onclick="window.setTheme('light')" aria-pressed="${localStorage.getItem('mylib_theme') !== 'dark' && localStorage.getItem('mylib_theme') !== 'sepia'}" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') !== 'dark' && localStorage.getItem('mylib_theme') !== 'sepia' ? 'border-primary' : 'border-transparent'} bg-white text-slate-900 text-xs font-bold focus-visible:ring-2 focus-visible:ring-blue-500 outline-none transition-all">Light</button>
+                                    <button onclick="window.setTheme('dark')" aria-pressed="${localStorage.getItem('mylib_theme') === 'dark'}" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'dark' ? 'border-primary' : 'border-transparent'} bg-slate-900 text-white text-xs font-bold focus-visible:ring-2 focus-visible:ring-blue-500 outline-none transition-all">Dark</button>
+                                    <button onclick="window.setTheme('sepia')" aria-pressed="${localStorage.getItem('mylib_theme') === 'sepia'}" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'sepia' ? 'border-primary' : 'border-transparent'} bg-sepia-100 text-sepia-900 text-xs font-bold focus-visible:ring-2 focus-visible:ring-blue-500 outline-none transition-all">Sepia</button>
                                 </div>
                             </div>
                             <div>
@@ -687,7 +687,7 @@
                                     ${['blue', 'rose', 'emerald', 'amber', 'violet'].map(color => {
                     const bgClass = color === 'blue' ? 'bg-blue-500' : color === 'rose' ? 'bg-rose-500' : color === 'emerald' ? 'bg-emerald-500' : color === 'amber' ? 'bg-amber-500' : 'bg-violet-500';
                     const isSelected = (localStorage.getItem('mylib_accent') || 'blue') === color;
-                    return `<button onclick="window.setAccent('${color}')" class="w-8 h-8 rounded-full ${bgClass} ${isSelected ? 'ring-4 ring-offset-2 ring-slate-300 dark:ring-slate-600' : ''}" title="${color.charAt(0).toUpperCase() + color.slice(1)}"></button>`;
+                    return `<button onclick="window.setAccent('${color}')" aria-pressed="${isSelected}" class="w-8 h-8 rounded-full ${bgClass} ${isSelected ? 'ring-4 ring-offset-2 ring-slate-300 dark:ring-slate-600' : ''} focus-visible:ring-2 focus-visible:ring-blue-500 outline-none transition-all" title="${color.charAt(0).toUpperCase() + color.slice(1)}"></button>`;
                 }).join('')}
                                 </div>
                             </div>
@@ -1189,16 +1189,20 @@
                     let html = '';
                     let activeCount = 0;
                     if (advancedFilters.rating !== 'all') {
-                        html += `<span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-bold flex items-center gap-2">${advancedFilters.rating} Stars <button onclick="window.clearAdvancedFilter('rating')">×</button></span>`;
+                        html += `<span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-bold flex items-center gap-2">${advancedFilters.rating} Stars <button onclick="window.clearAdvancedFilter('rating')" aria-label="Remove rating filter">×</button></span>`;
                         activeCount++;
                     }
                     if (advancedFilters.minPrice || advancedFilters.maxPrice) {
-                        html += `<span class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold flex items-center gap-2">$${advancedFilters.minPrice || 0} - $${advancedFilters.maxPrice || '∞'} <button onclick="window.clearAdvancedFilter('price')">×</button></span>`;
+                        html += `<span class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold flex items-center gap-2">$${advancedFilters.minPrice || 0} - $${advancedFilters.maxPrice || '∞'} <button onclick="window.clearAdvancedFilter('price')" aria-label="Remove price filter">×</button></span>`;
                         activeCount++;
                     }
                     if (advancedFilters.startDate || advancedFilters.endDate) {
-                        html += `<span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold flex items-center gap-2">Date Range <button onclick="window.clearAdvancedFilter('date')">×</button></span>`;
+                        html += `<span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold flex items-center gap-2">Date Range <button onclick="window.clearAdvancedFilter('date')" aria-label="Remove date filter">×</button></span>`;
                         activeCount++;
+                    }
+
+                    if (activeCount > 1) {
+                        html += `<button onclick="window.clearAllFilters()" class="text-[10px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest ml-2 px-2 py-1 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded transition-all">Clear All</button>`;
                     }
 
                     if (window.innerWidth < 768) {
@@ -1570,23 +1574,28 @@
                     sortBy = e.target.value;
                     localStorage.setItem('mylib_sortBy', sortBy);
                     renderLibraryOnly();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
                 document.getElementById('status-filter')?.addEventListener('change', e => {
                     statusFilter = e.target.value;
                     localStorage.setItem('mylib_statusFilter', statusFilter);
                     renderLibraryOnly();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
                 document.getElementById('category-filter')?.addEventListener('change', e => {
                     categoryFilter = e.target.value;
                     renderLibraryOnly();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
                 document.getElementById('author-filter')?.addEventListener('change', e => {
                     authorFilter = e.target.value;
                     renderLibraryOnly();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
                 document.getElementById('owner-filter')?.addEventListener('change', e => {
                     ownerFilter = e.target.value;
                     renderLibraryOnly();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
                 document.getElementById('grid-view-btn')?.addEventListener('click', () => {
                     viewMode = 'grid';
@@ -2522,7 +2531,7 @@
                     container.innerHTML = currentGenres.map((g, i) => `
                     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
                         ${g}
-                        <button onclick="window.removeGenre(${i})" class="ml-2 hover:text-blue-900 dark:hover:text-blue-100">&times;</button>
+                        <button onclick="window.removeGenre(${i})" class="ml-2 hover:text-blue-900 dark:hover:text-blue-100" aria-label="Remove genre: ${g}">&times;</button>
                     </span>
                 `).join('');
                 };
