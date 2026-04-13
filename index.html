@@ -1390,20 +1390,22 @@
 
                     // Empty state
                     if (filteredBooks.length === 0) {
+                        const isAnyFilterActive = searchQuery || statusFilter !== 'all' || categoryFilter !== 'all' || authorFilter !== 'all' || ownerFilter !== 'all' || tagFilter || advancedFilters.rating !== 'all' || advancedFilters.minPrice || advancedFilters.maxPrice || advancedFilters.startDate || advancedFilters.endDate;
+
                         html = `
                         <div class="py-32 text-center">
                             <div class="bg-blue-50 dark:bg-slate-800 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
                                 <svg class="w-12 h-12 text-blue-200 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                             </div>
-                            <h3 class="text-xl font-black font-serif">${searchQuery || advancedFilters.rating !== 'all' || tagFilter ? 'No matching books' : (activeTab === 'wishlist' ? 'Wishlist is Empty' : 'Empty Library')}</h3>
+                            <h3 class="text-xl font-black font-serif">${isAnyFilterActive ? 'No matching books' : (activeTab === 'wishlist' ? 'Wishlist is Empty' : 'Empty Library')}</h3>
                             <p class="text-slate-400 max-w-xs mx-auto mt-2 text-sm">
-                                ${searchQuery || advancedFilters.rating !== 'all' || tagFilter ? 'Try adjusting your search or filters to find what you are looking for.' : 'Scan a book or add manually to start building your collection.'}
+                                ${isAnyFilterActive ? 'Try adjusting your search or filters to find what you are looking for.' : 'Scan a book or add manually to start building your collection.'}
                             </p>
                             <div class="mt-8 flex items-center justify-center gap-4">
-                                ${searchQuery || advancedFilters.rating !== 'all' || tagFilter ?
-                                    `<button onclick="window.clearAllFilters()" class="px-6 py-2 bg-blue-600 text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95">Clear All Filters</button>` :
-                                    `<button onclick="document.getElementById('scan-btn').click()" class="px-6 py-2 bg-primary text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95">Scan Book</button>
-                                     <button onclick="document.getElementById('manual-add-btn').click()" class="px-6 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-full font-bold text-sm shadow-md transition-transform active:scale-95">Add Manually</button>`
+                                ${isAnyFilterActive ?
+                                    `<button onclick="window.clearAllFilters()" class="px-6 py-2 bg-blue-600 text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Clear All Filters</button>` :
+                                    `<button onclick="document.getElementById('scan-btn').click()" class="px-6 py-2 bg-primary text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Scan Book</button>
+                                     <button onclick="document.getElementById('manual-add-btn').click()" class="px-6 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-full font-bold text-sm shadow-md transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Add Manually</button>`
                                 }
                             </div>
                         </div>
