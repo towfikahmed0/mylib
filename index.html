@@ -3328,7 +3328,9 @@
 
 
             window.jumpToBook = async (bookId) => {
-                setTab('library');
+                window.clearAllFilters();
+                window.setTab('library');
+
                 // Find book and scroll to it
                 const book = books.find(b => b.id === bookId);
                 if (book) {
@@ -3336,8 +3338,17 @@
                         const element = document.querySelector(`[data-book-id="${bookId}"]`);
                         if (element) {
                             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            element.classList.add('ring-4', 'ring-blue-500', 'ring-offset-2');
+                            setTimeout(() => {
+                                element.classList.remove('ring-4', 'ring-blue-500', 'ring-offset-2');
+                            }, 2000);
                         }
                     }, 100);
+
+                    // Auto-open details after scroll
+                    setTimeout(() => {
+                        openBookDetails(book);
+                    }, 800);
                 }
             };
 

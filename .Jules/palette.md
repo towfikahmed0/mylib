@@ -23,3 +23,7 @@
 ## 2025-05-24 - [Interactive Data Cards & Content-Aware Labels]
 **Learning:** In high-density feeds like an Activity Log, converting individual row items into interactive cards significantly improves touch/click targets. By shifting click handlers to the container and stripping HTML tags to generate `aria-label` values, we provide screen reader users with concise, meaningful summaries of complex nested data (e.g., "User added Book Title") without redundant focus stops.
 **Action:** Use full-card interaction for feed items. Generate text-only `aria-label` attributes from template content to ensure semantic clarity for non-visual users.
+
+## 2025-05-26 - [Dynamic Visibility for 'Jump-to' Navigation]
+**Learning:** When navigating to specific items in a highly dynamic, filterable interface (like an Activity Log jump), ensuring the item's visibility by clearing global filters is as critical as the scroll-to-view logic itself. Combining this with a temporary visual 'ping' (ring highlight) and auto-opening the details modal creates a truly seamless 'teleport' experience.
+**Action:** Always clear relevant filters before executing a 'jump-to-element' action to guarantee the target is rendered. Use temporary visual highlights (e.g., Tailwind rings) to guide user focus after significant layout changes.
