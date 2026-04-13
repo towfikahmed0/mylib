@@ -613,9 +613,9 @@
                                     ${metadataCache.authors.map(author => `
                                         <div class="group flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-sm transition-all hover:bg-blue-50 dark:hover:bg-blue-900/20">
                                             <span class="font-medium">${author}</span>
-                                            <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onclick="window.editMetadata('Author', '${author.replace(/'/g, "\\'")}')" class="text-blue-500 hover:text-blue-600" aria-label="Edit author"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
-                                                <button onclick="window.deleteMetadata('Author', '${author.replace(/'/g, "\\'")}')" class="text-rose-500 hover:text-rose-600" aria-label="Delete author"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                                            <div class="flex gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                                                <button onclick="window.editMetadata('Author', '${author.replace(/'/g, "\\'")}')" class="text-blue-500 hover:text-blue-600 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded" aria-label="Edit author"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
+                                                <button onclick="window.deleteMetadata('Author', '${author.replace(/'/g, "\\'")}')" class="text-rose-500 hover:text-rose-600 focus-visible:ring-2 focus-visible:ring-rose-500 outline-none rounded" aria-label="Delete author"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
                                             </div>
                                         </div>
                                     `).join('')}
@@ -629,9 +629,9 @@
                                     ${metadataCache.genres.map(genre => `
                                         <div class="group flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-sm transition-all hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
                                             <span class="font-medium">${genre}</span>
-                                            <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onclick="window.editMetadata('Genre', '${genre.replace(/'/g, "\\'")}')" class="text-emerald-500 hover:text-emerald-600" aria-label="Edit genre"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
-                                                <button onclick="window.deleteMetadata('Genre', '${genre.replace(/'/g, "\\'")}')" class="text-rose-500 hover:text-rose-600" aria-label="Delete genre"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                                            <div class="flex gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                                                <button onclick="window.editMetadata('Genre', '${genre.replace(/'/g, "\\'")}')" class="text-emerald-500 hover:text-emerald-600 focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none rounded" aria-label="Edit genre"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
+                                                <button onclick="window.deleteMetadata('Genre', '${genre.replace(/'/g, "\\'")}')" class="text-rose-500 hover:text-rose-600 focus-visible:ring-2 focus-visible:ring-rose-500 outline-none rounded" aria-label="Delete genre"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
                                             </div>
                                         </div>
                                     `).join('')}
@@ -645,9 +645,9 @@
                                     ${metadataCache.owners.map(owner => `
                                         <div class="group flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-sm transition-all hover:bg-amber-50 dark:hover:bg-amber-900/20">
                                             <span class="font-medium">${owner}</span>
-                                            <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onclick="window.editMetadata('Owner', '${owner.replace(/'/g, "\\'")}')" class="text-amber-500 hover:text-amber-600" aria-label="Edit owner"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
-                                                <button onclick="window.deleteMetadata('Owner', '${owner.replace(/'/g, "\\'")}')" class="text-rose-500 hover:text-rose-600" aria-label="Delete owner"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                                            <div class="flex gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                                                <button onclick="window.editMetadata('Owner', '${owner.replace(/'/g, "\\'")}')" class="text-amber-500 hover:text-amber-600 focus-visible:ring-2 focus-visible:ring-amber-500 outline-none rounded" aria-label="Edit owner"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
+                                                <button onclick="window.deleteMetadata('Owner', '${owner.replace(/'/g, "\\'")}')" class="text-rose-500 hover:text-rose-600 focus-visible:ring-2 focus-visible:ring-rose-500 outline-none rounded" aria-label="Delete owner"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
                                             </div>
                                         </div>
                                     `).join('')}
@@ -659,11 +659,11 @@
                     <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
                         <h2 class="text-2xl font-black mb-6 font-serif">Data Management</h2>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <button id="import-btn" class="flex items-center justify-center gap-3 p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition text-sm">
+                            <button id="import-btn" class="flex items-center justify-center gap-3 p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition text-sm focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">
                                 <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
                                 Import CSV
                             </button>
-                            <button id="export-btn" class="flex items-center justify-center gap-3 p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition text-sm">
+                            <button id="export-btn" class="flex items-center justify-center gap-3 p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition text-sm focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">
                                 <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                 Export CSV
                             </button>
@@ -676,9 +676,9 @@
                             <div>
                                 <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Theme Selection</label>
                                 <div class="grid grid-cols-3 gap-2 mt-1">
-                                    <button onclick="window.setTheme('light')" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') !== 'dark' && localStorage.getItem('mylib_theme') !== 'sepia' ? 'border-primary' : 'border-transparent'} bg-white text-slate-900 text-xs font-bold">Light</button>
-                                    <button onclick="window.setTheme('dark')" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'dark' ? 'border-primary' : 'border-transparent'} bg-slate-900 text-white text-xs font-bold">Dark</button>
-                                    <button onclick="window.setTheme('sepia')" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'sepia' ? 'border-primary' : 'border-transparent'} bg-sepia-100 text-sepia-900 text-xs font-bold">Sepia</button>
+                                    <button onclick="window.setTheme('light')" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') !== 'dark' && localStorage.getItem('mylib_theme') !== 'sepia' ? 'border-primary' : 'border-transparent'} bg-white text-slate-900 text-xs font-bold focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Light</button>
+                                    <button onclick="window.setTheme('dark')" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'dark' ? 'border-primary' : 'border-transparent'} bg-slate-900 text-white text-xs font-bold focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Dark</button>
+                                    <button onclick="window.setTheme('sepia')" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'sepia' ? 'border-primary' : 'border-transparent'} bg-sepia-100 text-sepia-900 text-xs font-bold focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Sepia</button>
                                 </div>
                             </div>
                             <div>
@@ -687,7 +687,7 @@
                                     ${['blue', 'rose', 'emerald', 'amber', 'violet'].map(color => {
                     const bgClass = color === 'blue' ? 'bg-blue-500' : color === 'rose' ? 'bg-rose-500' : color === 'emerald' ? 'bg-emerald-500' : color === 'amber' ? 'bg-amber-500' : 'bg-violet-500';
                     const isSelected = (localStorage.getItem('mylib_accent') || 'blue') === color;
-                    return `<button onclick="window.setAccent('${color}')" class="w-8 h-8 rounded-full ${bgClass} ${isSelected ? 'ring-4 ring-offset-2 ring-slate-300 dark:ring-slate-600' : ''}" title="${color.charAt(0).toUpperCase() + color.slice(1)}"></button>`;
+                    return `<button onclick="window.setAccent('${color}')" class="w-8 h-8 rounded-full ${bgClass} ${isSelected ? 'ring-4 ring-offset-2 ring-slate-300 dark:ring-slate-600' : ''} focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" title="${color.charAt(0).toUpperCase() + color.slice(1)}"></button>`;
                 }).join('')}
                                 </div>
                             </div>
@@ -723,7 +723,7 @@
                                     </select>
                                 </div>
                             </div>
-                            <button id="notify-btn" class="w-full flex items-center justify-between p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition">
+                            <button id="notify-btn" class="w-full flex items-center justify-between p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">
                                 <div class="flex items-center gap-3">
                                     <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
                                     <span class="text-sm">Push Notifications</span>
@@ -1033,14 +1033,14 @@
                             <div class="glass p-4 rounded-2xl border border-blue-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-4">
                                 <div class="flex items-center gap-3">
                                     <span id="selected-count" class="text-sm font-black text-blue-600 px-3 py-1 bg-blue-100 dark:bg-blue-900/50 rounded-lg">0 Selected</span>
-                                    <button onclick="window.clearSelection()" class="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase">Clear</button>
+                                    <button onclick="window.clearSelection()" class="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded">Clear</button>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <select id="bulk-genre" class="bg-slate-100 dark:bg-slate-800 rounded-lg text-[10px] font-bold px-3 py-2 outline-none">
+                                    <select id="bulk-genre" class="bg-slate-100 dark:bg-slate-800 rounded-lg text-[10px] font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
                                         <option value="">Change Genre...</option>
                                         ${metadataCache.genres.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
                                     </select>
-                                    <button onclick="window.bulkDelete()" class="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors" title="Delete Selected" aria-label="Delete selected books">
+                                    <button onclick="window.bulkDelete()" class="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" title="Delete Selected" aria-label="Delete selected books">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                     </button>
                                 </div>
@@ -2522,7 +2522,7 @@
                     container.innerHTML = currentGenres.map((g, i) => `
                     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
                         ${g}
-                        <button onclick="window.removeGenre(${i})" class="ml-2 hover:text-blue-900 dark:hover:text-blue-100">&times;</button>
+                        <button onclick="window.removeGenre(${i})" class="ml-2 hover:text-blue-900 dark:hover:text-blue-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded" aria-label="Remove genre">&times;</button>
                     </span>
                 `).join('');
                 };
@@ -2592,7 +2592,7 @@
                             </div>
                         </div>
                         <div class="flex gap-4 mt-10 pb-10">
-                            <button data-close class="flex-1 px-4 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold">Cancel</button>
+                            <button data-close class="flex-1 px-4 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Cancel</button>
                             <button id="save-manual" class="flex-1 px-4 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">${isEdit ? 'Update' : 'Save'}</button>
                         </div>
                     </div>
