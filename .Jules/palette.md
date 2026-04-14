@@ -27,3 +27,7 @@
 ## 2025-05-26 - [Dynamic Visibility for 'Jump-to' Navigation]
 **Learning:** When navigating to specific items in a highly dynamic, filterable interface (like an Activity Log jump), ensuring the item's visibility by clearing global filters is as critical as the scroll-to-view logic itself. Combining this with a temporary visual 'ping' (ring highlight) and auto-opening the details modal creates a truly seamless 'teleport' experience.
 **Action:** Always clear relevant filters before executing a 'jump-to-element' action to guarantee the target is rendered. Use temporary visual highlights (e.g., Tailwind rings) to guide user focus after significant layout changes.
+
+## 2025-05-28 - [Context-Aware Empty States for Filtered Lists]
+**Learning:** In applications with multiple, layered filtering mechanisms (search, dropdowns, advanced filters), a generic "Empty" message can be misleading if results are simply filtered out. Implementing a centralized `isAnyFilterActive` flag allows the UI to distinguish between an actually empty collection and a restrictive search/filter state, providing users with a clear "Clear All Filters" path back to their data.
+**Action:** Always aggregate all possible filter states into a single boolean to drive empty-state messaging and recovery actions (CTAs).
