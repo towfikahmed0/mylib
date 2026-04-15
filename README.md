@@ -41,10 +41,11 @@ My Lib is a masterfully crafted, single-page application (SPA) designed for book
 
 ## 🚀 Getting Started
 
-1. **Sign In**: Use your Google account for secure, one-click access.
-2. **Add Books**: Start building your catalog by scanning a barcode or entering details manually.
-3. **Organize**: Use tags and genres to categorize your sanctuary.
-4. **Share**: Go to Settings to add collaborators by their email.
+1. **Visit mylib-web**: go to mylib-web from here https://mylib-web.vercel.app/
+2. **Sign In**: Use your Google account for secure, one-click access.
+3. **Add Books**: Start building your catalog by scanning a barcode or entering details manually.
+4. **Organize**: Use tags and genres to categorize your sanctuary.
+5. **Share**: Go to Settings to add collaborators by their email.
 
 ## 📜 Credits
 
