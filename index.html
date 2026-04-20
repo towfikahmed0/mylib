@@ -273,7 +273,9 @@
             // ---------- State ----------
             let deferredPrompt = null;
             let currentUser = null;
+            window.__setCurrentUser = (u) => currentUser = u;
             let userProfile = null;
+            window.__setUserProfile = (p) => userProfile = p;
 
             window.addEventListener('beforeinstallprompt', (e) => {
                 e.preventDefault();
@@ -290,6 +292,8 @@
             let unsubscribeBooks = null;
             let unsubscribeStatus = null;
             let activeTab = 'library';     // 'library', 'wishlist', 'activity', 'settings'
+            let chatHistory = [];
+            let aiResponseCache = [];      // Cache last 5 responses [{prompt, response}]
             let lastActiveTab = null;
             let myBooksSubTab = 'finished';
             let currentModalCloseHandler = null;
@@ -572,6 +576,27 @@
             function renderSettings() {
                 return `
                 <div class="max-w-2xl mx-auto space-y-8 animate-slide-up">
+                    <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
+                        <h2 class="text-2xl font-black mb-6 font-serif italic text-blue-600 dark:text-blue-400">AI Librarian Settings</h2>
+                        <div class="space-y-4">
+                            <div>
+                                <label for="gemini-api-key" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Gemini API Key</label>
+                                <input id="gemini-api-key" type="password" placeholder="Enter your Gemini API Key" value="${localStorage.getItem('mylib_gemini_api_key') || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
+                                <p class="text-[9px] text-slate-400 mt-1 ml-1 italic">Key is stored only in your browser's localStorage.</p>
+                            </div>
+                            <div>
+                                <label for="gemini-model" class="text-[10px] font-bold text-slate-400 uppercase ml-1">AI Model</label>
+                                <select id="gemini-model" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
+                                    <option value="gemini-2.0-flash-lite-preview-02-05" ${ (localStorage.getItem('mylib_gemini_model') || 'gemini-2.0-flash-lite-preview-02-05') === 'gemini-2.0-flash-lite-preview-02-05' ? 'selected' : '' }>Gemini 2.0 Flash-Lite</option>
+                                    <option value="gemini-2.0-flash" ${ localStorage.getItem('mylib_gemini_model') === 'gemini-2.0-flash' ? 'selected' : '' }>Gemini 2.0 Flash</option>
+                                    <option value="gemini-1.5-pro" ${ localStorage.getItem('mylib_gemini_model') === 'gemini-1.5-pro' ? 'selected' : '' }>Gemini 1.5 Pro</option>
+                                    <option value="gemini-1.5-flash" ${ localStorage.getItem('mylib_gemini_model') === 'gemini-1.5-flash' ? 'selected' : '' }>Gemini 1.5 Flash</option>
+                                </select>
+                            </div>
+                            <button id="save-ai-settings-btn" class="w-full sm:w-auto px-6 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 dark:shadow-none focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Save AI Settings</button>
+                        </div>
+                    </div>
+
                     <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
                         <h2 class="text-2xl font-black mb-6 font-serif italic text-blue-600 dark:text-blue-400">Profile Settings</h2>
                         <div class="space-y-4">
@@ -976,6 +1001,12 @@
                         </div>
                     </header>
                     <main id="main-content" class="max-w-6xl mx-auto p-6 pb-32 w-full flex-1"></main>
+
+                    <!-- Floating AI Button -->
+                    <button id="ai-chat-fab" class="fixed bottom-24 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-40 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="AI Librarian Chat">
+                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+                        <span id="ai-ping" class="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full border-2 border-white dark:border-slate-900 animate-bounce hidden"></span>
+                    </button>
                     <nav id="mobile-nav" class="md:hidden fixed bottom-0 left-0 right-0 glass border-t border-slate-200 dark:border-slate-800 px-3 py-3 grid grid-cols-4 gap-1 z-40">
                         <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${activeTab === 'library' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></svg>
@@ -1009,6 +1040,8 @@
                     mainContentEl.innerHTML = renderMyBooks();
                 } else if (activeTab === 'insight') {
                     mainContentEl.innerHTML = renderLibraryInsight();
+                    loadLastAIAnalysis();
+                    document.getElementById('run-ai-analysis-btn')?.addEventListener('click', runAILibraryAnalysis);
                     attachActivityListeners();
                 } else {
                     if (!document.getElementById('search-input')) {
@@ -1430,7 +1463,7 @@
             function attachGlobalListeners() {
                 document.getElementById('scan-btn')?.addEventListener('click', openScanner);
                 document.getElementById('manual-add-btn')?.addEventListener('click', () => openManualEntry(''));
-
+                document.getElementById('ai-chat-fab')?.addEventListener('click', openAIChat);
             }
 
             function attachSettingsListeners() {
@@ -1449,6 +1482,14 @@
                 document.getElementById('export-btn')?.addEventListener('click', exportCSV);
                 document.getElementById('notify-btn')?.addEventListener('click', requestNotificationPermission);
                 document.getElementById('save-sharing-btn')?.addEventListener('click', saveSharingSettings);
+
+                document.getElementById('save-ai-settings-btn')?.addEventListener('click', (e) => {
+                    const apiKey = document.getElementById('gemini-api-key').value.trim();
+                    const model = document.getElementById('gemini-model').value;
+                    localStorage.setItem('mylib_gemini_api_key', apiKey);
+                    localStorage.setItem('mylib_gemini_model', model);
+                    showToast('AI Settings saved!', 'success');
+                });
 
                 document.getElementById('save-profile-btn')?.addEventListener('click', async (e) => {
                     const btn = e.currentTarget;
@@ -3320,8 +3361,93 @@
                                 </div>
                             </div>
                         </div>
+                    <div id="ai-insights-section" class="mt-12 pt-12 border-t border-slate-100 dark:border-slate-800">
+                        <div class="flex items-center justify-between mb-8">
+                            <div>
+                                <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">AI Librarian Analysis</h3>
+                                <p class="text-lg font-black font-serif italic">Personalized Collection Strategy</p>
+                            </div>
+                            <button id="run-ai-analysis-btn" class="px-6 py-2 bg-blue-600 text-white rounded-full font-bold text-sm shadow-lg hover:scale-105 transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Analyze Library</button>
+                        </div>
+
+                        <div id="ai-analysis-content" class="p-8 bg-blue-50/50 dark:bg-slate-800/40 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-700 min-h-[150px] flex flex-col items-center justify-center text-center">
+                            <p class="text-slate-400 italic text-sm">Tap 'Analyze Library' to get personalized insights and recommendations from your AI Librarian.</p>
+                        </div>
                     </div>
                 </div>
+                `;
+            }
+
+            async function runAILibraryAnalysis() {
+                const btn = document.getElementById('run-ai-analysis-btn');
+                const content = document.getElementById('ai-analysis-content');
+                if (!btn || !content) return;
+
+                const config = getAIConfig();
+                if (!config.apiKey) {
+                    showToast('Please set your Gemini API key in Settings.', 'error');
+                    return;
+                }
+
+                btn.disabled = true;
+                btn.innerText = 'Analyzing...';
+                content.innerHTML = `
+                    <div class="flex flex-col items-center gap-4">
+                        <div class="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
+                        <p class="text-blue-600 font-bold uppercase tracking-widest text-[10px]">AI is reading your library...</p>
+                    </div>
+                `;
+
+                try {
+                    const prompt = "Please provide a comprehensive analysis of my library. Analyze reading habits, most read genres, and completion rate. Then suggest what genres are missing and how to improve the collection balance. Also, list 5 recommended books to buy/add based on my taste.";
+                    const systemPrompt = `${LIBRARIAN_SYSTEM_PROMPT}\n\nTask: Full Library Analysis.`;
+
+                    const result = await callGeminiAI(prompt, systemPrompt);
+
+                    const formattedResult = result
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/^\s*[\-\*]\s*(.*)/gm, '<li class="ml-4">$1</li>');
+
+                    content.innerHTML = `<div class="text-left text-sm leading-relaxed space-y-2 whitespace-pre-wrap">${formattedResult}</div>`;
+
+                    // Save to Firestore
+                    await db.collection('users').doc(currentUser.uid).set({
+                        lastAIAnalysis: result,
+                        lastAIAnalysisDate: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+
+                    if (userProfile) {
+                        userProfile.lastAIAnalysis = result;
+                        userProfile.lastAIAnalysisDate = new Date();
+                    }
+
+                } catch (err) {
+                    showToast('Analysis failed: ' + err.message, 'error');
+                    content.innerHTML = `<p class="text-rose-500 font-medium">Failed to generate analysis. ${err.message}</p>`;
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = 'Analyze Library';
+                }
+            }
+
+            function loadLastAIAnalysis() {
+                const content = document.getElementById('ai-analysis-content');
+                if (!content || !userProfile?.lastAIAnalysis) return;
+
+                const result = userProfile.lastAIAnalysis;
+                const date = userProfile.lastAIAnalysisDate?.toDate ? userProfile.lastAIAnalysisDate.toDate() : userProfile.lastAIAnalysisDate;
+                const formattedDate = date ? new Date(date).toLocaleDateString() : '';
+
+                const formattedResult = result
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/^\s*[\-\*]\s*(.*)/gm, '<li class="ml-4">$1</li>')
+                    .replace(/\n/g, '<br>');
+
+                content.innerHTML = `
+                    <div class="text-left text-sm leading-relaxed space-y-2">
+                        <div class="mb-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 pb-2">Last Analysis: ${formattedDate}</div>
+                        ${formattedResult}
+                    </div>
                 `;
             }
 
@@ -3681,10 +3807,309 @@
                 a.click();
             }
 
+            // ---------- AI Librarian Service ----------
+            const AI_CONFIG = {
+                defaultModel: 'gemini-2.0-flash-lite-preview-02-05', // Using latest available lite
+                fallbackModel: 'gemini-2.0-flash-lite-preview-02-05'
+            };
+
+            function getAIConfig() {
+                return {
+                    apiKey: localStorage.getItem('mylib_gemini_api_key'),
+                    model: localStorage.getItem('mylib_gemini_model') || AI_CONFIG.defaultModel
+                };
+            }
+
+            async function callGeminiAI(userPrompt, systemInstruction, useFallback = false, history = []) {
+                const config = getAIConfig();
+                if (!config.apiKey) throw new Error('API_KEY_MISSING');
+
+                // Check cache
+                const cacheKey = JSON.stringify({ userPrompt, model: config.model });
+                const cached = aiResponseCache.find(c => c.key === cacheKey);
+                if (cached) return cached.response;
+
+                const model = useFallback ? AI_CONFIG.fallbackModel : config.model;
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.apiKey}`;
+
+                const contents = history.length > 0 ? history : [
+                    { role: 'user', parts: [{ text: `SYSTEM: ${systemInstruction}\n\nCONTEXT: ${JSON.stringify(getLibraryContext())}\n\nUSER: ${userPrompt}` }] }
+                ];
+
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents,
+                            generationConfig: {
+                                temperature: 0.7,
+                                maxOutputTokens: 800,
+                            }
+                        }),
+                        signal: controller.signal
+                    });
+
+                    clearTimeout(timeoutId);
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        if (!useFallback && model !== AI_CONFIG.fallbackModel) {
+                            console.warn("AI Primary failed, retrying with fallback...", error);
+                            return callGeminiAI(userPrompt, systemInstruction, true, history);
+                        }
+                        throw new Error(error.error?.message || 'AI_CALL_FAILED');
+                    }
+
+                    const data = await response.json();
+                    let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+                    if (useFallback) {
+                        text = "*(Note: Using fallback model)*\n\n" + text;
+                    }
+
+                    // Update cache
+                    aiResponseCache.unshift({ key: cacheKey, response: text });
+                    if (aiResponseCache.length > 5) aiResponseCache.pop();
+
+                    return text;
+                } catch (err) {
+                    clearTimeout(timeoutId);
+                    if (err.name === 'AbortError') throw new Error('AI_TIMEOUT');
+                    if (!useFallback && model !== AI_CONFIG.fallbackModel) {
+                        console.warn("AI Primary failed (catch), retrying with fallback...", err);
+                        return callGeminiAI(userPrompt, systemInstruction, true, history);
+                    }
+                    throw err;
+                }
+            }
+
+            function getLibraryContext() {
+                const libBooks = books.filter(b => {
+                    const s = getStatusData(b.id);
+                    return !s.isWishlist && !b.excludeFromLibrary;
+                });
+
+                const finished = libBooks.filter(b => getStatusData(b.id).status === 'finished');
+
+                const genreCounts = {};
+                finished.forEach(b => {
+                    const gs = getBookGenres(b);
+                    gs.forEach(g => genreCounts[g] = (genreCounts[g] || 0) + 1);
+                });
+                const topGenres = Object.entries(genreCounts).sort((a,b) => b[1] - a[1]).slice(0, 3).map(e => e[0]);
+
+                return {
+                    summary: {
+                        total: libBooks.length,
+                        finished: finished.length,
+                        topGenres
+                    },
+                    // Highly compressed data for token efficiency
+                    finished: finished.map(b => ({
+                        t: b.title,
+                        a: b.author,
+                        g: getBookGenres(b).slice(0, 2),
+                        r: getStatusData(b.id).rating
+                    })).slice(0, 50), // Limit to 50 most recent finished
+                    library: libBooks.filter(b => getStatusData(b.id).status !== 'finished').map(b => ({
+                        t: b.title,
+                        a: b.author,
+                        g: getBookGenres(b).slice(0, 2)
+                    })).slice(0, 50)
+                };
+            }
+
+            const LIBRARIAN_SYSTEM_PROMPT = `You are the AI Librarian for "My Lib".
+Response Style: Concise, use bullet points, avoid long paragraphs, give actionable suggestions.
+Context provided: User's finished books (t:title, a:author, g:genres, r:rating) and books in library not yet finished.
+Goal: Help users explore their library, recommend what to read next from their collection, suggest missing genres, and analyze reading habits.
+If you suggest books NOT in the library, clearly state they are recommendations to add to the collection.
+
+When asked for a "summary", provide:
+- Total books in library
+- Total finished books
+- Top 3 genres by volume
+- A one-sentence commentary on the library's diversity.
+
+If the user has no finished books, base your recommendations and analysis on all books in their collection.
+If the user's collection is small, encourage them to add more books for better analysis.`;
+
+            async function openAIChat() {
+                const modalHtml = `
+                <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+                    <div class="glass max-w-lg w-full rounded-[2.5rem] flex flex-col h-[80vh] sm:h-[70vh] shadow-2xl animate-slide-up border border-blue-100/50 dark:border-slate-800">
+                        <div class="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+                                </div>
+                                <div>
+                                    <h2 class="text-lg font-black font-serif italic">AI Librarian</h2>
+                                    <p id="ai-status-indicator" class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Online & Ready</p>
+                                </div>
+                            </div>
+                            <button data-close class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                        </div>
+
+                        <div id="ai-chat-messages" class="flex-1 overflow-y-auto p-6 space-y-4">
+                            <!-- Welcome Message -->
+                            <div class="flex gap-3 max-w-[85%]">
+                                <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 flex-shrink-0">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+                                </div>
+                                <div class="p-4 bg-slate-100 dark:bg-slate-800/50 rounded-2xl rounded-tl-none text-sm leading-relaxed">
+                                    Hello! I'm your AI Librarian. I can help you find your next read, analyze your collection, or suggest new genres. How can I help you today?
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="p-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
+                            <!-- Quick Action Buttons -->
+                            <div class="flex flex-wrap gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                                <button onclick="window.sendAIChatMessage('📚 Recommend next book')" class="whitespace-nowrap px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-full text-xs font-bold hover:bg-blue-100 transition-colors border border-blue-100/50 dark:border-blue-900/30 active:scale-95">📚 Recommend next book</button>
+                                <button onclick="window.sendAIChatMessage('📊 Analyze my library')" class="whitespace-nowrap px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-full text-xs font-bold hover:bg-emerald-100 transition-colors border border-emerald-100/50 dark:border-emerald-900/30 active:scale-95">📊 Analyze my library</button>
+                                <button onclick="window.sendAIChatMessage('🧠 Improve my collection')" class="whitespace-nowrap px-4 py-2 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 rounded-full text-xs font-bold hover:bg-amber-100 transition-colors border border-amber-100/50 dark:border-amber-900/30 active:scale-95">🧠 Improve my collection</button>
+                                <button onclick="window.sendAIChatMessage('📝 Summarize my library')" class="whitespace-nowrap px-4 py-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-full text-xs font-bold hover:bg-indigo-100 transition-colors border border-indigo-100/50 dark:border-indigo-900/30 active:scale-95">📝 Summarize my library</button>
+                            </div>
+
+                            <div class="flex gap-2">
+                                <input id="ai-chat-input" type="text" placeholder="Type your message..." class="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
+                                <button id="ai-chat-send" class="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition active:scale-95 shadow-lg shadow-blue-200">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                `;
+
+                showModal(modalHtml);
+
+                const input = document.getElementById('ai-chat-input');
+                const sendBtn = document.getElementById('ai-chat-send');
+                const chatMessages = document.getElementById('ai-chat-messages');
+
+                // Load existing chat history if any
+                if (chatHistory.length > 0) {
+                    chatHistory.forEach(msg => {
+                        if (msg.parts[0].text.startsWith('SYSTEM:')) return;
+                        renderChatMessage(msg.role === 'user' ? 'user' : 'ai', msg.parts[0].text);
+                    });
+                }
+
+                input.focus();
+
+                input.onkeydown = (e) => {
+                    if (e.key === 'Enter') window.sendAIChatMessage();
+                };
+
+                sendBtn.onclick = () => window.sendAIChatMessage();
+
+                window.sendAIChatMessage = async (predefinedMessage) => {
+                    const message = predefinedMessage || input.value.trim();
+                    if (!message) return;
+
+                    if (!predefinedMessage) input.value = '';
+
+                    renderChatMessage('user', message);
+
+                    const thinkingId = 'thinking-' + Date.now();
+                    renderChatMessage('ai', '<span class="flex items-center gap-1">Thinking<span class="animate-pulse">...</span></span>', thinkingId);
+
+                    try {
+                        const config = getAIConfig();
+                        if (!config.apiKey) {
+                            updateChatMessage(thinkingId, "Please enter your Gemini API key in Settings to use the AI Librarian.");
+                            return;
+                        }
+
+                        if (books.length === 0) {
+                            updateChatMessage(thinkingId, "Please add some books to your library first so I can analyze your collection!");
+                            return;
+                        }
+
+                        // Build history for Gemini
+                        if (chatHistory.length === 0) {
+                            // Combine system instructions and context with the first user message
+                            // to avoid consecutive 'user' role messages which is rejected by Gemini API.
+                            const initialPrompt = `SYSTEM: ${LIBRARIAN_SYSTEM_PROMPT}\n\nCONTEXT: ${JSON.stringify(getLibraryContext())}\n\nUSER: ${message}`;
+                            chatHistory.push({ role: 'user', parts: [{ text: initialPrompt }] });
+                        } else {
+                            chatHistory.push({ role: 'user', parts: [{ text: message }] });
+                        }
+
+                        const aiResponse = await callGeminiAI(message, LIBRARIAN_SYSTEM_PROMPT, false, chatHistory);
+
+                        if (aiResponse.includes("Using fallback model")) {
+                            const status = document.getElementById('ai-status-indicator');
+                            if (status) {
+                                status.innerText = 'Fallback Active';
+                                status.classList.remove('text-emerald-500');
+                                status.classList.add('text-amber-500');
+                            }
+                        }
+
+                        chatHistory.push({ role: 'model', parts: [{ text: aiResponse }] });
+                        updateChatMessage(thinkingId, aiResponse);
+
+                    } catch (err) {
+                        console.error("Chat Error:", err);
+                        updateChatMessage(thinkingId, "Sorry, I encountered an error: " + err.message);
+                    }
+                };
+
+                function renderChatMessage(role, text, id) {
+                    const div = document.createElement('div');
+                    div.id = id || '';
+                    div.className = `flex gap-3 ${role === 'user' ? 'flex-row-reverse' : ''} animate-slide-up max-w-[85%] ${role === 'user' ? 'ml-auto' : ''}`;
+
+                    const icon = role === 'user'
+                        ? `<div class="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 flex-shrink-0"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path></svg></div>`
+                        : `<div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 flex-shrink-0"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg></div>`;
+
+                    const bg = role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-100 dark:bg-slate-800/50 rounded-tl-none';
+
+                    // Simple markdown-to-html (bold and bullet points)
+                    const formattedText = text
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/^\s*[\-\*]\s*(.*)/gm, '<li class="ml-4">$1</li>');
+
+                    div.innerHTML = `
+                        ${icon}
+                        <div class="p-4 ${bg} rounded-2xl text-sm leading-relaxed whitespace-pre-wrap">
+                            ${formattedText}
+                        </div>
+                    `;
+
+                    chatMessages.appendChild(div);
+                    chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
+                }
+
+                function updateChatMessage(id, text) {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        const contentDiv = el.querySelector('div:last-child');
+                        if (contentDiv) {
+                            const formattedText = text
+                                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                .replace(/^\s*[\-\*]\s*(.*)/gm, '<li class="ml-4">$1</li>')
+                                .replace(/\n/g, '<br>');
+                            contentDiv.innerHTML = formattedText;
+                        }
+                    }
+                    chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
+                }
+            }
+
             // ---------- Auth State Observer ----------
             window.startApp = function() {
                 if (authObserverStarted) return;
                 authObserverStarted = true;
+                window.__appReady = true;
 
                 auth.onAuthStateChanged(async (user) => {
                     currentUser = user;
@@ -4117,6 +4542,8 @@
 
             // Expose for testing
             window.renderMainApp = renderMainApp;
+            window.openAIChat = openAIChat;
+            window.runAILibraryAnalysis = runAILibraryAnalysis;
             window.openBookDetails = openBookDetails;
             window.__test_data = {
                 get books() { return books; },
