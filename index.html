@@ -297,6 +297,7 @@
             let lastActiveTab = null;
             let myBooksSubTab = 'finished';
             let currentModalCloseHandler = null;
+            let aiSearchResults = null; // List of book IDs
 
             // Global keyboard shortcuts (attached once)
             document.addEventListener('keydown', (e) => {
@@ -595,6 +596,15 @@
                             </div>
                             <button id="save-ai-settings-btn" class="w-full sm:w-auto px-6 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 dark:shadow-none focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Save AI Settings</button>
                         </div>
+                    </div>
+
+                    <div class="glass p-8 rounded-[2.5rem] border border-emerald-100/50 dark:border-emerald-900/30">
+                        <h2 class="text-2xl font-black mb-2 font-serif italic text-emerald-600 dark:text-emerald-400">AI Metadata Fixer</h2>
+                        <p class="text-sm text-slate-500 mb-6">Automatically find and fix missing descriptions, tags, or inconsistent genres across your library.</p>
+                        <button id="ai-cleanup-btn" class="w-full sm:w-auto px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition active:scale-95 shadow-lg shadow-emerald-200 focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none flex items-center justify-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            Fix Missing Metadata
+                        </button>
                     </div>
 
                     <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
@@ -1154,6 +1164,35 @@
                 }
             };
 
+            async function runAISearch() {
+                const config = getAIConfig();
+                if (!config.apiKey) { showToast('Please set your Gemini API key in Settings.', 'error'); return; }
+                const searchInput = document.getElementById('search-input');
+                const btn = document.getElementById('ai-search-btn');
+                if (!searchQuery) return;
+
+                const originalText = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<div class="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>';
+
+                try {
+                    const libraryData = books.map(b => ({ id: b.id, t: b.title, a: b.author, g: getBookGenres(b), tags: b.tags || [], d: b.description || '' }));
+                    const prompt = `Analyze my library and find books matching this natural language query: "${searchQuery}".
+                    Library Data: ${JSON.stringify(libraryData)}
+                    Return ONLY a JSON array of matching book IDs. If no matches, return [].`;
+
+                    const response = await callGeminiAI(prompt, "Respond ONLY with a valid JSON array of strings.");
+                    const cleaned = response.replace(/```json|```/g, '').trim();
+                    aiSearchResults = JSON.parse(cleaned);
+                    renderLibraryOnly();
+                } catch (err) {
+                    showToast('AI Search failed: ' + err.message, 'error');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            }
+
             function renderLibraryOnly() {
                 const clearSearchBtn = document.getElementById('clear-search-btn');
                 const searchHint = document.getElementById('search-hint');
@@ -1181,7 +1220,10 @@
                         : (!isWishlist && !b.excludeFromLibrary);
 
                     // ⚡ Bolt: Use pre-normalized _searchStr for O(1) string check per book
-                    const matchesSearch = !searchQuery || b._searchStr.includes(searchLower);
+                    let matchesSearch = !searchQuery || b._searchStr.includes(searchLower);
+                    if (aiSearchResults) {
+                        matchesSearch = aiSearchResults.includes(b.id);
+                    }
 
                     const bookStatus = statusData.status;
 
@@ -1246,9 +1288,19 @@
                         if (ownerFilter !== 'all') activeCount++;
                     }
 
+                    if (aiSearchResults) {
+                        html += `<span class="px-3 py-1 bg-blue-600 text-white rounded-full text-[10px] font-bold flex items-center gap-2">AI Search: "${searchQuery}" <button onclick="window.clearAISearch()" aria-label="Clear AI search">×</button></span>`;
+                        activeCount++;
+                    }
+
                     activeFiltersContainer.innerHTML = html;
                     document.getElementById('filter-dot')?.classList.toggle('hidden', activeCount === 0);
                 }
+
+                window.clearAISearch = () => {
+                    aiSearchResults = null;
+                    renderLibraryOnly();
+                };
 
                 const bulkBar = document.getElementById('bulk-actions-bar');
                 if (bulkBar) {
@@ -1434,12 +1486,18 @@
                             <p class="text-slate-400 max-w-xs mx-auto mt-2 text-sm">
                                 ${isAnyFilterActive ? 'Try adjusting your search or filters to find what you are looking for.' : 'Scan a book or add manually to start building your collection.'}
                             </p>
-                            <div class="mt-8 flex items-center justify-center gap-4">
-                                ${isAnyFilterActive ?
-                                    `<button onclick="window.clearAllFilters()" class="px-6 py-2 bg-blue-600 text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Clear All Filters</button>` :
-                                    `<button onclick="document.getElementById('scan-btn').click()" class="px-6 py-2 bg-primary text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Scan Book</button>
-                                     <button onclick="document.getElementById('manual-add-btn').click()" class="px-6 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-full font-bold text-sm shadow-md transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Add Manually</button>`
-                                }
+                            <div class="mt-8 flex flex-col items-center justify-center gap-4">
+                                ${isAnyFilterActive ? `
+                                    <div class="flex gap-4">
+                                        <button onclick="window.clearAllFilters()" class="px-6 py-2 bg-blue-600 text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Clear All Filters</button>
+                                        ${(searchQuery && !aiSearchResults) ? `<button id="ai-search-btn" onclick="runAISearch()" class="px-6 py-2 bg-white text-blue-600 border border-blue-100 rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>Search with AI</button>` : ''}
+                                    </div>
+                                ` : `
+                                    <div class="flex gap-4">
+                                        <button onclick="document.getElementById('scan-btn').click()" class="px-6 py-2 bg-primary text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Scan Book</button>
+                                        <button onclick="document.getElementById('manual-add-btn').click()" class="px-6 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-full font-bold text-sm shadow-md transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Add Manually</button>
+                                    </div>
+                                `}
                             </div>
                         </div>
                         `;
@@ -1482,6 +1540,7 @@
                 document.getElementById('export-btn')?.addEventListener('click', exportCSV);
                 document.getElementById('notify-btn')?.addEventListener('click', requestNotificationPermission);
                 document.getElementById('save-sharing-btn')?.addEventListener('click', saveSharingSettings);
+                document.getElementById('ai-cleanup-btn')?.addEventListener('click', runLibraryCleanup);
 
                 document.getElementById('save-ai-settings-btn')?.addEventListener('click', (e) => {
                     const apiKey = document.getElementById('gemini-api-key').value.trim();
@@ -1745,6 +1804,7 @@
 
             window.clearAllFilters = () => {
                 searchQuery = '';
+                aiSearchResults = null;
                 tagFilter = null;
                 categoryFilter = 'all';
                 authorFilter = 'all';
@@ -3422,26 +3482,28 @@
                 if (!config.apiKey) { showToast('Please set your Gemini API key first.', 'error'); return; }
                 const myBooks = books.filter(b => b.userId === currentUser.uid);
                 if (myBooks.length === 0) { showToast('Your library is empty.', 'info'); return; }
-                const originalText = btn.innerText;
+                const originalText = btn.innerHTML;
                 btn.disabled = true;
                 btn.innerText = 'Scanning...';
                 try {
-                    const bookDataToScan = myBooks.map(b => ({ id: b.id, t: b.title, a: b.author, g: getBookGenres(b), tags: b.tags || [] }));
+                    const bookDataToScan = myBooks.map(b => ({ id: b.id, t: b.title, a: b.author, g: getBookGenres(b), tags: b.tags || [], d: b.description || '' }));
                     const chunks = [];
-                    for (let i = 0; i < bookDataToScan.length; i += 20) chunks.push(bookDataToScan.slice(i, i + 20));
+                    for (let i = 0; i < bookDataToScan.length; i += 15) chunks.push(bookDataToScan.slice(i, i + 15));
                     let allFixes = [];
                     for (const chunk of chunks) {
-                        const prompt = 'Analyze these 20 books for spelling errors or inconsistent naming: ' + JSON.stringify(chunk) + '. Return ONLY JSON array: [{ "id": "book_id", "field": "author|genres|tags", "old": "value", "new": "fixed_value", "reason": "why" }]';
-                        const response = await callGeminiAI(prompt, "Respond ONLY with valid JSON array.");
+                        const prompt = `Analyze these books. If they are missing descriptions or tags, provide them. If there are spelling errors or inconsistent naming in genres/authors, fix them.
+                        Data: ${JSON.stringify(chunk)}
+                        Return ONLY JSON array: [{ "id": "book_id", "field": "author|genres|tags|description", "old": "value", "new": "fixed_value", "reason": "why" }]`;
+                        const response = await callGeminiAI(prompt, "Respond ONLY with a valid JSON array.");
                         try {
-                            const fixes = JSON.parse(response.replace(/\`\`\`json|\`\`\`/g, '').trim());
+                            const fixes = JSON.parse(response.replace(/```json|```/g, '').trim());
                             allFixes = allFixes.concat(fixes);
                         } catch (e) {}
                     }
-                    if (allFixes.length === 0) { showToast('Library is clean!', 'success'); return; }
+                    if (allFixes.length === 0) { showToast('No fixes needed!', 'success'); return; }
                     showCleanupReviewModal(allFixes);
                 } catch (err) { showToast('Cleanup failed', 'error'); }
-                finally { btn.disabled = false; btn.innerText = originalText; }
+                finally { btn.disabled = false; btn.innerHTML = originalText; }
             }
             function showCleanupReviewModal(fixes) {
                 const modalHtml = '<div class="w-full h-full flex flex-col p-6 sm:p-10 overflow-y-auto bg-slate-50 dark:bg-slate-900">' +
@@ -3473,6 +3535,7 @@
                             const ref = db.collection('books').doc(f.id);
                             const updateData = {};
                             if (f.field === 'genres') { updateData.categories = Array.isArray(f.new) ? f.new : [f.new]; updateData.category = firebase.firestore.FieldValue.delete(); }
+                            else if (f.field === 'tags') { updateData.tags = Array.isArray(f.new) ? f.new : [f.new]; }
                             else { updateData[f.field] = f.new; }
                             batch.update(ref, updateData);
                         });
@@ -4044,7 +4107,7 @@ When asked for a "summary", provide:
 If the user has no finished books, base your recommendations and analysis on all books in their collection.
 If the user's collection is small, encourage them to add more books for better analysis.`;
 
-            async function openAIChat() {
+            async function openAIChat(initialMessage = '', bookContext = null) {
                 const modalHtml = `
                 <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
                     <div class="glass max-w-lg w-full rounded-[2.5rem] flex flex-col h-[80vh] sm:h-[70vh] shadow-2xl animate-slide-up border border-blue-100/50 dark:border-slate-800">
@@ -4109,6 +4172,10 @@ If the user's collection is small, encourage them to add more books for better a
 
                 input.focus();
 
+                if (initialMessage) {
+                    window.sendAIChatMessage(initialMessage);
+                }
+
                 input.onkeydown = (e) => {
                     if (e.key === 'Enter') window.sendAIChatMessage();
                 };
@@ -4142,7 +4209,9 @@ If the user's collection is small, encourage them to add more books for better a
                         if (chatHistory.length === 0) {
                             // Combine system instructions and context with the first user message
                             // to avoid consecutive 'user' role messages which is rejected by Gemini API.
-                            const initialPrompt = `SYSTEM: ${LIBRARIAN_SYSTEM_PROMPT}\n\nCONTEXT: ${JSON.stringify(getLibraryContext())}\n\nUSER: ${message}`;
+                            let context = getLibraryContext();
+                            if (bookContext) context.focusedBook = bookContext;
+                            const initialPrompt = `SYSTEM: ${LIBRARIAN_SYSTEM_PROMPT}\n\nCONTEXT: ${JSON.stringify(context)}\n\nUSER: ${message}`;
                             chatHistory.push({ role: 'user', parts: [{ text: initialPrompt }] });
                         } else {
                             chatHistory.push({ role: 'user', parts: [{ text: message }] });
@@ -4322,6 +4391,7 @@ If the user's collection is small, encourage them to add more books for better a
                                 </div>
                                 <h2 class="text-3xl font-black mt-3 leading-tight font-serif">${escapeHTML(book.title)}</h2>
                                 <p class="text-xl text-slate-500 dark:text-slate-400 mt-2 font-medium italic">${escapeHTML(book.author)}</p>
+                                ${book.description ? `<p class="text-sm text-slate-600 dark:text-slate-300 mt-4 leading-relaxed line-clamp-4 hover:line-clamp-none transition-all cursor-pointer" title="Click to expand description">${escapeHTML(book.description)}</p>` : ''}
                                 <div class="flex items-center gap-4 m-5">
                                     <div class="text-amber-400 text-lg">${stars}</div>
                                     ${averageRating ? `<span class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-lg text-[11px] font-black">Avg: ${averageRating} ★</span>` : ''}
@@ -4431,6 +4501,10 @@ If the user's collection is small, encourage them to add more books for better a
                         <div class="flex flex-col sm:flex-row items-center justify-between mt-10 gap-4">
                             <button id="delete-book-btn" class="w-full sm:w-auto px-8 py-4 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-2xl font-bold transition-all">Delete</button>
                             <div class="flex w-full sm:w-auto gap-4">
+                                <button id="ai-book-btn" class="flex-1 sm:flex-none px-8 py-4 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-2xl font-bold hover:bg-blue-200 transition-all flex items-center justify-center gap-2">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+                                    Ask AI
+                                </button>
                                 <button id="edit-book-btn" class="flex-1 sm:flex-none px-8 py-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition-all">Edit Details</button>
                                 <button data-close class="flex-1 sm:flex-none px-10 py-4 bg-primary dark:bg-white text-white dark:text-primary rounded-2xl font-bold shadow-xl shadow-primary/20 dark:shadow-none hover:scale-105 active:scale-95 transition-all">Close</button>
                             </div>
@@ -4438,6 +4512,17 @@ If the user's collection is small, encourage them to add more books for better a
                     </div>
                 </div>
             `);
+
+                document.getElementById('ai-book-btn').addEventListener('click', () => {
+                    close();
+                    openAIChat(`Tell me more about the book "${book.title}" by ${book.author}.`, {
+                        title: book.title,
+                        author: book.author,
+                        description: book.description,
+                        genres: bookGenres,
+                        tags: book.tags
+                    });
+                });
 
                 document.getElementById('edit-book-btn').addEventListener('click', () => {
                     close();
