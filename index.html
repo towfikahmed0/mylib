@@ -2601,7 +2601,16 @@
                         </div>
                         ` : ''}
                         <div class="space-y-6">
-                            <div><label for="man-title" class="text-[10px] font-bold text-slate-400 uppercase ml-1 font-serif">Title *</label><input id="man-title" placeholder="e.g. The Great Gatsby" value="${existingBook?.title || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                            <div class="flex flex-col gap-2">
+                                <label for="man-title" class="text-[10px] font-bold text-slate-400 uppercase ml-1 font-serif">Title *</label>
+                                <div class="flex gap-2">
+                                    <input id="man-title" placeholder="e.g. The Great Gatsby" value="${existingBook?.title || ''}" class="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                                    <button id="ai-magic-fill" class="px-4 py-3 bg-blue-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-blue-700 transition active:scale-95 shadow-lg shadow-blue-200 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" title="AI Magic Fill">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                        <span class="hidden sm:inline">Magic Fill</span>
+                                    </button>
+                                </div>
+                            </div>
 
                             <div class="relative">
                                 <label for="man-author" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Author</label>
@@ -2622,6 +2631,11 @@
                                 <label for="man-owner" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Owner</label>
                                 <input id="man-owner" placeholder="Owner Name" value="${existingBook?.owner || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" autocomplete="off">
                                 <div id="owner-dropdown" class="dropdown-menu"></div>
+                            </div>
+
+                            <div>
+                                <label for="man-description" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Description</label>
+                                <textarea id="man-description" placeholder="Book description..." class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[100px]">${existingBook?.description || ''}</textarea>
                             </div>
 
                             <div>
@@ -2713,6 +2727,28 @@
                     document.getElementById('man-owner').value = val;
                 });
 
+                document.getElementById('ai-magic-fill')?.addEventListener('click', async () => {
+                    const title = document.getElementById('man-title').value.trim();
+                    const author = document.getElementById('man-author').value.trim();
+                    if (!title) { showToast('Please enter a title first', 'error'); return; }
+                    const btn = document.getElementById('ai-magic-fill');
+                    const originalContent = btn.innerHTML;
+                    btn.disabled = true;
+                    btn.innerHTML = `<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+                    try {
+                        const prompt = `Fetch metadata for the book "${title}"${author ? ` by ${author}` : ''}. Return ONLY a JSON object with: { "author": "string", "genres": ["string"], "tags": ["string"], "price": number, "description": "string" }`;
+                        const response = await callGeminiAI(prompt, "You are a book metadata expert. Respond ONLY with valid JSON.");
+                        const metadata = JSON.parse(response.replace(/```json|```/g, '').trim());
+                        if (metadata.author && !document.getElementById('man-author').value) document.getElementById('man-author').value = metadata.author;
+                        if (metadata.genres) { metadata.genres.forEach(g => { if (!currentGenres.includes(g)) currentGenres.push(g); }); renderGenres(); }
+                        if (metadata.tags) { const currentTags = document.getElementById('man-tags').value.split(',').map(t => t.trim()).filter(Boolean); document.getElementById('man-tags').value = [...new Set([...currentTags, ...metadata.tags])].join(', '); }
+                        if (metadata.price && !document.getElementById('man-price').value) document.getElementById('man-price').value = metadata.price;
+                        if (metadata.description && !document.getElementById('man-description').value) document.getElementById('man-description').value = metadata.description;
+                        showToast('Magic Fill complete!', 'success');
+                    } catch (err) { showToast('Magic Fill failed', 'error'); }
+                    finally { btn.disabled = false; btn.innerHTML = originalContent; }
+                });
+
                 document.getElementById('save-manual').addEventListener('click', async (e) => {
                     const btn = e.currentTarget;
                     const originalText = btn.innerText;
@@ -2732,6 +2768,7 @@
                             author: document.getElementById('man-author').value || 'Unknown',
                             categories: currentGenres.length > 0 ? currentGenres : ['Other'],
                             owner: document.getElementById('man-owner').value || '',
+                            description: document.getElementById('man-description').value || '',
                             tags: tags,
                             coverUrl: document.getElementById('man-cover').value || null,
                             isWishlist: document.getElementById('man-wishlist').checked,
@@ -3378,6 +3415,75 @@
                 `;
             }
 
+
+            async function runLibraryCleanup() {
+                const btn = document.getElementById('ai-cleanup-btn');
+                const config = getAIConfig();
+                if (!config.apiKey) { showToast('Please set your Gemini API key first.', 'error'); return; }
+                const myBooks = books.filter(b => b.userId === currentUser.uid);
+                if (myBooks.length === 0) { showToast('Your library is empty.', 'info'); return; }
+                const originalText = btn.innerText;
+                btn.disabled = true;
+                btn.innerText = 'Scanning...';
+                try {
+                    const bookDataToScan = myBooks.map(b => ({ id: b.id, t: b.title, a: b.author, g: getBookGenres(b), tags: b.tags || [] }));
+                    const chunks = [];
+                    for (let i = 0; i < bookDataToScan.length; i += 20) chunks.push(bookDataToScan.slice(i, i + 20));
+                    let allFixes = [];
+                    for (const chunk of chunks) {
+                        const prompt = 'Analyze these 20 books for spelling errors or inconsistent naming: ' + JSON.stringify(chunk) + '. Return ONLY JSON array: [{ "id": "book_id", "field": "author|genres|tags", "old": "value", "new": "fixed_value", "reason": "why" }]';
+                        const response = await callGeminiAI(prompt, "Respond ONLY with valid JSON array.");
+                        try {
+                            const fixes = JSON.parse(response.replace(/\`\`\`json|\`\`\`/g, '').trim());
+                            allFixes = allFixes.concat(fixes);
+                        } catch (e) {}
+                    }
+                    if (allFixes.length === 0) { showToast('Library is clean!', 'success'); return; }
+                    showCleanupReviewModal(allFixes);
+                } catch (err) { showToast('Cleanup failed', 'error'); }
+                finally { btn.disabled = false; btn.innerText = originalText; }
+            }
+            function showCleanupReviewModal(fixes) {
+                const modalHtml = '<div class="w-full h-full flex flex-col p-6 sm:p-10 overflow-y-auto bg-slate-50 dark:bg-slate-900">' +
+                    '<div class="max-w-3xl mx-auto w-full">' +
+                    '<div class="flex justify-between items-center mb-8"><div><h2 class="text-3xl font-black font-serif italic text-emerald-600">Review AI Fixes</h2><p class="text-slate-500 text-sm mt-1">AI found ' + fixes.length + ' fixes.</p></div>' +
+                    '<button data-close class="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm hover:bg-slate-100"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button></div>' +
+                    '<div class="space-y-4 mb-10">' +
+                    fixes.map((f, i) => {
+                        const book = books.find(b => b.id === f.id);
+                        return '<div class="glass p-5 rounded-2xl border border-emerald-100 dark:border-emerald-900/30 flex items-start gap-4">' +
+                            '<div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600 flex-shrink-0 font-bold">' + (i + 1) + '</div>' +
+                            '<div class="flex-1 min-w-0"><div class="text-xs font-black text-slate-400 uppercase mb-1">' + (book?.title || 'Unknown') + '</div>' +
+                            '<div class="flex flex-wrap items-center gap-2 text-sm"><span class="line-through text-slate-500">' + f.old + '</span><svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg><span class="text-emerald-700 font-bold">' + f.new + '</span></div>' +
+                            '<p class="text-[10px] text-slate-400 mt-2">' + f.reason + '</p></div>' +
+                            '<input type="checkbox" checked data-fix-index="' + i + '" class="w-6 h-6 rounded text-emerald-600"></div>';
+                    }).join('') +
+                    '</div><div class="flex gap-4 sticky bottom-0 bg-slate-50/80 backdrop-blur-md py-6 border-t border-slate-200">' +
+                    '<button data-close class="flex-1 px-8 py-4 bg-white rounded-2xl font-bold">Discard</button>' +
+                    '<button id="apply-cleanup-fixes" class="flex-[2] px-8 py-4 bg-emerald-600 text-white rounded-2xl font-bold">Apply Fixes</button></div></div></div>';
+                showModal(modalHtml, null, true);
+                document.getElementById('apply-cleanup-fixes').addEventListener('click', async () => {
+                    const btn = document.getElementById('apply-cleanup-fixes');
+                    const selectedFixes = Array.from(document.querySelectorAll('[data-fix-index]')).filter(cb => cb.checked).map(cb => fixes[parseInt(cb.dataset.fixIndex)]);
+                    if (selectedFixes.length === 0) return;
+                    btn.disabled = true; btn.innerText = 'Applying...';
+                    try {
+                        const batch = db.batch();
+                        selectedFixes.forEach(f => {
+                            const ref = db.collection('books').doc(f.id);
+                            const updateData = {};
+                            if (f.field === 'genres') { updateData.categories = Array.isArray(f.new) ? f.new : [f.new]; updateData.category = firebase.firestore.FieldValue.delete(); }
+                            else { updateData[f.field] = f.new; }
+                            batch.update(ref, updateData);
+                        });
+                        await batch.commit();
+                        showToast(`Applied ${selectedFixes.length} fixes!`, 'success');
+                        modalContainer.innerHTML = '';
+                        modalContainer.classList.remove('pointer-events-auto');
+                    } catch (err) { showToast('Apply failed', 'error'); }
+                    finally { btn.disabled = false; }
+                });
+            }
             async function runAILibraryAnalysis() {
                 const btn = document.getElementById('run-ai-analysis-btn');
                 const content = document.getElementById('ai-analysis-content');
@@ -4545,6 +4651,8 @@ If the user's collection is small, encourage them to add more books for better a
             window.openAIChat = openAIChat;
             window.runAILibraryAnalysis = runAILibraryAnalysis;
             window.openBookDetails = openBookDetails;
+            window.openManualEntry = openManualEntry;
+            window.runLibraryCleanup = runLibraryCleanup;
             window.__test_data = {
                 get books() { return books; },
                 set books(v) { books = v; },
