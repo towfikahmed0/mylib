@@ -588,7 +588,7 @@
                             <div>
                                 <label for="gemini-model" class="text-[10px] font-bold text-slate-400 uppercase ml-1">AI Model</label>
                                 <select id="gemini-model" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
-                                    <option value="gemini-2.5-flash-lite" ${ (localStorage.getItem('mylib_gemini_model') || 'gemini-2.5-flash-lite') === 'gemini-2.5-flash-lite' ? 'selected' : '' }>Gemini 2.0 Flash-Lite</option>
+                                    <option value="gemini-2.0-flash-lite-preview-02-05" ${ (localStorage.getItem('mylib_gemini_model') || 'gemini-2.0-flash-lite-preview-02-05') === 'gemini-2.0-flash-lite-preview-02-05' ? 'selected' : '' }>Gemini 2.0 Flash-Lite</option>
                                     <option value="gemini-2.0-flash" ${ localStorage.getItem('mylib_gemini_model') === 'gemini-2.0-flash' ? 'selected' : '' }>Gemini 2.0 Flash</option>
                                     <option value="gemini-1.5-pro" ${ localStorage.getItem('mylib_gemini_model') === 'gemini-1.5-pro' ? 'selected' : '' }>Gemini 1.5 Pro</option>
                                     <option value="gemini-1.5-flash" ${ localStorage.getItem('mylib_gemini_model') === 'gemini-1.5-flash' ? 'selected' : '' }>Gemini 1.5 Flash</option>
@@ -3994,8 +3994,8 @@
 
             // ---------- AI Librarian Service ----------
             const AI_CONFIG = {
-                defaultModel: 'gemini-2.5-flash-lite', // Using latest available lite
-                fallbackModel: 'gemini-2.5-flash-lite'
+                defaultModel: 'gemini-2.0-flash-lite-preview-02-05',
+                fallbackModel: 'gemini-1.5-flash'
             };
 
             function getAIConfig() {
@@ -4114,6 +4114,8 @@ Context provided: User's finished books (t:title, a:author, g:genres, r:rating) 
 Goal: Help users explore their library, recommend what to read next from their collection, suggest missing genres, and analyze reading habits.
 If you suggest books NOT in the library, clearly state they are recommendations to add to the collection.
 
+When recommending "what to read next", prioritize books already in the user's library that are marked as "want_to_read" or "reading".
+
 When asked for a "summary", provide:
 - Total books in library
 - Total finished books
@@ -4137,7 +4139,12 @@ If the user's collection is small, encourage them to add more books for better a
                                     <p id="ai-status-indicator" class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Online & Ready</p>
                                 </div>
                             </div>
-                            <button data-close class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                            <div class="flex items-center gap-2">
+                                <button id="clear-ai-chat" class="p-2 text-slate-400 hover:text-rose-500 transition-colors" title="Clear Chat History">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                </button>
+                                <button data-close class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                            </div>
                         </div>
 
                         <div id="ai-chat-messages" class="flex-1 overflow-y-auto p-6 space-y-4">
@@ -4177,6 +4184,25 @@ If the user's collection is small, encourage them to add more books for better a
                 const input = document.getElementById('ai-chat-input');
                 const sendBtn = document.getElementById('ai-chat-send');
                 const chatMessages = document.getElementById('ai-chat-messages');
+                const clearBtn = document.getElementById('clear-ai-chat');
+
+                if (clearBtn) {
+                    clearBtn.onclick = () => {
+                        if (confirm('Clear chat history?')) {
+                            chatHistory = [];
+                            chatMessages.innerHTML = `
+                                <div class="flex gap-3 max-w-[85%]">
+                                    <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 flex-shrink-0">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+                                    </div>
+                                    <div class="p-4 bg-slate-100 dark:bg-slate-800/50 rounded-2xl rounded-tl-none text-sm leading-relaxed">
+                                        Chat cleared. How else can I help you?
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    };
+                }
 
                 // Load existing chat history if any
                 if (chatHistory.length > 0) {
@@ -4277,7 +4303,7 @@ If the user's collection is small, encourage them to add more books for better a
                     `;
 
                     chatMessages.appendChild(div);
-                    chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
+                    setTimeout(() => chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' }), 0);
                 }
 
                 function updateChatMessage(id, text) {
@@ -4292,7 +4318,7 @@ If the user's collection is small, encourage them to add more books for better a
                             contentDiv.innerHTML = formattedText;
                         }
                     }
-                    chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
+                    setTimeout(() => chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' }), 0);
                 }
             }
 
