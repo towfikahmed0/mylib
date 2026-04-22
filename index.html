@@ -4216,18 +4216,6 @@ If the user's collection is small, encourage them to add more books for better a
                     });
                 }
 
-                input.focus();
-
-                if (initialMessage) {
-                    window.sendAIChatMessage(initialMessage);
-                }
-
-                input.onkeydown = (e) => {
-                    if (e.key === 'Enter') window.sendAIChatMessage();
-                };
-
-                sendBtn.onclick = () => window.sendAIChatMessage();
-
                 window.sendAIChatMessage = async (predefinedMessage) => {
                     const message = predefinedMessage || input.value.trim();
                     if (!message) return;
@@ -4282,6 +4270,18 @@ If the user's collection is small, encourage them to add more books for better a
                         updateChatMessage(thinkingId, "Sorry, I encountered an error: " + err.message);
                     }
                 };
+
+                input.focus();
+
+                if (initialMessage) {
+                    window.sendAIChatMessage(initialMessage);
+                }
+
+                input.onkeydown = (e) => {
+                    if (e.key === 'Enter') window.sendAIChatMessage();
+                };
+
+                sendBtn.onclick = () => window.sendAIChatMessage();
 
                 function renderChatMessage(role, text, id) {
                     const div = document.createElement('div');
