@@ -404,6 +404,23 @@
                 return escapeDiv.innerHTML;
             }
 
+            function formatAIText(text) {
+                if (!text) return '';
+                // First sanitize the input to prevent XSS
+                let formatted = escapeHTML(text);
+
+                // Then apply markdown-like replacements on the sanitized text
+                formatted = formatted
+                    .replace(/^### (.*$)/gim, '<h4 class="text-base font-bold mt-4 mb-1 text-primary">$1</h4>')
+                    .replace(/^## (.*$)/gim, '<h3 class="text-lg font-bold mt-6 mb-2 text-primary">$1</h3>')
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                    .replace(/^\s*[\-\*]\s*(.*)/gm, '<li class="ml-4 my-1">$1</li>')
+                    .replace(/\n/g, '<br>');
+
+                return formatted;
+            }
+
             window.copyISBN = (isbn) => {
                 if (!navigator.clipboard) {
                     showToast('Clipboard not available', 'error');
@@ -596,6 +613,18 @@
                                     <option value="gemma-3-4b-it" ${ localStorage.getItem('mylib_gemini_model') === 'gemma-3-4b-it' ? 'selected' : '' }>gemma-3-4b-it</option>
                                     <option value="gemma-3-1b-it" ${ localStorage.getItem('mylib_gemini_model') === 'gemma-3-1b-it' ? 'selected' : '' }>gemma-3-1b-it</option>
                                     <option value="gemma-3-27b-it" ${ localStorage.getItem('mylib_gemini_model') === 'gemma-3-27b-it' ? 'selected' : '' }>gemma-3-27b-it</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="gemini-language" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Preferred Language</label>
+                                <select id="gemini-language" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
+                                    <option value="English" ${ (localStorage.getItem('mylib_ai_language') || 'English') === 'English' ? 'selected' : '' }>English</option>
+                                    <option value="Bengali" ${ localStorage.getItem('mylib_ai_language') === 'Bengali' ? 'selected' : '' }>Bengali</option>
+                                    <option value="Spanish" ${ localStorage.getItem('mylib_ai_language') === 'Spanish' ? 'selected' : '' }>Spanish</option>
+                                    <option value="French" ${ localStorage.getItem('mylib_ai_language') === 'French' ? 'selected' : '' }>French</option>
+                                    <option value="German" ${ localStorage.getItem('mylib_ai_language') === 'German' ? 'selected' : '' }>German</option>
+                                    <option value="Arabic" ${ localStorage.getItem('mylib_ai_language') === 'Arabic' ? 'selected' : '' }>Arabic</option>
+                                    <option value="Hindi" ${ localStorage.getItem('mylib_ai_language') === 'Hindi' ? 'selected' : '' }>Hindi</option>
                                 </select>
                             </div>
                             <button id="save-ai-settings-btn" class="w-full sm:w-auto px-6 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 dark:shadow-none focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Save AI Settings</button>
@@ -1181,9 +1210,10 @@
 
                 try {
                     const libraryData = books.map(b => ({ id: b.id, t: b.title, a: b.author, g: getBookGenres(b), tags: b.tags || [], d: b.description || '' }));
-                    const prompt = `Analyze my library and find books matching this natural language query: "${searchQuery}".
+                    const prompt = `Analyze the provided library data and return the IDs of books that best match this natural language query: "${searchQuery}".
+                    Include books that match the intent, themes, or specific attributes mentioned.
                     Library Data: ${JSON.stringify(libraryData)}
-                    Return ONLY a JSON array of matching book IDs. If no matches, return [].`;
+                    Return ONLY a valid JSON array of matching book ID strings. If no matches are found, return [].`;
 
                     const response = await callGeminiAI(prompt, "Respond ONLY with a valid JSON array of strings.");
                     const cleaned = response.replace(/```json|```/g, '').trim();
@@ -1549,8 +1579,10 @@
                 document.getElementById('save-ai-settings-btn')?.addEventListener('click', (e) => {
                     const apiKey = document.getElementById('gemini-api-key').value.trim();
                     const model = document.getElementById('gemini-model').value;
+                    const language = document.getElementById('gemini-language').value;
                     localStorage.setItem('mylib_gemini_api_key', apiKey);
                     localStorage.setItem('mylib_gemini_model', model);
+                    localStorage.setItem('mylib_ai_language', language);
                     showToast('AI Settings saved!', 'success');
                 });
 
@@ -3484,11 +3516,17 @@
                                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">AI Librarian Analysis</h3>
                                 <p class="text-lg font-black font-serif italic">Personalized Collection Strategy</p>
                             </div>
-                            <button id="run-ai-analysis-btn" class="px-6 py-2 bg-blue-600 text-white rounded-full font-bold text-sm shadow-lg hover:scale-105 transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Analyze Library</button>
+                            <div class="flex gap-3">
+                                <button id="run-ai-roadmap-btn" class="px-6 py-2 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 rounded-full font-bold text-sm shadow-md hover:scale-105 transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+                                    Reading Roadmap
+                                </button>
+                                <button id="run-ai-analysis-btn" class="px-6 py-2 bg-blue-600 text-white rounded-full font-bold text-sm shadow-lg hover:scale-105 transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Analyze Library</button>
+                            </div>
                         </div>
 
                         <div id="ai-analysis-content" class="p-8 bg-blue-50/50 dark:bg-slate-800/40 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-700 min-h-[150px] flex flex-col items-center justify-center text-center">
-                            <p class="text-slate-400 italic text-sm">Tap 'Analyze Library' to get personalized insights and recommendations from your AI Librarian.</p>
+                            <p class="text-slate-400 italic text-sm">Tap 'Analyze Library' or 'Reading Roadmap' to get personalized insights from your AI Librarian.</p>
                         </div>
                     </div>
                 </div>
@@ -3511,10 +3549,15 @@
                     for (let i = 0; i < bookDataToScan.length; i += 15) chunks.push(bookDataToScan.slice(i, i + 15));
                     let allFixes = [];
                     for (const chunk of chunks) {
-                        const prompt = `Analyze these books. If they are missing descriptions or tags, provide them. If there are spelling errors or inconsistent naming in genres/authors, fix them.
+                        const prompt = `Perform a high-quality metadata audit on these books.
+                        1. For missing descriptions, provide a professional 2-sentence summary.
+                        2. For missing tags, provide 3 relevant keywords.
+                        3. Fix obvious spelling errors in titles/authors.
+                        4. Standardize genres (e.g., 'Sci-Fi' to 'Science Fiction').
+
                         Data: ${JSON.stringify(chunk)}
                         Return ONLY JSON array: [{ "id": "book_id", "field": "author|genres|tags|description", "old": "value", "new": "fixed_value", "reason": "why" }]`;
-                        const response = await callGeminiAI(prompt, "Respond ONLY with a valid JSON array.");
+                        const response = await callGeminiAI(prompt, "Respond ONLY with a valid JSON array of objects.");
                         try {
                             const fixes = JSON.parse(response.replace(/```json|```/g, '').trim());
                             allFixes = allFixes.concat(fixes);
@@ -3525,6 +3568,77 @@
                 } catch (err) { showToast('Cleanup failed', 'error'); }
                 finally { btn.disabled = false; btn.innerHTML = originalText; }
             }
+            function showAISummaryModal(book, data) {
+                const modalHtml = `
+                <div class="glass max-w-lg w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up border border-emerald-100 dark:border-emerald-900/30">
+                    <div class="flex items-center gap-4 mb-6">
+                        <div class="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/50 rounded-2xl flex items-center justify-center text-emerald-600">
+                            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-black font-serif italic">AI Book Insights</h2>
+                            <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Enriching your collection</p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-6">
+                        <div>
+                            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Professional Summary</h3>
+                            <div class="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-sm leading-relaxed text-slate-700 dark:text-slate-300 italic border border-slate-100 dark:border-slate-800">
+                                "${data.summary}"
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Suggested Tags</h3>
+                            <div class="flex flex-wrap gap-2">
+                                ${data.tags.map(tag => `
+                                    <span class="px-3 py-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 rounded-full text-xs font-bold border border-emerald-100/50 dark:border-emerald-900/30">
+                                        ${tag}
+                                    </span>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-8 grid grid-cols-2 gap-4">
+                        <button data-close class="px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold transition active:scale-95">Dismiss</button>
+                        <button id="apply-ai-enrichment" class="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-200 dark:shadow-none hover:bg-emerald-700 transition active:scale-95">Apply & Save</button>
+                    </div>
+                </div>
+                `;
+
+                const close = showModal(modalHtml);
+
+                document.getElementById('apply-ai-enrichment').onclick = async () => {
+                    const btn = document.getElementById('apply-ai-enrichment');
+                    btn.disabled = true;
+                    btn.innerText = 'Saving...';
+
+                    try {
+                        const mergedTags = [...new Set([...(book.tags || []), ...data.tags])].slice(0, 10);
+                        const updateData = {
+                            tags: mergedTags,
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        };
+
+                        if (!book.description) {
+                            updateData.description = data.summary;
+                        }
+
+                        await db.collection('books').doc(book.id).update(updateData);
+                        showToast('Book enriched with AI insights!', 'success');
+                        close();
+                        // Refresh details
+                        openBookDetails(books.find(b => b.id === book.id));
+                    } catch (err) {
+                        showToast('Failed to save enrichment: ' + err.message, 'error');
+                    } finally {
+                        btn.disabled = false;
+                    }
+                };
+            }
+
             function showCleanupReviewModal(fixes) {
                 const modalHtml = '<div class="w-full h-full flex flex-col p-6 sm:p-10 overflow-y-auto bg-slate-50 dark:bg-slate-900">' +
                     '<div class="max-w-3xl mx-auto w-full">' +
@@ -3567,6 +3681,44 @@
                     finally { btn.disabled = false; }
                 });
             }
+            async function generateReadingRoadmap() {
+                const btn = document.getElementById('run-ai-roadmap-btn');
+                const content = document.getElementById('ai-analysis-content');
+                if (!btn || !content) return;
+
+                const config = getAIConfig();
+                if (!config.apiKey) { showToast('Please set Gemini API key in Settings', 'error'); return; }
+
+                btn.disabled = true;
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<div class="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>';
+
+                content.innerHTML = `
+                    <div class="flex flex-col items-center gap-4">
+                        <div class="w-12 h-12 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin"></div>
+                        <p class="text-emerald-600 font-bold uppercase tracking-widest text-[10px]">Mapping your reading journey...</p>
+                    </div>
+                `;
+
+                try {
+                    const context = getLibraryContext();
+                    const prompt = `Create a personalized 3-month 'Reading Roadmap' based on my library context: ${JSON.stringify(context)}.
+                    Recommend 3 books for each month: Month 1 (Build Foundation), Month 2 (Deep Dive), Month 3 (Expand Horizons).
+                    Prioritize books already in my 'want_to_read' list, but suggest new ones if needed.`;
+                    const systemPrompt = `${getSystemPrompt()}\n\nTask: Reading Roadmap Generation.`;
+
+                    const result = await callGeminiAI(prompt, systemPrompt);
+
+                    content.innerHTML = `<div class="text-left text-sm leading-relaxed space-y-2">${formatAIText(result)}</div>`;
+                } catch (err) {
+                    showToast('Roadmap generation failed: ' + err.message, 'error');
+                    content.innerHTML = `<p class="text-rose-500 font-medium">Failed to generate roadmap.</p>`;
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            }
+
             async function runAILibraryAnalysis() {
                 const btn = document.getElementById('run-ai-analysis-btn');
                 const content = document.getElementById('ai-analysis-content');
@@ -3579,25 +3731,35 @@
                 }
 
                 btn.disabled = true;
-                btn.innerText = 'Analyzing...';
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>';
+
                 content.innerHTML = `
-                    <div class="flex flex-col items-center gap-4">
-                        <div class="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
-                        <p class="text-blue-600 font-bold uppercase tracking-widest text-[10px]">AI is reading your library...</p>
+                    <div class="flex flex-col items-center gap-4 py-8">
+                        <div class="flex gap-1">
+                            <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+                            <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                            <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                        </div>
+                        <p class="text-blue-600 font-bold uppercase tracking-widest text-[10px]">Librarian is analyzing your collection...</p>
                     </div>
                 `;
 
                 try {
-                    const prompt = "Please provide a comprehensive analysis of my library. Analyze reading habits, most read genres, and completion rate. Then suggest what genres are missing and how to improve the collection balance. Also, list 5 recommended books to buy/add based on my taste.";
-                    const systemPrompt = `${LIBRARIAN_SYSTEM_PROMPT}\n\nTask: Full Library Analysis.`;
+                    const context = getLibraryContext();
+                    const prompt = `Provide a deep-dive professional analysis of my personal library based on this data: ${JSON.stringify(context)}.
+                    Your report should include:
+                    1. ## Collection DNA: A sophisticated breakdown of my taste.
+                    2. ## Reading Velocity: Analysis of completion rates and habits.
+                    3. ## Missing Dimensions: Genres or perspectives that would enrich my collection.
+                    4. ## Top 5 Curated Recommendations: Specific books I should add, with a brief 'why' for each.
+
+                    Structure the response with clear headers and bullet points.`;
+                    const systemPrompt = `${getSystemPrompt()}\n\nTask: Comprehensive Library Analysis.`;
 
                     const result = await callGeminiAI(prompt, systemPrompt);
 
-                    const formattedResult = result
-                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                        .replace(/^\s*[\-\*]\s*(.*)/gm, '<li class="ml-4">$1</li>');
-
-                    content.innerHTML = `<div class="text-left text-sm leading-relaxed space-y-2">${formattedResult}</div>`;
+                    content.innerHTML = `<div class="text-left text-sm leading-relaxed space-y-2">${formatAIText(result)}</div>`;
 
                     // Save to Firestore
                     await db.collection('users').doc(currentUser.uid).set({
@@ -3627,15 +3789,10 @@
                 const date = userProfile.lastAIAnalysisDate?.toDate ? userProfile.lastAIAnalysisDate.toDate() : userProfile.lastAIAnalysisDate;
                 const formattedDate = date ? new Date(date).toLocaleDateString() : '';
 
-                const formattedResult = result
-                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                    .replace(/^\s*[\-\*]\s*(.*)/gm, '<li class="ml-4">$1</li>')
-                    .replace(/\n/g, '<br>');
-
                 content.innerHTML = `
                     <div class="text-left text-sm leading-relaxed space-y-2">
                         <div class="mb-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 pb-2">Last Analysis: ${formattedDate}</div>
-                        ${formattedResult}
+                        ${formatAIText(result)}
                     </div>
                 `;
             }
@@ -4005,7 +4162,8 @@
             function getAIConfig() {
                 return {
                     apiKey: localStorage.getItem('mylib_gemini_api_key'),
-                    model: localStorage.getItem('mylib_gemini_model') || AI_CONFIG.defaultModel
+                    model: localStorage.getItem('mylib_gemini_model') || AI_CONFIG.defaultModel,
+                    language: localStorage.getItem('mylib_ai_language') || 'English'
                 };
             }
 
@@ -4112,22 +4270,39 @@
                 };
             }
 
-            const LIBRARIAN_SYSTEM_PROMPT = `You are the AI Librarian for "My Lib".
-Response Style: Concise, use bullet points, avoid long paragraphs, give actionable suggestions.
-Context provided: User's finished books (t:title, a:author, g:genres, r:rating) and books in library not yet finished.
-Goal: Help users explore their library, recommend what to read next from their collection, suggest missing genres, and analyze reading habits.
-If you suggest books NOT in the library, clearly state they are recommendations to add to the collection.
+            function getSystemPrompt() {
+                const language = localStorage.getItem('mylib_ai_language') || 'English';
+                return `You are the Expert AI Librarian for "My Lib", a sophisticated personal library management app.
+Your personality is professional, insightful, and encouraging. You speak as a true book lover who knows the user's collection intimately.
 
-When recommending "what to read next", prioritize books already in the user's library that are marked as "want_to_read" or "reading".
+LANGUAGE RULE:
+You MUST respond in ${language}.
+
+RESPONSE STYLE:
+- Be concise but high-value.
+- Use Markdown for structure: **bold** for book titles, ## for sections, and bullet points for lists.
+- Avoid long, dense paragraphs.
+- Provide actionable, personalized suggestions based on the user's specific reading history.
+
+CONTEXT PROVIDED:
+- User's finished books (t:title, a:author, g:genres, r:rating).
+- Books in library not yet finished (available for immediate reading).
+
+GOAL:
+- Help users rediscover their own collection.
+- Recommend what to read next, prioritizing "want_to_read" or "reading" books already in their library.
+- If suggesting books NOT in their library, call them "Discovery Recommendations" and explain why they fit the user's taste.
+- Analyze patterns (e.g., "I noticed you enjoy Thrillers but haven't explored much Historical Fiction lately").
 
 When asked for a "summary", provide:
-- Total books in library
-- Total finished books
-- Top 3 genres by volume
-- A one-sentence commentary on the library's diversity.
+- ## Library Snapshot
+- **Total Books:** [count]
+- **Finished:** [count]
+- **Core Genres:** [top 3]
+- **Librarian's Note:** A one-sentence professional insight into their collection's unique character.
 
-If the user has no finished books, base your recommendations and analysis on all books in their collection.
-If the user's collection is small, encourage them to add more books for better analysis.`;
+If the collection is small or has no finished books, be extra encouraging and suggest foundational titles in their favorite genres.`;
+            }
 
             async function openAIChat(initialMessage = '', bookContext = null) {
                 const modalHtml = `
@@ -4135,12 +4310,12 @@ If the user's collection is small, encourage them to add more books for better a
                     <div class="glass max-w-lg w-full rounded-[2.5rem] flex flex-col h-[80vh] sm:h-[70vh] shadow-2xl animate-slide-up border border-blue-100/50 dark:border-slate-800">
                         <div class="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                             <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
+                                <div class="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/20">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
                                 </div>
                                 <div>
                                     <h2 class="text-lg font-black font-serif italic">AI Librarian</h2>
-                                    <p id="ai-status-indicator" class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Online & Ready</p>
+                                    <p id="ai-status-indicator" class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Expert Assistant</p>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
@@ -4225,7 +4400,7 @@ If the user's collection is small, encourage them to add more books for better a
                     renderChatMessage('user', message);
 
                     const thinkingId = 'thinking-' + Date.now();
-                    renderChatMessage('ai', '<span class="flex items-center gap-1">Thinking<span class="animate-pulse">...</span></span>', thinkingId);
+                    renderChatMessage('ai', '<div class="flex items-center gap-3"><div class="flex gap-1"><div class="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce"></div><div class="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div><div class="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div></div><span class="text-[10px] font-black uppercase tracking-widest text-blue-600">Librarian is thinking</span></div>', thinkingId);
 
                     try {
                         const config = getAIConfig();
@@ -4240,18 +4415,19 @@ If the user's collection is small, encourage them to add more books for better a
                         }
 
                         // Build history for Gemini
+                        const systemPrompt = getSystemPrompt();
                         if (chatHistory.length === 0) {
                             // Combine system instructions and context with the first user message
                             // to avoid consecutive 'user' role messages which is rejected by Gemini API.
                             let context = getLibraryContext();
                             if (bookContext) context.focusedBook = bookContext;
-                            const initialPrompt = `SYSTEM: ${LIBRARIAN_SYSTEM_PROMPT}\n\nCONTEXT: ${JSON.stringify(context)}\n\nUSER: ${message}`;
+                            const initialPrompt = `SYSTEM: ${systemPrompt}\n\nCONTEXT: ${JSON.stringify(context)}\n\nUSER: ${message}`;
                             chatHistory.push({ role: 'user', parts: [{ text: initialPrompt }] });
                         } else {
                             chatHistory.push({ role: 'user', parts: [{ text: message }] });
                         }
 
-                        const aiResponse = await callGeminiAI(message, LIBRARIAN_SYSTEM_PROMPT, false, chatHistory);
+                        const aiResponse = await callGeminiAI(message, systemPrompt, false, chatHistory);
 
                         if (aiResponse.includes("Using fallback model")) {
                             const status = document.getElementById('ai-status-indicator');
@@ -4286,28 +4462,23 @@ If the user's collection is small, encourage them to add more books for better a
                 function renderChatMessage(role, text, id) {
                     const div = document.createElement('div');
                     div.id = id || '';
-                    div.className = `flex gap-3 ${role === 'user' ? 'flex-row-reverse' : ''} animate-slide-up max-w-[85%] ${role === 'user' ? 'ml-auto' : ''}`;
+                    div.className = `flex gap-3 ${role === 'user' ? 'flex-row-reverse' : ''} animate-slide-up max-w-[90%] sm:max-w-[85%] ${role === 'user' ? 'ml-auto' : ''}`;
 
                     const icon = role === 'user'
                         ? `<div class="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 flex-shrink-0"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path></svg></div>`
                         : `<div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 flex-shrink-0"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg></div>`;
 
-                    const bg = role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-100 dark:bg-slate-800/50 rounded-tl-none';
-
-                    // Simple markdown-to-html (bold and bullet points)
-                    const formattedText = text
-                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                        .replace(/^\s*[\-\*]\s*(.*)/gm, '<li class="ml-4">$1</li>');
+                    const bg = role === 'user' ? 'bg-primary text-white rounded-tr-none' : 'bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-tl-none shadow-sm';
 
                     div.innerHTML = `
                         ${icon}
                         <div class="p-4 ${bg} rounded-2xl text-sm leading-relaxed">
-                            ${formattedText}
+                            ${role === 'ai' ? formatAIText(text) : `<p class="whitespace-pre-line">${escapeHTML(text)}</p>`}
                         </div>
                     `;
 
                     chatMessages.appendChild(div);
-                    setTimeout(() => chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' }), 0);
+                    setTimeout(() => chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' }), 50);
                 }
 
                 function updateChatMessage(id, text) {
@@ -4315,14 +4486,10 @@ If the user's collection is small, encourage them to add more books for better a
                     if (el) {
                         const contentDiv = el.querySelector('div:last-child');
                         if (contentDiv) {
-                            const formattedText = text
-                                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                                .replace(/^\s*[\-\*]\s*(.*)/gm, '<li class="ml-4">$1</li>')
-                                .replace(/\n/g, '<br>');
-                            contentDiv.innerHTML = formattedText;
+                            contentDiv.innerHTML = formatAIText(text);
                         }
                     }
-                    setTimeout(() => chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' }), 0);
+                    setTimeout(() => chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' }), 50);
                 }
             }
 
@@ -4547,6 +4714,10 @@ If the user's collection is small, encourage them to add more books for better a
                         <div class="flex flex-col sm:flex-row items-center justify-between mt-10 gap-4">
                             <button id="delete-book-btn" class="w-full sm:w-auto px-8 py-4 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-2xl font-bold transition-all">Delete</button>
                             <div class="flex w-full sm:w-auto gap-4">
+                                <button id="ai-summary-btn" class="flex-1 sm:flex-none px-8 py-4 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-2xl font-bold hover:bg-emerald-200 transition-all flex items-center justify-center gap-2" title="Generate AI Summary & Tags">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                    AI Summary
+                                </button>
                                 <button id="ai-book-btn" class="flex-1 sm:flex-none px-8 py-4 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-2xl font-bold hover:bg-blue-200 transition-all flex items-center justify-center gap-2">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
                                     Ask AI
@@ -4568,6 +4739,33 @@ If the user's collection is small, encourage them to add more books for better a
                         genres: bookGenres,
                         tags: book.tags
                     });
+                });
+
+                document.getElementById('ai-summary-btn')?.addEventListener('click', async () => {
+                    const btn = document.getElementById('ai-summary-btn');
+                    const originalText = btn.innerHTML;
+                    btn.disabled = true;
+                    btn.innerHTML = '<div class="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>';
+
+                    try {
+                        const config = getAIConfig();
+                        if (!config.apiKey) { showToast('Please set Gemini API key in Settings', 'error'); return; }
+
+                        const prompt = `Provide a professional, concise summary (max 3 sentences) and 5 highly relevant tags for the book "${book.title}" by ${book.author}.
+                        Book Context: ${book.description || 'No description available.'}
+                        Return ONLY JSON: { "summary": "...", "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"] }
+                        Language: ${config.language}`;
+
+                        const response = await callGeminiAI(prompt, "Respond ONLY with a valid JSON object.");
+                        const data = JSON.parse(response.replace(/```json|```/g, '').trim());
+
+                        showAISummaryModal(book, data);
+                    } catch (err) {
+                        showToast('Failed to generate summary: ' + err.message, 'error');
+                    } finally {
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
+                    }
                 });
 
                 document.getElementById('edit-book-btn').addEventListener('click', () => {
@@ -4784,6 +4982,7 @@ If the user's collection is small, encourage them to add more books for better a
             window.openBookDetails = openBookDetails;
             window.openManualEntry = openManualEntry;
             window.runLibraryCleanup = runLibraryCleanup;
+            window.generateReadingRoadmap = generateReadingRoadmap;
             window.__test_data = {
                 get books() { return books; },
                 set books(v) { books = v; },
