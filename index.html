@@ -583,15 +583,19 @@
                             <div>
                                 <label for="gemini-api-key" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Gemini API Key</label>
                                 <input id="gemini-api-key" type="password" placeholder="Enter your Gemini API Key" value="${localStorage.getItem('mylib_gemini_api_key') || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
-                                <p class="text-[9px] text-slate-400 mt-1 ml-1 italic">Key is stored only in your browser's localStorage.</p>
+                                <p class="text-[9px] text-slate-400 mt-1 ml-1 italic">Key is stored only in your browser's localStorage. Get your API key from <a href="https://aistudio.google.com/api-keys">Google AI Studio</a></p>
                             </div>
                             <div>
                                 <label for="gemini-model" class="text-[10px] font-bold text-slate-400 uppercase ml-1">AI Model</label>
                                 <select id="gemini-model" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
-                                    <option value="gemini-2.0-flash-lite-preview-02-05" ${ (localStorage.getItem('mylib_gemini_model') || 'gemini-2.0-flash-lite-preview-02-05') === 'gemini-2.0-flash-lite-preview-02-05' ? 'selected' : '' }>Gemini 2.0 Flash-Lite</option>
-                                    <option value="gemini-2.0-flash" ${ localStorage.getItem('mylib_gemini_model') === 'gemini-2.0-flash' ? 'selected' : '' }>Gemini 2.0 Flash</option>
-                                    <option value="gemini-1.5-pro" ${ localStorage.getItem('mylib_gemini_model') === 'gemini-1.5-pro' ? 'selected' : '' }>Gemini 1.5 Pro</option>
-                                    <option value="gemini-1.5-flash" ${ localStorage.getItem('mylib_gemini_model') === 'gemini-1.5-flash' ? 'selected' : '' }>Gemini 1.5 Flash</option>
+                                    <option value="gemini-2.5-flash-lite" ${ (localStorage.getItem('mylib_gemini_model') || 'gemini-2.5-flash-lite') === 'gemini-2.5-flash-lite' ? 'selected' : '' }>gemini-2.5-flash-lite</option>
+                                    <option value="gemini-2.5-flash" ${ localStorage.getItem('mylib_gemini_model') === 'gemini-2.5-flash' ? 'selected' : '' }>gemini-2.5-flash</option>
+                                    <option value="gemini-3-flash-preview" ${ localStorage.getItem('mylib_gemini_model') === 'gemini-3-flash-preview' ? 'selected' : '' }>gemini-3-flash-preview</option>
+                                    <option value="gemini-3.1-flash-lite-preview" ${ localStorage.getItem('mylib_gemini_model') === 'gemini-3.1-flash-lite-preview' ? 'selected' : '' }>gemini-3.1-flash-lite-preview</option>
+                                    <option value="gemma-3-12b-it" ${ localStorage.getItem('mylib_gemini_model') === 'gemma-3-12b-it' ? 'selected' : '' }>gemma-3-12b-it</option>
+                                    <option value="gemma-3-4b-it" ${ localStorage.getItem('mylib_gemini_model') === 'gemma-3-4b-it' ? 'selected' : '' }>gemma-3-4b-it</option>
+                                    <option value="gemma-3-1b-it" ${ localStorage.getItem('mylib_gemini_model') === 'gemma-3-1b-it' ? 'selected' : '' }>gemma-3-1b-it</option>
+                                    <option value="gemma-3-27b-it" ${ localStorage.getItem('mylib_gemini_model') === 'gemma-3-27b-it' ? 'selected' : '' }>gemma-3-27b-it</option>
                                 </select>
                             </div>
                             <button id="save-ai-settings-btn" class="w-full sm:w-auto px-6 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 dark:shadow-none focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Save AI Settings</button>
@@ -2191,7 +2195,7 @@
                         <div>
                             <div class="flex justify-between items-start gap-2">
                                 <span class="text-[9px] font-black uppercase tracking-widest text-primary truncate max-w-[150px]">${bookGenres.join(', ')}</span>
-                                <div class="text-amber-400 text-[10px] tracking-tighter">${stars}${book.averageRating ? `<span class="ml-1 text-slate-400">(${book.averageRating.toFixed(1)})</span>` : ''}</div>
+                                <div class="text-amber-400 text-[13px] tracking-tighter">${stars}${book.averageRating ? `<span class="ml-1 text-slate-400">(${book.averageRating.toFixed(1)})</span>` : ''}</div>
                             </div>
                             <h3 class="font-black text-lg leading-tight line-clamp-2 mt-1 group-hover:text-blue-600 transition-colors font-serif italic">${book.title}</h3>
                             <div class="flex justify-between items-center gap-2">
@@ -3236,7 +3240,7 @@
                                         <div class="w-2 h-2 rounded-full" style="background-color: ${colors[i % colors.length]}"></div>
                                         <span class="font-medium truncate ${filterType ? 'group-hover:text-primary transition-colors' : ''}">${label}</span>
                                     </div>
-                                    <span class="font-bold text-slate-400">${count}</span>
+                                    <span class="font-bold text-primary">${count}</span>
                                 </div>
                             `;}).join('')}
                             ${entries.length === 0 ? '<p class="text-xs text-slate-400 italic">No data available.</p>' : ''}
@@ -3994,8 +3998,8 @@
 
             // ---------- AI Librarian Service ----------
             const AI_CONFIG = {
-                defaultModel: 'gemini-2.0-flash-lite-preview-02-05',
-                fallbackModel: 'gemini-1.5-flash'
+                defaultModel: 'gemini-2.5-flash-lite',
+                fallbackModel: 'gemini-2.5-flash-lite'
             };
 
             function getAIConfig() {
