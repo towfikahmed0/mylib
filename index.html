@@ -3597,7 +3597,7 @@
                         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                         .replace(/^\s*[\-\*]\s*(.*)/gm, '<li class="ml-4">$1</li>');
 
-                    content.innerHTML = `<div class="text-left text-sm leading-relaxed space-y-2 whitespace-pre-wrap">${formattedResult}</div>`;
+                    content.innerHTML = `<div class="text-left text-sm leading-relaxed space-y-2">${formattedResult}</div>`;
 
                     // Save to Firestore
                     await db.collection('users').doc(currentUser.uid).set({
@@ -4301,7 +4301,7 @@ If the user's collection is small, encourage them to add more books for better a
 
                     div.innerHTML = `
                         ${icon}
-                        <div class="p-4 ${bg} rounded-2xl text-sm leading-relaxed whitespace-pre-wrap">
+                        <div class="p-4 ${bg} rounded-2xl text-sm leading-relaxed">
                             ${formattedText}
                         </div>
                     `;
