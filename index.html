@@ -2224,7 +2224,13 @@
                         </div>
                         <div class="text-right flex-shrink-0 flex flex-col items-end">
                             <div class="text-amber-400 text-[10px]">${stars}</div>
-                            <div class="text-[10px] font-bold text-primary dark:text-primary mt-1 truncate max-w-[120px] text-right">${bookGenres.join(', ')}</div>
+                            <div class="text-[10px] font-bold text-primary dark:text-primary mt-1 truncate max-w-[120px] text-right">
+                                ${bookGenres.map((g, i) => {
+                                    const escapedG = escapeHTML(g);
+                                    const jsEscapedG = g.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                                    return `<button onclick="event.stopPropagation(); window.setCategoryFilter('${jsEscapedG}')" class="hover:text-blue-700 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>${i < bookGenres.length - 1 ? '<span class="text-slate-300">, </span>' : ''}`;
+                                }).join('')}
+                            </div>
                             ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${(book.owner).replace(/'/g, "\\'")}')" aria-label="Filter by owner: ${book.owner}">Owner: ${book.owner}</button>` : ''}
                             <div class="flex items-center gap-2 mt-1">
                                 <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Edit book details">
@@ -2260,7 +2266,13 @@
                     <div class="flex-1 flex flex-col justify-between overflow-hidden py-1">
                         <div>
                             <div class="flex justify-between items-start gap-2">
-                                <span class="text-[9px] font-black uppercase tracking-widest text-primary truncate max-w-[150px]">${bookGenres.join(', ')}</span>
+                                <div class="text-[9px] font-black uppercase tracking-widest text-primary truncate max-w-[150px]">
+                                    ${bookGenres.map((g, i) => {
+                                        const escapedG = escapeHTML(g);
+                                        const jsEscapedG = g.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                                        return `<button onclick="event.stopPropagation(); window.setCategoryFilter('${jsEscapedG}')" class="hover:text-blue-700 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>${i < bookGenres.length - 1 ? '<span class="text-slate-300">, </span>' : ''}`;
+                                    }).join('')}
+                                </div>
                                 <div class="text-amber-400 text-[13px] tracking-tighter">${stars}${book.averageRating ? `<span class="ml-1 text-slate-400">(${book.averageRating.toFixed(1)})</span>` : ''}</div>
                             </div>
                             <h3 class="font-black text-lg leading-tight line-clamp-2 mt-1 group-hover:text-blue-600 transition-colors font-serif italic">${book.title}</h3>
@@ -4641,7 +4653,11 @@ If the collection is small or has no finished books, be extra encouraging and su
                             <div class="flex-1 text-center sm:text-left">
                                 <div class="flex flex-col sm:flex-row sm:items-center gap-2 justify-center sm:justify-start">
                                     <div class="flex flex-wrap gap-1">
-                                        ${bookGenres.map(g => `<span class="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">${escapeHTML(g)}</span>`).join('<span class="text-slate-300 mx-1">·</span>')}
+                                        ${bookGenres.map((g, i) => {
+                                            const escapedG = escapeHTML(g);
+                                            const jsEscapedG = g.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                                            return `<button onclick="window.setCategoryFilter('${jsEscapedG}'); close();" class="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest hover:opacity-80 transition-opacity focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded px-1" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>${i < bookGenres.length - 1 ? '<span class="text-slate-300 mx-1">·</span>' : ''}`;
+                                        }).join('')}
                                     </div>
                                     ${book.owner ? `<span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-auto">Owner: ${escapeHTML(book.owner)}</span>` : ''}
                                 </div>
