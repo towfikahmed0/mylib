@@ -271,6 +271,7 @@
 
         (function () {
             // ---------- State ----------
+            const APP_VERSION = '2.5';
             let deferredPrompt = null;
             let currentUser = null;
             window.__setCurrentUser = (u) => currentUser = u;
@@ -342,6 +343,7 @@
             let authorFilter = 'all';
             let ownerFilter = 'all';
             let tagFilter = null;
+            let favoritesOnly = false;
             let selectedBookIds = new Set();
             let advancedFilters = {
                 rating: 'all',
@@ -364,7 +366,7 @@
             const modalContainer = document.getElementById('modal-container');
 
             // ---------- Utilities ----------
-            const DEFAULT_STATUS = Object.freeze({ status: 'want_to_read', rating: 0, progress: 0, comment: '' });
+            const DEFAULT_STATUS = Object.freeze({ status: 'want_to_read', rating: 0, progress: 0, comment: '', isFavorite: false });
 
             function getCurrencySymbol() {
                 const currencies = {
@@ -505,13 +507,13 @@
                                 <div class="w-16 h-16 rounded-2xl flex items-center justify-center mb-8">
                                    <img src="https://cdn-icons-png.flaticon.com/512/2232/2232688.png">
                                 </div>
-                                <h1 class="text-5xl lg:text-7xl font-black font-serif italic text-slate-900 leading-tight mb-6 animate-slide-up">Your personal sanctuary for <span class="text-blue-600">every story.</span></h1>
+                                <h1 class="text-5xl lg:text-7xl font-black font-serif italic text-slate-900 leading-tight mb-6 animate-slide-up">Your Personal Library, <span class="text-blue-600">Evolved.</span></h1>
                                 <p class="text-lg text-slate-600 mb-10 leading-relaxed animate-slide-up" style="animation-delay: 100ms">
-                                    My Lib is a professional library manager designed for book lovers who appreciate organization and peace of mind. Catalog your collection, track your progress, and share your passion with a community of readers.
+                                    Experience the future of book management with AI-powered insights, smart cataloging, and seamless cloud sync. My Lib is the ultimate sanctuary for your reading journey.
                                 </p>
 
                                 <div class="flex flex-col sm:flex-row gap-4 items-start animate-slide-up" style="animation-delay: 200ms">
-                                    <button id="google-signin" class="bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold flex items-center gap-3 hover:bg-slate-800 transition shadow-xl shadow-slate-200 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">
+                                    <button id="google-signin" class="bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold flex items-center gap-3 hover:bg-slate-800 transition shadow-xl shadow-slate-200 active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">
                                         <svg class="w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
                                         Continue with Google
                                     </button>
@@ -576,13 +578,14 @@
                                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                                     </div>
                                     <h3 class="text-xl font-black font-serif italic mb-3">Deep Insights</h3>
-                                    <p class="text-slate-500 text-sm leading-relaxed">Visualize your reading composition, collection value, and rating distributions with elegant charts and analysis.</p>
+                                    <p class="text-slate-500 text-sm leading-relaxed">Visualize your reading composition, collection value, and rating distributions with elegant charts and AI-generated reading roadmaps.</p>
                                 </div>
-                                <div class="p-8 rounded-[2.5rem] bg-[#fdfbf7] border border-slate-100 flex items-center justify-center border-dashed border-2">
-                                    <div class="text-center">
-                                        <p class="text-slate-400 font-bold uppercase tracking-widest text-xs mb-2">More coming soon</p>
-                                        <p class="text-slate-300 text-[10px]">AI Librarian · Reading Goals · Export PDF</p>
+                                <div class="p-8 rounded-[2.5rem] bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
+                                    <div class="w-12 h-12 bg-violet-100 rounded-2xl flex items-center justify-center text-violet-600 mb-6">
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
                                     </div>
+                                    <h3 class="text-xl font-black font-serif italic mb-3">AI Librarian</h3>
+                                    <p class="text-slate-500 text-sm leading-relaxed">Chat with your personal AI Librarian for tailored recommendations, natural language search, and deep collection analysis.</p>
                                 </div>
                             </div>
                         </div>
@@ -596,7 +599,7 @@
                             </div>
                             <span class="text-xl font-black font-serif italic">My Lib</span>
                         </div>
-                        <p class="text-slate-400 text-xs uppercase tracking-[0.2em] font-bold">&copy; 2026 My Lib · Preserve Every Word</p>
+                        <p class="text-slate-400 text-xs uppercase tracking-[0.2em] font-bold">&copy; 2026 My Lib · v2.5 · Preserve Every Word</p>
                     </footer>
                 </div>
             `;
@@ -622,14 +625,10 @@
                             <div>
                                 <label for="gemini-model" class="text-[10px] font-bold text-slate-400 uppercase ml-1">AI Model</label>
                                 <select id="gemini-model" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
-                                    <option value="gemini-2.5-flash-lite" ${ (localStorage.getItem('mylib_gemini_model') || 'gemini-2.5-flash-lite') === 'gemini-2.5-flash-lite' ? 'selected' : '' }>gemini-2.5-flash-lite</option>
-                                    <option value="gemini-2.5-flash" ${ localStorage.getItem('mylib_gemini_model') === 'gemini-2.5-flash' ? 'selected' : '' }>gemini-2.5-flash</option>
-                                    <option value="gemini-3-flash-preview" ${ localStorage.getItem('mylib_gemini_model') === 'gemini-3-flash-preview' ? 'selected' : '' }>gemini-3-flash-preview</option>
-                                    <option value="gemini-3.1-flash-lite-preview" ${ localStorage.getItem('mylib_gemini_model') === 'gemini-3.1-flash-lite-preview' ? 'selected' : '' }>gemini-3.1-flash-lite-preview</option>
-                                    <option value="gemma-3-12b-it" ${ localStorage.getItem('mylib_gemini_model') === 'gemma-3-12b-it' ? 'selected' : '' }>gemma-3-12b-it</option>
+                                    <option value="gemma-3-12b-it" ${ (localStorage.getItem('mylib_gemini_model') || 'gemma-3-12b-it') === 'gemma-3-12b-it' ? 'selected' : '' }>gemma-3-12b-it (Recommended)</option>
                                     <option value="gemma-3-4b-it" ${ localStorage.getItem('mylib_gemini_model') === 'gemma-3-4b-it' ? 'selected' : '' }>gemma-3-4b-it</option>
-                                    <option value="gemma-3-1b-it" ${ localStorage.getItem('mylib_gemini_model') === 'gemma-3-1b-it' ? 'selected' : '' }>gemma-3-1b-it</option>
-                                    <option value="gemma-3-27b-it" ${ localStorage.getItem('mylib_gemini_model') === 'gemma-3-27b-it' ? 'selected' : '' }>gemma-3-27b-it</option>
+                                    <option value="gemini-2.0-flash" ${ localStorage.getItem('mylib_gemini_model') === 'gemini-2.0-flash' ? 'selected' : '' }>gemini-2.0-flash</option>
+                                    <option value="gemini-2.0-flash-lite-preview-02-05" ${ localStorage.getItem('mylib_gemini_model') === 'gemini-2.0-flash-lite-preview-02-05' ? 'selected' : '' }>gemini-2.0-flash-lite</option>
                                 </select>
                             </div>
                             <div>
@@ -644,7 +643,7 @@
                                     <option value="Hindi" ${ localStorage.getItem('mylib_ai_language') === 'Hindi' ? 'selected' : '' }>Hindi</option>
                                 </select>
                             </div>
-                            <button id="save-ai-settings-btn" class="w-full sm:w-auto px-6 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 dark:shadow-none focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Save AI Settings</button>
+                            <button id="save-ai-settings-btn" class="w-full sm:w-auto px-6 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 dark:shadow-none focus-visible:ring-2 focus-visible:ring-primary outline-none">Save AI Settings</button>
                         </div>
                     </div>
 
@@ -664,7 +663,7 @@
                                 <label for="profile-display-name" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Display Name</label>
                                 <div class="flex flex-col sm:flex-row gap-2">
                                     <input id="profile-display-name" type="text" placeholder="Your Name" value="${escapeHTML(userProfile?.displayName || '')}" class="flex-1 min-w-0 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
-                                    <button id="save-profile-btn" class="sm:px-6 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 dark:shadow-none focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Save Profile</button>
+                                    <button id="save-profile-btn" class="sm:px-6 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 dark:shadow-none focus-visible:ring-2 focus-visible:ring-primary outline-none">Save Profile</button>
                                 </div>
                             </div>
                         </div>
@@ -678,7 +677,7 @@
                                 <label for="share-email" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Collaborator Email</label>
                                 <div class="flex flex-col sm:flex-row gap-2">
                                     <input id="share-email" type="email" placeholder="email@example.com" class="flex-1 min-w-0 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
-                                    <button id="save-sharing-btn" class="sm:px-6 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 dark:shadow-none focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Add Collaborator</button>
+                                    <button id="save-sharing-btn" class="sm:px-6 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 dark:shadow-none focus-visible:ring-2 focus-visible:ring-primary outline-none">Add Collaborator</button>
                                 </div>
                             </div>
                             <div id="collaborators-list" class="space-y-2">
@@ -761,9 +760,9 @@
                             <div>
                                 <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Theme Selection</label>
                                 <div class="grid grid-cols-3 gap-2 mt-1">
-                                    <button onclick="window.setTheme('light')" aria-pressed="${localStorage.getItem('mylib_theme') !== 'dark' && localStorage.getItem('mylib_theme') !== 'sepia'}" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') !== 'dark' && localStorage.getItem('mylib_theme') !== 'sepia' ? 'border-primary' : 'border-transparent'} bg-white text-slate-900 text-xs font-bold focus-visible:ring-2 focus-visible:ring-blue-500 outline-none transition-all">Light</button>
-                                    <button onclick="window.setTheme('dark')" aria-pressed="${localStorage.getItem('mylib_theme') === 'dark'}" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'dark' ? 'border-primary' : 'border-transparent'} bg-slate-900 text-white text-xs font-bold focus-visible:ring-2 focus-visible:ring-blue-500 outline-none transition-all">Dark</button>
-                                    <button onclick="window.setTheme('sepia')" aria-pressed="${localStorage.getItem('mylib_theme') === 'sepia'}" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'sepia' ? 'border-primary' : 'border-transparent'} bg-sepia-100 text-sepia-900 text-xs font-bold focus-visible:ring-2 focus-visible:ring-blue-500 outline-none transition-all">Sepia</button>
+                                    <button onclick="window.setTheme('light')" aria-pressed="${localStorage.getItem('mylib_theme') !== 'dark' && localStorage.getItem('mylib_theme') !== 'sepia'}" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') !== 'dark' && localStorage.getItem('mylib_theme') !== 'sepia' ? 'border-primary' : 'border-transparent'} bg-white text-slate-900 text-xs font-bold focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all">Light</button>
+                                    <button onclick="window.setTheme('dark')" aria-pressed="${localStorage.getItem('mylib_theme') === 'dark'}" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'dark' ? 'border-primary' : 'border-transparent'} bg-slate-900 text-white text-xs font-bold focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all">Dark</button>
+                                    <button onclick="window.setTheme('sepia')" aria-pressed="${localStorage.getItem('mylib_theme') === 'sepia'}" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'sepia' ? 'border-primary' : 'border-transparent'} bg-sepia-100 text-sepia-900 text-xs font-bold focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all">Sepia</button>
                                 </div>
                             </div>
                             <div>
@@ -772,7 +771,7 @@
                                     ${['blue', 'rose', 'emerald', 'amber', 'violet'].map(color => {
                     const bgClass = color === 'blue' ? 'bg-blue-500' : color === 'rose' ? 'bg-rose-500' : color === 'emerald' ? 'bg-emerald-500' : color === 'amber' ? 'bg-amber-500' : 'bg-violet-500';
                     const isSelected = (localStorage.getItem('mylib_accent') || 'blue') === color;
-                    return `<button onclick="window.setAccent('${color}')" aria-pressed="${isSelected}" class="w-8 h-8 rounded-full ${bgClass} ${isSelected ? 'ring-4 ring-offset-2 ring-slate-300 dark:ring-slate-600' : ''} focus-visible:ring-2 focus-visible:ring-blue-500 outline-none transition-all" title="${color.charAt(0).toUpperCase() + color.slice(1)}"></button>`;
+                    return `<button onclick="window.setAccent('${color}')" aria-pressed="${isSelected}" class="w-8 h-8 rounded-full ${bgClass} ${isSelected ? 'ring-4 ring-offset-2 ring-slate-300 dark:ring-slate-600' : ''} focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all" title="${color.charAt(0).toUpperCase() + color.slice(1)}"></button>`;
                 }).join('')}
                                 </div>
                             </div>
@@ -1042,7 +1041,10 @@
                                     <img src="https://cdn-icons-png.flaticon.com/512/2232/2232688.png">
                                 </div>
                                 <div class="hidden sm:block">
-                                    <h1 class="text-lg font-black tracking-tight leading-tight font-serif text-primary">My Lib</h1>
+                                    <div class="flex items-center gap-2">
+                                        <h1 class="text-lg font-black tracking-tight leading-tight font-serif text-primary">My Lib</h1>
+                                        <span class="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-[8px] font-black uppercase tracking-tighter border border-primary/20">v${APP_VERSION}</span>
+                                    </div>
                                     <div class="flex items-center gap-2">
                                         <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-widest">${currentUser.email}</p>
                                         <span class="text-[10px] text-slate-300">|</span>
@@ -1052,19 +1054,19 @@
                             </div>
                             <div class="flex-1"></div>
                             <nav class="hidden md:flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                                <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${activeTab === 'library' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Library</button>
-                                <button onclick="window.setTab('mybooks')" ${activeTab === 'mybooks' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${activeTab === 'mybooks' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">My Books</button>
-                                <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${activeTab === 'activity' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Activity</button>
-                                <button onclick="window.setTab('insight')" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${activeTab === 'insight' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Insights</button>
+                                <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'library' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Library</button>
+                                <button onclick="window.setTab('mybooks')" ${activeTab === 'mybooks' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'mybooks' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">My Books</button>
+                                <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'activity' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Activity</button>
+                                <button onclick="window.setTab('insight')" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'insight' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Insights</button>
                             </nav>
                             <div class="flex items-center gap-1">
-                                <button id="manual-add-btn" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" title="Add Book Manually" aria-label="Add Book Manually">
+                                <button id="manual-add-btn" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500 focus-visible:ring-2 focus-visible:ring-primary outline-none" title="Add Book Manually" aria-label="Add Book Manually">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                 </button>
-                                <button onclick="window.setTab('settings')" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${activeTab === 'settings' ? 'text-primary bg-blue-50 dark:bg-blue-900/20' : 'text-slate-500'}" title="Settings" aria-label="Settings">
+                                <button onclick="window.setTab('settings')" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'settings' ? 'text-primary bg-blue-50 dark:bg-blue-900/20' : 'text-slate-500'}" title="Settings" aria-label="Settings">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                 </button>
-                                <button id="scan-btn" class="bg-primary hover:opacity-90 text-white px-5 py-2.5 rounded-full text-sm font-bold flex items-center gap-2 transition-all shadow-md active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Scan QR or Barcode" title="Scan QR or Barcode">
+                                <button id="scan-btn" class="bg-primary hover:opacity-90 text-white px-5 py-2.5 rounded-full text-sm font-bold flex items-center gap-2 transition-all shadow-md active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Scan QR or Barcode" title="Scan QR or Barcode">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                     <span class="hidden lg:inline">Scan</span>
                                 </button>
@@ -1074,24 +1076,24 @@
                     <main id="main-content" class="max-w-6xl mx-auto p-6 pb-32 w-full flex-1"></main>
 
                     <!-- Floating AI Button -->
-                    <button id="ai-chat-fab" class="fixed bottom-24 right-6 w-14 h-14 bg-primary text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-40 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="AI Librarian Chat">
+                    <button id="ai-chat-fab" class="fixed bottom-24 right-6 w-14 h-14 bg-primary text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-40 focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="AI Librarian Chat">
                         <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
                         <span id="ai-ping" class="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full border-2 border-white dark:border-slate-900 animate-bounce hidden"></span>
                     </button>
                     <nav id="mobile-nav" class="md:hidden fixed bottom-0 left-0 right-0 glass border-t border-slate-200 dark:border-slate-800 px-3 py-3 grid grid-cols-4 gap-1 z-40">
-                        <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${activeTab === 'library' ? 'text-primary' : 'text-slate-400'}">
+                        <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'library' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></svg>
                             <span class="text-[8px] font-bold">Library</span>
                         </button>
-                        <button onclick="window.setTab('mybooks')" ${activeTab === 'mybooks' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${activeTab === 'mybooks' ? 'text-primary' : 'text-slate-400'}">
+                        <button onclick="window.setTab('mybooks')" ${activeTab === 'mybooks' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'mybooks' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                             <span class="text-[8px] font-bold">My Books</span>
                         </button>
-                        <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${activeTab === 'activity' ? 'text-primary' : 'text-slate-400'}">
+                        <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'activity' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             <span class="text-[8px] font-bold">Activity</span>
                         </button>
-                        <button onclick="window.setTab('insight')" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${activeTab === 'insight' ? 'text-primary' : 'text-slate-400'}">
+                        <button onclick="window.setTab('insight')" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'insight' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                             <span class="text-[8px] font-bold text-center">Insights</span>
                         </button>
@@ -1128,7 +1130,7 @@
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                                 </button>
                             </div>
-                            <button id="advanced-search-btn" class="px-6 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[1.5rem] font-bold text-slate-500 hover:text-blue-600 transition-all shadow-sm flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Open Advanced Filters">
+                            <button id="advanced-search-btn" class="px-6 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[1.5rem] font-bold text-slate-500 hover:text-blue-600 transition-all shadow-sm flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Open Advanced Filters">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
                                 <span class="hidden sm:inline">Filters</span>
                                 <span id="filter-dot" class="hidden w-2 h-2 bg-blue-500 rounded-full"></span>
@@ -1138,10 +1140,10 @@
                             <div class="glass p-4 rounded-2xl border border-blue-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-4">
                                 <div class="flex items-center gap-3">
                                     <span id="selected-count" class="text-sm font-black text-blue-600 px-3 py-1 bg-blue-100 dark:bg-blue-900/50 rounded-lg">0 Selected</span>
-                                    <button onclick="window.clearSelection()" class="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded px-1">Clear</button>
+                                    <button onclick="window.clearSelection()" class="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase focus-visible:ring-2 focus-visible:ring-primary outline-none rounded px-1">Clear</button>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <select id="bulk-genre" class="bg-slate-100 dark:bg-slate-800 rounded-lg text-[10px] font-bold px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                                    <select id="bulk-genre" class="bg-slate-100 dark:bg-slate-800 rounded-lg text-[10px] font-bold px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-primary">
                                         <option value="">Change Genre...</option>
                                         ${metadataCache.genres.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
                                     </select>
@@ -1296,6 +1298,7 @@
                     const matchesAuthor = authorFilter === 'all' || b.author === authorFilter;
                     const matchesOwner = ownerFilter === 'all' || b.owner === ownerFilter;
                     const matchesTag = !tagFilter || (b.tags && b.tags.includes(tagFilter));
+                    const matchesFavorites = !favoritesOnly || statusData.isFavorite;
 
                     // ⚡ Bolt: Use cached advRating
                     const matchesAdvancedRating = advRating === -1 || (b.rating || 0) >= advRating;
@@ -1310,7 +1313,7 @@
                         if (endTime && bTime > endTime) matchesDate = false;
                     }
 
-                    return matchesTab && matchesSearch && matchesStatus && matchesCategory && matchesAuthor && matchesOwner && matchesTag && matchesAdvancedRating && matchesPrice && matchesDate;
+                    return matchesTab && matchesSearch && matchesStatus && matchesCategory && matchesAuthor && matchesOwner && matchesTag && matchesFavorites && matchesAdvancedRating && matchesPrice && matchesDate;
                 });
 
                 filteredBooks.sort((a, b) => {
@@ -1347,13 +1350,18 @@
                         html += `<span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold flex items-center gap-2">Date Range <button onclick="window.clearAdvancedFilter('date')" aria-label="Remove date filter">×</button></span>`;
                         activeCount++;
                     }
+                    if (favoritesOnly) {
+                        html += `<span class="px-3 py-1 bg-rose-100 text-rose-700 rounded-full text-[10px] font-bold flex items-center gap-2">Favorites <button onclick="window.toggleFavoritesFilter(false)" aria-label="Remove favorites filter">×</button></span>`;
+                        activeCount++;
+                    }
 
                     if (activeCount > 1) {
-                        html += `<button onclick="window.clearAllFilters()" class="text-[10px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest ml-2 px-2 py-1 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded transition-all">Clear All</button>`;
+                        html += `<button onclick="window.clearAllFilters()" class="text-[10px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest ml-2 px-2 py-1 focus-visible:ring-2 focus-visible:ring-primary outline-none rounded transition-all">Clear All</button>`;
                     }
 
                     if (window.innerWidth < 768) {
                         if (sortBy !== defaultSort) activeCount++;
+                        if (favoritesOnly) activeCount++;
                         if (categoryFilter !== 'all') activeCount++;
                         if (statusFilter !== 'all') activeCount++;
                         if (authorFilter !== 'all') activeCount++;
@@ -1481,14 +1489,19 @@
                             <div class="px-3 py-2 rounded-xl bg-blue-50 dark:bg-slate-800 text-xs font-bold text-blue-700 dark:text-blue-300">
                                 ${filteredBooks.length} ${filteredBooks.length === 1 ? 'book' : 'books'} shown
                             </div>
-                            <div class="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                                <button id="grid-view-btn" aria-pressed="${viewMode === 'grid'}" class="p-2 rounded-lg transition focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${viewMode === 'grid' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}" aria-label="Grid view">
+                            <div class="flex items-center gap-3">
+                                <button onclick="window.toggleFavoritesFilter()" class="flex items-center gap-2 px-3 py-2 rounded-xl transition-all focus-visible:ring-2 focus-visible:ring-rose-500 outline-none ${favoritesOnly ? 'bg-rose-500 text-white shadow-lg' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-rose-500'}" aria-pressed="${favoritesOnly}" aria-label="Toggle favorites filter">
+                                    <svg class="w-4 h-4 ${favoritesOnly ? 'fill-current' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+                                    <span class="text-[10px] font-black uppercase tracking-tight">${favoritesOnly ? 'Favorites' : 'All'}</span>
+                                </button>
+                                <div class="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                                <button id="grid-view-btn" aria-pressed="${viewMode === 'grid'}" class="p-2 rounded-lg transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${viewMode === 'grid' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}" aria-label="Grid view">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                                 </button>
-                                <button id="compact-view-btn" aria-pressed="${viewMode === 'compact'}" class="p-2 rounded-lg transition focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${viewMode === 'compact' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}" aria-label="Compact grid view">
+                                <button id="compact-view-btn" aria-pressed="${viewMode === 'compact'}" class="p-2 rounded-lg transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${viewMode === 'compact' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}" aria-label="Compact grid view">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
                                 </button>
-                                <button id="list-view-btn" aria-pressed="${viewMode === 'list'}" class="p-2 rounded-lg transition focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${viewMode === 'list' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}" aria-label="List view">
+                                <button id="list-view-btn" aria-pressed="${viewMode === 'list'}" class="p-2 rounded-lg transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${viewMode === 'list' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}" aria-label="List view">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
                                 </button>
                             </div>
@@ -1561,13 +1574,13 @@
                             <div class="mt-8 flex flex-col items-center justify-center gap-4">
                                 ${isAnyFilterActive ? `
                                     <div class="flex gap-4">
-                                        <button onclick="window.clearAllFilters()" class="px-6 py-2 bg-blue-600 text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Clear All Filters</button>
-                                        ${(searchQuery && !aiSearchResults) ? `<button id="ai-search-btn" onclick="runAISearch()" class="px-6 py-2 bg-white text-blue-600 border border-blue-100 rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>Search with AI</button>` : ''}
+                                        <button onclick="window.clearAllFilters()" class="px-6 py-2 bg-blue-600 text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">Clear All Filters</button>
+                                        ${(searchQuery && !aiSearchResults) ? `<button id="ai-search-btn" onclick="runAISearch()" class="px-6 py-2 bg-white text-blue-600 border border-blue-100 rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>Search with AI</button>` : ''}
                                     </div>
                                 ` : `
                                     <div class="flex gap-4">
-                                        <button onclick="document.getElementById('scan-btn').click()" class="px-6 py-2 bg-primary text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Scan Book</button>
-                                        <button onclick="document.getElementById('manual-add-btn').click()" class="px-6 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-full font-bold text-sm shadow-md transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Add Manually</button>
+                                        <button onclick="document.getElementById('scan-btn').click()" class="px-6 py-2 bg-primary text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">Scan Book</button>
+                                        <button onclick="document.getElementById('manual-add-btn').click()" class="px-6 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-full font-bold text-sm shadow-md transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">Add Manually</button>
                                     </div>
                                 `}
                             </div>
@@ -1805,6 +1818,75 @@
                 });
             }
 
+            window.toggleFavorite = async (bookId) => {
+                const statusData = getStatusData(bookId);
+                const newVal = !statusData.isFavorite;
+
+                try {
+                    await db.collection('books').doc(bookId).collection('readingStatus').doc(currentUser.uid).set({
+                        isFavorite: newVal,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+                    showToast(newVal ? 'Added to favorites' : 'Removed from favorites', 'success');
+
+                    // If we are in book details, we might need to refresh it
+                    if (currentModalCloseHandler && document.querySelector(`[data-book-id="${bookId}"]`)) {
+                        // refreshing the modal is tricky, easiest is to just let the snapshot update the background
+                        // and if we are IN the modal, the button should have its own local state or we re-render modal.
+                        // For simplicity, renderLibraryOnly will be called by snapshot.
+                    }
+                } catch (err) {
+                    showToast('Error: ' + err.message, 'error');
+                }
+            };
+
+            window.toggleFavoritesFilter = (val) => {
+                favoritesOnly = val !== undefined ? val : !favoritesOnly;
+                renderLibraryOnly();
+            };
+
+            window.addHighlight = async (bookId, text) => {
+                if (!text.trim()) return;
+                try {
+                    const statusData = getStatusData(bookId);
+                    const highlights = [...(statusData.highlights || [])];
+                    highlights.unshift({
+                        text: text.trim(),
+                        timestamp: new Date().toISOString()
+                    });
+
+                    await db.collection('books').doc(bookId).collection('readingStatus').doc(currentUser.uid).set({
+                        highlights: highlights,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+
+                    showToast('Highlight added!', 'success');
+                    // refresh modal
+                    openBookDetails(books.find(b => b.id === bookId));
+                } catch (err) {
+                    showToast('Error adding highlight: ' + err.message, 'error');
+                }
+            };
+
+            window.deleteHighlight = async (bookId, index) => {
+                try {
+                    const statusData = getStatusData(bookId);
+                    const highlights = [...(statusData.highlights || [])];
+                    highlights.splice(index, 1);
+
+                    await db.collection('books').doc(bookId).collection('readingStatus').doc(currentUser.uid).set({
+                        highlights: highlights,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+
+                    showToast('Highlight removed', 'info');
+                    // refresh modal
+                    openBookDetails(books.find(b => b.id === bookId));
+                } catch (err) {
+                    showToast('Error deleting highlight: ' + err.message, 'error');
+                }
+            };
+
             window.setTab = (tab) => {
                 activeTab = tab;
                 renderMainApp();
@@ -1898,6 +1980,7 @@
                 categoryFilter = 'all';
                 authorFilter = 'all';
                 ownerFilter = 'all';
+                favoritesOnly = false;
                 advancedFilters = { rating: 'all', minPrice: null, maxPrice: null, startDate: null, endDate: null };
                 const searchInput = document.getElementById('search-input');
                 if (searchInput) searchInput.value = '';
@@ -2185,6 +2268,7 @@
             // Helper to render a single book card
             function renderBookCard(book) {
                 const statusData = getStatusData(book.id);
+                const isFavorite = statusData.isFavorite || false;
                 const bookStatus = statusData.status;
                 const userRating = statusData.rating;
                 const userProgress = statusData.progress;
@@ -2200,7 +2284,7 @@
 
                 if (viewMode === 'compact') {
                     return `
-                    <div class="book-card relative group cursor-pointer focus-visible:ring-4 focus-visible:ring-primary/20 outline-none rounded-2xl" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${escapeHTML(book.title)} by ${escapeHTML(book.author || 'Unknown author')}">
+                    <div class="book-card relative group cursor-pointer focus-visible:ring-4 focus-visible:ring-primary/30 outline-none rounded-2xl" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${escapeHTML(book.title)} by ${escapeHTML(book.author || 'Unknown author')}">
                         <div class="absolute inset-0 bg-blue-600/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity rounded-2xl"></div>
                         <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm relative">
                             ${book.coverUrl || book.thumbnail ?
@@ -2210,12 +2294,15 @@
                                 </div>`
                         }
                             <div class="absolute bottom-2 right-2 flex flex-col items-end gap-1">
-                                <div class="px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase text-white ${READING_STATUSES[bookStatus].badge.includes('emerald') ? 'bg-emerald-500' : READING_STATUSES[bookStatus].badge.includes('blue') ? 'bg-blue-500' : 'bg-slate-500'}">
+                                <div class="px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase text-white ${READING_STATUSES[bookStatus].badge.includes('emerald') ? 'bg-emerald-500' : READING_STATUSES[bookStatus].badge.includes('blue') ? 'bg-blue-500' : 'bg-slate-500'} ${bookStatus === 'reading' ? 'animate-pulse-subtle' : ''}">
                                     ${READING_STATUSES[bookStatus].label === 'Want to Read' ? '' : (bookStatus === 'reading' ? `Reading (${userProgress || book.progress || 0}%)` : READING_STATUSES[bookStatus].label)}
                                 </div>
                             </div>
-                            <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                            <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex flex-col gap-2">
                                 <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-5 h-5 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer">
+                                <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="w-5 h-5 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform">
+                                    <svg class="w-3.5 h-3.5 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'stroke-white'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+                                </button>
                             </div>
                         </div>
                         <div class="mt-2 px-1">
@@ -2228,7 +2315,7 @@
 
                 if (viewMode === 'list') {
                     return `
-                    <div class="book-card glass px-6 py-4 rounded-2xl flex items-center gap-4 cursor-pointer hover:bg-white dark:hover:bg-slate-800 transition-all border ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-lg' : 'border-blue-100/50 dark:border-slate-800'} group relative focus-visible:ring-4 focus-visible:ring-primary/20 outline-none" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${escapeHTML(book.title)} by ${escapeHTML(book.author || 'Unknown author')}">
+                    <div class="book-card glass px-6 py-4 rounded-2xl flex items-center gap-4 cursor-pointer hover:bg-white dark:hover:bg-slate-800 transition-all border ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-lg' : 'border-blue-100/50 dark:border-slate-800'} group relative focus-visible:ring-4 focus-visible:ring-primary/30 outline-none" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${escapeHTML(book.title)} by ${escapeHTML(book.author || 'Unknown author')}">
                         <div class="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                             <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
                         </div>
@@ -2240,9 +2327,9 @@
                                 <h3 class="font-black text-sm truncate font-serif">${book.title}</h3>
                                 ${book.borrowedBy ? `<span class="px-2 py-0.5 rounded-full text-[8px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed</span>` : ''}
                             </div>
-                            <button class="text-xs text-slate-500 truncate hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none text-left" onclick="event.stopPropagation(); window.setAuthorFilter('${(book.author || 'Unknown').replace(/'/g, "\\'")}')" aria-label="Filter by author: ${book.author || 'Unknown'}">${book.author || 'Unknown'}</button>
+                            <button class="text-xs text-slate-500 truncate hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-left" onclick="event.stopPropagation(); window.setAuthorFilter('${(book.author || 'Unknown').replace(/'/g, "\\'")}')" aria-label="Filter by author: ${book.author || 'Unknown'}">${book.author || 'Unknown'}</button>
                             <div class="flex flex-wrap gap-1 mt-1">
-                                ${(book.tags || []).map(tag => `<button onclick="event.stopPropagation(); window.setTagFilter('${tag}')" class="text-[8px] bg-slate-100 dark:bg-slate-700 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Filter by tag: ${tag}">${tag}</button>`).join('')}
+                                ${(book.tags || []).map(tag => `<button onclick="event.stopPropagation(); window.setTagFilter('${tag}')" class="text-[8px] bg-slate-100 dark:bg-slate-700 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by tag: ${tag}">${tag}</button>`).join('')}
                             </div>
                         </div>
                         <div class="text-right flex-shrink-0 flex flex-col items-end">
@@ -2251,15 +2338,18 @@
                                 ${bookGenres.map((g, i) => {
                                     const escapedG = escapeHTML(g);
                                     const jsEscapedG = g.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-                                    return `<button onclick="event.stopPropagation(); window.setCategoryFilter('${jsEscapedG}')" class="hover:text-blue-700 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>${i < bookGenres.length - 1 ? '<span class="text-slate-300">, </span>' : ''}`;
+                                    return `<button onclick="event.stopPropagation(); window.setCategoryFilter('${jsEscapedG}')" class="hover:text-blue-700 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none rounded" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>${i < bookGenres.length - 1 ? '<span class="text-slate-300">, </span>' : ''}`;
                                 }).join('')}
                             </div>
-                            ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${(book.owner).replace(/'/g, "\\'")}')" aria-label="Filter by owner: ${book.owner}">Owner: ${book.owner}</button>` : ''}
+                            ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${(book.owner).replace(/'/g, "\\'")}')" aria-label="Filter by owner: ${book.owner}">Owner: ${book.owner}</button>` : ''}
                             <div class="flex items-center gap-2 mt-1">
+                                <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-full transition-colors ${isFavorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'}" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                                    <svg class="w-3.5 h-3.5 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'text-slate-300'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+                                </button>
                                 <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Edit book details">
                                     <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
-                                <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge}">
+                                <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge} ${bookStatus === 'reading' ? 'animate-pulse-subtle' : ''}">
                                     ${statusData.isWishlist ? 'Wishlist' : (bookStatus === 'reading' ? `Reading (${userProgress || book.progress || 0}%)` : READING_STATUSES[bookStatus].label)}
                                 </div>
                             </div>
@@ -2270,9 +2360,12 @@
 
                 const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
                 return `
-                <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-blue-100/50 dark:border-slate-800'} relative ${densityClass} focus-visible:ring-4 focus-visible:ring-primary/20 outline-none" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${escapeHTML(book.title)} by ${escapeHTML(book.author || 'Unknown author')}">
-                    <div class="absolute top-4 left-4 z-20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-blue-100/50 dark:border-slate-800'} relative ${densityClass} focus-visible:ring-4 focus-visible:ring-primary/30 outline-none" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${escapeHTML(book.title)} by ${escapeHTML(book.author || 'Unknown author')}">
+                    <div class="absolute top-4 left-4 z-20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex flex-col gap-3">
                         <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-6 h-6 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer">
+                        <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="w-6 h-6 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform">
+                            <svg class="w-4 h-4 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'stroke-white'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+                        </button>
                     </div>
                     <div class="w-28 h-40 bg-slate-100 dark:bg-slate-800 rounded-3xl overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 relative shadow-lg">
                         ${bookStatus === 'reading' ? `
@@ -2293,21 +2386,21 @@
                                     ${bookGenres.map((g, i) => {
                                         const escapedG = escapeHTML(g);
                                         const jsEscapedG = g.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-                                        return `<button onclick="event.stopPropagation(); window.setCategoryFilter('${jsEscapedG}')" class="hover:text-blue-700 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>${i < bookGenres.length - 1 ? '<span class="text-slate-300">, </span>' : ''}`;
+                                        return `<button onclick="event.stopPropagation(); window.setCategoryFilter('${jsEscapedG}')" class="hover:text-blue-700 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none rounded" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>${i < bookGenres.length - 1 ? '<span class="text-slate-300">, </span>' : ''}`;
                                     }).join('')}
                                 </div>
                                 <div class="text-amber-400 text-[13px] tracking-tighter">${stars}${book.averageRating ? `<span class="ml-1 text-slate-400">(${book.averageRating.toFixed(1)})</span>` : ''}</div>
                             </div>
-                            <h3 class="font-black text-lg leading-tight line-clamp-2 mt-1 group-hover:text-blue-600 transition-colors font-serif italic">${book.title}</h3>
+                            <h3 class="font-black text-lg leading-tight line-clamp-2 mt-1 group-hover:text-primary transition-colors font-serif italic">${book.title}</h3>
                             <div class="flex justify-between items-center gap-2">
-                                <button class="text-sm text-slate-500 dark:text-slate-400 mt-1 truncate font-medium hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none text-left" onclick="event.stopPropagation(); window.setAuthorFilter('${(book.author || 'Unknown').replace(/'/g, "\\'")}')" aria-label="Filter by author: ${book.author || 'Unknown'}">${book.author || 'Unknown'}</button>
-                                ${book.owner ? `<button class="text-[10px] text-slate-400 font-medium truncate hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${(book.owner).replace(/'/g, "\\'")}')" aria-label="Filter by owner: ${book.owner}">Owner: ${book.owner}</button>` : ''}
+                                <button class="text-sm text-slate-500 dark:text-slate-400 mt-1 truncate font-medium hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-left" onclick="event.stopPropagation(); window.setAuthorFilter('${(book.author || 'Unknown').replace(/'/g, "\\'")}')" aria-label="Filter by author: ${book.author || 'Unknown'}">${book.author || 'Unknown'}</button>
+                                ${book.owner ? `<button class="text-[10px] text-slate-400 font-medium truncate hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${(book.owner).replace(/'/g, "\\'")}')" aria-label="Filter by owner: ${book.owner}">Owner: ${book.owner}</button>` : ''}
                             </div>
                             <div class="flex flex-wrap gap-1 mt-2">
-                                ${(book.tags || []).map(tag => `<button onclick="event.stopPropagation(); window.setTagFilter('${tag}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Filter by tag: ${tag}">${tag}</button>`).join('')}
+                                ${(book.tags || []).map(tag => `<button onclick="event.stopPropagation(); window.setTagFilter('${tag}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by tag: ${tag}">${tag}</button>`).join('')}
                             </div>
                             <div class="mt-2 flex flex-wrap gap-1">
-                                <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge}">
+                                <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge} ${bookStatus === 'reading' ? 'animate-pulse-subtle' : ''}">
                                     ${statusData.isWishlist ? 'Wishlist' : (bookStatus === 'reading' ? `Reading (${userProgress || book.progress || 0}%)` : READING_STATUSES[bookStatus].label)}
                                 </div>
                                 ${book.borrowedBy ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed by ${book.borrowedBy}</div>` : ''}
@@ -2493,7 +2586,9 @@
                                     rating: data.rating || 0,
                                     progress: data.progress || 0,
                                     comment: data.comment || '',
-                                    isWishlist: data.isWishlist || false
+                                    isWishlist: data.isWishlist || false,
+                                    isFavorite: data.isFavorite || false,
+                                    highlights: data.highlights || []
                                 };
                             }
                         });
@@ -2800,7 +2895,7 @@
                                 <label for="man-title" class="text-[10px] font-bold text-slate-400 uppercase ml-1 font-serif">Title *</label>
                                 <div class="flex gap-2">
                                     <input id="man-title" placeholder="e.g. The Great Gatsby" value="${existingBook?.title || ''}" class="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
-                                    <button id="ai-magic-fill" class="px-4 py-3 bg-blue-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-blue-700 transition active:scale-95 shadow-lg shadow-blue-200 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" title="AI Magic Fill">
+                                    <button id="ai-magic-fill" class="px-4 py-3 bg-blue-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-blue-700 transition active:scale-95 shadow-lg shadow-blue-200 focus-visible:ring-2 focus-visible:ring-primary outline-none" title="AI Magic Fill">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                                         <span class="hidden sm:inline">Magic Fill</span>
                                     </button>
@@ -2854,7 +2949,7 @@
                         </div>
                         <div class="flex gap-4 mt-10 pb-10">
                             <button data-close class="flex-1 px-4 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold">Cancel</button>
-                            <button id="save-manual" class="flex-1 px-4 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">${isEdit ? 'Update' : 'Save'}</button>
+                            <button id="save-manual" class="flex-1 px-4 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">${isEdit ? 'Update' : 'Save'}</button>
                         </div>
                     </div>
                 </div>
@@ -3006,14 +3101,14 @@
                 <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up">
                     <h2 class="text-2xl font-black mb-6 font-serif italic text-primary">Add a Finished Book</h2>
                     <div class="grid grid-cols-1 gap-4">
-                        <button id="select-existing-btn" class="w-full p-6 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition flex flex-col items-center gap-2 group focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">
+                        <button id="select-existing-btn" class="w-full p-6 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition flex flex-col items-center gap-2 group focus-visible:ring-2 focus-visible:ring-primary outline-none">
                             <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/50 rounded-xl flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
                             </div>
                             <span class="text-sm">Select from existing library</span>
                             <span class="text-[10px] font-medium text-slate-400">Mark a book you already have as finished</span>
                         </button>
-                        <button id="add-new-finished-btn" class="w-full p-6 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-emerald-50 dark:hover:bg-slate-700 transition flex flex-col items-center gap-2 group focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">
+                        <button id="add-new-finished-btn" class="w-full p-6 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-emerald-50 dark:hover:bg-slate-700 transition flex flex-col items-center gap-2 group focus-visible:ring-2 focus-visible:ring-primary outline-none">
                             <div class="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/50 rounded-xl flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                             </div>
@@ -3022,7 +3117,7 @@
                         </button>
                     </div>
                     <div class="mt-8 flex justify-center">
-                        <button data-close class="px-8 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold transition active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Cancel</button>
+                        <button data-close class="px-8 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold transition active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">Cancel</button>
                     </div>
                 </div>
                 `;
@@ -3047,7 +3142,7 @@
                 <div class="glass max-w-2xl w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up overflow-hidden flex flex-col max-h-[90vh]">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-black font-serif italic">Select from Library</h2>
-                        <button data-close class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                        <button data-close class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                     </div>
                     <div class="relative mb-6">
                         <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
@@ -3055,7 +3150,7 @@
                     </div>
                     <div id="select-book-list" class="flex-1 overflow-y-auto space-y-3 pr-2">
                         ${myBooks.length > 0 ? myBooks.map(b => `
-                            <button onclick="window.markAsFinished('${b.id}')" class="w-full flex items-center gap-4 p-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all text-left group focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">
+                            <button onclick="window.markAsFinished('${b.id}')" class="w-full flex items-center gap-4 p-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all text-left group focus-visible:ring-2 focus-visible:ring-primary outline-none">
                                 <img src="${b.coverUrl || b.thumbnail || 'https://via.placeholder.com/40x60?text=No+Cover'}" class="w-12 h-16 object-cover rounded-lg shadow-sm">
                                 <div class="flex-1 min-w-0">
                                     <h4 class="font-bold text-sm truncate group-hover:text-blue-600 transition-colors">${escapeHTML(b.title)}</h4>
@@ -3080,7 +3175,7 @@
                         const q = e.target.value.toLowerCase();
                         const filtered = myBooks.filter(b => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q));
                         listContainer.innerHTML = filtered.length > 0 ? filtered.map(b => `
-                            <button onclick="window.markAsFinished('${b.id}')" class="w-full flex items-center gap-4 p-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all text-left group focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">
+                            <button onclick="window.markAsFinished('${b.id}')" class="w-full flex items-center gap-4 p-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all text-left group focus-visible:ring-2 focus-visible:ring-primary outline-none">
                                 <img src="${b.coverUrl || b.thumbnail || 'https://via.placeholder.com/40x60?text=No+Cover'}" class="w-12 h-16 object-cover rounded-lg shadow-sm">
                                 <div class="flex-1 min-w-0">
                                     <h4 class="font-bold text-sm truncate group-hover:text-blue-600 transition-colors">${escapeHTML(b.title)}</h4>
@@ -3284,11 +3379,11 @@
                     <!-- Sub-tab Navigation -->
                     <div class="flex items-center justify-center">
                         <div class="bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl flex gap-1 shadow-inner">
-                            <button onclick="window.setMyBooksSubTab('finished')" class="px-8 py-3 rounded-xl text-sm font-bold transition-all focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${myBooksSubTab === 'finished' ? 'bg-white dark:bg-slate-700 shadow-md text-primary' : 'text-slate-500 hover:text-slate-700'}">
+                            <button onclick="window.setMyBooksSubTab('finished')" class="px-8 py-3 rounded-xl text-sm font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${myBooksSubTab === 'finished' ? 'bg-white dark:bg-slate-700 shadow-md text-primary' : 'text-slate-500 hover:text-slate-700'}">
                                 Finished Books
                                 <span class="ml-2 px-2 py-0.5 bg-slate-200 dark:bg-slate-600 rounded-lg text-[10px]">${finishedBooks.length}</span>
                             </button>
-                            <button onclick="window.setMyBooksSubTab('wishlist')" class="px-8 py-3 rounded-xl text-sm font-bold transition-all focus-visible:ring-2 focus-visible:ring-blue-500 outline-none ${myBooksSubTab === 'wishlist' ? 'bg-white dark:bg-slate-700 shadow-md text-primary' : 'text-slate-500 hover:text-slate-700'}">
+                            <button onclick="window.setMyBooksSubTab('wishlist')" class="px-8 py-3 rounded-xl text-sm font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${myBooksSubTab === 'wishlist' ? 'bg-white dark:bg-slate-700 shadow-md text-primary' : 'text-slate-500 hover:text-slate-700'}">
                                 Wishlist
                                 <span class="ml-2 px-2 py-0.5 bg-slate-200 dark:bg-slate-600 rounded-lg text-[10px]">${wishlistBooks.length}</span>
                             </button>
@@ -3297,7 +3392,7 @@
 
                     ${myBooksSubTab === 'finished' ? `
                     <div class="flex justify-center">
-                        <button onclick="window.openAddFinishedBookModal()" class="px-6 py-3 bg-primary text-white rounded-2xl font-bold flex items-center gap-2 hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">
+                        <button onclick="window.openAddFinishedBookModal()" class="px-6 py-3 bg-primary text-white rounded-2xl font-bold flex items-center gap-2 hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 focus-visible:ring-2 focus-visible:ring-primary outline-none">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                             Add a finished book
                         </button>
@@ -3597,7 +3692,7 @@
                                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Top Tags</h3>
                                 <div class="grid gap-2">
                                     ${Object.entries(tagsCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => `
-                                        <button class="w-full flex justify-between items-center group cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded-lg text-left" onclick='window.applyInsightFilter("tag", "${name.replace(/"/g, "&quot;")}")' aria-label="Filter by tag: ${name}">
+                                        <button class="w-full flex justify-between items-center group cursor-pointer focus-visible:ring-2 focus-visible:ring-primary outline-none rounded-lg text-left" onclick='window.applyInsightFilter("tag", "${name.replace(/"/g, "&quot;")}")' aria-label="Filter by tag: ${name}">
                                             <div class="flex items-center gap-3">
                                                 <div class="w-1 h-1 rounded-full bg-amber-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                                 <span class="text-sm font-medium text-slate-600 dark:text-slate-300 group-hover:text-amber-600 transition-colors">${name}</span>
@@ -3619,7 +3714,7 @@
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
                                     Reading Roadmap
                                 </button>
-                                <button id="run-ai-analysis-btn" class="px-6 py-2 bg-blue-600 text-white rounded-full font-bold text-sm shadow-lg hover:scale-105 transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Analyze Library</button>
+                                <button id="run-ai-analysis-btn" class="px-6 py-2 bg-blue-600 text-white rounded-full font-bold text-sm shadow-lg hover:scale-105 transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">Analyze Library</button>
                             </div>
                         </div>
 
@@ -3954,7 +4049,7 @@
                     }
 
                     return `
-                        <div class="activity-card glass rounded-3xl p-5 border border-blue-100/50 dark:border-slate-800 border-l-4 border-l-blue-500 hover:shadow-xl hover:bg-blue-50/50 dark:hover:bg-slate-800/80 transition-all group cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" onclick="window.jumpToBook('${activity.bookId}')" tabindex="0" role="button" aria-label="View activity: ${escapeHTML(activity.userName || activity.addedBy || 'Someone')} ${actionText.replace(/<[^>]*>?/gm, '')} ${escapeHTML(activity.bookTitle || activity.title)}">
+                        <div class="activity-card glass rounded-3xl p-5 border border-blue-100/50 dark:border-slate-800 border-l-4 border-l-blue-500 hover:shadow-xl hover:bg-blue-50/50 dark:hover:bg-slate-800/80 transition-all group cursor-pointer focus-visible:ring-2 focus-visible:ring-primary outline-none" onclick="window.jumpToBook('${activity.bookId}')" tabindex="0" role="button" aria-label="View activity: ${escapeHTML(activity.userName || activity.addedBy || 'Someone')} ${actionText.replace(/<[^>]*>?/gm, '')} ${escapeHTML(activity.bookTitle || activity.title)}">
                             <div class="flex items-start gap-4">
                                 <div class="w-12 h-12 rounded-2xl ${badgeColor} flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-110 transition-transform">
                                     ${icon}
@@ -4253,8 +4348,8 @@
 
             // ---------- AI Librarian Service ----------
             const AI_CONFIG = {
-                defaultModel: 'gemini-2.5-flash-lite',
-                fallbackModel: 'gemini-2.5-flash-lite'
+                defaultModel: 'gemma-3-12b-it',
+                fallbackModel: 'gemma-3-12b-it'
             };
 
             function getAIConfig() {
@@ -4380,7 +4475,7 @@
                 }
 
                 return `You are the Expert AI Librarian for "My Lib", a sophisticated personal library management app.
-Your personality is professional, insightful, and encouraging. You speak as a true book lover who knows the user's collection intimately.
+Your personality is warm, bibliophilic, and deeply encouraging. You speak as a true book lover who knows the user's collection intimately and treats every book like a precious gem. Use literary metaphors occasionally to enrich your responses.
 
 LANGUAGE RULE:
 ${languageInstructions}
@@ -4643,6 +4738,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                 const userRating = statusData.rating;
                 const userComment = statusData.comment;
                 const userProgress = statusData.progress;
+                const isFavorite = statusData.isFavorite || false;
 
                 const stars = STAR_CACHE[userRating] || STAR_CACHE[book.rating] || STAR_CACHE[0];
 
@@ -4661,6 +4757,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                 const userRatingVal = userStatusDoc.exists ? userStatusDoc.data().rating || 0 : userRating;
                 const userCommentVal = userStatusDoc.exists ? userStatusDoc.data().comment || '' : userComment;
                 const userProgressVal = userStatusDoc.exists ? userStatusDoc.data().progress || 0 : userProgress;
+                const userHighlightsVal = userStatusDoc.exists ? userStatusDoc.data().highlights || [] : (statusData.highlights || []);
 
                 // Fetch all ratings and comments for this book
                 const allStatusesSnapshot = await db.collection('books').doc(book.id).collection('readingStatus').get();
@@ -4709,12 +4806,17 @@ If the collection is small or has no finished books, be extra encouraging and su
                                         ${bookGenres.map((g, i) => {
                                             const escapedG = escapeHTML(g);
                                             const jsEscapedG = g.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-                                            return `<button onclick="window.setCategoryFilter('${jsEscapedG}'); close();" class="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest hover:opacity-80 transition-opacity focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded px-1" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>${i < bookGenres.length - 1 ? '<span class="text-slate-300 mx-1">·</span>' : ''}`;
+                                            return `<button onclick="window.setCategoryFilter('${jsEscapedG}'); close();" class="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest hover:opacity-80 transition-opacity focus-visible:ring-2 focus-visible:ring-primary outline-none rounded px-1" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>${i < bookGenres.length - 1 ? '<span class="text-slate-300 mx-1">·</span>' : ''}`;
                                         }).join('')}
                                     </div>
                                     ${book.owner ? `<span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-auto">Owner: ${escapeHTML(book.owner)}</span>` : ''}
                                 </div>
-                                <h2 class="text-3xl font-black mt-3 leading-tight font-serif">${escapeHTML(book.title)}</h2>
+                                <div class="flex items-center gap-4 mt-3">
+                                    <h2 class="text-3xl font-black leading-tight font-serif">${escapeHTML(book.title)}</h2>
+                                    <button onclick="window.toggleFavorite('${book.id}')" class="p-2 bg-white dark:bg-slate-800 rounded-xl shadow-md hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                                        <svg class="w-6 h-6 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'text-slate-300'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+                                    </button>
+                                </div>
                                 <p class="text-xl text-slate-500 dark:text-slate-400 mt-2 font-medium italic">${escapeHTML(book.author)}</p>
                                 ${book.description ? `<p class="text-sm text-slate-600 dark:text-slate-300 mt-4 leading-relaxed line-clamp-4 hover:line-clamp-none transition-all cursor-pointer" title="Click to expand description">${escapeHTML(book.description)}</p>` : ''}
                                 <div class="flex items-center gap-4 m-5">
@@ -4730,7 +4832,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                                 ${book.isbn ? `
                                     <div class="mt-6 px-4">
                                         <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">ISBN</p>
-                                        <button onclick="window.copyISBN('${book.isbn.replace(/'/g, "\\'")}')" class="flex items-center gap-2 group/isbn hover:text-blue-600 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500/50 outline-none rounded-lg px-2 -ml-2" title="Copy ISBN" aria-label="Copy ISBN">
+                                        <button onclick="window.copyISBN('${book.isbn.replace(/'/g, "\\'")}')" class="flex items-center gap-2 group/isbn hover:text-blue-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary/50 outline-none rounded-lg px-2 -ml-2" title="Copy ISBN" aria-label="Copy ISBN">
                                             <span class="text-sm font-mono tracking-wider">${book.isbn}</span>
                                             <svg class="w-3.5 h-3.5 opacity-0 group-hover/isbn:opacity-100 transition-opacity" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
                                         </button>
@@ -4757,7 +4859,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                                 <div class="mt-4 px-4">
                                     <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Tags</p>
                                     <div class="flex flex-wrap gap-2">
-                                        ${(book.tags || []).map(tag => `<button onclick="window.setTagFilter('${tag}'); document.querySelector('[data-close]').click();" class="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-bold cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Filter by tag: ${tag}">${tag}</button>`).join('')}
+                                        ${(book.tags || []).map(tag => `<button onclick="window.setTagFilter('${tag}'); document.querySelector('[data-close]').click();" class="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-bold cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by tag: ${tag}">${tag}</button>`).join('')}
                                     </div>
                                 </div>
                                 <div class="mt-4 px-4">
@@ -4772,7 +4874,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                                             <option value="5" ${userRatingVal === 5 ? 'selected' : ''}>5 Stars</option>
                                         </select>
                                         <textarea id="detail-comment-textarea" placeholder="What did you think of this book?" class="w-full px-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px]">${escapeHTML(userCommentVal)}</textarea>
-                                        <button id="save-rating-btn" class="w-full py-2 bg-primary text-white text-[10px] font-black uppercase rounded-lg focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Save Review</button>
+                                        <button id="save-rating-btn" class="w-full py-2 bg-primary text-white text-[10px] font-black uppercase rounded-lg focus-visible:ring-2 focus-visible:ring-primary outline-none">Save Review</button>
                                     </div>
                                 </div>
                                 <div class="mt-4 px-4">
@@ -4789,7 +4891,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                                         <div class="flex flex-col gap-2">
                                             <div class="flex gap-2">
                                                 <input id="borrower-name" type="text" placeholder="Borrower Name" class="flex-1 px-3 py-2 text-xs bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                                                <button id="borrow-book-btn" class="px-4 py-2 bg-primary text-white text-[10px] font-black uppercase rounded-lg focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Borrow</button>
+                                                <button id="borrow-book-btn" class="px-4 py-2 bg-primary text-white text-[10px] font-black uppercase rounded-lg focus-visible:ring-2 focus-visible:ring-primary outline-none">Borrow</button>
                                             </div>
                                             <p class="text-[9px] text-slate-400">Leave name empty to borrow as yourself (${currentUser.displayName || currentUser.email})</p>
                                         </div>
@@ -4815,6 +4917,31 @@ If the collection is small or has no finished books, be extra encouraging and su
                                 </div>
                             </div>
                         ` : ''}
+
+                        <!-- Highlights & Quotes Section -->
+                        <div class="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase mb-4">Highlights & Quotes</p>
+                            <div class="space-y-4 mb-6">
+                                ${userHighlightsVal.map((h, i) => `
+                                    <div class="group relative p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm transition-all hover:shadow-md">
+                                        <p class="text-sm text-slate-700 dark:text-slate-300 italic leading-relaxed">"${escapeHTML(h.text)}"</p>
+                                        <div class="flex items-center justify-between mt-3">
+                                            <span class="text-[8px] font-bold text-slate-400 uppercase tracking-widest">${new Date(h.timestamp).toLocaleDateString()}</span>
+                                            <button onclick="window.deleteHighlight('${book.id}', ${i})" class="text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                                ${!userHighlightsVal.length ? '<p class="text-xs text-slate-400 italic">No highlights saved yet.</p>' : ''}
+                            </div>
+                            <div class="flex gap-2">
+                                <input id="new-highlight-input" type="text" placeholder="Add a quote or highlight..." class="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
+                                <button onclick="window.addHighlight('${book.id}', document.getElementById('new-highlight-input').value)" class="p-3 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700 transition active:scale-95">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                </button>
+                            </div>
+                        </div>
 
                         ${book.comments ? `
                             <div class="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800">
@@ -5092,6 +5219,10 @@ If the collection is small or has no finished books, be extra encouraging and su
             window.openAIChat = openAIChat;
             window.runAILibraryAnalysis = runAILibraryAnalysis;
             window.openBookDetails = openBookDetails;
+            window.toggleFavorite = toggleFavorite;
+            window.toggleFavoritesFilter = toggleFavoritesFilter;
+            window.addHighlight = addHighlight;
+            window.deleteHighlight = deleteHighlight;
             window.openManualEntry = openManualEntry;
             window.runLibraryCleanup = runLibraryCleanup;
             window.generateReadingRoadmap = generateReadingRoadmap;
@@ -5127,6 +5258,14 @@ If the collection is small or has no finished books, be extra encouraging and su
         /* Prevent layout shift during re-render */
         #main-content:empty {
             min-height: 50vh;
+        }
+
+        @keyframes pulse-subtle {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.85; transform: scale(0.98); }
+        }
+        .animate-pulse-subtle {
+            animation: pulse-subtle 3s ease-in-out infinite;
         }
     </style>
 
