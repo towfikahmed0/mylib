@@ -419,11 +419,18 @@
             }
 
             // ---------- Utility: Escape HTML ----------
-            const escapeDiv = document.createElement('div');
+            /**
+             * ⚡ Bolt: Pure JS implementation of escapeHTML to avoid slow DOM operations.
+             * This eliminates O(N) DOM manipulations during list rendering.
+             */
             function escapeHTML(str) {
-                if (!str) return '';
-                escapeDiv.textContent = str;
-                return escapeDiv.innerHTML;
+                if (!str && str !== 0) return '';
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
             }
 
             function formatAIText(text) {
@@ -1284,6 +1291,9 @@
                 const startTime = advancedFilters.startDate ? new Date(advancedFilters.startDate).getTime() : null;
                 const endTime = advancedFilters.endDate ? new Date(advancedFilters.endDate).getTime() : null;
 
+                // ⚡ Bolt: Convert aiSearchResults to a Set for O(1) lookup complexity
+                const aiIds = aiSearchResults ? new Set(aiSearchResults) : null;
+
                 let filteredBooks = books.filter(b => {
                     const statusData = getStatusData(b.id);
                     const isWishlist = statusData.isWishlist || false;
@@ -1293,8 +1303,8 @@
 
                     // ⚡ Bolt: Use pre-normalized _searchStr for O(1) string check per book
                     let matchesSearch = !searchQuery || b._searchStr.includes(searchLower);
-                    if (aiSearchResults) {
-                        matchesSearch = aiSearchResults.includes(b.id);
+                    if (aiIds) {
+                        matchesSearch = aiIds.has(b.id);
                     }
 
                     const bookStatus = statusData.status;
@@ -1323,23 +1333,18 @@
                     return matchesTab && matchesSearch && matchesStatus && matchesCategory && matchesAuthor && matchesOwner && matchesTag && matchesFavorites && matchesAdvancedRating && matchesPrice && matchesDate;
                 });
 
-                filteredBooks.sort((a, b) => {
-                    // ⚡ Bolt: Use pre-calculated sort keys instead of localeCompare for better performance
-                    if (sortBy === 'title') {
-                        if (a._sortTitle < b._sortTitle) return -1;
-                        if (a._sortTitle > b._sortTitle) return 1;
-                        return 0;
-                    }
-                    if (sortBy === 'author') {
-                        if (a._sortAuthor < b._sortAuthor) return -1;
-                        if (a._sortAuthor > b._sortAuthor) return 1;
-                        return 0;
-                    }
-                    // ⚡ Bolt: Use pre-calculated _createdTime for O(1) comparison
-                    if (sortBy === 'newest') return b._createdTime - a._createdTime;
-                    if (sortBy === 'oldest') return a._createdTime - b._createdTime;
-                    return 0;
-                });
+                // ⚡ Bolt: Select the comparator once to avoid branching inside the sort loop
+                let sortComparator;
+                if (sortBy === 'title') {
+                    sortComparator = (a, b) => (a._sortTitle < b._sortTitle ? -1 : (a._sortTitle > b._sortTitle ? 1 : 0));
+                } else if (sortBy === 'author') {
+                    sortComparator = (a, b) => (a._sortAuthor < b._sortAuthor ? -1 : (a._sortAuthor > b._sortAuthor ? 1 : 0));
+                } else if (sortBy === 'oldest') {
+                    sortComparator = (a, b) => a._createdTime - b._createdTime;
+                } else { // default: newest
+                    sortComparator = (a, b) => b._createdTime - a._createdTime;
+                }
+                filteredBooks.sort(sortComparator);
 
                 const activeFiltersContainer = document.getElementById('active-filters-bar');
                 if (activeFiltersContainer) {
