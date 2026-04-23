@@ -311,19 +311,26 @@
                     document.activeElement.click();
                     return;
                 }
-                if (e.key === '/' && !currentModalCloseHandler && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
-                    e.preventDefault();
-                    if (activeTab !== 'library') {
-                        window.setTab('library');
+                if (!currentModalCloseHandler && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+                    if (e.key === '/') {
+                        e.preventDefault();
+                        if (activeTab !== 'library') window.setTab('library');
+                        setTimeout(() => {
+                            const input = document.getElementById('search-input');
+                            if (input) { input.focus(); input.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+                        }, activeTab === 'library' ? 0 : 50);
+                        return;
                     }
-                    // Small timeout to allow tab to render if needed
-                    setTimeout(() => {
-                        const searchInput = document.getElementById('search-input');
-                        if (searchInput) {
-                            searchInput.focus();
-                            searchInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }
-                    }, activeTab === 'library' ? 0 : 50);
+                    if (e.key.toLowerCase() === 'n') {
+                        e.preventDefault();
+                        document.getElementById('manual-add-btn')?.click();
+                        return;
+                    }
+                    if (e.key.toLowerCase() === 'l') { e.preventDefault(); window.setTab('library'); return; }
+                    if (e.key.toLowerCase() === 'm') { e.preventDefault(); window.setTab('mybooks'); return; }
+                    if (e.key.toLowerCase() === 'a') { e.preventDefault(); window.setTab('activity'); return; }
+                    if (e.key.toLowerCase() === 'i') { e.preventDefault(); window.setTab('insight'); return; }
+                    if (e.key.toLowerCase() === 's') { e.preventDefault(); window.setTab('settings'); return; }
                 }
             });
             let viewMode = localStorage.getItem('mylib_viewMode') || 'grid';
@@ -459,6 +466,19 @@
                     showToast('ISBN copied to clipboard!', 'success');
                 }).catch(err => {
                     showToast('Failed to copy ISBN', 'error');
+                });
+            };
+
+            window.copyQuote = (text, title, author) => {
+                if (!navigator.clipboard) {
+                    showToast('Clipboard not available', 'error');
+                    return;
+                }
+                const formattedQuote = `"${text}" — ${title}, ${author}`;
+                navigator.clipboard.writeText(formattedQuote).then(() => {
+                    showToast('Quote copied to clipboard!', 'success');
+                }).catch(err => {
+                    showToast('Failed to copy quote', 'error');
                 });
             };
 
@@ -1583,11 +1603,20 @@
                             <p class="text-slate-400 max-w-xs mx-auto mt-2 text-sm">
                                 ${isAnyFilterActive ? 'Try adjusting your search or filters to find what you are looking for.' : 'Scan a book or add manually to start building your collection.'}
                             </p>
-                            <div class="mt-8 flex flex-col items-center justify-center gap-4">
+                            <div class="mt-8 flex flex-col items-center justify-center gap-6">
                                 ${isAnyFilterActive ? `
-                                    <div class="flex gap-4">
-                                        <button onclick="window.clearAllFilters()" class="px-6 py-2 bg-blue-600 text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">Clear All Filters</button>
-                                        ${(searchQuery && !aiSearchResults) ? `<button id="ai-search-btn" onclick="runAISearch()" class="px-6 py-2 bg-white text-blue-600 border border-blue-100 rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>Search with AI</button>` : ''}
+                                    <div class="flex flex-col sm:flex-row gap-4">
+                                        <button onclick="window.clearAllFilters()" class="px-6 py-3 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-full font-bold text-sm shadow-md transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">Clear All Filters</button>
+                                        ${(searchQuery && !aiSearchResults) ? `<button id="ai-search-btn" onclick="runAISearch()" class="px-6 py-3 bg-blue-600 text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none flex items-center gap-2 shadow-blue-200 dark:shadow-none"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>Search with AI</button>` : ''}
+                                    </div>
+                                    <div class="max-w-md p-4 bg-blue-50/50 dark:bg-slate-800/40 rounded-2xl border border-blue-100/50 dark:border-slate-800 text-center animate-slide-up">
+                                        <p class="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-2">Search Tips</p>
+                                        <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                                            Try searching by <span class="font-bold text-slate-700 dark:text-slate-200">genre</span> (e.g. "Fiction"),
+                                            <span class="font-bold text-slate-700 dark:text-slate-200">tags</span>, or
+                                            <span class="font-bold text-slate-700 dark:text-slate-200">author name</span> for better results.
+                                            You can also use <span class="font-bold text-slate-700 dark:text-slate-200">AI Search</span> for natural language queries!
+                                        </p>
                                     </div>
                                 ` : `
                                     <div class="flex gap-4">
@@ -3597,6 +3626,27 @@
                 const avgPrice = libBooks.length > 0 ? (totalValue / libBooks.length).toFixed(2) : 0;
                 const avgTags = libBooks.length > 0 ? (totalTags / libBooks.length).toFixed(1) : 0;
 
+                // --- Calculate Velocity & Momentum ---
+                let firstBookTime = Date.now();
+                let recentMomentum = 0;
+                const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+
+                libBooks.forEach(b => {
+                    const statusData = getStatusData(b.id);
+                    if (b._createdTime > 0 && b._createdTime < firstBookTime) {
+                        firstBookTime = b._createdTime;
+                    }
+                    if (statusData.status === 'finished' && statusData.updatedAt) {
+                        const finishedTime = statusData.updatedAt.toMillis ? statusData.updatedAt.toMillis() : new Date(statusData.updatedAt).getTime();
+                        if (finishedTime > thirtyDaysAgo) {
+                            recentMomentum++;
+                        }
+                    }
+                });
+
+                const monthsActive = Math.max(1, (Date.now() - firstBookTime) / (30 * 24 * 60 * 60 * 1000));
+                const readingVelocity = (statusCounts.finished / monthsActive).toFixed(1);
+
                 return `
                 <div class="max-w-4xl mx-auto space-y-12 animate-slide-up">
                     <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
@@ -3633,6 +3683,23 @@
                                 </div>
                                 <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Tags / Book</div>
                                 <div class="text-xl sm:text-3xl font-black font-sans relative z-10 text-slate-900 dark:text-white">${avgTags}</div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 sm:gap-4 mb-10">
+                            <div class="glass p-3 sm:p-6 rounded-3xl border border-blue-100/50 dark:border-slate-700 relative overflow-hidden group shadow-sm">
+                                <div class="absolute -right-2 -bottom-2 opacity-5 dark:opacity-10 group-hover:scale-110 transition-transform duration-500 text-blue-600 dark:text-blue-400">
+                                    <svg class="w-16 h-16 sm:w-20 sm:h-20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                                </div>
+                                <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Reading Velocity</div>
+                                <div class="text-xl sm:text-3xl font-black font-sans relative z-10 text-slate-900 dark:text-white">${readingVelocity} <span class="text-xs font-bold text-slate-400">books/mo</span></div>
+                            </div>
+                            <div class="glass p-3 sm:p-6 rounded-3xl border border-emerald-100/50 dark:border-slate-700 relative overflow-hidden group shadow-sm">
+                                <div class="absolute -right-2 -bottom-2 opacity-5 dark:opacity-10 group-hover:scale-110 transition-transform duration-500 text-emerald-600 dark:text-emerald-400">
+                                    <svg class="w-16 h-16 sm:w-20 sm:h-20" fill="currentColor" viewBox="0 0 24 24"><path d="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42C17.99 7.86 19 9.81 19 12c0 3.87-3.13 7-7 7s-7-3.13-7-7c0-2.19 1.01-4.14 2.58-5.42L6.17 5.17C4.23 6.82 3 9.26 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-2.74-1.23-5.18-3.17-6.83z"/></svg>
+                                </div>
+                                <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Recent Momentum</div>
+                                <div class="text-xl sm:text-3xl font-black font-sans relative z-10 text-slate-900 dark:text-white">${recentMomentum} <span class="text-xs font-bold text-slate-400">last 30d</span></div>
                             </div>
                         </div>
 
@@ -4942,9 +5009,14 @@ If the collection is small or has no finished books, be extra encouraging and su
                                         <p class="text-sm text-slate-700 dark:text-slate-300 italic leading-relaxed">"${escapeHTML(h.text)}"</p>
                                         <div class="flex items-center justify-between mt-3">
                                             <span class="text-[8px] font-bold text-slate-400 uppercase tracking-widest">${new Date(h.timestamp).toLocaleDateString()}</span>
-                                        <button onclick="window.deleteHighlight('${book.id}', ${i})" class="text-rose-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="Delete highlight">
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                            </button>
+                                            <div class="flex items-center gap-2">
+                                                <button onclick="window.copyQuote('${h.text.replace(/'/g, "\\'")}', '${book.title.replace(/'/g, "\\'")}', '${(book.author || 'Unknown').replace(/'/g, "\\'")}')" class="text-blue-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity p-1 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Copy highlight" title="Copy highlight">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                                                </button>
+                                                <button onclick="window.deleteHighlight('${book.id}', ${i})" class="text-rose-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="Delete highlight" title="Delete highlight">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 `).join('')}
