@@ -1314,8 +1314,17 @@
                 });
 
                 filteredBooks.sort((a, b) => {
-                    if (sortBy === 'title') return (a.title || '').localeCompare(b.title || '');
-                    if (sortBy === 'author') return (a.author || '').localeCompare(b.author || '');
+                    // ⚡ Bolt: Use pre-calculated sort keys instead of localeCompare for better performance
+                    if (sortBy === 'title') {
+                        if (a._sortTitle < b._sortTitle) return -1;
+                        if (a._sortTitle > b._sortTitle) return 1;
+                        return 0;
+                    }
+                    if (sortBy === 'author') {
+                        if (a._sortAuthor < b._sortAuthor) return -1;
+                        if (a._sortAuthor > b._sortAuthor) return 1;
+                        return 0;
+                    }
                     // ⚡ Bolt: Use pre-calculated _createdTime for O(1) comparison
                     if (sortBy === 'newest') return b._createdTime - a._createdTime;
                     if (sortBy === 'oldest') return a._createdTime - b._createdTime;
@@ -1570,9 +1579,19 @@
 
                     // Fetch owner names for partner libraries
                     Object.keys(partnerLibraries).forEach(ownerId => {
+                        // ⚡ Bolt: Check userProfileCache first to avoid redundant Firestore calls
+                        if (userProfileCache[ownerId]) {
+                            const name = userProfileCache[ownerId].displayName || userProfileCache[ownerId].email || 'Unknown';
+                            const heading = libraryWrapper.querySelector(`[data-owner-id="${ownerId}"] [data-name]`);
+                            if (heading) heading.textContent = name;
+                            return;
+                        }
+
                         db.collection('users').doc(ownerId).get().then(doc => {
                             if (doc.exists) {
-                                const name = doc.data()?.displayName || doc.data()?.email || 'Unknown';
+                                const data = doc.data();
+                                userProfileCache[ownerId] = data; // Update cache
+                                const name = data.displayName || data.email || 'Unknown';
                                 const heading = libraryWrapper.querySelector(`[data-owner-id="${ownerId}"] [data-name]`);
                                 if (heading) heading.textContent = name;
                             }
@@ -2127,6 +2146,8 @@
                     ...book,
                     _genres: genres,
                     _searchStr: searchParts.filter(Boolean).join(' ').toLowerCase(),
+                    _sortTitle: (book.title || '').toLowerCase(),
+                    _sortAuthor: (book.author || '').toLowerCase(),
                     _purchaseTime: book.purchaseDate ? new Date(book.purchaseDate).getTime() : 0,
                     _createdTime: book.createdAt?.toMillis() || 0
                 };
@@ -2150,7 +2171,8 @@
                 books.forEach(b => {
                     if (b.author) authorsSet.add(b.author);
                     if (b.owner) ownersSet.add(b.owner);
-                    getBookGenres(b).forEach(g => {
+                    // ⚡ Bolt: Use pre-calculated _genres instead of re-calculating them
+                    (b._genres || []).forEach(g => {
                         if (g) genresSet.add(g);
                     });
                 });
@@ -2171,7 +2193,8 @@
                 const stars = STAR_CACHE[displayRating] || '';
 
                 const isSelected = selectedBookIds.has(book.id);
-                const bookGenres = getBookGenres(book);
+                // ⚡ Bolt: Use pre-calculated _genres
+                const bookGenres = book._genres || [];
                 const isSharedBook = book.userId !== currentUser.uid;
                 const addedByBadge = book.addedBy && book.addedBy !== currentUser.uid ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">Added by contributor</div>` : '';
 
@@ -2357,17 +2380,32 @@
                     }
 
                     const bookUnsubs = [];
-                    let chunkedBooks = {};
+                    const chunkedBooksMap = new Map(); // Using Map for O(1) chunk updates
 
                     for (let i = 0; i < userIdsToFetch.length; i += 10) {
                         const chunk = userIdsToFetch.slice(i, i + 10);
+                        const chunkMap = new Map(); // Persistent map for this chunk's documents
+                        chunkedBooksMap.set(i, chunkMap);
+
                         const unsub = db.collection('books')
                             .where('userId', 'in', chunk)
                             .onSnapshot(snapshot => {
-                                chunkedBooks[i] = snapshot.docs.map(doc => normalizeBook({ id: doc.id, ...doc.data() }));
+                                // ⚡ Bolt: Use incremental updates with docChanges() to avoid O(N) re-processing
+                                snapshot.docChanges().forEach(change => {
+                                    if (change.type === 'removed') {
+                                        chunkMap.delete(change.doc.id);
+                                    } else {
+                                        chunkMap.set(change.doc.id, normalizeBook({ id: change.doc.id, ...change.doc.data() }));
+                                    }
+                                });
 
                                 // Merge and sort all chunked books
-                                books = Object.values(chunkedBooks).flat().sort((a, b) => b._createdTime - a._createdTime);
+                                const allBooks = [];
+                                for (const m of chunkedBooksMap.values()) {
+                                    for (const b of m.values()) allBooks.push(b);
+                                }
+                                books = allBooks.sort((a, b) => b._createdTime - a._createdTime);
+
                                 updateMetadataCache();
                                 renderMainApp();
                             }, err => {
@@ -2384,23 +2422,38 @@
                     }
 
                     const activityUnsubs = [];
-                    let chunkedActivities = {};
+                    const chunkedActivitiesMap = new Map();
 
                     for (let i = 0; i < userIdsToFetch.length; i += 10) {
                         const chunk = userIdsToFetch.slice(i, i + 10);
+                        const chunkMap = new Map();
+                        chunkedActivitiesMap.set(i, chunkMap);
+
                         const unsub = db.collection('activityFeed')
                             .where('libraryId', 'in', chunk)
                             .orderBy('timestamp', 'desc')
                             .limit(30)
                             .onSnapshot(snapshot => {
-                                chunkedActivities[i] = snapshot.docs.map(doc => ({
-                                    id: doc.id,
-                                    ...doc.data(),
-                                    timestamp: doc.data().timestamp?.toDate() || new Date()
-                                }));
+                                // ⚡ Bolt: Incremental activity updates
+                                snapshot.docChanges().forEach(change => {
+                                    if (change.type === 'removed') {
+                                        chunkMap.delete(change.doc.id);
+                                    } else {
+                                        chunkMap.set(change.doc.id, {
+                                            id: change.doc.id,
+                                            ...change.doc.data(),
+                                            timestamp: change.doc.data().timestamp?.toDate() || new Date()
+                                        });
+                                    }
+                                });
 
                                 // Merge and sort all chunked activities
-                                activities = Object.values(chunkedActivities).flat().sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
+                                const allActivities = [];
+                                for (const m of chunkedActivitiesMap.values()) {
+                                    for (const a of m.values()) allActivities.push(a);
+                                }
+                                activities = allActivities.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
+
                                 if (activeTab === 'activity') renderMainApp();
                             }, err => {
                                 console.error("Activity Listener Error for chunk:", chunk, err);
