@@ -1,0 +1,3 @@
+## 2025-05-14 - Interactive Filtering and Search Feedback
+**Learning:** In dynamic, filterable interfaces, providing immediate visual feedback for interaction states (like fading a search hint on focus) and clear, accessible labels for filter removal actions significantly improves discoverability and keyboard navigation. Passive cards should be elevated to interactive buttons with proper focus rings to ensure consistent accessibility.
+**Action:** Always verify that every interactive filter element (tags, removal icons, search clear) has a descriptive ARIA label and a visible focus indicator (`focus-visible:ring-2`). For input hints, use CSS `group-focus-within` patterns to handle visibility transitions without JavaScript overhead.
