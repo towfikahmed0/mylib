@@ -351,11 +351,22 @@
                 endDate: null
             };
 
+            // ⚡ Bolt: Cache currency symbol to avoid redundant localStorage hits in render loops
+            const CURRENCIES = Object.freeze({
+                'USD': '$',
+                'EUR': '€',
+                'GBP': '£',
+                'BDT': '৳',
+                'INR': '₹',
+                'JPY': '¥'
+            });
+            let cachedCurrencySymbol = CURRENCIES[localStorage.getItem('mylib_currency')] || '$';
+
             const READING_STATUSES = {
-                want_to_read: { label: '', badge: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200' },
-                reading: { label: 'Reading', badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' },
-                finished: { label: 'Finished', badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300' },
-                unread: { label: 'Want to Read', badge: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200' } // fallback for legacy data
+                want_to_read: { label: '', badge: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200', solid: 'bg-slate-500' },
+                reading: { label: 'Reading', badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300', solid: 'bg-blue-500' },
+                finished: { label: 'Finished', badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300', solid: 'bg-emerald-500' },
+                unread: { label: 'Want to Read', badge: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200', solid: 'bg-slate-500' } // fallback for legacy data
             };
 
             // DOM elements
@@ -367,15 +378,7 @@
             const DEFAULT_STATUS = Object.freeze({ status: 'want_to_read', rating: 0, progress: 0, comment: '' });
 
             function getCurrencySymbol() {
-                const currencies = {
-                    'USD': '$',
-                    'EUR': '€',
-                    'GBP': '£',
-                    'BDT': '৳',
-                    'INR': '₹',
-                    'JPY': '¥'
-                };
-                return currencies[localStorage.getItem('mylib_currency')] || '$';
+                return cachedCurrencySymbol;
             }
 
             function formatPrice(amount) {
@@ -1683,7 +1686,10 @@
                 });
 
                 document.getElementById('pref-currency')?.addEventListener('change', e => {
-                    localStorage.setItem('mylib_currency', e.target.value);
+                    const val = e.target.value;
+                    localStorage.setItem('mylib_currency', val);
+                    // ⚡ Bolt: Update cached currency symbol immediately
+                    cachedCurrencySymbol = CURRENCIES[val] || '$';
                     renderMainApp();
                 });
 
@@ -2204,13 +2210,13 @@
                         <div class="absolute inset-0 bg-blue-600/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity rounded-2xl"></div>
                         <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm relative">
                             ${book.coverUrl || book.thumbnail ?
-                            `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-105" alt="cover">` :
+                            `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-105" alt="cover" loading="lazy">` :
                             `<div class="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-blue-50 dark:bg-slate-800 text-blue-200 dark:text-slate-600">
                                     <span class="text-[8px] font-black uppercase font-serif line-clamp-3">${book.title}</span>
                                 </div>`
                         }
                             <div class="absolute bottom-2 right-2 flex flex-col items-end gap-1">
-                                <div class="px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase text-white ${READING_STATUSES[bookStatus].badge.includes('emerald') ? 'bg-emerald-500' : READING_STATUSES[bookStatus].badge.includes('blue') ? 'bg-blue-500' : 'bg-slate-500'}">
+                                <div class="px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase text-white ${READING_STATUSES[bookStatus].solid}">
                                     ${READING_STATUSES[bookStatus].label === 'Want to Read' ? '' : (bookStatus === 'reading' ? `Reading (${userProgress || book.progress || 0}%)` : READING_STATUSES[bookStatus].label)}
                                 </div>
                             </div>
@@ -2233,7 +2239,7 @@
                             <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
                         </div>
                         <div class="w-12 h-16 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700">
-                            ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover">` : '<div class="w-full h-full flex items-center justify-center bg-blue-50 dark:bg-slate-700 text-[8px] text-blue-300 dark:text-slate-500 font-bold uppercase p-1 text-center">No Cover</div>'}
+                            ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover" loading="lazy">` : '<div class="w-full h-full flex items-center justify-center bg-blue-50 dark:bg-slate-700 text-[8px] text-blue-300 dark:text-slate-500 font-bold uppercase p-1 text-center">No Cover</div>'}
                         </div>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2">
@@ -2281,7 +2287,7 @@
                             </div>
                         ` : ''}
                         ${book.coverUrl || book.thumbnail ?
-                        `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-110" alt="cover">` :
+                        `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-110" alt="cover" loading="lazy">` :
                         `<div class="w-full h-full flex items-center justify-center bg-blue-50 dark:bg-slate-800 text-blue-200 dark:text-slate-600 text-[10px] font-bold uppercase p-2 text-center">No Cover</div>`
                     }
                         
@@ -3056,7 +3062,7 @@
                     <div id="select-book-list" class="flex-1 overflow-y-auto space-y-3 pr-2">
                         ${myBooks.length > 0 ? myBooks.map(b => `
                             <button onclick="window.markAsFinished('${b.id}')" class="w-full flex items-center gap-4 p-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all text-left group focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">
-                                <img src="${b.coverUrl || b.thumbnail || 'https://via.placeholder.com/40x60?text=No+Cover'}" class="w-12 h-16 object-cover rounded-lg shadow-sm">
+                                <img src="${b.coverUrl || b.thumbnail || 'https://via.placeholder.com/40x60?text=No+Cover'}" class="w-12 h-16 object-cover rounded-lg shadow-sm" loading="lazy">
                                 <div class="flex-1 min-w-0">
                                     <h4 class="font-bold text-sm truncate group-hover:text-blue-600 transition-colors">${escapeHTML(b.title)}</h4>
                                     <p class="text-xs text-slate-500 truncate">${escapeHTML(b.author)}</p>
@@ -3081,7 +3087,7 @@
                         const filtered = myBooks.filter(b => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q));
                         listContainer.innerHTML = filtered.length > 0 ? filtered.map(b => `
                             <button onclick="window.markAsFinished('${b.id}')" class="w-full flex items-center gap-4 p-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all text-left group focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">
-                                <img src="${b.coverUrl || b.thumbnail || 'https://via.placeholder.com/40x60?text=No+Cover'}" class="w-12 h-16 object-cover rounded-lg shadow-sm">
+                                <img src="${b.coverUrl || b.thumbnail || 'https://via.placeholder.com/40x60?text=No+Cover'}" class="w-12 h-16 object-cover rounded-lg shadow-sm" loading="lazy">
                                 <div class="flex-1 min-w-0">
                                     <h4 class="font-bold text-sm truncate group-hover:text-blue-600 transition-colors">${escapeHTML(b.title)}</h4>
                                     <p class="text-xs text-slate-500 truncate">${escapeHTML(b.author)}</p>
