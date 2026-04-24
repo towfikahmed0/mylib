@@ -299,7 +299,9 @@
                 if (activeTab === 'settings') renderMainApp();
             });
             let books = [];                // local copy for UI, synced with Firestore
+            window.__setBooks = (b) => books = b;
             let readingStatuses = {};      // local copy for per-user statuses {bookId: status}
+            window.__setReadingStatuses = (s) => readingStatuses = s;
             let unsubscribeBooks = null;
             let unsubscribeStatus = null;
             let activeTab = 'library';     // 'library', 'wishlist', 'activity', 'settings'
@@ -468,19 +470,30 @@
                 return formatted;
             }
 
-            window.copyISBN = (isbn) => {
+            window.copyISBN = (isbn, element) => {
                 if (!navigator.clipboard) {
                     showToast('Clipboard not available', 'error');
                     return;
                 }
                 navigator.clipboard.writeText(isbn).then(() => {
                     showToast('ISBN copied to clipboard!', 'success');
+                    if (element) {
+                        const svg = element.querySelector('svg');
+                        if (svg) {
+                            const originalHTML = svg.outerHTML;
+                            svg.outerHTML = '<svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+                            setTimeout(() => {
+                                const newSvg = element.querySelector('svg.text-emerald-500');
+                                if (newSvg) newSvg.outerHTML = originalHTML;
+                            }, 2000);
+                        }
+                    }
                 }).catch(err => {
                     showToast('Failed to copy ISBN', 'error');
                 });
             };
 
-            window.copyQuote = (text, title, author) => {
+            window.copyQuote = (text, title, author, element) => {
                 if (!navigator.clipboard) {
                     showToast('Clipboard not available', 'error');
                     return;
@@ -488,6 +501,17 @@
                 const formattedQuote = `"${text}" — ${title}, ${author}`;
                 navigator.clipboard.writeText(formattedQuote).then(() => {
                     showToast('Quote copied to clipboard!', 'success');
+                    if (element) {
+                        const svg = element.querySelector('svg');
+                        if (svg) {
+                            const originalHTML = svg.outerHTML;
+                            svg.outerHTML = '<svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+                            setTimeout(() => {
+                                const newSvg = element.querySelector('svg.text-emerald-500');
+                                if (newSvg) newSvg.outerHTML = originalHTML;
+                            }, 2000);
+                        }
+                    }
                 }).catch(err => {
                     showToast('Failed to copy quote', 'error');
                 });
@@ -1640,7 +1664,7 @@
                                             Try searching by <span class="font-bold text-slate-700 dark:text-slate-200">genre</span> (e.g. "Fiction"),
                                             <span class="font-bold text-slate-700 dark:text-slate-200">tags</span>, or
                                             <span class="font-bold text-slate-700 dark:text-slate-200">author name</span> for better results.
-                                            You can also use <span class="font-bold text-slate-700 dark:text-slate-200">AI Search</span> for natural language queries!
+                                            You can also use <span class="font-bold text-slate-700 dark:text-slate-200">AI Search</span> for natural language queries like <span class="italic text-blue-500 dark:text-blue-400">"Science fiction books under $20"</span>!
                                         </p>
                                     </div>
                                 ` : `
@@ -2453,6 +2477,12 @@
                                 <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge} ${bookStatus === 'reading' ? 'animate-pulse-subtle' : ''}">
                                     ${statusData.isWishlist ? 'Wishlist' : (bookStatus === 'reading' ? `Reading (${userProgress || book.progress || 0}%)` : READING_STATUSES[bookStatus].label)}
                                 </div>
+                                ${bookStatus === 'want_to_read' ? `
+                                    <button onclick="event.stopPropagation(); window.quickUpdateStatus('${book.id}', 'reading')" class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Start reading">Start Reading</button>
+                                ` : ''}
+                                ${bookStatus === 'reading' ? `
+                                    <button onclick="event.stopPropagation(); window.quickUpdateStatus('${book.id}', 'finished')" class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none" aria-label="Mark as finished">Mark as Finished</button>
+                                ` : ''}
                             </div>
                         </div>
                     </div>
@@ -2503,6 +2533,12 @@
                                 <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge} ${bookStatus === 'reading' ? 'animate-pulse-subtle' : ''}">
                                     ${statusData.isWishlist ? 'Wishlist' : (bookStatus === 'reading' ? `Reading (${userProgress || book.progress || 0}%)` : READING_STATUSES[bookStatus].label)}
                                 </div>
+                                ${bookStatus === 'want_to_read' ? `
+                                    <button onclick="event.stopPropagation(); window.quickUpdateStatus('${book.id}', 'reading')" class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Start reading">Start Reading</button>
+                                ` : ''}
+                                ${bookStatus === 'reading' ? `
+                                    <button onclick="event.stopPropagation(); window.quickUpdateStatus('${book.id}', 'finished')" class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none" aria-label="Mark as finished">Mark as Finished</button>
+                                ` : ''}
                                 ${book.borrowedBy ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed by ${book.borrowedBy}</div>` : ''}
                                 ${addedByBadge}
                             </div>
@@ -3703,6 +3739,7 @@
 
                 const monthsActive = Math.max(1, (Date.now() - firstBookTime) / (30 * 24 * 60 * 60 * 1000));
                 const readingVelocity = (statusCounts.finished / monthsActive).toFixed(1);
+                const goalPercent = Math.min(100, Math.round((statusCounts.finished / readingGoal) * 100));
 
                 return `
                 <div class="max-w-4xl mx-auto space-y-12 animate-slide-up">
@@ -3743,7 +3780,20 @@
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-3 sm:gap-4 mb-10">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-10">
+                            <div class="glass p-3 sm:p-6 rounded-3xl border border-amber-100/50 dark:border-slate-700 relative overflow-hidden group shadow-sm">
+                                <div class="absolute -right-2 -bottom-2 opacity-5 dark:opacity-10 group-hover:scale-110 transition-transform duration-500 text-amber-600 dark:text-amber-400">
+                                    <svg class="w-16 h-16 sm:w-20 sm:h-20" fill="currentColor" viewBox="0 0 24 24"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0011 15.9V19H7v2h10v-2h-4v-3.1a5.01 5.01 0 003.61-2.96C19.08 10.63 21 8.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/></svg>
+                                </div>
+                                <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Yearly Goal</div>
+                                <div class="flex items-end gap-2 relative z-10">
+                                    <div class="text-xl sm:text-3xl font-black font-sans text-slate-900 dark:text-white">${statusCounts.finished} / ${readingGoal}</div>
+                                    <div class="text-xs font-bold text-amber-600 mb-1">${goalPercent}%</div>
+                                </div>
+                                <div class="mt-3 h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden relative z-10">
+                                    <div class="h-full bg-amber-500 transition-all duration-1000" style="width: ${goalPercent}%"></div>
+                                </div>
+                            </div>
                             <div class="glass p-3 sm:p-6 rounded-3xl border border-blue-100/50 dark:border-slate-700 relative overflow-hidden group shadow-sm">
                                 <div class="absolute -right-2 -bottom-2 opacity-5 dark:opacity-10 group-hover:scale-110 transition-transform duration-500 text-blue-600 dark:text-blue-400">
                                     <svg class="w-16 h-16 sm:w-20 sm:h-20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
@@ -4283,13 +4333,60 @@
                 }
             };
 
-            window.copyAIResults = (text) => {
+            window.quickUpdateStatus = async (bookId, newStatus) => {
+                try {
+                    const updateData = {
+                        status: newStatus,
+                        userId: currentUser.uid,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+                    if (newStatus === 'finished') updateData.progress = 100;
+                    if (newStatus === 'reading') updateData.progress = 0;
+
+                    await db.collection('books').doc(bookId)
+                        .collection('readingStatus').doc(currentUser.uid).set(updateData, { merge: true });
+
+                    const book = books.find(b => b.id === bookId);
+                    await db.collection('activityFeed').add({
+                        type: 'status_updated',
+                        bookId: bookId,
+                        bookTitle: book?.title || 'Unknown Book',
+                        userName: currentUser.displayName || currentUser.email || currentUser.uid,
+                        userId: currentUser.uid,
+                        status: newStatus,
+                        addedTo: book?.userId === currentUser.uid ? 'My' : 'Partner',
+                        libraryId: book?.userId || currentUser.uid,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    showToast(`Marked as ${READING_STATUSES[newStatus].label}!`, 'success');
+                    if (newStatus === 'finished') {
+                        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+                    }
+                } catch (err) {
+                    console.error('Quick status update error:', err);
+                    showToast('Failed to update status', 'error');
+                }
+            };
+
+            window.copyAIResults = (text, element) => {
                 if (!navigator.clipboard) {
                     showToast('Clipboard not available', 'error');
                     return;
                 }
                 navigator.clipboard.writeText(text).then(() => {
                     showToast('Results copied to clipboard!', 'success');
+                    if (element) {
+                        const svg = element.querySelector('svg');
+                        if (svg) {
+                            const originalHTML = svg.outerHTML;
+                            svg.outerHTML = '<svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+                            setTimeout(() => {
+                                const newSvg = element.querySelector('svg.text-emerald-500');
+                                if (newSvg) newSvg.outerHTML = originalHTML;
+                            }, 2000);
+                        }
+                    }
                 }).catch(err => {
                     showToast('Failed to copy results', 'error');
                 });
@@ -5024,7 +5121,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                                 ${book.isbn ? `
                                     <div class="mt-6 px-4">
                                         <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">ISBN</p>
-                                        <button onclick="window.copyISBN('${book.isbn.replace(/'/g, "\\'")}')" class="flex items-center gap-2 group/isbn hover:text-blue-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary/50 outline-none rounded-lg px-2 -ml-2" title="Copy ISBN" aria-label="Copy ISBN">
+                                        <button onclick="window.copyISBN('${book.isbn.replace(/'/g, "\\'")}', this)" class="flex items-center gap-2 group/isbn hover:text-blue-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary/50 outline-none rounded-lg px-2 -ml-2" title="Copy ISBN" aria-label="Copy ISBN">
                                             <span class="text-sm font-mono tracking-wider">${book.isbn}</span>
                                             <svg class="w-3.5 h-3.5 opacity-0 group-hover/isbn:opacity-100 transition-opacity" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
                                         </button>
@@ -5129,7 +5226,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                                         <div class="flex items-center justify-between mt-3">
                                             <span class="text-[8px] font-bold text-slate-400 uppercase tracking-widest">${new Date(h.timestamp).toLocaleDateString()}</span>
                                             <div class="flex items-center gap-2">
-                                                <button onclick="window.copyQuote('${h.text.replace(/'/g, "\\'")}', '${book.title.replace(/'/g, "\\'")}', '${(book.author || 'Unknown').replace(/'/g, "\\'")}')" class="text-blue-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity p-1 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Copy highlight" title="Copy highlight">
+                                                <button onclick="window.copyQuote('${h.text.replace(/'/g, "\\'")}', '${book.title.replace(/'/g, "\\'")}', '${(book.author || 'Unknown').replace(/'/g, "\\'")}', this)" class="text-blue-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity p-1 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Copy highlight" title="Copy highlight">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
                                                 </button>
                                                 <button onclick="window.deleteHighlight('${book.id}', ${i})" class="text-rose-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="Delete highlight" title="Delete highlight">
@@ -5466,7 +5563,9 @@ If the collection is small or has no finished books, be extra encouraging and su
                 get books() { return books; },
                 set books(v) { books = v; },
                 get readingStatuses() { return readingStatuses; },
-                set readingStatuses(v) { readingStatuses = v; }
+                set readingStatuses(v) { readingStatuses = v; },
+                get currentUser() { return currentUser; },
+                set currentUser(v) { currentUser = v; }
             };
 
             // ---------- Global click listener for book cards and AI copy buttons ----------
@@ -5475,7 +5574,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                 if (copyBtn) {
                     e.stopPropagation();
                     const text = copyBtn.getAttribute('data-copy-ai');
-                    window.copyAIResults(text);
+                    window.copyAIResults(text, copyBtn);
                     return;
                 }
 
