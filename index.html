@@ -2954,6 +2954,14 @@
 
             function openManualEntry(code, existingBook = null, options = {}) {
                 const isEdit = !!existingBook;
+                const updateDescCount = () => {
+                    const textarea = document.getElementById('man-description');
+                    const counter = document.getElementById('desc-char-count');
+                    if (textarea && counter) {
+                        const count = textarea.value.length;
+                        counter.textContent = `${count} character${count !== 1 ? 's' : ''}`;
+                    }
+                };
                 let currentGenres = getBookGenres(existingBook || {});
                 if (currentGenres.length === 1 && currentGenres[0] === 'Other' && !isEdit) currentGenres = [];
                 let selectedLibraryUserId = currentUser.uid; // Track which library this book is being added to
@@ -2992,7 +3000,7 @@
                         ` : ''}
                         <div class="space-y-6">
                             <div class="flex flex-col gap-2">
-                                <label for="man-title" class="text-[10px] font-bold text-slate-400 uppercase ml-1 font-serif">Title *</label>
+                                <label for="man-title" class="text-[10px] font-bold text-slate-400 uppercase ml-1 font-serif">Title <span class="text-rose-500">*</span></label>
                                 <div class="flex gap-2">
                                     <input id="man-title" placeholder="e.g. The Great Gatsby" value="${existingBook?.title || ''}" class="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
                                     <button id="ai-magic-fill" class="px-4 py-3 bg-blue-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-blue-700 transition active:scale-95 shadow-lg shadow-blue-200 focus-visible:ring-2 focus-visible:ring-primary outline-none" title="AI Magic Fill">
@@ -3024,7 +3032,10 @@
                             </div>
 
                             <div>
-                                <label for="man-description" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Description</label>
+                                <div class="flex justify-between items-center ml-1 mb-1">
+                                    <label for="man-description" class="text-[10px] font-bold text-slate-400 uppercase">Description</label>
+                                    <span id="desc-char-count" class="text-[9px] font-bold text-slate-400 uppercase opacity-60">0 characters</span>
+                                </div>
                                 <textarea id="man-description" placeholder="Book description..." class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[100px]">${existingBook?.description || ''}</textarea>
                             </div>
 
@@ -3057,6 +3068,8 @@
                 const close = showModal(modalHtml, null, true);
                 document.getElementById('man-title')?.focus();
                 renderGenres();
+                updateDescCount();
+                document.getElementById('man-description')?.addEventListener('input', updateDescCount);
 
                 // Populate library destination options
                 if (!isEdit) {
@@ -3133,7 +3146,10 @@
                         if (metadata.genres) { metadata.genres.forEach(g => { if (!currentGenres.includes(g)) currentGenres.push(g); }); renderGenres(); }
                         if (metadata.tags) { const currentTags = document.getElementById('man-tags').value.split(',').map(t => t.trim()).filter(Boolean); document.getElementById('man-tags').value = [...new Set([...currentTags, ...metadata.tags])].join(', '); }
                         if (metadata.price && !document.getElementById('man-price').value) document.getElementById('man-price').value = metadata.price;
-                        if (metadata.description && !document.getElementById('man-description').value) document.getElementById('man-description').value = metadata.description;
+                        if (metadata.description && !document.getElementById('man-description').value) {
+                            document.getElementById('man-description').value = metadata.description;
+                        }
+                        updateDescCount();
                         showToast('Magic Fill complete!', 'success');
                     } catch (err) { showToast('Magic Fill failed', 'error'); }
                     finally { btn.disabled = false; btn.innerHTML = originalContent; }
