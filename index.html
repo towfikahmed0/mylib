@@ -306,6 +306,7 @@
             let myBooksSubTab = 'finished';
             let currentModalCloseHandler = null;
             let aiSearchResults = null; // List of book IDs
+            let aiSearchResultsSet = null; // Set of book IDs for O(1) lookup
 
             // Global keyboard shortcuts (attached once)
             document.addEventListener('keydown', (e) => {
@@ -1292,6 +1293,7 @@
                     const response = await callGeminiAI(prompt, "Respond ONLY with a valid JSON array of strings.");
                     const cleaned = response.replace(/```json|```/g, '').trim();
                     aiSearchResults = JSON.parse(cleaned);
+                    aiSearchResultsSet = new Set(aiSearchResults);
                     renderLibraryOnly();
                 } catch (err) {
                     showToast('AI Search failed: ' + err.message, 'error');
@@ -1320,8 +1322,8 @@
                 const startTime = advancedFilters.startDate ? new Date(advancedFilters.startDate).getTime() : null;
                 const endTime = advancedFilters.endDate ? new Date(advancedFilters.endDate).getTime() : null;
 
-                // ⚡ Bolt: Convert aiSearchResults to a Set for O(1) lookup complexity
-                const aiIds = aiSearchResults ? new Set(aiSearchResults) : null;
+                // ⚡ Bolt: Use pre-calculated aiSearchResultsSet for O(1) lookup complexity
+                const aiIds = aiSearchResultsSet;
 
                 let filteredBooks = books.filter(b => {
                     const statusData = getStatusData(b.id);
@@ -1420,6 +1422,7 @@
 
                 window.clearAISearch = () => {
                     aiSearchResults = null;
+                    aiSearchResultsSet = null;
                     renderLibraryOnly();
                 };
 
@@ -1586,10 +1589,14 @@
                     // Partner libraries
                     Object.entries(partnerLibraries).forEach(([ownerId, books]) => {
                         if (books.length > 0) {
+                            // ⚡ Bolt: Use userProfileCache directly to avoid "loading..." flash and subsequent DOM updates
+                            const cachedUser = userProfileCache[ownerId];
+                            const name = cachedUser ? (cachedUser.displayName || cachedUser.email || 'Unknown') : 'loading...';
+
                             html += `
                             <div ${html ? 'class="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800"' : ''}>
                                 <h3 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200" data-owner-id="${ownerId}">
-                                    From <span data-name="loading...">loading...</span>'s Library (${books.length})
+                                    From <span data-name="${escapeHTML(name)}">${escapeHTML(name)}</span>'s Library (${books.length})
                                 </h3>
                                 <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3'}">
                                     ${books.map(book => renderBookCard(book)).join('')}
@@ -2029,6 +2036,7 @@
             window.clearAllFilters = () => {
                 searchQuery = '';
                 aiSearchResults = null;
+                aiSearchResultsSet = null;
                 tagFilter = null;
                 categoryFilter = 'all';
                 authorFilter = 'all';
@@ -2270,12 +2278,16 @@
              */
             function normalizeBook(book) {
                 const genres = getBookGenres(book);
+                const escapedAuthor = escapeHTML(book.author || 'Unknown');
+                const jsAuthor = (book.author || 'Unknown').replace(/'/g, "\\'");
+                const tags = book.tags || [];
+
                 const searchParts = [
                     book.title,
                     book.author,
                     ...genres,
                     book.isbn,
-                    ...(book.tags || [])
+                    ...tags
                 ];
 
                 return {
@@ -2285,7 +2297,26 @@
                     _sortTitle: (book.title || '').toLowerCase(),
                     _sortAuthor: (book.author || '').toLowerCase(),
                     _purchaseTime: book.purchaseDate ? new Date(book.purchaseDate).getTime() : 0,
-                    _createdTime: book.createdAt?.toMillis() || 0
+                    _createdTime: book.createdAt?.toMillis() || 0,
+                    // Pre-calculated fragments for render performance
+                    _escapedTitle: escapeHTML(book.title),
+                    _escapedAuthor: escapedAuthor,
+                    _jsAuthor: jsAuthor,
+                    _escapedOwner: book.owner ? escapeHTML(book.owner) : '',
+                    _jsOwner: book.owner ? book.owner.replace(/'/g, "\\'") : '',
+                    _genresHTML: genres.map((g, i) => {
+                        const escapedG = escapeHTML(g);
+                        const jsEscapedG = g.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                        return `<button onclick="event.stopPropagation(); window.setCategoryFilter('${jsEscapedG}')" class="hover:text-blue-700 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none rounded" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>${i < genres.length - 1 ? '<span class="text-slate-300">, </span>' : ''}`;
+                    }).join(''),
+                    _tagsHTML_grid: tags.map(tag => {
+                        const escapedTag = escapeHTML(tag);
+                        return `<button onclick="event.stopPropagation(); window.setTagFilter('${escapedTag.replace(/'/g, "\\'")}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by tag: ${escapedTag}">${escapedTag}</button>`;
+                    }).join(''),
+                    _tagsHTML_list: tags.map(tag => {
+                        const escapedTag = escapeHTML(tag);
+                        return `<button onclick="event.stopPropagation(); window.setTagFilter('${escapedTag.replace(/'/g, "\\'")}')" class="text-[8px] bg-slate-100 dark:bg-slate-700 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by tag: ${escapedTag}">${escapedTag}</button>`;
+                    }).join('')
                 };
             }
 
@@ -2330,20 +2361,18 @@
                 const stars = STAR_CACHE[displayRating] || '';
 
                 const isSelected = selectedBookIds.has(book.id);
-                // ⚡ Bolt: Use pre-calculated _genres
-                const bookGenres = book._genres || [];
                 const isSharedBook = book.userId !== currentUser.uid;
                 const addedByBadge = book.addedBy && book.addedBy !== currentUser.uid ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">Added by contributor</div>` : '';
 
                 if (viewMode === 'compact') {
                     return `
-                    <div class="book-card relative group cursor-pointer focus-visible:ring-4 focus-visible:ring-primary/30 outline-none rounded-2xl" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${escapeHTML(book.title)} by ${escapeHTML(book.author || 'Unknown author')}">
+                    <div class="book-card relative group cursor-pointer focus-visible:ring-4 focus-visible:ring-primary/30 outline-none rounded-2xl" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}">
                         <div class="absolute inset-0 bg-blue-600/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity rounded-2xl"></div>
                         <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm relative">
                             ${book.coverUrl || book.thumbnail ?
                             `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-105" alt="cover" loading="lazy">` :
                             `<div class="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-blue-50 dark:bg-slate-800 text-blue-200 dark:text-slate-600">
-                                    <span class="text-[8px] font-black uppercase font-serif line-clamp-3">${book.title}</span>
+                                    <span class="text-[8px] font-black uppercase font-serif line-clamp-3">${book._escapedTitle}</span>
                                 </div>`
                         }
                             <div class="absolute bottom-2 right-2 flex flex-col items-end gap-1">
@@ -2359,8 +2388,8 @@
                             </div>
                         </div>
                         <div class="mt-2 px-1">
-                            <h4 class="text-[10px] font-black font-serif truncate leading-tight">${book.title}</h4>
-                            <p class="text-[9px] text-slate-400 truncate">${book.author || 'Unknown'}</p>
+                            <h4 class="text-[10px] font-black font-serif truncate leading-tight">${book._escapedTitle}</h4>
+                            <p class="text-[9px] text-slate-400 truncate">${book._escapedAuthor}</p>
                         </div>
                     </div>
                     `;
@@ -2368,7 +2397,7 @@
 
                 if (viewMode === 'list') {
                     return `
-                    <div class="book-card glass px-6 py-4 rounded-2xl flex items-center gap-4 cursor-pointer hover:bg-white dark:hover:bg-slate-800 transition-all border ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-lg' : 'border-blue-100/50 dark:border-slate-800'} group relative focus-visible:ring-4 focus-visible:ring-primary/30 outline-none" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${escapeHTML(book.title)} by ${escapeHTML(book.author || 'Unknown author')}">
+                    <div class="book-card glass px-6 py-4 rounded-2xl flex items-center gap-4 cursor-pointer hover:bg-white dark:hover:bg-slate-800 transition-all border ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-lg' : 'border-blue-100/50 dark:border-slate-800'} group relative focus-visible:ring-4 focus-visible:ring-primary/30 outline-none" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}">
                         <div class="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                             <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
                         </div>
@@ -2377,24 +2406,20 @@
                         </div>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2">
-                                <h3 class="font-black text-sm truncate font-serif">${book.title}</h3>
+                                <h3 class="font-black text-sm truncate font-serif">${book._escapedTitle}</h3>
                                 ${book.borrowedBy ? `<span class="px-2 py-0.5 rounded-full text-[8px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed</span>` : ''}
                             </div>
-                            <button class="text-xs text-slate-500 truncate hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-left" onclick="event.stopPropagation(); window.setAuthorFilter('${(book.author || 'Unknown').replace(/'/g, "\\'")}')" aria-label="Filter by author: ${book.author || 'Unknown'}">${book.author || 'Unknown'}</button>
+                            <button class="text-xs text-slate-500 truncate hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-left" onclick="event.stopPropagation(); window.setAuthorFilter('${book._jsAuthor}')" aria-label="Filter by author: ${book._escapedAuthor}">${book._escapedAuthor}</button>
                             <div class="flex flex-wrap gap-1 mt-1">
-                                ${(book.tags || []).map(tag => `<button onclick="event.stopPropagation(); window.setTagFilter('${tag}')" class="text-[8px] bg-slate-100 dark:bg-slate-700 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by tag: ${tag}">${tag}</button>`).join('')}
+                                ${book._tagsHTML_list}
                             </div>
                         </div>
                         <div class="text-right flex-shrink-0 flex flex-col items-end">
                             <div class="text-amber-400 text-[10px]">${stars}</div>
                             <div class="text-[10px] font-bold text-primary dark:text-primary mt-1 truncate max-w-[120px] text-right">
-                                ${bookGenres.map((g, i) => {
-                                    const escapedG = escapeHTML(g);
-                                    const jsEscapedG = g.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-                                    return `<button onclick="event.stopPropagation(); window.setCategoryFilter('${jsEscapedG}')" class="hover:text-blue-700 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none rounded" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>${i < bookGenres.length - 1 ? '<span class="text-slate-300">, </span>' : ''}`;
-                                }).join('')}
+                                ${book._genresHTML}
                             </div>
-                            ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${(book.owner).replace(/'/g, "\\'")}')" aria-label="Filter by owner: ${book.owner}">Owner: ${book.owner}</button>` : ''}
+                            ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${book._jsOwner}')" aria-label="Filter by owner: ${book._escapedOwner}">Owner: ${book._escapedOwner}</button>` : ''}
                             <div class="flex items-center gap-2 mt-1">
                                 <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-full transition-colors ${isFavorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'}" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                                     <svg class="w-3.5 h-3.5 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'text-slate-300'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
@@ -2413,7 +2438,7 @@
 
                 const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
                 return `
-                <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-blue-100/50 dark:border-slate-800'} relative ${densityClass} focus-visible:ring-4 focus-visible:ring-primary/30 outline-none" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${escapeHTML(book.title)} by ${escapeHTML(book.author || 'Unknown author')}">
+                <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-blue-100/50 dark:border-slate-800'} relative ${densityClass} focus-visible:ring-4 focus-visible:ring-primary/30 outline-none" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}">
                     <div class="absolute top-4 left-4 z-20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex flex-col gap-3">
                         <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-6 h-6 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer">
                         <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="w-6 h-6 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform" aria-label="Toggle favorite">
@@ -2439,21 +2464,17 @@
                         <div>
                             <div class="flex justify-between items-start gap-2">
                                 <div class="text-[9px] font-black uppercase tracking-widest text-primary truncate max-w-[150px]">
-                                    ${bookGenres.map((g, i) => {
-                                        const escapedG = escapeHTML(g);
-                                        const jsEscapedG = g.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-                                        return `<button onclick="event.stopPropagation(); window.setCategoryFilter('${jsEscapedG}')" class="hover:text-blue-700 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none rounded" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>${i < bookGenres.length - 1 ? '<span class="text-slate-300">, </span>' : ''}`;
-                                    }).join('')}
+                                    ${book._genresHTML}
                                 </div>
                                 <div class="text-amber-400 text-[13px] tracking-tighter">${stars}${book.averageRating ? `<span class="ml-1 text-slate-400">(${book.averageRating.toFixed(1)})</span>` : ''}</div>
                             </div>
-                            <h3 class="font-black text-lg leading-tight line-clamp-2 mt-1 group-hover:text-primary transition-colors font-serif italic">${book.title}</h3>
+                            <h3 class="font-black text-lg leading-tight line-clamp-2 mt-1 group-hover:text-primary transition-colors font-serif italic">${book._escapedTitle}</h3>
                             <div class="flex justify-between items-center gap-2">
-                                <button class="text-sm text-slate-500 dark:text-slate-400 mt-1 truncate font-medium hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-left" onclick="event.stopPropagation(); window.setAuthorFilter('${(book.author || 'Unknown').replace(/'/g, "\\'")}')" aria-label="Filter by author: ${book.author || 'Unknown'}">${book.author || 'Unknown'}</button>
-                                ${book.owner ? `<button class="text-[10px] text-slate-400 font-medium truncate hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${(book.owner).replace(/'/g, "\\'")}')" aria-label="Filter by owner: ${book.owner}">Owner: ${book.owner}</button>` : ''}
+                                <button class="text-sm text-slate-500 dark:text-slate-400 mt-1 truncate font-medium hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-left" onclick="event.stopPropagation(); window.setAuthorFilter('${book._jsAuthor}')" aria-label="Filter by author: ${book._escapedAuthor}">${book._escapedAuthor}</button>
+                                ${book.owner ? `<button class="text-[10px] text-slate-400 font-medium truncate hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${book._jsOwner}')" aria-label="Filter by owner: ${book._escapedOwner}">Owner: ${book._escapedOwner}</button>` : ''}
                             </div>
                             <div class="flex flex-wrap gap-1 mt-2">
-                                ${(book.tags || []).map(tag => `<button onclick="event.stopPropagation(); window.setTagFilter('${tag}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by tag: ${tag}">${tag}</button>`).join('')}
+                                ${book._tagsHTML_grid}
                             </div>
                             <div class="mt-2 flex flex-wrap gap-1">
                                 <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge} ${bookStatus === 'reading' ? 'animate-pulse-subtle' : ''}">
