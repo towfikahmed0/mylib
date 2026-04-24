@@ -842,7 +842,7 @@
                                     ${['blue', 'rose', 'emerald', 'amber', 'violet'].map(color => {
                     const bgClass = color === 'blue' ? 'bg-blue-500' : color === 'rose' ? 'bg-rose-500' : color === 'emerald' ? 'bg-emerald-500' : color === 'amber' ? 'bg-amber-500' : 'bg-violet-500';
                     const isSelected = (localStorage.getItem('mylib_accent') || 'blue') === color;
-                    return `<button onclick="window.setAccent('${color}')" aria-pressed="${isSelected}" class="w-8 h-8 rounded-full ${bgClass} ${isSelected ? 'ring-4 ring-offset-2 ring-slate-300 dark:ring-slate-600' : ''} focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all" title="${color.charAt(0).toUpperCase() + color.slice(1)}"></button>`;
+                    return `<button onclick="window.setAccent('${color}')" aria-pressed="${isSelected}" class="w-8 h-8 rounded-full ${bgClass} ${isSelected ? 'ring-4 ring-offset-2 ring-slate-300 dark:ring-slate-600' : ''} focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all" title="${color.charAt(0).toUpperCase() + color.slice(1)}" aria-label="Set ${color} accent color"></button>`;
                 }).join('')}
                                 </div>
                             </div>
@@ -2428,8 +2428,8 @@
                                 </div>
                             </div>
                             <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex flex-col gap-2">
-                                <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-5 h-5 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer">
-                                <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="w-5 h-5 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform">
+                                <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-5 h-5 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer" aria-label="Select '${book._escapedTitle}' for bulk actions">
+                                <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="w-5 h-5 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                                     <svg class="w-3.5 h-3.5 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'stroke-white'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                                 </button>
                             </div>
@@ -2446,7 +2446,7 @@
                     return `
                     <div class="book-card glass px-6 py-4 rounded-2xl flex items-center gap-4 cursor-pointer hover:bg-white dark:hover:bg-slate-800 transition-all border ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-lg' : 'border-blue-100/50 dark:border-slate-800'} group relative focus-visible:ring-4 focus-visible:ring-primary/30 outline-none" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}">
                         <div class="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
-                            <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                            <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" aria-label="Select '${book._escapedTitle}' for bulk actions">
                         </div>
                         <div class="w-12 h-16 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700">
                             ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover" loading="lazy">` : '<div class="w-full h-full flex items-center justify-center bg-blue-50 dark:bg-slate-700 text-[8px] text-blue-300 dark:text-slate-500 font-bold uppercase p-1 text-center">No Cover</div>'}
@@ -2468,10 +2468,10 @@
                             </div>
                             ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${book._jsOwner}')" aria-label="Filter by owner: ${book._escapedOwner}">Owner: ${book._escapedOwner}</button>` : ''}
                             <div class="flex items-center gap-2 mt-1">
-                                <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-full transition-colors ${isFavorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'}" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                                <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 outline-none ${isFavorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'}" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                                     <svg class="w-3.5 h-3.5 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'text-slate-300'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                                 </button>
-                                <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Edit book details">
+                                <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Edit book details">
                                     <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
                                 <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge} ${bookStatus === 'reading' ? 'animate-pulse-subtle' : ''}">
@@ -2493,8 +2493,8 @@
                 return `
                 <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-blue-100/50 dark:border-slate-800'} relative ${densityClass} focus-visible:ring-4 focus-visible:ring-primary/30 outline-none" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}">
                     <div class="absolute top-4 left-4 z-20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex flex-col gap-3">
-                        <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-6 h-6 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer">
-                        <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="w-6 h-6 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform" aria-label="Toggle favorite">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-6 h-6 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer" aria-label="Select '${book._escapedTitle}' for bulk actions">
+                        <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="w-6 h-6 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                             <svg class="w-4 h-4 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'stroke-white'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                         </button>
                     </div>
@@ -2547,7 +2547,7 @@
                             <span class="text-[10px] font-bold text-slate-400">${book.purchaseDate ? new Date(book.purchaseDate).toLocaleDateString() : ''}</span>
                             <div class="flex items-center gap-2">
                                 <span class="text-slate-900 dark:text-white font-black text-sm">${book.price ? getCurrencySymbol() + book.price : ''}</span>
-                                <button class="p-2 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" aria-label="Edit book details">
+                                <button class="p-2 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Edit book details">
                                     <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
                             </div>
@@ -5090,6 +5090,15 @@ If the collection is small or has no finished books, be extra encouraging and su
                 const averageRating = ratingsOnly.length > 0 ? (ratingsOnly.reduce((a, b) => a + b, 0) / ratingsOnly.length).toFixed(1) : null;
                 const isWishlist = statusData.isWishlist || book.isWishlist || false;
 
+                const detailUpdateCharCount = () => {
+                    const textarea = document.getElementById('detail-comment-textarea');
+                    const counter = document.getElementById('detail-char-count');
+                    if (textarea && counter) {
+                        const count = textarea.value.length;
+                        counter.textContent = `${count} character${count !== 1 ? 's' : ''}`;
+                    }
+                };
+
                 closeLoading();
                 const close = showModal(`
                 <div class="fixed inset-0 z-50 flex items-center justify-center sm:p-4">
@@ -5177,7 +5186,10 @@ If the collection is small or has no finished books, be extra encouraging and su
                                     </div>
                                 </div>
                                 <div class="mt-4 px-4">
-                                    <label for="detail-rating-select" class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">My Rating & Review</label>
+                                    <div class="flex justify-between items-center mb-1">
+                                        <label for="detail-rating-select" class="text-[10px] font-bold text-slate-400 uppercase block">My Rating & Review</label>
+                                        <span id="detail-char-count" class="text-[9px] font-bold text-slate-400 uppercase opacity-60">0 characters</span>
+                                    </div>
                                     <div class="space-y-3">
                                         <select id="detail-rating-select" class="w-full px-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                                             <option value="0" ${userRatingVal === 0 ? 'selected' : ''}>No Rating</option>
@@ -5287,6 +5299,9 @@ If the collection is small or has no finished books, be extra encouraging and su
                     </div>
                 </div>
             `);
+
+                detailUpdateCharCount();
+                document.getElementById('detail-comment-textarea')?.addEventListener('input', detailUpdateCharCount);
 
                 document.getElementById('ai-book-btn').addEventListener('click', () => {
                     close();
