@@ -253,7 +253,7 @@
     <div id="app" class="min-h-screen flex flex-col"></div>
 
     <!-- Toast & Modal containers (global) -->
-    <div id="toast"
+    <div id="toast" role="status" aria-live="polite"
         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-medium shadow-2xl flex items-center gap-3 transition-all duration-300 opacity-0 translate-y-10 pointer-events-none">
     </div>
     <div id="modal-container" class="fixed inset-0 z-50 pointer-events-none"></div>
@@ -3053,7 +3053,10 @@
                                 <div id="author-dropdown" class="dropdown-menu"></div>
                             </div>
 
-                            <div><label for="man-cover" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Cover Image URL</label><input id="man-cover" placeholder="https://..." value="${existingBook?.coverUrl || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div><label for="man-cover" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Cover Image URL</label><input id="man-cover" placeholder="https://..." value="${existingBook?.coverUrl || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                                <div><label for="man-isbn" class="text-[10px] font-bold text-slate-400 uppercase ml-1">ISBN</label><input id="man-isbn" placeholder="e.g. 978..." value="${existingBook?.isbn || code || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                            </div>
 
                             <div class="relative">
                                 <label for="man-category" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Genres</label>
@@ -3170,16 +3173,19 @@
                 document.getElementById('ai-magic-fill')?.addEventListener('click', async () => {
                     const title = document.getElementById('man-title').value.trim();
                     const author = document.getElementById('man-author').value.trim();
-                    if (!title) { showToast('Please enter a title first', 'error'); return; }
+                    const isbn = document.getElementById('man-isbn').value.trim();
+                    if (!title && !isbn) { showToast('Please enter a title or ISBN first', 'error'); return; }
                     const btn = document.getElementById('ai-magic-fill');
                     const originalContent = btn.innerHTML;
                     btn.disabled = true;
                     btn.innerHTML = `<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
                     try {
-                        const prompt = `Fetch metadata for the book "${title}"${author ? ` by ${author}` : ''}. Author name, Genre and tags must be in English. Return ONLY a JSON object with: { "author": "string", "genres": ["string"], "tags": ["string"], "price": number, "description": "string" }`;
+                        const prompt = `Fetch metadata for the book "${title}"${author ? ` by ${author}` : ''}${isbn ? ` or ISBN ${isbn}` : ''}. Author name, Genre and tags must be in English. Return ONLY a JSON object with: { "title": "string", "author": "string", "genres": ["string"], "tags": ["string"], "price": number, "description": "string", "isbn": "string" }`;
                         const response = await callGeminiAI(prompt, "You are a book metadata expert. Respond ONLY with valid JSON.");
                         const metadata = JSON.parse(response.replace(/```json|```/g, '').trim());
+                        if (metadata.title && !document.getElementById('man-title').value) document.getElementById('man-title').value = metadata.title;
                         if (metadata.author && !document.getElementById('man-author').value) document.getElementById('man-author').value = metadata.author;
+                        if (metadata.isbn && !document.getElementById('man-isbn').value) document.getElementById('man-isbn').value = metadata.isbn;
                         if (metadata.genres) { metadata.genres.forEach(g => { if (!currentGenres.includes(g)) currentGenres.push(g); }); renderGenres(); }
                         if (metadata.tags) { const currentTags = document.getElementById('man-tags').value.split(',').map(t => t.trim()).filter(Boolean); document.getElementById('man-tags').value = [...new Set([...currentTags, ...metadata.tags])].join(', '); }
                         if (metadata.price && !document.getElementById('man-price').value) document.getElementById('man-price').value = metadata.price;
@@ -3217,7 +3223,7 @@
                             isWishlist: document.getElementById('man-wishlist').checked,
                             price: document.getElementById('man-price').value ? parseFloat(document.getElementById('man-price').value) : null,
                             purchaseDate: safeDate(document.getElementById('man-date').value),
-                            isbn: existingBook?.isbn || code || '',
+                            isbn: document.getElementById('man-isbn').value || existingBook?.isbn || code || '',
                             thumbnail: existingBook?.thumbnail || null,
                             source: existingBook?.source || (code ? 'scanned' : 'manual'),
                             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
