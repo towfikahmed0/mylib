@@ -1408,7 +1408,10 @@
                 } else { // default: newest
                     sortComparator = (a, b) => b._createdTime - a._createdTime;
                 }
-                filteredBooks.sort(sortComparator);
+                // ⚡ Bolt: Bypass redundant sorting if sortBy is 'newest' (data is already sorted by listener)
+                if (sortBy !== 'newest') {
+                    filteredBooks.sort(sortComparator);
+                }
 
                 const activeFiltersContainer = document.getElementById('active-filters-bar');
                 if (activeFiltersContainer) {
@@ -2351,6 +2354,9 @@
                     _jsAuthor: jsAuthor,
                     _escapedOwner: book.owner ? escapeHTML(book.owner) : '',
                     _jsOwner: book.owner ? book.owner.replace(/'/g, "\\'") : '',
+                    // ⚡ Bolt: Pre-calculate UI strings to shift computation from render-time (O(N)) to sync-time (O(1))
+                    _formattedRating: book.averageRating ? book.averageRating.toFixed(1) : (book.rating || 0).toFixed(1),
+                    _formattedDate: book.purchaseDate ? new Date(book.purchaseDate).toLocaleDateString() : '',
                     _genresHTML: genres.map((g, i) => {
                         const escapedG = escapeHTML(g);
                         const jsEscapedG = g.replace(/'/g, "\\'").replace(/"/g, "&quot;");
@@ -2519,7 +2525,7 @@
                                 <div class="text-[9px] font-black uppercase tracking-widest text-primary truncate max-w-[150px]">
                                     ${book._genresHTML}
                                 </div>
-                                <div class="text-amber-400 text-[13px] tracking-tighter">${stars}${book.averageRating ? `<span class="ml-1 text-slate-400">(${book.averageRating.toFixed(1)})</span>` : ''}</div>
+                                <div class="text-amber-400 text-[13px] tracking-tighter">${stars}${book.averageRating ? `<span class="ml-1 text-slate-400">(${book._formattedRating})</span>` : ''}</div>
                             </div>
                             <h3 class="font-black text-lg leading-tight line-clamp-2 mt-1 group-hover:text-primary transition-colors font-serif italic">${book._escapedTitle}</h3>
                             <div class="flex justify-between items-center gap-2">
@@ -2544,7 +2550,7 @@
                             </div>
                         </div>
                         <div class="flex items-center justify-between">
-                            <span class="text-[10px] font-bold text-slate-400">${book.purchaseDate ? new Date(book.purchaseDate).toLocaleDateString() : ''}</span>
+                            <span class="text-[10px] font-bold text-slate-400">${book._formattedDate}</span>
                             <div class="flex items-center gap-2">
                                 <span class="text-slate-900 dark:text-white font-black text-sm">${book.price ? getCurrencySymbol() + book.price : ''}</span>
                                 <button class="p-2 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Edit book details">
