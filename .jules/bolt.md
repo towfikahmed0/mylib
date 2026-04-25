@@ -26,3 +26,12 @@
 1. Refactor utility functions like `escapeHTML` to be pure JS string operations to avoid layout thrashing and DOM overhead.
 2. Convert filter result arrays (like AI search results) into a `Set` before the filter loop to achieve O(1) lookup complexity.
 3. Hoist conditional logic (like choosing a sort comparator) outside of hot loops to reduce branching overhead during execution.
+
+## 2025-05-22 - [Optimization] Redundant Sorting & Pre-calculated UI Strings
+
+**Learning:** In listener-driven SPAs, the data source is often already sorted by the state manager or the listener itself. Re-applying `Array.prototype.sort()` in the render loop is a redundant O(N log N) operation that blocks the main thread. Additionally, repeatedly calling expensive formatters like `toLocaleDateString()` and `toFixed()` inside `renderBookCard` for every item in a large list is a major bottleneck.
+
+**Action:**
+1. Implement "Bypass Sorting" logic to detect when the current sort order matches the data source's native order.
+2. Pre-calculate all UI-bound strings (dates, ratings, HTML fragments) during `normalizeBook` (ingestion/update phase) to shift computation from O(N) at render-time to O(1) at sync-time.
+3. Use pre-calculated `_escapedTitle`, `_formattedRating`, etc., directly in template strings to maximize render performance.
