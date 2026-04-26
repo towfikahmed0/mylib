@@ -3030,7 +3030,7 @@
                     <div class="max-w-2xl mx-auto w-full">
                         <div class="flex justify-between items-center mb-8">
                             <h2 class="text-3xl font-black font-serif italic">${isEdit ? 'Edit Book' : 'Add Manually'}</h2>
-                            <button data-close class="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm hover:bg-slate-100 transition-colors" aria-label="Close modal"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                            <button data-close class="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm hover:bg-slate-100 transition-colors focus-visible:ring-2 focus-visible:ring-slate-400 outline-none" aria-label="Close modal"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                         </div>
                         ${code ? `<p class="text-slate-500 text-sm mb-6">Code: ${code.substring(0, 20)}</p>` : ''}
                         ${!isEdit ? `
@@ -3046,7 +3046,7 @@
                                 <label for="man-title" class="text-[10px] font-bold text-slate-400 uppercase ml-1 font-serif">Title <span class="text-rose-500">*</span></label>
                                 <div class="flex gap-2">
                                     <input id="man-title" placeholder="e.g. The Great Gatsby" value="${existingBook?.title || ''}" class="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
-                                    <button id="ai-magic-fill" class="px-4 py-3 bg-blue-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-blue-700 transition active:scale-95 shadow-lg shadow-blue-200 focus-visible:ring-2 focus-visible:ring-primary outline-none" title="AI Magic Fill">
+                                    <button id="ai-magic-fill" class="px-4 py-3 bg-blue-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-blue-700 transition active:scale-95 shadow-lg shadow-blue-200 focus-visible:ring-2 focus-visible:ring-primary outline-none" title="AI Magic Fill" aria-label="Auto-fill book details using AI">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                                         <span class="hidden sm:inline">Magic Fill</span>
                                     </button>
@@ -3105,8 +3105,8 @@
                             </div>
                         </div>
                         <div class="flex gap-4 mt-10 pb-10">
-                            <button data-close class="flex-1 px-4 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold">Cancel</button>
-                            <button id="save-manual" class="flex-1 px-4 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">${isEdit ? 'Update' : 'Save'}</button>
+                            <button data-close class="flex-1 px-4 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 outline-none">Cancel</button>
+                            <button id="save-manual" class="flex-1 px-4 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 outline-none">${isEdit ? 'Update' : 'Save'}</button>
                         </div>
                     </div>
                 </div>
