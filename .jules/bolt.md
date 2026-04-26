@@ -35,3 +35,9 @@
 1. Implement "Bypass Sorting" logic to detect when the current sort order matches the data source's native order.
 2. Pre-calculate all UI-bound strings (dates, ratings, HTML fragments) during `normalizeBook` (ingestion/update phase) to shift computation from O(N) at render-time to O(1) at sync-time.
 3. Use pre-calculated `_escapedTitle`, `_formattedRating`, etc., directly in template strings to maximize render performance.
+
+## 2025-05-24 - [Optimization] Render Debouncing with requestAnimationFrame
+
+**Learning:** High-frequency event triggers (like rapid search input or multiple Firestore snapshots) can lead to multiple synchronous calls to expensive render functions within a single browser frame. This causes redundant computations and layout thrashing.
+
+**Action:** Implement a queuing mechanism using `requestAnimationFrame`. By setting a `pending` flag and only executing the render on the next animation frame, the application effectively batches multiple update requests into a single UI refresh. This ensures exactly one render cycle per frame regardless of update frequency.

@@ -291,12 +291,12 @@
             window.addEventListener('beforeinstallprompt', (e) => {
                 e.preventDefault();
                 deferredPrompt = e;
-                if (activeTab === 'settings') renderMainApp();
+                if (activeTab === 'settings') window.queueRenderMainApp();
             });
 
             window.addEventListener('appinstalled', () => {
                 deferredPrompt = null;
-                if (activeTab === 'settings') renderMainApp();
+                if (activeTab === 'settings') window.queueRenderMainApp();
             });
             let books = [];                // local copy for UI, synced with Firestore
             window.__setBooks = (b) => books = b;
@@ -314,6 +314,28 @@
             let currentModalCloseHandler = null;
             let aiSearchResults = null; // List of book IDs
             let aiSearchResultsSet = null; // Set of book IDs for O(1) lookup
+
+            // ⚡ Bolt: Debounce UI renders to prevent lag during rapid state updates (e.g., Firestore sync)
+            let renderPending = false;
+            let libraryRenderPending = false;
+
+            window.queueRenderMainApp = () => {
+                if (renderPending) return;
+                renderPending = true;
+                requestAnimationFrame(() => {
+                    renderMainApp();
+                    renderPending = false;
+                });
+            };
+
+            window.queueRenderLibraryOnly = () => {
+                if (libraryRenderPending) return;
+                libraryRenderPending = true;
+                requestAnimationFrame(() => {
+                    renderLibraryOnly();
+                    libraryRenderPending = false;
+                });
+            };
 
             // Global keyboard shortcuts (attached once)
             document.addEventListener('keydown', (e) => {
@@ -1258,7 +1280,7 @@
                             if (searchHint) searchHint.classList.toggle('opacity-0', !!searchQuery);
                             if (searchTimeout) clearTimeout(searchTimeout);
                             searchTimeout = setTimeout(() => {
-                                renderLibraryOnly();
+                                window.queueRenderLibraryOnly();
                             }, 150);
                         });
                         searchInput.addEventListener('keydown', e => {
@@ -1268,7 +1290,7 @@
                                 searchInput.blur();
                                 document.getElementById('clear-search-btn').classList.add('hidden');
                                 if (searchHint) searchHint.classList.remove('opacity-0');
-                                renderLibraryOnly();
+                                window.queueRenderLibraryOnly();
                             }
                         });
                         searchInput.addEventListener('focus', () => {
@@ -1283,18 +1305,18 @@
                             input.value = '';
                             input.focus();
                             document.getElementById('clear-search-btn').classList.add('hidden');
-                            renderLibraryOnly();
+                            window.queueRenderLibraryOnly();
                         });
                         document.getElementById('advanced-search-btn').addEventListener('click', openAdvancedSearch);
                     }
-                    renderLibraryOnly();
+                    window.queueRenderLibraryOnly();
                 }
             }
 
             window.clearSelection = () => {
                 selectedBookIds.clear();
                 if (document.getElementById('bulk-actions-bar')) {
-                    renderLibraryOnly();
+                    window.queueRenderLibraryOnly();
                 }
             };
 
@@ -1342,7 +1364,7 @@
                     const cleaned = response.replace(/```json|```/g, '').trim();
                     aiSearchResults = JSON.parse(cleaned);
                     aiSearchResultsSet = new Set(aiSearchResults);
-                    renderLibraryOnly();
+                    window.queueRenderLibraryOnly();
                 } catch (err) {
                     showToast('AI Search failed: ' + err.message, 'error');
                 } finally {
@@ -1489,7 +1511,7 @@
                 window.clearAISearch = () => {
                     aiSearchResults = null;
                     aiSearchResultsSet = null;
-                    renderLibraryOnly();
+                    window.queueRenderLibraryOnly();
                 };
 
                 const bulkBar = document.getElementById('bulk-actions-bar');
@@ -1764,7 +1786,7 @@
                         const { outcome } = await deferredPrompt.userChoice;
                         if (outcome === 'accepted') {
                             deferredPrompt = null;
-                            renderMainApp();
+                            window.queueRenderMainApp();
                         }
                     }
                 });
@@ -1798,7 +1820,7 @@
                         await currentUser.updateProfile({ displayName });
                         userProfile.displayName = displayName;
                         showToast('Profile updated!', 'success');
-                        renderMainApp();
+                        window.queueRenderMainApp();
                     } catch (err) {
                         showToast('Error updating profile: ' + err.message, 'error');
                     } finally {
@@ -1810,13 +1832,13 @@
                 document.getElementById('pref-default-view')?.addEventListener('change', e => {
                     localStorage.setItem('mylib_viewMode', e.target.value);
                     viewMode = e.target.value;
-                    renderMainApp();
+                    window.queueRenderMainApp();
                 });
                 document.getElementById('pref-default-sort')?.addEventListener('change', e => {
                     localStorage.setItem('mylib_defaultSort', e.target.value);
                     defaultSort = e.target.value;
                     sortBy = e.target.value;
-                    renderMainApp();
+                    window.queueRenderMainApp();
                 });
 
                 document.getElementById('pref-reading-goal')?.addEventListener('input', e => {
@@ -1824,12 +1846,12 @@
                     localStorage.setItem('mylib_readingGoal', val);
                     readingGoal = val; // Update in-memory cache
                 });
-                document.getElementById('pref-reading-goal')?.addEventListener('blur', () => renderMainApp());
+                document.getElementById('pref-reading-goal')?.addEventListener('blur', () => window.queueRenderMainApp());
 
                 document.getElementById('pref-card-density')?.addEventListener('change', e => {
                     localStorage.setItem('mylib_density', e.target.value);
                     cardDensity = e.target.value; // Update in-memory cache
-                    renderMainApp();
+                    window.queueRenderMainApp();
                 });
 
                 document.getElementById('pref-currency')?.addEventListener('change', e => {
@@ -1837,7 +1859,7 @@
                     localStorage.setItem('mylib_currency', val);
                     // ⚡ Bolt: Update cached currency symbol immediately
                     cachedCurrencySymbol = CURRENCIES[val] || '$';
-                    renderMainApp();
+                    window.queueRenderMainApp();
                 });
 
                 renderPartners();
@@ -1876,7 +1898,7 @@
                     await batch.commit();
                     showToast(`Updated ${snapshot.size} books`, 'success');
                 }
-                renderMainApp();
+                window.queueRenderMainApp();
             };
 
             window.deleteMetadata = async (type, val) => {
@@ -1910,51 +1932,51 @@
                     await batch.commit();
                     showToast(`Updated ${snapshot.size} books`, 'success');
                 }
-                renderMainApp();
+                window.queueRenderMainApp();
             };
 
             function attachFilteredListeners() {
                 document.getElementById('sort-select')?.addEventListener('change', e => {
                     sortBy = e.target.value;
                     localStorage.setItem('mylib_sortBy', sortBy);
-                    renderLibraryOnly();
+                    window.queueRenderLibraryOnly();
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
                 document.getElementById('status-filter')?.addEventListener('change', e => {
                     statusFilter = e.target.value;
                     localStorage.setItem('mylib_statusFilter', statusFilter);
-                    renderLibraryOnly();
+                    window.queueRenderLibraryOnly();
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
                 document.getElementById('category-filter')?.addEventListener('change', e => {
                     categoryFilter = e.target.value;
-                    renderLibraryOnly();
+                    window.queueRenderLibraryOnly();
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
                 document.getElementById('author-filter')?.addEventListener('change', e => {
                     authorFilter = e.target.value;
-                    renderLibraryOnly();
+                    window.queueRenderLibraryOnly();
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
                 document.getElementById('owner-filter')?.addEventListener('change', e => {
                     ownerFilter = e.target.value;
-                    renderLibraryOnly();
+                    window.queueRenderLibraryOnly();
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
                 document.getElementById('grid-view-btn')?.addEventListener('click', () => {
                     viewMode = 'grid';
                     localStorage.setItem('mylib_viewMode', 'grid');
-                    renderLibraryOnly();
+                    window.queueRenderLibraryOnly();
                 });
                 document.getElementById('compact-view-btn')?.addEventListener('click', () => {
                     viewMode = 'compact';
                     localStorage.setItem('mylib_viewMode', 'compact');
-                    renderLibraryOnly();
+                    window.queueRenderLibraryOnly();
                 });
                 document.getElementById('list-view-btn')?.addEventListener('click', () => {
                     viewMode = 'list';
                     localStorage.setItem('mylib_viewMode', 'list');
-                    renderLibraryOnly();
+                    window.queueRenderLibraryOnly();
                 });
             }
 
@@ -1982,7 +2004,7 @@
 
             window.toggleFavoritesFilter = (val) => {
                 favoritesOnly = val !== undefined ? val : !favoritesOnly;
-                renderLibraryOnly();
+                window.queueRenderLibraryOnly();
             };
 
             window.addHighlight = async (bookId, text) => {
@@ -2029,37 +2051,37 @@
 
             window.setTab = (tab) => {
                 activeTab = tab;
-                renderMainApp();
+                window.queueRenderMainApp();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
             window.setMyBooksSubTab = (tab) => {
                 myBooksSubTab = tab;
-                renderMainApp();
+                window.queueRenderMainApp();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
             window.setTagFilter = (tag) => {
                 tagFilter = tag;
-                renderMainApp();
+                window.queueRenderMainApp();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
             window.setAuthorFilter = (author) => {
                 authorFilter = author;
-                renderMainApp();
+                window.queueRenderMainApp();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
             window.setOwnerFilter = (owner) => {
                 ownerFilter = owner;
-                renderMainApp();
+                window.queueRenderMainApp();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
             window.setCategoryFilter = (category) => {
                 categoryFilter = category;
-                renderMainApp();
+                window.queueRenderMainApp();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
@@ -2071,7 +2093,7 @@
                 authorFilter = type === 'author' ? value : 'all';
                 ownerFilter = type === 'owner' ? value : 'all';
                 advancedFilters = { rating: 'all', minPrice: null, maxPrice: null, startDate: null, endDate: null };
-                renderMainApp();
+                window.queueRenderMainApp();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
@@ -2079,7 +2101,7 @@
                 document.documentElement.classList.remove('dark', 'sepia');
                 if (theme !== 'light') document.documentElement.classList.add(theme);
                 localStorage.setItem('mylib_theme', theme);
-                renderMainApp(); // Re-render to update border classes
+                window.queueRenderMainApp(); // Re-render to update border classes
             };
 
             window.setAccent = (color) => {
@@ -2093,7 +2115,7 @@
                 const primary = colors[color] || colors.blue;
                 document.documentElement.style.setProperty('--primary-color', primary);
                 localStorage.setItem('mylib_accent', color);
-                renderMainApp();
+                window.queueRenderMainApp();
             };
 
             // Initialize accent on load
@@ -2102,14 +2124,14 @@
             window.toggleSelection = (id) => {
                 if (selectedBookIds.has(id)) selectedBookIds.delete(id);
                 else selectedBookIds.add(id);
-                renderLibraryOnly();
+                window.queueRenderLibraryOnly();
             };
 
             window.clearAdvancedFilter = (type) => {
                 if (type === 'rating') advancedFilters.rating = 'all';
                 if (type === 'price') { advancedFilters.minPrice = null; advancedFilters.maxPrice = null; }
                 if (type === 'date') { advancedFilters.startDate = null; advancedFilters.endDate = null; }
-                renderLibraryOnly();
+                window.queueRenderLibraryOnly();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
@@ -2125,7 +2147,7 @@
                 advancedFilters = { rating: 'all', minPrice: null, maxPrice: null, startDate: null, endDate: null };
                 const searchInput = document.getElementById('search-input');
                 if (searchInput) searchInput.value = '';
-                renderMainApp();
+                window.queueRenderMainApp();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
@@ -2230,7 +2252,7 @@
                         localStorage.setItem('mylib_statusFilter', statusFilter);
                     }
 
-                    renderLibraryOnly();
+                    window.queueRenderLibraryOnly();
                     close();
                 });
             }
@@ -2239,7 +2261,7 @@
             function toggleViewMode() {
                 viewMode = viewMode === 'grid' ? 'list' : 'grid';
                 localStorage.setItem('mylib_viewMode', viewMode);
-                renderMainApp();
+                window.queueRenderMainApp();
             }
 
             function setupSearchableDropdown(inputId, menuId, dataList, onAdd) {
@@ -2689,7 +2711,7 @@
                                 books = allBooks.sort((a, b) => b._createdTime - a._createdTime);
 
                                 updateMetadataCache();
-                                renderMainApp();
+                                window.queueRenderMainApp();
                             }, err => {
                                 console.error("Firestore Error for chunk:", chunk, err);
                             });
@@ -2736,7 +2758,7 @@
                                 }
                                 activities = allActivities.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
 
-                                if (activeTab === 'activity') renderMainApp();
+                                if (activeTab === 'activity') window.queueRenderMainApp();
                             }, err => {
                                 console.error("Activity Listener Error for chunk:", chunk, err);
                             });
@@ -2770,7 +2792,7 @@
                                 };
                             }
                         });
-                        renderLibraryOnly();
+                        window.queueRenderLibraryOnly();
                         syncCompletedBooksCount();
                     }, err => {
                         console.error("Status Listener Error (Ensure index is created):", err);
@@ -5090,7 +5112,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                     }
 
                     subscribeToBooks();
-                    renderMainApp();
+                    window.queueRenderMainApp();
                     } else {
                         if (unsubscribeBooks) unsubscribeBooks();
                         if (unsubscribeStatus) unsubscribeStatus();
