@@ -308,6 +308,8 @@
             let chatHistory = [];
             let aiResponseCache = [];      // Cache last 5 responses [{prompt, response}]
             let lastActiveTab = null;
+            let renderPending = false;
+            let libraryRenderPending = false;
             let myBooksSubTab = 'finished';
             let currentModalCloseHandler = null;
             let aiSearchResults = null; // List of book IDs
@@ -1086,7 +1088,20 @@
             };
 
             // ---------- Render Main App (authenticated) ----------
+            /**
+             * ⚡ Bolt: Render batching for Main App.
+             * Uses requestAnimationFrame to debounce multiple synchronous calls into a single render pass per frame.
+             */
             function renderMainApp() {
+                if (renderPending) return;
+                renderPending = true;
+                requestAnimationFrame(() => {
+                    doRenderMainApp();
+                    renderPending = false;
+                });
+            }
+
+            function doRenderMainApp() {
                 if (!currentUser) return;
 
                 const statusCounts = { finished: 0, reading: 0, want_to_read: 0 };
@@ -1336,7 +1351,22 @@
                 }
             }
 
+            /**
+             * ⚡ Bolt: Render batching for Library view.
+             * Debounces updates (e.g. from multiple Firestore snapshots) to prevent UI thrashing.
+             */
             function renderLibraryOnly() {
+                if (libraryRenderPending) return;
+                libraryRenderPending = true;
+                requestAnimationFrame(() => {
+                    doRenderLibraryOnly();
+                    libraryRenderPending = false;
+                });
+            }
+
+            function doRenderLibraryOnly() {
+                // ⚡ Bolt: Hoist density class calculation out of the mapping loop
+                const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
                 const clearSearchBtn = document.getElementById('clear-search-btn');
                 const searchHint = document.getElementById('search-hint');
                 if (clearSearchBtn) {
@@ -1616,7 +1646,7 @@
                         <div>
                             <h2 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200">My Books (${myOwnBooks.length})</h2>
                             <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3'}">
-                                ${myOwnBooks.map(book => renderBookCard(book)).join('')}
+                                ${myOwnBooks.map(book => renderBookCard(book, densityClass)).join('')}
                             </div>
                         </div>
                         `;
@@ -1635,7 +1665,7 @@
                                     From <span data-name="${escapeHTML(name)}">${escapeHTML(name)}</span>'s Library (${books.length})
                                 </h3>
                                 <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3'}">
-                                    ${books.map(book => renderBookCard(book)).join('')}
+                                    ${books.map(book => renderBookCard(book, densityClass)).join('')}
                                 </div>
                             </div>
                             `;
@@ -2403,7 +2433,11 @@
             }
 
             // Helper to render a single book card
-            function renderBookCard(book) {
+            /**
+             * ⚡ Bolt: Optimized renderBookCard.
+             * Uses pre-calculated densityClass and direct property lookups for status colors.
+             */
+            function renderBookCard(book, densityClass) {
                 const statusData = getStatusData(book.id);
                 const isFavorite = statusData.isFavorite || false;
                 const bookStatus = statusData.status;
@@ -2429,7 +2463,8 @@
                                 </div>`
                         }
                             <div class="absolute bottom-2 right-2 flex flex-col items-end gap-1">
-                                <div class="px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase text-white ${READING_STATUSES[bookStatus].badge.includes('emerald') ? 'bg-emerald-500' : READING_STATUSES[bookStatus].badge.includes('blue') ? 'bg-blue-500' : 'bg-slate-500'} ${bookStatus === 'reading' ? 'animate-pulse-subtle' : ''}">
+                                <!-- ⚡ Bolt: Use direct property lookup for 'solid' color instead of string .includes() searching -->
+                                <div class="px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase text-white ${READING_STATUSES[bookStatus].solid} ${bookStatus === 'reading' ? 'animate-pulse-subtle' : ''}">
                                     ${READING_STATUSES[bookStatus].label === 'Want to Read' ? '' : (bookStatus === 'reading' ? `Reading (${userProgress || book.progress || 0}%)` : READING_STATUSES[bookStatus].label)}
                                 </div>
                             </div>
@@ -2495,9 +2530,9 @@
                 `;
                 }
 
-                const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
+                const activeDensityClass = densityClass !== undefined ? densityClass : (cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '');
                 return `
-                <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-blue-100/50 dark:border-slate-800'} relative ${densityClass} focus-visible:ring-4 focus-visible:ring-primary/30 outline-none" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}">
+                <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-blue-100/50 dark:border-slate-800'} relative ${activeDensityClass} focus-visible:ring-4 focus-visible:ring-primary/30 outline-none" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}">
                     <div class="absolute top-4 left-4 z-20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex flex-col gap-3">
                         <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-6 h-6 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer" aria-label="Select '${book._escapedTitle}' for bulk actions">
                         <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="w-6 h-6 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
@@ -3522,6 +3557,8 @@
 
             // ---------- My Books Tab ----------
             function renderMyBooks() {
+                // ⚡ Bolt: Hoist density class calculation out of the mapping loop
+                const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
                 const finishedBooks = books.filter(b => {
                     const statusData = getStatusData(b.id);
                     return statusData.status === 'finished';
@@ -3566,7 +3603,7 @@
 
                     <!-- Filtered List -->
                     <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3'}">
-                        ${displayBooks.length > 0 ? displayBooks.map(b => renderBookCard(b)).join('') : `
+                        ${displayBooks.length > 0 ? displayBooks.map(b => renderBookCard(b, densityClass)).join('') : `
                             <div class="col-span-full py-20 text-center">
                                 <div class="bg-slate-100 dark:bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                                     <svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
@@ -3860,7 +3897,8 @@
                                                     <span class="text-slate-400">${count} (${percent}%)</span>
                                                 </div>
                                                 <div class="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden" role="progressbar" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100" aria-label="${READING_STATUSES[status].label}: ${percent}%">
-                                                    <div class="h-full ${color} transition-all duration-1000" style="width: ${percent}%"></div>
+                                                    <!-- ⚡ Bolt: Use direct property lookup for 'solid' color -->
+                                                    <div class="h-full ${READING_STATUSES[status].solid} transition-all duration-1000" style="width: ${percent}%"></div>
                                                 </div>
                                             </div>
                                         `;
