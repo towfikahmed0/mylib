@@ -5297,8 +5297,8 @@ If the collection is small or has no finished books, be extra encouraging and su
                                 ${!userHighlightsVal.length ? '<p class="text-xs text-slate-400 italic">No highlights saved yet.</p>' : ''}
                             </div>
                             <div class="flex gap-2">
-                                <input id="new-highlight-input" type="text" placeholder="Add a quote or highlight..." class="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
-                            <button onclick="window.addHighlight('${book.id}', document.getElementById('new-highlight-input').value)" class="p-3 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700 transition active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Add highlight">
+                                <input id="new-highlight-input" type="text" aria-label="Add a quote or highlight" placeholder="Add a quote or highlight..." class="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
+                                <button onclick="window.addHighlight('${book.id}', document.getElementById('new-highlight-input').value)" class="p-3 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700 transition active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Add highlight">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                 </button>
                             </div>
@@ -5374,6 +5374,13 @@ If the collection is small or has no finished books, be extra encouraging and su
                 document.getElementById('edit-book-btn').addEventListener('click', () => {
                     close();
                     openManualEntry(null, book);
+                });
+
+                document.getElementById('new-highlight-input')?.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        window.addHighlight(book.id, e.target.value);
+                    }
                 });
 
                 document.getElementById('move-to-lib-btn')?.addEventListener('click', async () => {
@@ -5588,8 +5595,12 @@ If the collection is small or has no finished books, be extra encouraging and su
                     }
                 });
 
-                document.getElementById('delete-book-btn').addEventListener('click', async () => {
+                document.getElementById('delete-book-btn').addEventListener('click', async (e) => {
                     if (confirm('Are you sure you want to delete this book?')) {
+                        const btn = e.currentTarget;
+                        const originalText = btn.innerText;
+                        btn.disabled = true;
+                        btn.innerText = 'Deleting...';
                         try {
                             const batch = db.batch();
                             batch.delete(db.collection('books').doc(book.id));
@@ -5599,7 +5610,11 @@ If the collection is small or has no finished books, be extra encouraging and su
 
                             showToast('Book deleted.', 'info');
                             close();
-                        } catch (err) { showToast('Error deleting: ' + err.message, 'error'); }
+                        } catch (err) {
+                            showToast('Error deleting: ' + err.message, 'error');
+                            btn.disabled = false;
+                            btn.innerText = originalText;
+                        }
                     }
                 });
             }
