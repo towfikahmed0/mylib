@@ -232,19 +232,25 @@
         const db = firebase.firestore();
         window.__db = db;
         // Global variables for persistence state
-        let persistenceInitialized = false;
-        let authObserverStarted = false;
+        window.persistenceInitialized = false;
+        window.authObserverStarted = false;
+
+        const tryStartApp = () => {
+            if (typeof window.startApp === 'function') {
+                window.startApp();
+            }
+        };
 
         // Enable offline persistence
         db.enablePersistence({ synchronizeTabs: true })
             .then(() => {
-                persistenceInitialized = true;
-                startApp();
+                window.persistenceInitialized = true;
+                tryStartApp();
             })
             .catch(err => {
                 console.warn("Offline persistence error:", err);
-                persistenceInitialized = true;
-                startApp();
+                window.persistenceInitialized = true;
+                tryStartApp();
             });
     </script>
     <!-- ============================================================================== -->
@@ -317,23 +323,8 @@
             let renderPending = false;
             let libraryRenderPending = false;
 
-            window.queueRenderMainApp = () => {
-                if (renderPending) return;
-                renderPending = true;
-                requestAnimationFrame(() => {
-                    renderMainApp();
-                    renderPending = false;
-                });
-            };
-
-            window.queueRenderLibraryOnly = () => {
-                if (libraryRenderPending) return;
-                libraryRenderPending = true;
-                requestAnimationFrame(() => {
-                    renderLibraryOnly();
-                    libraryRenderPending = false;
-                });
-            };
+            window.queueRenderMainApp = () => renderMainApp();
+            window.queueRenderLibraryOnly = () => renderLibraryOnly();
 
             // Global keyboard shortcuts (attached once)
             document.addEventListener('keydown', (e) => {
@@ -5145,8 +5136,8 @@ If the collection is small or has no finished books, be extra encouraging and su
 
             // ---------- Auth State Observer ----------
             window.startApp = function() {
-                if (authObserverStarted) return;
-                authObserverStarted = true;
+                if (window.authObserverStarted) return;
+                window.authObserverStarted = true;
                 window.__appReady = true;
 
                 auth.onAuthStateChanged(async (user) => {
@@ -5787,6 +5778,10 @@ If the collection is small or has no finished books, be extra encouraging and su
                 }
                 openBookDetails(book);
             });
+
+            if (window.persistenceInitialized) {
+                window.startApp();
+            }
 
         })();
     </script>
