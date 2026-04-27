@@ -9,3 +9,7 @@
 ## 2026-04-25 - Async Button Feedback and Keyboard Shortcuts
 **Learning:** For destructive or time-consuming operations like book deletion, a multi-stage visual confirmation (disabling the button and changing text to "Deleting...") prevents user anxiety and duplicate requests. Additionally, ensuring all modal inputs (like highlight entries) support standard keyboard shortcuts like 'Enter' makes the interface feel more responsive and professional.
 **Action:** Always implement a loading state for primary async action buttons. Ensure all text inputs within modals have an associated 'Enter' key listener to trigger the primary action of that section.
+
+## 2025-05-16 - Enter Key Form Submission and Dropdown Interoperability
+**Learning:** Adding "Enter to submit" functionality significantly improves form efficiency, but must be carefully integrated with searchable dropdowns. Checking the visibility of the suggestion menu before triggering the primary action prevents accidental submissions when the user intends to select a suggestion.
+**Action:** Always verify if an input field is associated with a dropdown or autocomplete menu. If so, ensure the 'Enter' key listener only triggers the form submission when the menu is hidden or no item is selected.
