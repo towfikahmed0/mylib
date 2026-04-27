@@ -308,8 +308,6 @@
             let chatHistory = [];
             let aiResponseCache = [];      // Cache last 5 responses [{prompt, response}]
             let lastActiveTab = null;
-            let renderPending = false;
-            let libraryRenderPending = false;
             let myBooksSubTab = 'finished';
             let currentModalCloseHandler = null;
             let aiSearchResults = null; // List of book IDs
@@ -378,6 +376,24 @@
             let activities = [];           // activity log for book additions
             let metadataCache = { authors: [], genres: [], owners: [] }; // Performance optimization: single-pass cache
             let userProfileCache = {}; // Cache for user profiles (names/emails)
+            let libraryStats = {
+                libBooksCount: 0,
+                totalValue: 0,
+                totalTags: 0,
+                statusCounts: { finished: 0, reading: 0, want_to_read: 0 },
+                ratingDist: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
+                genresCount: {},
+                authorsCount: {},
+                ownersCount: {},
+                tagsCount: {},
+                firstBookTime: Date.now(),
+                recentMomentum: 0,
+                aiContext: {
+                    finished: [],
+                    notYetFinished: [],
+                    topGenres: []
+                }
+            };
 
             let searchQuery = '';
             let searchTimeout = null;
@@ -1126,16 +1142,8 @@
             function doRenderMainApp() {
                 if (!currentUser) return;
 
-                const statusCounts = { finished: 0, reading: 0, want_to_read: 0 };
-                books.forEach(b => {
-                    const statusData = getStatusData(b.id);
-                    const status = statusData.status;
-                    if (b.isWishlist) {
-                        if (status === 'finished') statusCounts.finished++;
-                        return;
-                    }
-                    if (statusCounts.hasOwnProperty(status)) statusCounts[status]++;
-                });
+                // ⚡ Bolt: Use pre-calculated statusCounts from libraryStats
+                const statusCounts = libraryStats.statusCounts;
 
                 // Only rebuild the whole app shell if we've switched tabs or the container is empty
                 if (!appEl.querySelector('header') || activeTab !== lastActiveTab) {
@@ -2434,24 +2442,121 @@
                 5: '★★★★★'
             });
 
-            // Performance optimization: Update metadata cache in a single pass over the books array
-            function updateMetadataCache() {
+            /**
+             * ⚡ Bolt: Comprehensive O(N) library analysis.
+             * Consolidates metadata caching, statistics calculation, and AI context generation
+             * into a single pass to eliminate redundant processing and memory overhead.
+             */
+            function updateLibraryStats() {
                 const authorsSet = new Set();
                 const genresSet = new Set();
                 const ownersSet = new Set();
 
+                // Reset stats
+                libraryStats = {
+                    libBooksCount: 0,
+                    totalValue: 0,
+                    totalTags: 0,
+                    statusCounts: { finished: 0, reading: 0, want_to_read: 0 },
+                    ratingDist: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
+                    genresCount: {},
+                    authorsCount: {},
+                    ownersCount: {},
+                    tagsCount: {},
+                    firstBookTime: Date.now(),
+                    recentMomentum: 0,
+                    aiContext: {
+                        finished: [],
+                        notYetFinished: [],
+                        topGenres: []
+                    }
+                };
+
+                const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+                const genreCountsForAI = {};
+
                 books.forEach(b => {
+                    const statusData = getStatusData(b.id);
+                    const isWishlist = statusData.isWishlist || b.isWishlist || false;
+                    const status = statusData.status;
+
+                    // ⚡ Bolt: Collect metadata for ALL books (including wishlist) to preserve autocomplete/global filters.
                     if (b.author) authorsSet.add(b.author);
                     if (b.owner) ownersSet.add(b.owner);
-                    // ⚡ Bolt: Use pre-calculated _genres instead of re-calculating them
+                    (b._genres || []).forEach(g => { if (g) genresSet.add(g); });
+
+                    // Original logic for main app header: Finished wishlist books are counted.
+                    if (isWishlist) {
+                        if (status === 'finished') libraryStats.statusCounts.finished++;
+                        return;
+                    }
+                    if (b.excludeFromLibrary) return;
+
+                    libraryStats.libBooksCount++;
+
+                    // Analysis Metadata (Library only)
+                    if (b.author) {
+                        libraryStats.authorsCount[b.author] = (libraryStats.authorsCount[b.author] || 0) + 1;
+                    }
+                    if (b.owner) {
+                        libraryStats.ownersCount[b.owner] = (libraryStats.ownersCount[b.owner] || 0) + 1;
+                    }
+
                     (b._genres || []).forEach(g => {
-                        if (g) genresSet.add(g);
+                        if (g) {
+                            libraryStats.genresCount[g] = (libraryStats.genresCount[g] || 0) + 1;
+                            genreCountsForAI[g] = (genreCountsForAI[g] || 0) + 1;
+                        }
                     });
+
+                    (b.tags || []).forEach(t => {
+                        libraryStats.tagsCount[t] = (libraryStats.tagsCount[t] || 0) + 1;
+                        libraryStats.totalTags++;
+                    });
+
+                    // Financials & Rating
+                    libraryStats.totalValue += (parseFloat(b.price) || 0);
+                    const rating = statusData.rating || 0;
+                    if (rating >= 1 && rating <= 5) libraryStats.ratingDist[rating]++;
+
+                    // Status & Velocity
+                    if (libraryStats.statusCounts.hasOwnProperty(status)) libraryStats.statusCounts[status]++;
+                    if (b._createdTime > 0 && b._createdTime < libraryStats.firstBookTime) {
+                        libraryStats.firstBookTime = b._createdTime;
+                    }
+
+                    if (status === 'finished' && statusData.updatedAt) {
+                        const finishedTime = statusData.updatedAt.toMillis ? statusData.updatedAt.toMillis() : new Date(statusData.updatedAt).getTime();
+                        if (finishedTime > thirtyDaysAgo) libraryStats.recentMomentum++;
+                    }
+
+                    // AI Context
+                    if (status === 'finished') {
+                        libraryStats.aiContext.finished.push({
+                            t: b.title,
+                            a: b.author,
+                            g: (b._genres || []).slice(0, 2),
+                            r: statusData.rating
+                        });
+                    } else if (libraryStats.aiContext.notYetFinished.length < 50) {
+                        libraryStats.aiContext.notYetFinished.push({
+                            t: b.title,
+                            a: b.author,
+                            g: (b._genres || []).slice(0, 2)
+                        });
+                    }
                 });
 
+                // Finalize Metadata Cache
                 metadataCache.authors = [...authorsSet].sort();
                 metadataCache.genres = [...genresSet].sort();
                 metadataCache.owners = [...ownersSet].sort();
+
+                // Finalize AI Context
+                libraryStats.aiContext.topGenres = Object.entries(genreCountsForAI)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 3)
+                    .map(e => e[0]);
             }
 
             // Helper to render a single book card
@@ -2710,7 +2815,7 @@
                                 }
                                 books = allBooks.sort((a, b) => b._createdTime - a._createdTime);
 
-                                updateMetadataCache();
+                                updateLibraryStats();
                                 window.queueRenderMainApp();
                             }, err => {
                                 console.error("Firestore Error for chunk:", chunk, err);
@@ -2792,6 +2897,7 @@
                                 };
                             }
                         });
+                        updateLibraryStats();
                         window.queueRenderLibraryOnly();
                         syncCompletedBooksCount();
                     }, err => {
@@ -3766,68 +3872,20 @@
             }
 
             function renderLibraryInsight() {
-                const authorsCount = {};
-                const ownersCount = {};
-                const genresCount = {};
-                const tagsCount = {};
-                let totalValue = 0;
-                let totalTags = 0;
-                let libBooksCount = 0;
-                const statusCounts = { finished: 0, reading: 0, want_to_read: 0 };
-                const ratingDist = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-
-                // --- Velocity & Momentum State ---
-                let firstBookTime = Date.now();
-                let recentMomentum = 0;
-                const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
-
-                /**
-                 * ⚡ Bolt: Single-pass O(N) loop for library analysis.
-                 * Consolidates filtering, statistics calculation, and reading performance metrics.
-                 */
-                books.forEach(b => {
-                    const statusData = getStatusData(b.id);
-                    if (statusData.isWishlist || b.excludeFromLibrary) return;
-
-                    libBooksCount++;
-                    const status = statusData.status;
-
-                    const author = b.author || 'Unknown';
-                    authorsCount[author] = (authorsCount[author] || 0) + 1;
-
-                    const owner = b.owner || 'Unknown';
-                    ownersCount[owner] = (ownersCount[owner] || 0) + 1;
-
-                    // Reuse pre-calculated _genres from normalizeBook
-                    (b._genres || []).forEach(g => {
-                        genresCount[g] = (genresCount[g] || 0) + 1;
-                    });
-
-                    (b.tags || []).forEach(t => {
-                        tagsCount[t] = (tagsCount[t] || 0) + 1;
-                        totalTags++;
-                    });
-
-                    totalValue += (parseFloat(b.price) || 0);
-
-                    const rating = statusData.rating || 0;
-                    if (rating >= 1 && rating <= 5) ratingDist[rating]++;
-
-                    if (statusCounts.hasOwnProperty(status)) statusCounts[status]++;
-
-                    // Reuse pre-calculated _createdTime from normalizeBook
-                    if (b._createdTime > 0 && b._createdTime < firstBookTime) {
-                        firstBookTime = b._createdTime;
-                    }
-
-                    // Calculate Recent Momentum (books finished in last 30 days)
-                    if (status === 'finished' && statusData.updatedAt) {
-                        const finishedTime = statusData.updatedAt.toMillis ? statusData.updatedAt.toMillis() : new Date(statusData.updatedAt).getTime();
-                        if (finishedTime > thirtyDaysAgo) {
-                            recentMomentum++;
-                        }
-                    }
-                });
+                // ⚡ Bolt: Use pre-calculated statistics from libraryStats to eliminate redundant O(N) loop
+                const {
+                    authorsCount,
+                    ownersCount,
+                    genresCount,
+                    tagsCount,
+                    totalValue,
+                    totalTags,
+                    libBooksCount,
+                    statusCounts,
+                    ratingDist,
+                    firstBookTime,
+                    recentMomentum
+                } = libraryStats;
 
                 const avgPrice = libBooksCount > 0 ? (totalValue / libBooksCount).toFixed(2) : 0;
                 const avgTags = libBooksCount > 0 ? (totalTags / libBooksCount).toFixed(1) : 0;
@@ -4810,48 +4868,17 @@
             }
 
             function getLibraryContext() {
-                const finished = [];
-                const notYetFinished = [];
-                const genreCounts = {};
-                let total = 0;
-
-                /**
-                 * ⚡ Bolt: Single-pass O(N) loop to build library context for AI Librarian.
-                 * Eliminates redundant filter/forEach passes.
-                 */
-                books.forEach(b => {
-                    const s = getStatusData(b.id);
-                    if (s.isWishlist || b.excludeFromLibrary) return;
-
-                    total++;
-                    if (s.status === 'finished') {
-                        finished.push({
-                            t: b.title,
-                            a: b.author,
-                            g: (b._genres || getBookGenres(b)).slice(0, 2),
-                            r: s.rating
-                        });
-                        (b._genres || getBookGenres(b)).forEach(g => genreCounts[g] = (genreCounts[g] || 0) + 1);
-                    } else if (notYetFinished.length < 50) {
-                        notYetFinished.push({
-                            t: b.title,
-                            a: b.author,
-                            g: (b._genres || getBookGenres(b)).slice(0, 2)
-                        });
-                    }
-                });
-
-                const topGenres = Object.entries(genreCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]);
-
+                // ⚡ Bolt: Return pre-calculated AI context from libraryStats to eliminate redundant O(N) loop
+                const { aiContext, libBooksCount } = libraryStats;
                 return {
                     summary: {
-                        total: total,
-                        finished: finished.length,
-                        topGenres
+                        total: libBooksCount,
+                        finished: aiContext.finished.length,
+                        topGenres: aiContext.topGenres
                     },
                     // Highly compressed data for token efficiency
-                    finished: finished.slice(-50), // Use the last 50 finished
-                    not_yet_finished: notYetFinished
+                    finished: aiContext.finished.slice(-50), // Use the last 50 finished
+                    not_yet_finished: aiContext.notYetFinished
                 };
             }
 
@@ -5682,6 +5709,7 @@ If the collection is small or has no finished books, be extra encouraging and su
             // Expose for testing
             window.renderMainApp = renderMainApp;
             window.renderLibraryOnly = renderLibraryOnly;
+            window.updateLibraryStats = updateLibraryStats;
             window.normalizeBook = normalizeBook;
             window.getStatusData = getStatusData;
             window.getBookGenres = getBookGenres;
@@ -5694,6 +5722,7 @@ If the collection is small or has no finished books, be extra encouraging and su
             window.deleteHighlight = deleteHighlight;
             window.openManualEntry = openManualEntry;
             window.runLibraryCleanup = runLibraryCleanup;
+            window.getLibraryContext = getLibraryContext;
             window.generateReadingRoadmap = generateReadingRoadmap;
             window.__test_data = {
                 get books() { return books; },
@@ -5701,7 +5730,8 @@ If the collection is small or has no finished books, be extra encouraging and su
                 get readingStatuses() { return readingStatuses; },
                 set readingStatuses(v) { readingStatuses = v; },
                 get currentUser() { return currentUser; },
-                set currentUser(v) { currentUser = v; }
+                set currentUser(v) { currentUser = v; },
+                get libraryStats() { return libraryStats; }
             };
 
             // ---------- Global click listener for book cards and AI copy buttons ----------
