@@ -5358,7 +5358,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                                     </div>
                                     ${book.owner ? `<span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-auto">Owner: ${escapeHTML(book.owner)}</span>` : ''}
                                 </div>
-                                <div class="flex items-center gap-4 mt-3 mb-4">
+                                <div class="flex items-center justify-center gap-4 mt-3 mb-4">
                                     <h2 class="text-3xl font-black leading-tight font-serif">${escapeHTML(book.title)}</h2>
                                     <button onclick="window.toggleFavorite('${book.id}')" class="p-2 bg-white dark:bg-slate-800 rounded-xl shadow-md hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                                         <svg class="w-6 h-6 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'text-slate-300'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
