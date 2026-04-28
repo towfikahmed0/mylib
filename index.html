@@ -369,6 +369,7 @@
             let userProfileCache = {}; // Cache for user profiles (names/emails)
             let libraryStats = {
                 libBooksCount: 0,
+                wishlistCount: 0,
                 totalValue: 0,
                 totalTags: 0,
                 statusCounts: { finished: 0, reading: 0, want_to_read: 0 },
@@ -500,6 +501,30 @@
 
                 return formatted;
             }
+
+            window.copyBookInfo = (title, author, isbn, element) => {
+                if (!navigator.clipboard) {
+                    showToast('Clipboard not available', 'error');
+                    return;
+                }
+                const info = `Title: ${title}\nAuthor: ${author}${isbn ? `\nISBN: ${isbn}` : ''}`;
+                navigator.clipboard.writeText(info).then(() => {
+                    showToast('Book info copied!', 'success');
+                    if (element) {
+                        const svg = element.querySelector('svg');
+                        if (svg) {
+                            const originalHTML = svg.outerHTML;
+                            svg.outerHTML = '<svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+                            setTimeout(() => {
+                                const newSvg = element.querySelector('svg.text-emerald-500');
+                                if (newSvg) newSvg.outerHTML = originalHTML;
+                            }, 2000);
+                        }
+                    }
+                }).catch(err => {
+                    showToast('Failed to copy info', 'error');
+                });
+            };
 
             window.copyISBN = (isbn, element) => {
                 if (!navigator.clipboard) {
@@ -1158,6 +1183,8 @@
                                     <span class="text-[10px] font-black text-primary">${statusCounts.finished} Completed</span>
                                     <span class="text-[10px] text-slate-300">·</span>
                                     <span class="text-[10px] font-black text-blue-500">${statusCounts.reading} Reading</span>
+                                    <span class="text-[10px] text-slate-300">·</span>
+                                    <span class="text-[10px] font-black text-emerald-500">${libraryStats.wishlistCount} Wishlist</span>
                                     </div>
                                 </div>
                             </div>
@@ -1266,6 +1293,7 @@
                                 </div>
                             </div>
                         </div>
+                        <div id="recent-searches-bar" class="mb-4 flex flex-wrap gap-2"></div>
                         <div id="active-filters-bar" class="mb-4 flex flex-wrap gap-2"></div>
                         <div id="tag-filter-container"></div>
                         <div id="controls-bar-container"></div>
@@ -1283,6 +1311,10 @@
                             }, 150);
                         });
                         searchInput.addEventListener('keydown', e => {
+                            if (e.key === 'Enter' && searchQuery.trim()) {
+                                saveRecentSearch(searchQuery.trim());
+                                window.queueRenderLibraryOnly();
+                            }
                             if (e.key === 'Escape') {
                                 searchQuery = '';
                                 searchInput.value = '';
@@ -1347,6 +1379,7 @@
                 const searchInput = document.getElementById('search-input');
                 const btn = document.getElementById('ai-search-btn');
                 if (!searchQuery) return;
+                saveRecentSearch(searchQuery);
 
                 const originalText = btn.innerHTML;
                 btn.disabled = true;
@@ -1386,6 +1419,7 @@
             }
 
             function doRenderLibraryOnly() {
+                renderRecentSearches();
                 // ⚡ Bolt: Hoist density class calculation out of the mapping loop
                 const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
                 const clearSearchBtn = document.getElementById('clear-search-btn');
@@ -2456,6 +2490,7 @@
                 // Reset stats
                 libraryStats = {
                     libBooksCount: 0,
+                    wishlistCount: 0,
                     totalValue: 0,
                     totalTags: 0,
                     statusCounts: { finished: 0, reading: 0, want_to_read: 0 },
@@ -2488,6 +2523,7 @@
 
                     // Original logic for main app header: Finished wishlist books are counted.
                     if (isWishlist) {
+                        libraryStats.wishlistCount++;
                         if (status === 'finished') libraryStats.statusCounts.finished++;
                         return;
                     }
@@ -2669,8 +2705,9 @@
                     </div>
                     <div class="w-28 h-40 bg-slate-100 dark:bg-slate-800 rounded-3xl overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 relative shadow-lg">
                         ${bookStatus === 'reading' ? `
-                            <div class="absolute bottom-0 left-0 right-0 h-2 bg-slate-200/50 z-10 flex" role="progressbar" aria-valuenow="${userProgress || book.progress || 0}" aria-valuemin="0" aria-valuemax="100" aria-label="Reading progress: ${userProgress || book.progress || 0}%">
+                            <div class="absolute bottom-0 left-0 right-0 h-3.5 bg-slate-900/40 backdrop-blur-sm z-10 flex items-center" role="progressbar" aria-valuenow="${userProgress || book.progress || 0}" aria-valuemin="0" aria-valuemax="100" aria-label="Reading progress: ${userProgress || book.progress || 0}%">
                                 <div class="h-full bg-primary transition-all duration-500" style="width: ${userProgress || book.progress || 0}%"></div>
+                                <span class="absolute inset-0 flex items-center justify-center text-[8px] font-black text-white drop-shadow-md pointer-events-none">${userProgress || book.progress || 0}%</span>
                                 <button onclick="event.stopPropagation(); window.quickUpdateProgress('${book.id}', this)" class="absolute right-0 bottom-full mb-1 mr-1 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 active:scale-90 transition-all opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary outline-none" title="Quickly increment progress by 5%" aria-label="Quickly increment progress by 5%">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 6v12m6-6H6"/></svg>
                                 </button>
@@ -3708,7 +3745,43 @@
             }
 
             // ---------- My Books Tab ----------
+            function saveRecentSearch(query) {
+                if (!query) return;
+                let searches = [];
+                try {
+                    searches = JSON.parse(localStorage.getItem('mylib_recent_searches') || '[]');
+                } catch (e) {
+                    searches = [];
+                }
+                searches = [query, ...searches.filter(s => s !== query)].slice(0, 5);
+                localStorage.setItem('mylib_recent_searches', JSON.stringify(searches));
+            }
+
+            function renderRecentSearches() {
+                const container = document.getElementById('recent-searches-bar');
+                if (!container) return;
+                let searches = [];
+                try {
+                    searches = JSON.parse(localStorage.getItem('mylib_recent_searches') || '[]');
+                } catch (e) {
+                    searches = [];
+                }
+                if (searches.length === 0 || searchQuery) {
+                    container.innerHTML = '';
+                    return;
+                }
+                container.innerHTML = `
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest self-center mr-1">Recent:</span>
+                    ${searches.map(s => `
+                        <button data-recent-search="${escapeHTML(s)}" class="recent-search-chip px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-full text-[10px] font-bold hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none border border-transparent hover:border-blue-100 dark:hover:border-blue-800">
+                            ${escapeHTML(s)}
+                        </button>
+                    `).join('')}
+                `;
+            }
+
             function renderMyBooks() {
+                renderRecentSearches();
                 // ⚡ Bolt: Hoist density class calculation out of the mapping loop
                 const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
                 const finishedBooks = books.filter(b => {
@@ -4000,9 +4073,10 @@
                                                     <span>${READING_STATUSES[status].label}</span>
                                                     <span class="text-slate-400">${count} (${percent}%)</span>
                                                 </div>
-                                                <div class="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden" role="progressbar" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100" aria-label="${READING_STATUSES[status].label}: ${percent}%">
+                                                <div class="relative h-3.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden" role="progressbar" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100" aria-label="${READING_STATUSES[status].label}: ${percent}%">
                                                     <!-- ⚡ Bolt: Use direct property lookup for 'solid' color -->
                                                     <div class="h-full ${READING_STATUSES[status].solid} transition-all duration-1000" style="width: ${percent}%"></div>
+                                                    <span class="absolute inset-0 flex items-center justify-center text-[9px] font-black ${percent > 50 ? 'text-white' : 'text-slate-500'} pointer-events-none">${percent}%</span>
                                                 </div>
                                             </div>
                                         `;
@@ -5447,6 +5521,10 @@ If the collection is small or has no finished books, be extra encouraging and su
                                     <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                                     AI Summary
                                 </button>
+                                <button id="copy-info-btn" class="px-4 py-3 sm:px-8 sm:py-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2 text-xs sm:text-base focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" title="Copy Book Info" aria-label="Copy Book Info">
+                                    <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                                    Copy Info
+                                </button>
                                 <button id="ai-book-btn" class="px-4 py-3 sm:px-8 sm:py-4 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-2xl font-bold hover:bg-blue-200 transition-all flex items-center justify-center gap-2 text-xs sm:text-base focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Ask AI about this book">
                                     <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
                                     Ask AI
@@ -5461,6 +5539,10 @@ If the collection is small or has no finished books, be extra encouraging and su
 
                 detailUpdateCharCount();
                 document.getElementById('detail-comment-textarea')?.addEventListener('input', detailUpdateCharCount);
+
+                document.getElementById('copy-info-btn')?.addEventListener('click', (e) => {
+                    window.copyBookInfo(book.title, book.author || 'Unknown', book.isbn || '', e.currentTarget);
+                });
 
                 document.getElementById('ai-book-btn').addEventListener('click', () => {
                     close();
@@ -5778,6 +5860,17 @@ If the collection is small or has no finished books, be extra encouraging and su
 
             // ---------- Global click listener for book cards and AI copy buttons ----------
             document.addEventListener('click', e => {
+                const recentSearchBtn = e.target.closest('.recent-search-chip');
+                if (recentSearchBtn) {
+                    const query = recentSearchBtn.getAttribute('data-recent-search');
+                    searchQuery = query;
+                    const input = document.getElementById('search-input');
+                    if (input) input.value = query;
+                    window.queueRenderLibraryOnly();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    return;
+                }
+
                 const copyBtn = e.target.closest('[data-copy-ai]');
                 if (copyBtn) {
                     e.stopPropagation();
