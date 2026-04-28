@@ -236,7 +236,7 @@
         window.authObserverStarted = false;
 
         const tryStartApp = () => {
-            if (typeof window.startApp === 'function') {
+            if (typeof window.startApp === 'function' && window.persistenceInitialized) {
                 window.startApp();
             }
         };
@@ -256,7 +256,13 @@
     <!-- ============================================================================== -->
 
     <!-- App Container (conditional rendering based on auth) -->
-    <div id="app" class="min-h-screen flex flex-col"></div>
+    <div id="app" class="min-h-screen flex flex-col">
+        <!-- Initial Loading State -->
+        <div id="initial-loader" class="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 transition-opacity duration-500">
+            <div class="w-16 h-16 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin mb-6"></div>
+            <p class="text-slate-500 font-bold uppercase tracking-widest text-xs animate-pulse">Connecting to Library...</p>
+        </div>
+    </div>
 
     <!-- Toast & Modal containers (global) -->
     <div id="toast" role="status" aria-live="polite"
@@ -268,7 +274,35 @@
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').catch(err => console.warn('SW registration failed:', err));
+                navigator.serviceWorker.register('/sw.js').then(reg => {
+                    const notifyUpdate = (worker) => {
+                        window.refreshApp = () => {
+                            worker.postMessage('SKIP_WAITING');
+                        };
+                        showToast('New version available! <button onclick="window.refreshApp()" class="ml-4 underline font-bold uppercase text-xs">Refresh</button>', 'info', 10000);
+                    };
+
+                    if (reg.waiting && navigator.serviceWorker.controller) {
+                        notifyUpdate(reg.waiting);
+                    }
+
+                    reg.onupdatefound = () => {
+                        const installingWorker = reg.installing;
+                        installingWorker.onstatechange = () => {
+                            if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                notifyUpdate(installingWorker);
+                            }
+                        };
+                    };
+                }).catch(err => console.warn('SW registration failed:', err));
+
+                let refreshing = false;
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (!refreshing) {
+                        window.location.reload();
+                        refreshing = true;
+                    }
+                });
             });
         }
     </script>
@@ -592,6 +626,34 @@
             }
 
             // ---------- Modal helper ----------
+            function trapFocus(element) {
+                const focusableEls = element.querySelectorAll('a[href], button, textarea, input:not([type="hidden"]), select, [tabindex]:not([tabindex="-1"])');
+                const firstFocusableEl = focusableEls[0];
+                const lastFocusableEl = focusableEls[focusableEls.length - 1];
+
+                element.addEventListener('keydown', function(e) {
+                    const isTabPressed = (e.key === 'Tab');
+                    if (!isTabPressed) return;
+
+                    if (e.shiftKey) { /* shift + tab */
+                        if (document.activeElement === firstFocusableEl) {
+                            lastFocusableEl.focus();
+                            e.preventDefault();
+                        }
+                    } else { /* tab */
+                        if (document.activeElement === lastFocusableEl) {
+                            firstFocusableEl.focus();
+                            e.preventDefault();
+                        }
+                    }
+                });
+
+                // Focus the first element initially
+                if (firstFocusableEl) {
+                    setTimeout(() => firstFocusableEl.focus(), 100);
+                }
+            }
+
             function showModal(html, onClose, isFullscreen = false) {
                 const triggerEl = document.activeElement;
                 const modal = document.createElement('div');
@@ -602,6 +664,9 @@
                 modalContainer.innerHTML = '';
                 modalContainer.appendChild(modal);
                 modalContainer.classList.add('pointer-events-auto');
+
+                trapFocus(modal);
+
                 const closeHandler = () => {
                     modal.remove();
                     modalContainer.classList.remove('pointer-events-auto');
@@ -610,7 +675,7 @@
                     if (triggerEl && triggerEl.focus) triggerEl.focus();
                 };
                 currentModalCloseHandler = closeHandler;
-                modal.querySelector('[data-close]')?.addEventListener('click', closeHandler);
+                modal.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', closeHandler));
                 if (!isFullscreen) {
                     modal.addEventListener('click', (e) => {
                         if (e.target === modal) closeHandler();
@@ -742,7 +807,12 @@
                         <div class="space-y-4">
                             <div>
                                 <label for="gemini-api-key" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Gemini API Key</label>
-                                <input id="gemini-api-key" type="password" placeholder="Enter your Gemini API Key" value="${localStorage.getItem('mylib_gemini_api_key') || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
+                                <div class="relative">
+                                    <input id="gemini-api-key" type="password" placeholder="Enter your Gemini API Key" value="${localStorage.getItem('mylib_gemini_api_key') || ''}" class="w-full pl-4 pr-12 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
+                                    <button id="toggle-api-key-visibility" class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none rounded-lg" aria-label="Toggle API Key visibility" title="Toggle API Key visibility">
+                                        <svg id="eye-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                    </button>
+                                </div>
                                 <p class="text-[9px] text-slate-400 mt-1 ml-1 italic">Key is stored only in your browser's localStorage. Get your API key from <a href="https://aistudio.google.com/api-keys">Google AI Studio</a></p>
                             </div>
                             <div>
@@ -1829,6 +1899,18 @@
                 document.getElementById('save-sharing-btn')?.addEventListener('click', saveSharingSettings);
                 document.getElementById('ai-cleanup-btn')?.addEventListener('click', runLibraryCleanup);
 
+                document.getElementById('toggle-api-key-visibility')?.addEventListener('click', () => {
+                    const input = document.getElementById('gemini-api-key');
+                    const icon = document.getElementById('eye-icon');
+                    if (input.type === 'password') {
+                        input.type = 'text';
+                        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/>';
+                    } else {
+                        input.type = 'password';
+                        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>';
+                    }
+                });
+
                 document.getElementById('profile-display-name')?.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter') document.getElementById('save-profile-btn')?.click();
                 });
@@ -2634,7 +2716,7 @@
                             </div>
                             <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex flex-col gap-2">
                                 <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-5 h-5 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer" aria-label="Select '${book._escapedTitle}' for bulk actions">
-                                <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="w-5 h-5 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                                <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="w-5 h-5 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                                     <svg class="w-3.5 h-3.5 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'stroke-white'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                                 </button>
                             </div>
@@ -2673,10 +2755,10 @@
                             </div>
                             ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${book._jsOwner}')" aria-label="Filter by owner: ${book._escapedOwner}">Owner: ${book._escapedOwner}</button>` : ''}
                             <div class="flex items-center gap-2 mt-1">
-                                <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 outline-none ${isFavorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'}" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                                <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 outline-none ${isFavorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'}" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                                     <svg class="w-3.5 h-3.5 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'text-slate-300'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                                 </button>
-                                <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Edit book details">
+                                <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Edit book details" title="Edit book details">
                                     <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
                                 <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge} ${bookStatus === 'reading' ? 'animate-pulse-subtle' : ''}">
@@ -2699,7 +2781,7 @@
                 <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-blue-100/50 dark:border-slate-800'} relative ${activeDensityClass} focus-visible:ring-4 focus-visible:ring-primary/30 outline-none" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}">
                     <div class="absolute top-4 left-4 z-20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex flex-col gap-3">
                         <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-6 h-6 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer" aria-label="Select '${book._escapedTitle}' for bulk actions">
-                        <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="w-6 h-6 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                                <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="w-6 h-6 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                             <svg class="w-4 h-4 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'stroke-white'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                         </button>
                     </div>
@@ -3246,7 +3328,7 @@
                             <div class="flex flex-col gap-2">
                                 <label for="man-title" class="text-[10px] font-bold text-slate-400 uppercase ml-1 font-serif">Title <span class="text-rose-500">*</span></label>
                                 <div class="flex gap-2">
-                                    <input id="man-title" placeholder="e.g. The Great Gatsby" value="${existingBook?.title || ''}" class="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                                    <input id="man-title" required placeholder="e.g. The Great Gatsby" value="${existingBook?.title || ''}" class="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
                                     <button id="ai-magic-fill" class="px-4 py-3 bg-blue-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-blue-700 transition active:scale-95 shadow-lg shadow-blue-200 focus-visible:ring-2 focus-visible:ring-primary outline-none" title="AI Magic Fill" aria-label="Auto-fill book details using AI">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                                         <span class="hidden sm:inline">Magic Fill</span>
@@ -3255,8 +3337,8 @@
                             </div>
 
                             <div class="relative">
-                                <label for="man-author" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Author</label>
-                                <input id="man-author" placeholder="e.g. F. Scott Fitzgerald" value="${existingBook?.author || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" autocomplete="off">
+                                <label for="man-author" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Author <span class="text-rose-500">*</span></label>
+                                <input id="man-author" required placeholder="e.g. F. Scott Fitzgerald" value="${existingBook?.author || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" autocomplete="off">
                                 <div id="author-dropdown" class="dropdown-menu"></div>
                             </div>
 
@@ -3419,6 +3501,20 @@
                 });
 
                 document.getElementById('save-manual').addEventListener('click', async (e) => {
+                    const titleVal = document.getElementById('man-title').value.trim();
+                    const authorVal = document.getElementById('man-author').value.trim();
+
+                    if (!titleVal) {
+                        showToast('Title is required', 'error');
+                        document.getElementById('man-title').focus();
+                        return;
+                    }
+                    if (!authorVal) {
+                        showToast('Author is required', 'error');
+                        document.getElementById('man-author').focus();
+                        return;
+                    }
+
                     const btn = e.currentTarget;
                     const originalText = btn.innerText;
                     btn.disabled = true;
@@ -3433,8 +3529,8 @@
                         };
 
                         const bookData = {
-                            title: document.getElementById('man-title').value,
-                            author: document.getElementById('man-author').value || 'Unknown',
+                            title: titleVal,
+                            author: authorVal,
                             categories: currentGenres.length > 0 ? currentGenres : ['Other'],
                             owner: document.getElementById('man-owner').value || '',
                             description: document.getElementById('man-description').value || '',
@@ -3449,10 +3545,6 @@
                             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                             ...options
                         };
-                        if (!bookData.title) {
-                            showToast('Title is required', 'error');
-                            return;
-                        }
 
                         if (isEdit) {
                             await db.collection('books').doc(existingBook.id).update(bookData);
@@ -4585,7 +4677,8 @@
                     showToast('Progress updated!', 'success', 1000);
                 } catch (err) {
                     console.error('Quick progress error:', err);
-                    showToast('Failed to update progress', 'error');
+                    showToast('Failed to update progress: ' + err.message, 'error');
+                } finally {
                     if (element) {
                         element.disabled = false;
                         element.classList.remove('animate-pulse');
@@ -4631,7 +4724,8 @@
                     }
                 } catch (err) {
                     console.error('Quick status update error:', err);
-                    showToast('Failed to update status', 'error');
+                    showToast('Failed to update status: ' + err.message, 'error');
+                } finally {
                     if (element) {
                         element.disabled = false;
                         element.innerHTML = originalHTML;
@@ -5238,6 +5332,13 @@ If the collection is small or has no finished books, be extra encouraging and su
                 window.__appReady = true;
 
                 auth.onAuthStateChanged(async (user) => {
+                    // Hide initial loader on first auth resolution
+                    const loader = document.getElementById('initial-loader');
+                    if (loader) {
+                        loader.classList.add('opacity-0');
+                        setTimeout(() => loader.remove(), 500);
+                    }
+
                     currentUser = user;
                     if (user) {
                     // Ensure user profile exists in Firestore
@@ -5618,7 +5719,8 @@ If the collection is small or has no finished books, be extra encouraging and su
                 document.getElementById('borrow-book-btn')?.addEventListener('click', async (e) => {
                     const btn = e.currentTarget;
                     const originalText = btn.innerText;
-                    const name = document.getElementById('borrower-name').value.trim() || (currentUser.displayName || currentUser.email);
+                    const nameInput = document.getElementById('borrower-name');
+                    const name = nameInput.value.trim() || (currentUser.displayName || currentUser.email);
                     btn.disabled = true;
                     btn.innerText = 'Borrowing...';
                     try {
@@ -5642,10 +5744,12 @@ If the collection is small or has no finished books, be extra encouraging and su
                         showToast(`Marked as borrowed by ${name}`, 'success');
                         close();
                     } catch (err) {
-                        showToast('Error: ' + err.message, 'error');
+                        showToast('Failed to borrow book: ' + err.message, 'error');
                     } finally {
-                        btn.disabled = false;
-                        btn.innerText = originalText;
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.innerText = originalText;
+                        }
                     }
                 });
 
@@ -5697,10 +5801,12 @@ If the collection is small or has no finished books, be extra encouraging and su
                         // Small delay to ensure Firestore sync
                         setTimeout(() => openBookDetails(books.find(b => b.id === book.id)), 100);
                     } catch (err) {
-                        showToast('Error: ' + err.message, 'error');
+                        showToast('Failed to save review: ' + err.message, 'error');
                     } finally {
-                        btn.disabled = false;
-                        btn.innerText = originalText;
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.innerText = originalText;
+                        }
                     }
                 });
 
@@ -5799,10 +5905,12 @@ If the collection is small or has no finished books, be extra encouraging and su
                         showToast('Book returned!', 'success');
                         close();
                     } catch (err) {
-                        showToast('Error: ' + err.message, 'error');
+                        showToast('Failed to return book: ' + err.message, 'error');
                     } finally {
-                        btn.disabled = false;
-                        btn.innerText = originalText;
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.innerText = originalText;
+                        }
                     }
                 });
 
