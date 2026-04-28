@@ -583,10 +583,10 @@
                 <div class="w-2 h-2 rounded-full ${type === 'success' ? 'bg-emerald-400' : type === 'error' ? 'bg-rose-400' : 'bg-blue-400'}"></div>
                 <span>${message}</span>
             `;
-                toastEl.classList.remove('opacity-0', 'translate-y-10');
+                toastEl.classList.remove('opacity-0', 'translate-y-10', 'pointer-events-none');
                 toastEl.classList.add('opacity-100', 'translate-y-0');
                 setTimeout(() => {
-                    toastEl.classList.add('opacity-0', 'translate-y-10');
+                    toastEl.classList.add('opacity-0', 'translate-y-10', 'pointer-events-none');
                     toastEl.classList.remove('opacity-100', 'translate-y-0');
                 }, duration);
             }
@@ -870,11 +870,11 @@
                     <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
                         <h2 class="text-2xl font-black mb-6 font-serif">Data Management</h2>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <button id="import-btn" class="flex items-center justify-center gap-3 p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition text-sm">
+                            <button id="import-btn" class="flex items-center justify-center gap-3 p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition text-sm focus-visible:ring-2 focus-visible:ring-primary outline-none">
                                 <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
                                 Import CSV
                             </button>
-                            <button id="export-btn" class="flex items-center justify-center gap-3 p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition text-sm">
+                            <button id="export-btn" class="flex items-center justify-center gap-3 p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition text-sm focus-visible:ring-2 focus-visible:ring-primary outline-none">
                                 <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                 Export CSV
                             </button>
@@ -945,7 +945,7 @@
                                     </select>
                                 </div>
                             </div>
-                            <button id="notify-btn" class="w-full flex items-center justify-between p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition">
+                            <button id="notify-btn" class="w-full flex items-center justify-between p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition focus-visible:ring-2 focus-visible:ring-primary outline-none">
                                 <div class="flex items-center gap-3">
                                     <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
                                     <span class="text-sm">Push Notifications</span>
@@ -953,7 +953,7 @@
                                 <span class="text-xs text-blue-600 dark:text-blue-400 font-black uppercase">Enable</span>
                             </button>
                             ${deferredPrompt ? `
-                            <button id="install-app-btn" class="w-full flex items-center justify-between p-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200">
+                            <button id="install-app-btn" class="w-full flex items-center justify-between p-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 focus-visible:ring-2 focus-visible:ring-primary outline-none">
                                 <div class="flex items-center gap-3">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                     <span class="text-sm">Install App</span>
@@ -2271,8 +2271,8 @@
                         </div>
                     </div>
                     <div class="flex gap-4 mt-8">
-                        <button data-close class="flex-1 px-4 py-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold">Cancel</button>
-                        <button id="apply-filters" class="flex-1 px-4 py-4 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20">Apply</button>
+                        <button data-close class="flex-1 px-4 py-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold focus-visible:ring-2 focus-visible:ring-slate-400 outline-none">Cancel</button>
+                        <button id="apply-filters" class="flex-1 px-4 py-4 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 focus-visible:ring-2 focus-visible:ring-primary outline-none">Apply</button>
                     </div>
                 </div>
             `;
@@ -2982,8 +2982,8 @@
 
                     destHtml += `
                         <div class="flex gap-4 mt-8">
-                            <button data-close class="flex-1 px-4 py-4 bg-slate-200 dark:bg-slate-700 rounded-2xl font-bold">Cancel</button>
-                            <button id="scan-start-btn" class="flex-1 px-4 py-4 bg-blue-600 text-white rounded-2xl font-bold">Start Scan</button>
+                            <button data-close class="flex-1 px-4 py-4 bg-slate-200 dark:bg-slate-700 rounded-2xl font-bold focus-visible:ring-2 focus-visible:ring-slate-400 outline-none">Cancel</button>
+                            <button id="scan-start-btn" class="flex-1 px-4 py-4 bg-blue-600 text-white rounded-2xl font-bold focus-visible:ring-2 focus-visible:ring-primary outline-none">Start Scan</button>
                         </div>
                     </div>
                     `;
@@ -3170,8 +3170,8 @@
                             <div><label class="text-xs font-bold text-slate-400">ISBN</label><input id="modal-isbn" value="${parsed.isbn || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
                         </div>
                         <div class="flex gap-4 mt-8">
-                            <button data-close class="flex-1 px-4 py-4 bg-slate-200 dark:bg-slate-700 rounded-2xl font-bold">Cancel</button>
-                            <button id="save-approved" class="flex-1 px-4 py-4 bg-blue-600 text-white rounded-2xl font-bold">Save</button>
+                            <button data-close class="flex-1 px-4 py-4 bg-slate-200 dark:bg-slate-700 rounded-2xl font-bold focus-visible:ring-2 focus-visible:ring-slate-400 outline-none">Cancel</button>
+                            <button id="save-approved" class="flex-1 px-4 py-4 bg-blue-600 text-white rounded-2xl font-bold focus-visible:ring-2 focus-visible:ring-primary outline-none">Save</button>
                         </div>
                     </div>
                 </div>
@@ -3835,7 +3835,7 @@
                                 </div>
                                 <h3 class="text-lg font-black font-serif italic">No books in this section</h3>
                                 <p class="text-slate-400 text-sm mt-1">Start by marking some books as ${myBooksSubTab === 'finished' ? 'finished' : 'wishlist item'}.</p>
-                                <button onclick="window.setTab('library')" class="mt-6 px-6 py-2 bg-primary text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95">Browse Library</button>
+                                <button onclick="window.setTab('library')" class="mt-6 px-6 py-2 bg-primary text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">Browse Library</button>
                             </div>
                         `}
                     </div>
@@ -4236,8 +4236,8 @@
                     </div>
 
                     <div class="mt-8 grid grid-cols-2 gap-4">
-                        <button data-close class="px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold transition active:scale-95">Dismiss</button>
-                        <button id="apply-ai-enrichment" class="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-200 dark:shadow-none hover:bg-emerald-700 transition active:scale-95">Apply & Save</button>
+                        <button data-close class="px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold transition active:scale-95 focus-visible:ring-2 focus-visible:ring-slate-400 outline-none">Dismiss</button>
+                        <button id="apply-ai-enrichment" class="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-200 dark:shadow-none hover:bg-emerald-700 transition active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none">Apply & Save</button>
                     </div>
                 </div>
                 `;
@@ -4289,8 +4289,8 @@
                             '<input type="checkbox" checked data-fix-index="' + i + '" class="w-6 h-6 rounded text-emerald-600"></div>';
                     }).join('') +
                     '</div><div class="flex gap-4 sticky bottom-0 bg-slate-50/80 backdrop-blur-md py-6 border-t border-slate-200">' +
-                    '<button data-close class="flex-1 px-8 py-4 bg-white rounded-2xl font-bold">Discard</button>' +
-                    '<button id="apply-cleanup-fixes" class="flex-[2] px-8 py-4 bg-emerald-600 text-white rounded-2xl font-bold">Apply Fixes</button></div></div></div>';
+                    '<button data-close class="flex-1 px-8 py-4 bg-white rounded-2xl font-bold focus-visible:ring-2 focus-visible:ring-slate-400 outline-none">Discard</button>' +
+                    '<button id="apply-cleanup-fixes" class="flex-[2] px-8 py-4 bg-emerald-600 text-white rounded-2xl font-bold focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none">Apply Fixes</button></div></div></div>';
                 showModal(modalHtml, null, true);
                 document.getElementById('apply-cleanup-fixes').addEventListener('click', async () => {
                     const btn = document.getElementById('apply-cleanup-fixes');
@@ -4878,7 +4878,7 @@
 
                             lastImportState = { addedIds, previousStates };
 
-                            const toastMsg = `Imported ${importedCount} new, updated ${updatedCount} existing. <button onclick="window.undoImport()" class="ml-4 underline font-bold uppercase text-xs">Undo</button>`;
+                            const toastMsg = `Imported ${importedCount} new, updated ${updatedCount} existing. <button onclick="window.undoImport()" class="ml-4 underline font-bold uppercase text-xs focus-visible:ring-2 focus-visible:ring-white outline-none rounded" aria-label="Undo last import">Undo</button>`;
                             showToast(toastMsg, 'success', 10000);
                             window.undoImport = undoImport;
                         }
