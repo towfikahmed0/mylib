@@ -1795,6 +1795,16 @@
                 document.getElementById('save-sharing-btn')?.addEventListener('click', saveSharingSettings);
                 document.getElementById('ai-cleanup-btn')?.addEventListener('click', runLibraryCleanup);
 
+                document.getElementById('profile-display-name')?.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') document.getElementById('save-profile-btn')?.click();
+                });
+                document.getElementById('share-email')?.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') document.getElementById('save-sharing-btn')?.click();
+                });
+                document.getElementById('gemini-api-key')?.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') document.getElementById('save-ai-settings-btn')?.click();
+                });
+
                 document.getElementById('save-ai-settings-btn')?.addEventListener('click', (e) => {
                     const apiKey = document.getElementById('gemini-api-key').value.trim();
                     const model = document.getElementById('gemini-model').value;
@@ -3328,6 +3338,19 @@
                 });
                 setupSearchableDropdown('man-owner', 'owner-dropdown', metadataCache.owners, (val) => {
                     document.getElementById('man-owner').value = val;
+                });
+
+                // Add Enter key support for manual entry fields
+                ['man-title', 'man-author', 'man-isbn', 'man-category', 'man-owner', 'man-tags', 'man-price', 'man-date'].forEach(id => {
+                    document.getElementById(id)?.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') {
+                            // Only trigger save if no dropdown is currently active/selected
+                            const menu = document.getElementById(id + '-dropdown') || document.getElementById(id.replace('man-', '') + '-dropdown');
+                            if (!menu || menu.style.display === 'none') {
+                                document.getElementById('save-manual')?.click();
+                            }
+                        }
+                    });
                 });
 
                 document.getElementById('ai-magic-fill')?.addEventListener('click', async () => {
