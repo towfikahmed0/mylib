@@ -17,18 +17,13 @@ self.addEventListener('install', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Only handle GET requests
   if (e.request.method !== 'GET') return;
-
-  // Skip chrome-extension and other non-http schemes
   if (!e.request.url.startsWith('http')) return;
 
-  // Stale-while-revalidate for everything
   e.respondWith(
     caches.open('mylib-v1').then(cache => {
       return cache.match(e.request).then(response => {
         const fetchPromise = fetch(e.request).then(networkResponse => {
-          // Only cache successful same-origin or specific CDN responses to avoid CORS issues
           if (networkResponse && networkResponse.status === 200) {
               const url = new URL(e.request.url);
               if (url.origin === location.origin ||
@@ -42,10 +37,16 @@ self.addEventListener('fetch', e => {
           }
           return networkResponse;
         }).catch(err => {
-            console.warn('Fetch failed for:', e.request.url, err);
+            // Silently fail for background revalidation
         });
         return response || fetchPromise;
       });
     })
   );
+});
+
+self.addEventListener('message', e => {
+  if (e.data === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
