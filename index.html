@@ -1546,7 +1546,12 @@
 
                 let filteredBooks = books.filter(b => {
                     const statusData = getStatusData(b.id);
-                    const isWishlist = statusData.isWishlist || false;
+                    const isOwner = b.userId === currentUser.uid;
+
+                    // ⚡ Bolt: Hide collaborator wishlist books from main library and search
+                    if (b.isWishlist && !isOwner && !statusData.updatedAt) return false;
+
+                    const isWishlist = statusData.isWishlist || (isOwner && b.isWishlist) || false;
                     const matchesTab = (activeTab === 'mybooks')
                         ? (myBooksSubTab === 'wishlist' ? isWishlist : statusData.status === 'finished')
                         : (!isWishlist && !b.excludeFromLibrary);
@@ -2631,7 +2636,15 @@
 
                 books.forEach(b => {
                     const statusData = getStatusData(b.id);
-                    const isWishlist = statusData.isWishlist || b.isWishlist || false;
+                    const isOwner = b.userId === currentUser.uid;
+
+                    // ⚡ Bolt: Hide collaborator wishlist books from stats and metadata.
+                    // If the book is marked as wishlist on the document and we are not the owner,
+                    // only consider it if we have explicitly changed its status/wishlist state ourselves.
+                    const isPrivateWishlist = b.isWishlist && !isOwner && !statusData.updatedAt;
+                    if (isPrivateWishlist) return;
+
+                    const isWishlist = statusData.isWishlist || (isOwner && b.isWishlist) || false;
                     const status = statusData.status;
 
                     // ⚡ Bolt: Collect metadata for ALL books (including wishlist) to preserve autocomplete/global filters.
@@ -4087,7 +4100,10 @@
             }
 
             function renderCollaboratorStats() {
-                const partnerships = allPartnerships.length > 0 ? allPartnerships : allPartnershipsForUI;
+                // ⚡ Bolt: Filter out inactive partnerships where either user has unsubscribed.
+                const partnerships = (allPartnerships.length > 0 ? allPartnerships : allPartnershipsForUI)
+                    .filter(p => !p.user1Unsubscribed && !p.user2Unsubscribed);
+
                 if (!partnerships || partnerships.length === 0) {
                     return `
                         <div class="text-center py-4">
@@ -4895,7 +4911,6 @@
                             userId: currentUser.uid,
                             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                         }, { merge: true });
-                        batch.update(doc.ref, { isWishlist: firebase.firestore.FieldValue.delete() });
                     });
 
                     await batch.commit();
