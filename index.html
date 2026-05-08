@@ -320,6 +320,15 @@
         }
 
         (function () {
+            // SRE: Global Error Boundary
+            window.onerror = function (msg, url, lineNo, columnNo, error) {
+                showToast('Something went wrong, but your data is safe. <button onclick="window.location.reload()" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Reload</button>', 'error', 10000);
+                return false;
+            };
+            window.onunhandledrejection = function (event) {
+                showToast('A background task failed. Your work is saved. <button onclick="window.location.reload()" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Reload</button>', 'error', 10000);
+            };
+
             // ---------- State ----------
             const APP_VERSION = '2.5';
             let deferredPrompt = null;
@@ -352,6 +361,7 @@
             let currentModalCloseHandler = null;
             let aiSearchResults = null; // List of book IDs
             let aiSearchResultsSet = null; // Set of book IDs for O(1) lookup
+            let isInitialSync = true;
 
             // ⚡ Bolt: Debounce UI renders to prevent lag during rapid state updates (e.g., Firestore sync)
             let renderPending = false;
@@ -726,9 +736,9 @@
                                 <div class="w-16 h-16 rounded-2xl flex items-center justify-center mb-8">
                                    <img src="https://cdn-icons-png.flaticon.com/512/2232/2232688.png">
                                 </div>
-                                <h1 class="text-5xl lg:text-7xl font-black font-serif italic text-slate-900 leading-tight mb-6 animate-slide-up">Your Personal Library, <span class="text-blue-600">Evolved.</span></h1>
+                                <h1 class="text-5xl lg:text-7xl font-black font-serif italic text-slate-900 leading-tight mb-6 animate-slide-up">Your personal sanctuary for <span class="text-blue-600">every story.</span></h1>
                                 <p class="text-lg text-slate-600 mb-10 leading-relaxed animate-slide-up" style="animation-delay: 100ms">
-                                    Experience the future of book management with AI-powered insights, smart cataloging, and seamless cloud sync. My Lib is the ultimate sanctuary for your reading journey.
+                                    My Lib is a professional library manager designed for book lovers who appreciate organization and peace of mind. Catalog your collection, track your progress, and share your passion with a community of readers.
                                 </p>
 
                                 <div class="flex flex-col sm:flex-row gap-4 items-start animate-slide-up" style="animation-delay: 200ms">
@@ -1546,7 +1556,12 @@
 
                 let filteredBooks = books.filter(b => {
                     const statusData = getStatusData(b.id);
-                    const isWishlist = statusData.isWishlist || false;
+                    const isOwner = b.userId === currentUser.uid;
+
+                    // ⚡ Bolt: Hide collaborator wishlist books from main library and search
+                    if (b.isWishlist && !isOwner && !statusData.updatedAt) return false;
+
+                    const isWishlist = statusData.isWishlist || (isOwner && b.isWishlist) || false;
                     const matchesTab = (activeTab === 'mybooks')
                         ? (myBooksSubTab === 'wishlist' ? isWishlist : statusData.status === 'finished')
                         : (!isWishlist && !b.excludeFromLibrary);
@@ -1779,6 +1794,14 @@
 
                 const libraryWrapper = document.getElementById('library-container-wrapper');
                 if (libraryWrapper) {
+                    if (isInitialSync && books.length === 0) {
+                        libraryWrapper.innerHTML = `
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            ${Array(6).fill(0).map(() => renderSkeletonCard()).join('')}
+                        </div>`;
+                        return;
+                    }
+
                     // Performance optimization: Single-pass O(N) grouping of books
                     const myOwnBooks = [];
                     const partnerLibraries = {};
@@ -2631,7 +2654,15 @@
 
                 books.forEach(b => {
                     const statusData = getStatusData(b.id);
-                    const isWishlist = statusData.isWishlist || b.isWishlist || false;
+                    const isOwner = b.userId === currentUser.uid;
+
+                    // ⚡ Bolt: Hide collaborator wishlist books from stats and metadata.
+                    // If the book is marked as wishlist on the document and we are not the owner,
+                    // only consider it if we have explicitly changed its status/wishlist state ourselves.
+                    const isPrivateWishlist = b.isWishlist && !isOwner && !statusData.updatedAt;
+                    if (isPrivateWishlist) return;
+
+                    const isWishlist = statusData.isWishlist || (isOwner && b.isWishlist) || false;
                     const status = statusData.status;
 
                     // ⚡ Bolt: Collect metadata for ALL books (including wishlist) to preserve autocomplete/global filters.
@@ -2744,6 +2775,22 @@
                     }
                 }
                 libraryStats.readingStreak = streak;
+            }
+
+            function renderSkeletonCard() {
+                return `
+                    <div class="glass rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 animate-pulse">
+                        <div class="aspect-[2/3] w-full skeleton"></div>
+                        <div class="p-4 space-y-3">
+                            <div class="h-4 w-3/4 skeleton rounded"></div>
+                            <div class="h-3 w-1/2 skeleton rounded opacity-50"></div>
+                            <div class="flex justify-between items-center pt-2">
+                                <div class="h-6 w-16 skeleton rounded-full"></div>
+                                <div class="h-6 w-6 skeleton rounded-full"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
             }
 
             // Helper to render a single book card
@@ -3004,6 +3051,7 @@
                                 books = allBooks.sort((a, b) => b._createdTime - a._createdTime);
 
                                 updateLibraryStats();
+                                if (isInitialSync) isInitialSync = false;
                                 window.queueRenderMainApp();
                             }, err => {
                                 console.error("Firestore Error for chunk:", chunk, err);
@@ -3462,10 +3510,71 @@
                     </div>
                 </div>
             `;
-                const close = showModal(modalHtml, null, true);
+                const close = showModal(modalHtml, () => {
+                    if (!isEdit) {
+                        // Clear draft when modal is explicitly closed/saved
+                        sessionStorage.removeItem(DRAFT_KEY);
+                    }
+                }, true);
                 document.getElementById('man-title')?.focus();
                 renderGenres();
                 updateDescCount();
+
+                const saveDraft = () => {
+                    if (isEdit) return;
+                    const draft = {
+                        title: document.getElementById('man-title').value,
+                        author: document.getElementById('man-author').value,
+                        cover: document.getElementById('man-cover').value,
+                        isbn: document.getElementById('man-isbn').value,
+                        owner: document.getElementById('man-owner').value,
+                        tags: document.getElementById('man-tags').value,
+                        description: document.getElementById('man-description').value,
+                        price: document.getElementById('man-price').value,
+                        date: document.getElementById('man-date').value,
+                        wishlist: document.getElementById('man-wishlist').checked,
+                        genres: currentGenres
+                    };
+                    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+                };
+
+                // Draft Recovery Logic
+                if (!isEdit) {
+                    const savedDraft = sessionStorage.getItem(DRAFT_KEY);
+                    if (savedDraft) {
+                        try {
+                            const draft = JSON.parse(savedDraft);
+                            if (confirm('Restore your unsaved book draft?')) {
+                                document.getElementById('man-title').value = draft.title || '';
+                                document.getElementById('man-author').value = draft.author || '';
+                                document.getElementById('man-cover').value = draft.cover || '';
+                                document.getElementById('man-isbn').value = draft.isbn || '';
+                                document.getElementById('man-owner').value = draft.owner || '';
+                                document.getElementById('man-tags').value = draft.tags || '';
+                                document.getElementById('man-description').value = draft.description || '';
+                                document.getElementById('man-price').value = draft.price || '';
+                                document.getElementById('man-date').value = draft.date || '';
+                                document.getElementById('man-wishlist').checked = draft.wishlist || false;
+                                if (draft.genres) {
+                                    currentGenres = draft.genres;
+                                    renderGenres();
+                                }
+                                updateDescCount();
+                            } else {
+                                sessionStorage.removeItem(DRAFT_KEY);
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse draft', e);
+                        }
+                    }
+
+                    // Attach auto-save listeners
+                    ['man-title', 'man-author', 'man-cover', 'man-isbn', 'man-owner', 'man-tags', 'man-description', 'man-price', 'man-date'].forEach(id => {
+                        document.getElementById(id)?.addEventListener('input', saveDraft);
+                    });
+                    document.getElementById('man-wishlist')?.addEventListener('change', saveDraft);
+                }
+
                 document.getElementById('man-description')?.addEventListener('input', updateDescCount);
 
                 // Populate library destination options
@@ -3515,16 +3624,19 @@
                 // Setup searchable dropdowns
                 setupSearchableDropdown('man-author', 'author-dropdown', metadataCache.authors, (val) => {
                     document.getElementById('man-author').value = val;
+                    if (!isEdit) saveDraft();
                 });
                 setupSearchableDropdown('man-category', 'category-dropdown', metadataCache.genres, (val) => {
                     if (!currentGenres.includes(val)) {
                         currentGenres.push(val);
                         renderGenres();
+                        if (!isEdit) saveDraft();
                     }
                     document.getElementById('man-category').value = '';
                 });
                 setupSearchableDropdown('man-owner', 'owner-dropdown', metadataCache.owners, (val) => {
                     document.getElementById('man-owner').value = val;
+                    if (!isEdit) saveDraft();
                 });
 
                 // Add Enter key support for manual entry fields
@@ -4087,7 +4199,10 @@
             }
 
             function renderCollaboratorStats() {
-                const partnerships = allPartnerships.length > 0 ? allPartnerships : allPartnershipsForUI;
+                // ⚡ Bolt: Filter out inactive partnerships where either user has unsubscribed.
+                const partnerships = (allPartnerships.length > 0 ? allPartnerships : allPartnershipsForUI)
+                    .filter(p => !p.user1Unsubscribed && !p.user2Unsubscribed);
+
                 if (!partnerships || partnerships.length === 0) {
                     return `
                         <div class="text-center py-4">
@@ -4895,7 +5010,6 @@
                             userId: currentUser.uid,
                             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                         }, { merge: true });
-                        batch.update(doc.ref, { isWishlist: firebase.firestore.FieldValue.delete() });
                     });
 
                     await batch.commit();
@@ -5123,11 +5237,18 @@
 
                     if (!response.ok) {
                         const error = await response.json();
+                        const msg = error.error?.message || '';
+
                         if (!useFallback && model !== AI_CONFIG.fallbackModel) {
                             console.warn("AI Primary failed, retrying with fallback...", error);
                             return callGeminiAI(userPrompt, systemInstruction, true, history);
                         }
-                        throw new Error(error.error?.message || 'AI_CALL_FAILED');
+
+                        if (msg.includes('API_KEY_INVALID')) throw new Error('INVALID_API_KEY');
+                        if (msg.includes('quota') || response.status === 429) throw new Error('RATE_LIMIT_EXCEEDED');
+                        if (response.status === 404) throw new Error('MODEL_NOT_FOUND');
+
+                        throw new Error(msg || 'AI_CALL_FAILED');
                     }
 
                     const data = await response.json();
@@ -5144,11 +5265,17 @@
                     return text;
                 } catch (err) {
                     clearTimeout(timeoutId);
-                    if (err.name === 'AbortError') throw new Error('AI_TIMEOUT');
+                    if (err.name === 'AbortError') throw new Error('The AI request timed out. Please try again.');
+
                     if (!useFallback && model !== AI_CONFIG.fallbackModel) {
                         console.warn("AI Primary failed (catch), retrying with fallback...", err);
                         return callGeminiAI(userPrompt, systemInstruction, true, history);
                     }
+
+                    if (err.message === 'INVALID_API_KEY') throw new Error('Your API key is invalid. Please check your Settings.');
+                    if (err.message === 'RATE_LIMIT_EXCEEDED') throw new Error('AI rate limit reached. Please try again in a few minutes.');
+                    if (err.message === 'MODEL_NOT_FOUND') throw new Error('Selected AI model was not found.');
+
                     throw err;
                 }
             }
@@ -5528,7 +5655,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                 closeLoading();
                 const close = showModal(`
                 <div class="fixed inset-0 z-50 flex items-center justify-center sm:p-4">
-                    <div class="bg-sky-50 dark:bg-gray-800 w-full h-full sm:h-auto sm:max-w-4xl sm:rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up overflow-y-auto sm:max-h-[90vh]">
+                    <div class="bg-sky-50 dark:bg-gray-800 w-full h-full sm:h-auto sm:rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up overflow-y-auto sm:max-h-[95vh]">
                         <div class="flex flex-col sm:flex-row gap-8">
                             <div class="flex-shrink-0 mx-auto sm:mx-0">
                                 <div class="relative group">
@@ -5557,7 +5684,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                                         <svg class="w-6 h-6 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'text-slate-300'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                                     </button>
                                 </div>
-                                <p class="text-xl text-slate-500 dark:text-slate-400 mt-2 font-medium italic">${escapeHTML(book.author)}</p>
+                                <p class="flex items-center justify-center text-xl text-slate-500 dark:text-slate-400 mt-2 font-medium italic">${escapeHTML(book.author)}</p>
                                 ${book.description ? `<button onclick="this.classList.toggle('line-clamp-4'); this.classList.toggle('line-clamp-none');" class="text-sm text-slate-600 dark:text-slate-300 mt-4 leading-[1.625] line-clamp-4 transition-all text-left focus-visible:ring-2 focus-visible:ring-primary outline-none rounded-lg" aria-label="Book description: Click to expand or collapse">${escapeHTML(book.description)}</button>` : ''}
                                 <div class="flex items-center gap-4 m-5">
                                     <div class="text-amber-400 text-lg">${stars}</div>
