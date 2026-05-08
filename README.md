@@ -1,28 +1,28 @@
-# My Lib · Professional Library Manager
+# My Lib · Book Review Social Network
 
-My Lib is a masterfully crafted, single-page application (SPA) designed for book enthusiasts who value organization, peace of mind, and their personal reading journey. Built as a Progressive Web App (PWA), it offers a seamless experience across devices with real-time cloud sync and robust offline support.
+My Lib is a text-focused social media platform for book lovers. Designed with a minimal, typography-first philosophy, it allows users to share deep, thoughtful reviews, engage with a community of readers, and catalog their personal library with elegance.
 
 ## 🌟 Key Features
 
-### 📚 Effortless Organization
-- **Smart Search**: Instantly find books by title, author, genre, or ISBN.
-- **Advanced Filtering**: Narrow down your collection using ratings, price ranges, purchase dates, and custom tags.
-- **Multiple Views**: Choose between Grid, List, and Compact view modes to suit your preference.
+### ✍️ Thoughtful Book Reviews
+- **Text-First Design**: A minimal UI where your words are the hero, featuring high-readability serif typography.
+- **Depth & Quality**: Share reviews from 10 to 2,000 characters with built-in character counting and star ratings.
+- **Reading Estimates**: Automatically calculated "min read" indicators for every review.
 
-### 🔍 Digital Cataloging
-- **QR/Barcode Scanning**: Add books instantly using your device's camera.
-- **Auto-Fetch Metadata**: Automatically retrieves book details, covers, and descriptions from Google Books and Open Library APIs.
-- **Manual Entry**: Full control to add or edit book details manually.
+### 🌐 Community & Connection
+- **Social Feed**: A reverse-chronological community feed to discover what others are reading and thinking.
+- **Interactions**: Liking with optimistic UI (heart-burst animation) and inline expandable comment threads.
+- **Profile Discovery**: Visit other users' profiles to see their personal bios, total collection stats, and reading history.
+
+### 📚 Professional Library Management
+- **Smart Search**: Find books and community reviews by title, author, or genre.
+- **Digital Cataloging**: QR/Barcode scanning and auto-fetch metadata from Google Books and Open Library.
+- **Advanced Filtering**: Organize your sanctuary with ratings, price ranges, purchase dates, and custom tags.
 
 ### ☁️ Seamless Sync & PWA
-- **Real-time Sync**: Powered by Firebase Firestore for instantaneous updates across all your devices.
-- **Offline Mode**: Full functionality even without an internet connection, thanks to Service Workers and Firestore persistence.
-- **Installable**: Add My Lib to your home screen for a native app-like experience.
-
-### 👥 Collaborative Reading
-- **Library Sharing**: Share your collection with partners or friends and see their libraries.
-- **Activity Feed**: Stay updated on what your collaborators are adding or reading.
-- **Lending Tracking**: Keep track of books you've lent to others.
+- **Real-time Sync**: Powered by Firebase for instantaneous updates across all your devices.
+- **Offline Mode**: Full functionality without internet, thanks to robust Service Worker and Firestore persistence.
+- **Installable**: Add to your home screen for a native app experience.
 
 ### 📊 Deep Insights
 - **Reading Composition**: Visualize your progress and genres with elegant charts.
