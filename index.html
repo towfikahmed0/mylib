@@ -132,6 +132,22 @@
             }
         }
 
+        .review-body {
+            font-family: 'Playfair Display', serif;
+            line-height: 1.8;
+            letter-spacing: 0.01em;
+        }
+
+        .heart-burst {
+            animation: heartBurst 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes heartBurst {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.4); }
+            100% { transform: scale(1); }
+        }
+
         /* Light blueish theme scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
@@ -357,6 +373,9 @@
             let chatHistory = [];
             let aiResponseCache = [];      // Cache last 5 responses [{prompt, response}]
             let lastActiveTab = null;
+            let socialReviews = [];
+            let lastReviewDoc = null;
+            let hasMoreReviews = true;
             let myBooksSubTab = 'finished';
             let currentModalCloseHandler = null;
             let aiSearchResults = null; // List of book IDs
@@ -495,26 +514,31 @@
             }
 
             let syncTimeout = null;
-            async function syncCompletedBooksCount() {
+            async function syncLibraryStats() {
                 if (!currentUser) return;
 
                 if (syncTimeout) clearTimeout(syncTimeout);
                 syncTimeout = setTimeout(async () => {
-                    const count = Object.values(readingStatuses).filter(data => {
+                    const totalBooks = books.filter(b => b.userId === currentUser.uid).length;
+                    const finishedBooks = Object.values(readingStatuses).filter(data => {
                         const status = typeof data === 'string' ? data : data.status;
                         return status === 'finished';
                     }).length;
 
-                    if (userProfile && userProfile.completedBooksCount === count) return;
+                    if (userProfile && userProfile.totalBooksCount === totalBooks && userProfile.completedBooksCount === finishedBooks) return;
 
                     try {
                         await db.collection('users').doc(currentUser.uid).update({
-                            completedBooksCount: count,
+                            totalBooksCount: totalBooks,
+                            completedBooksCount: finishedBooks,
                             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                         });
-                        if (userProfile) userProfile.completedBooksCount = count;
+                        if (userProfile) {
+                            userProfile.totalBooksCount = totalBooks;
+                            userProfile.completedBooksCount = finishedBooks;
+                        }
                     } catch (err) {
-                        console.error("Error syncing completed books count:", err);
+                        console.error("Error syncing library stats:", err);
                     }
                 }, 1000);
             }
@@ -1303,10 +1327,11 @@
                             <nav class="hidden md:flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
                                 <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'library' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Library</button>
                                 <button onclick="window.setTab('mybooks')" ${activeTab === 'mybooks' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'mybooks' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">My Books</button>
-                                <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'activity' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Activity</button>
+                                <button onclick="window.setTab('feed')" ${activeTab === 'feed' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'feed' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Feed</button>
                                 <button onclick="window.setTab('insight')" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'insight' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Insights</button>
                             </nav>
                             <div class="flex items-center gap-1">
+                                <button onclick="window.openPostReviewModal()" class="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-xs font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg focus-visible:ring-2 focus-visible:ring-primary outline-none mr-2">Write Review</button>
                                 <button id="manual-add-btn" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500 focus-visible:ring-2 focus-visible:ring-primary outline-none" title="Add Book Manually" aria-label="Add Book Manually">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                 </button>
@@ -1340,9 +1365,9 @@
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                             <span class="text-[8px] font-bold">My Books</span>
                         </button>
-                        <button onclick="window.setTab('activity')" ${activeTab === 'activity' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'activity' ? 'text-primary' : 'text-slate-400'}">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                            <span class="text-[8px] font-bold">Activity</span>
+                        <button onclick="window.setTab('feed')" ${activeTab === 'feed' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'feed' ? 'text-primary' : 'text-slate-400'}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h10M7 12h10"/></svg>
+                            <span class="text-[8px] font-bold">Feed</span>
                         </button>
                         <button onclick="window.setTab('insight')" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'insight' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
@@ -1357,7 +1382,7 @@
                 if (activeTab === 'settings') {
                     mainContentEl.innerHTML = renderSettings();
                     attachSettingsListeners();
-                } else if (activeTab === 'activity') {
+                } else if (activeTab === 'feed') {
                     mainContentEl.innerHTML = renderActivity();
                     attachActivityListeners();
                 } else if (activeTab === 'mybooks') {
@@ -1481,6 +1506,62 @@
 
                     selectedBookIds.clear();
                     showToast('Deleted books successfully', 'success');
+                }
+            };
+
+            window.openUserProfile = async (userId) => {
+                const closeLoading = showModal(`
+                    <div class="glass max-w-sm w-full rounded-[2.5rem] p-10 flex flex-col items-center justify-center gap-6 animate-pulse">
+                        <div class="w-16 h-16 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin"></div>
+                        <p class="text-slate-500 font-bold uppercase tracking-widest text-xs">Loading Profile...</p>
+                    </div>
+                `);
+
+                try {
+                    const userDoc = await db.collection('users').doc(userId).get();
+                    const profile = userDoc.data();
+                    const reviewsSnapshot = await db.collection('reviews').where('userId', '==', userId).orderBy('createdAt', 'desc').get();
+                    const userReviews = reviewsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                    closeLoading();
+                    const modalHtml = `
+                    <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div class="bg-slate-50 dark:bg-slate-900 w-full h-full sm:h-auto sm:max-w-3xl sm:rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up overflow-y-auto sm:max-h-[90vh]">
+                            <div class="flex flex-col items-center text-center mb-10">
+                                <div class="w-24 h-24 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-3xl uppercase shadow-xl mb-6">${profile.displayName?.substring(0, 2) || '??'}</div>
+                                <h2 class="text-3xl font-black font-serif italic">${escapeHTML(profile.displayName)}</h2>
+                                <p class="text-slate-500 text-sm mt-1 uppercase tracking-widest font-bold">Joined ${new Date(profile.joinedAt?.toDate ? profile.joinedAt.toDate() : Date.now()).toLocaleDateString()}</p>
+
+                                <div class="grid grid-cols-2 gap-4 mt-8 w-full max-w-sm">
+                                    <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
+                                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Books</p>
+                                        <p class="text-2xl font-black text-primary">${profile.totalBooksCount || 0}</p>
+                                    </div>
+                                    <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
+                                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Finished</p>
+                                        <p class="text-2xl font-black text-emerald-500">${profile.completedBooksCount || 0}</p>
+                                    </div>
+                                </div>
+
+                                ${profile.bio ? `<p class="mt-8 text-slate-600 dark:text-slate-300 max-w-md leading-relaxed italic review-body text-lg">"${escapeHTML(profile.bio)}"</p>` : ''}
+                            </div>
+
+                            <div class="space-y-6">
+                                <h3 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Community Reviews (${userReviews.length})</h3>
+                                ${userReviews.length > 0 ? userReviews.map(rev => renderReviewCard(rev)).join('') : '<p class="text-center py-10 text-slate-400 italic">No reviews shared yet.</p>'}
+                            </div>
+
+                            <div class="mt-10 flex justify-center">
+                                <button data-close class="px-10 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none">Close Profile</button>
+                            </div>
+                        </div>
+                    </div>
+                    `;
+                    showModal(modalHtml);
+                } catch (err) {
+                    closeLoading();
+                    showToast('Failed to load profile', 'error');
+                    console.error(err);
                 }
             };
 
@@ -2234,8 +2315,140 @@
 
             window.setTab = (tab) => {
                 activeTab = tab;
+                if (tab === 'feed' && socialReviews.length === 0) {
+                    fetchSocialReviews();
+                }
                 window.queueRenderMainApp();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+
+            window.loadMoreReviews = async (btn) => {
+                if (!hasMoreReviews) return;
+                const originalText = btn.innerText;
+                btn.disabled = true;
+                btn.innerText = 'Loading More...';
+                try {
+                    await fetchSocialReviews(true);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                }
+            };
+
+            window.toggleLike = async (reviewId, btn) => {
+                if (!currentUser) return;
+                const svg = btn.querySelector('svg');
+                const span = btn.querySelector('span');
+
+                // Optimistic UI
+                const isLiked = svg.classList.contains('fill-rose-500');
+                const count = parseInt(span.innerText);
+
+                svg.classList.toggle('fill-rose-500', !isLiked);
+                svg.classList.toggle('text-rose-500', !isLiked);
+                svg.classList.toggle('heart-burst', !isLiked);
+                span.innerText = isLiked ? Math.max(0, count - 1) : count + 1;
+
+                try {
+                    const likeRef = db.collection('reviews').doc(reviewId).collection('likes').doc(currentUser.uid);
+                    const reviewRef = db.collection('reviews').doc(reviewId);
+
+                    if (isLiked) {
+                        await likeRef.delete();
+                        await reviewRef.update({ likesCount: firebase.firestore.FieldValue.increment(-1) });
+                    } else {
+                        await likeRef.set({ userId: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                        await reviewRef.update({ likesCount: firebase.firestore.FieldValue.increment(1) });
+                    }
+                } catch (err) {
+                    console.error("Like error:", err);
+                    // Revert UI on failure
+                    svg.classList.toggle('fill-rose-500', isLiked);
+                    svg.classList.toggle('text-rose-500', isLiked);
+                    span.innerText = count;
+                    showToast('Failed to sync like', 'error');
+                }
+            };
+
+            window.toggleComments = async (reviewId) => {
+                const container = document.getElementById(`comments-${reviewId}`);
+                if (!container) return;
+
+                const isHidden = container.classList.contains('hidden');
+                container.classList.toggle('hidden');
+
+                if (isHidden && container.innerHTML === '') {
+                    container.innerHTML = `<div class="flex justify-center py-4"><div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div></div>`;
+
+                    try {
+                        const snapshot = await db.collection('reviews').doc(reviewId).collection('comments').orderBy('createdAt', 'asc').get();
+                        const comments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                        let html = comments.map(c => `
+                            <div class="flex gap-3 animate-slide-up">
+                                <div class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[10px] font-black uppercase flex-shrink-0">${c.userName?.substring(0, 2) || '??'}</div>
+                                <div class="flex-1">
+                                    <div class="bg-slate-100 dark:bg-slate-800/50 p-3 rounded-2xl rounded-tl-none">
+                                        <div class="flex justify-between items-center mb-1">
+                                            <span class="text-[10px] font-black text-primary uppercase">${escapeHTML(c.userName)}</span>
+                                            <span class="text-[8px] font-bold text-slate-400 uppercase">${formatDate(c.createdAt?.toDate ? c.createdAt.toDate() : new Date())}</span>
+                                        </div>
+                                        <p class="text-xs text-slate-600 dark:text-slate-300">${escapeHTML(c.body)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('');
+
+                        html += `
+                            <div class="flex gap-2 mt-4">
+                                <input id="comment-input-${reviewId}" type="text" placeholder="Add a comment..." class="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-primary outline-none text-xs transition-all">
+                                <button onclick="window.addComment('${reviewId}')" class="p-2 bg-primary text-white rounded-xl hover:bg-blue-700 transition active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Post comment">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                                </button>
+                            </div>
+                        `;
+                        container.innerHTML = html;
+
+                        const input = document.getElementById(`comment-input-${reviewId}`);
+                        input?.addEventListener('keydown', (e) => {
+                            if (e.key === 'Enter') window.addComment(reviewId);
+                        });
+                        input?.focus();
+                    } catch (err) {
+                        container.innerHTML = `<p class="text-center text-rose-500 text-xs py-4">Failed to load comments</p>`;
+                    }
+                }
+            };
+
+            window.addComment = async (reviewId) => {
+                const input = document.getElementById(`comment-input-${reviewId}`);
+                const body = input.value?.trim() || "";
+                if (!body) return;
+
+                if (body.length > 500) { showToast('Comment is too long (max 500)', 'error'); return; }
+
+                input.disabled = true;
+                try {
+                    const commentData = {
+                        userId: currentUser.uid,
+                        userName: userProfile.displayName || currentUser.email,
+                        body: body,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+
+                    await db.collection('reviews').doc(reviewId).collection('comments').add(commentData);
+                    await db.collection('reviews').doc(reviewId).update({ commentsCount: firebase.firestore.FieldValue.increment(1) });
+
+                    input.value = '';
+                    const container = document.getElementById(`comments-${reviewId}`);
+                    container.innerHTML = ''; // Force reload
+                    await window.toggleComments(reviewId);
+                    showToast('Comment posted!', 'success');
+                } catch (err) {
+                    showToast('Failed to post comment', 'error');
+                } finally {
+                    input.disabled = false;
+                }
             };
 
             window.setMyBooksSubTab = (tab) => {
@@ -3099,7 +3312,7 @@
                                 }
                                 activities = allActivities.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
 
-                                if (activeTab === 'activity') window.queueRenderMainApp();
+                                if (activeTab === 'feed') window.queueRenderMainApp();
                             }, err => {
                                 console.error("Activity Listener Error for chunk:", chunk, err);
                             });
@@ -3135,7 +3348,7 @@
                         });
                         updateLibraryStats();
                         window.queueRenderLibraryOnly();
-                        syncCompletedBooksCount();
+                        syncLibraryStats();
                     }, err => {
                         console.error("Status Listener Error (Ensure index is created):", err);
                     });
@@ -4733,100 +4946,130 @@
                 `;
             }
 
-            // ---------- Activity Tab ----------
+            // ---------- Social Feed Engine ----------
+            async function fetchSocialReviews(isLoadMore = false) {
+                if (!isLoadMore) {
+                    socialReviews = [];
+                    lastReviewDoc = null;
+                    hasMoreReviews = true;
+                }
+
+                if (!hasMoreReviews) return;
+
+                let query = db.collection('reviews').orderBy('createdAt', 'desc').limit(10);
+                if (lastReviewDoc) query = query.startAfter(lastReviewDoc);
+
+                const snapshot = await query.get();
+                if (snapshot.empty) {
+                    hasMoreReviews = false;
+                    return;
+                }
+
+                lastReviewDoc = snapshot.docs[snapshot.docs.length - 1];
+                const newReviews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                socialReviews = [...socialReviews, ...newReviews];
+
+                if (activeTab === 'feed') window.queueRenderMainApp();
+            }
+
+            async function fetchSocialReviewsWithSearch(q) {
+                socialReviews = [];
+                lastReviewDoc = null;
+                hasMoreReviews = false; // Disable pagination for simple search
+                window.queueRenderMainApp();
+
+                try {
+                    // Simple search implementation (Firebase lacks full-text search)
+                    const snapshot = await db.collection('reviews').orderBy('bookTitle').startAt(q).endAt(q + '\uf8ff').limit(20).get();
+                    socialReviews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    window.queueRenderMainApp();
+                } catch (err) {
+                    showToast('Search failed', 'error');
+                }
+            }
+
+            function renderReviewCard(rev) {
+                const date = rev.createdAt?.toDate ? rev.createdAt.toDate() : new Date();
+                const stars = '★'.repeat(rev.rating) + '☆'.repeat(5 - rev.rating);
+                const wordCount = (rev.body || "").split(/\s+/).length;
+                const readTime = Math.max(1, Math.ceil(wordCount / 200));
+
+                return `
+                <div class="glass rounded-[2.5rem] p-8 border border-blue-100/50 dark:border-slate-800 hover:shadow-2xl transition-all animate-slide-up group">
+                    <div class="flex items-center justify-between mb-6">
+                        <button onclick="window.openUserProfile('${rev.userId}')" class="flex items-center gap-3 text-left focus-visible:ring-2 focus-visible:ring-primary outline-none rounded-xl p-1 -ml-1">
+                            <div class="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-sm uppercase shadow-md">${rev.userName?.substring(0, 2) || '??'}</div>
+                            <div>
+                                <h4 class="text-sm font-black text-slate-900 dark:text-white">${escapeHTML(rev.userName)}</h4>
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${formatDate(date)} · ${readTime} min read</p>
+                            </div>
+                        </button>
+                        <div class="flex items-center gap-2">
+                            <div class="text-amber-500 text-sm font-black">${stars}</div>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <div class="flex items-center gap-2 mb-2">
+                            <h3 class="text-xl font-black font-serif italic text-primary">${escapeHTML(rev.bookTitle)}</h3>
+                            ${rev.author ? `<span class="text-slate-400 text-sm">by ${escapeHTML(rev.author)}</span>` : ''}
+                        </div>
+                        <div class="review-body text-slate-700 dark:text-slate-200 text-lg whitespace-pre-line line-clamp-6 group-hover:line-clamp-none transition-all">
+                            ${escapeHTML(rev.body)}
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-6 pt-6 border-t border-slate-100 dark:border-slate-800">
+                        <button onclick="window.toggleLike('${rev.id}', this)" class="flex items-center gap-2 text-slate-400 hover:text-rose-500 transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 outline-none rounded-lg p-1" aria-label="Like review by ${escapeHTML(rev.userName)}">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+                            <span class="text-xs font-black">${rev.likesCount || 0}</span>
+                        </button>
+                        <button onclick="window.toggleComments('${rev.id}')" class="flex items-center gap-2 text-slate-400 hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none rounded-lg p-1" aria-label="View comments">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                            <span class="text-xs font-black">${rev.commentsCount || 0}</span>
+                        </button>
+                    </div>
+                    <div id="comments-${rev.id}" class="hidden mt-6 space-y-4 animate-slide-up"></div>
+                </div>
+                `;
+            }
+
             function renderActivity() {
-                if (activities.length === 0) {
+                if (socialReviews.length === 0) {
+                    if (isInitialSync) {
+                        return `<div class="max-w-3xl mx-auto py-24 flex flex-col items-center"><div class="w-12 h-12 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin"></div></div>`;
+                    }
                     return `
                     <div class="flex flex-col items-center justify-center py-24 text-center">
-                        <div class="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6">
-                            <svg class="w-10 h-10 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <div class="w-24 h-24 bg-blue-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-8">
+                            <svg class="w-12 h-12 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
                         </div>
-                        <h2 class="text-xl font-black font-serif italic text-slate-700 dark:text-slate-300">No Activity Yet</h2>
-                        <p class="text-slate-500 dark:text-slate-400 text-sm max-w-xs mt-2">When you or your partners update library books, those events will appear here.</p>
+                        <h2 class="text-2xl font-black font-serif italic text-slate-700 dark:text-slate-300">Quiet in the Library</h2>
+                        <p class="text-slate-500 dark:text-slate-400 text-sm max-w-xs mt-3">Be the first to share your thoughts on a book that moved you.</p>
+                        <button onclick="window.openPostReviewModal()" class="mt-8 px-8 py-3 bg-primary text-white rounded-full font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">Write a Review</button>
                     </div>
                     `;
                 }
 
-                const html = `
-                <div class="max-w-3xl mx-auto space-y-6 animate-slide-up">
-                    <div class="flex items-center justify-between mb-2">
-                        <h2 class="text-3xl font-black font-serif italic">Library Activity</h2>
-                        <span class="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-[10px] font-black uppercase tracking-widest">${activities.length} Events</span>
-                    </div>
-                    <div class="space-y-4">
-                        ${activities.map((activity, idx) => {
-                    let icon = '';
-                    let actionText = '';
-                    let badgeColor = '';
-
-                    switch (activity.type) {
-                        case 'book_added':
-                            icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>';
-                            actionText = 'added a new book';
-                            badgeColor = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400';
-                            break;
-                        case 'status_updated':
-                            icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
-                            actionText = `marked as <span class="font-black uppercase text-[10px]">${READING_STATUSES[activity.status]?.label || activity.status}</span>`;
-                            badgeColor = 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
-                            break;
-                        case 'rating_updated':
-                            icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.54 1.118l-3.976-2.888a1 1 0 00-1.175 0l-3.976 2.888c-.784.57-1.838-.197-1.539-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>';
-                            actionText = `rated <span class="font-black text-amber-500">${activity.rating} ★</span>`;
-                            badgeColor = 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
-                            break;
-                        case 'book_borrowed':
-                            icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>';
-                            actionText = `lent to <span class="font-bold">${escapeHTML(activity.borrowedBy)}</span>`;
-                            badgeColor = 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400';
-                            break;
-                        case 'book_returned':
-                            icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>';
-                            actionText = 'marked as returned';
-                            badgeColor = 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
-                            break;
-                        default:
-                            icon = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
-                            actionText = 'performed an action';
-                            badgeColor = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400';
-                    }
-
-                    return `
-                        <div class="activity-card glass rounded-3xl p-5 border border-blue-100/50 dark:border-slate-800 border-l-4 border-l-blue-500 hover:shadow-xl hover:bg-blue-50/50 dark:hover:bg-slate-800/80 transition-all group cursor-pointer focus-visible:ring-2 focus-visible:ring-primary outline-none" onclick="window.jumpToBook('${activity.bookId}')" tabindex="0" role="button" aria-label="View activity: ${escapeHTML(activity.userName || activity.addedBy || 'Someone')} ${actionText.replace(/<[^>]*>?/gm, '')} ${escapeHTML(activity.bookTitle || activity.title)}">
-                            <div class="flex items-start gap-4">
-                                <div class="w-12 h-12 rounded-2xl ${badgeColor} flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-110 transition-transform">
-                                    ${icon}
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex flex-wrap items-center gap-x-2 text-sm">
-                                        <span class="font-black text-primary">${escapeHTML(activity.userName || activity.addedBy || 'Someone')}</span>
-                                        <span class="text-slate-500">${actionText}</span>
-                                    </div>
-                                    <h4 class="font-serif italic font-black text-lg mt-1 truncate">${escapeHTML(activity.bookTitle || activity.title)}</h4>
-                                    <div class="flex items-center gap-3 mt-3">
-                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${formatDate(activity.timestamp)}</span>
-                                        <span class="w-1 h-1 bg-slate-200 dark:bg-slate-700 rounded-full"></span>
-                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                            Library: ${activity.addedTo === 'My' ? 'Personal' : (activity.libraryName || 'Shared')}
-                                        </span>
-                                    </div>
-                                    ${activity.comment ? `
-                                        <div class="mt-4 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 text-sm text-slate-600 dark:text-slate-400 italic">
-                                            "${escapeHTML(activity.comment)}"
-                                        </div>
-                                    ` : ''}
-                                </div>
-                                <button tabindex="-1" class="p-3 bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-primary hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-2xl transition-all active:scale-90" title="Go to book" aria-label="Jump to book">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                                </button>
-                            </div>
+                return `
+                <div class="max-w-3xl mx-auto space-y-8 animate-slide-up">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-4xl font-black font-serif italic">Community Feed</h2>
+                            <p class="text-slate-500 text-sm">Discover what others are reading.</p>
                         </div>
-                    `;
-                }).join('')}
+                        <button onclick="window.openPostReviewModal()" class="hidden sm:block px-6 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg hover:scale-105 transition-all">New Post</button>
                     </div>
+                    <div class="space-y-6">
+                        ${socialReviews.map(rev => renderReviewCard(rev)).join('')}
+                    </div>
+                    ${hasMoreReviews ? `
+                        <div class="flex justify-center pt-8">
+                            <button onclick="window.loadMoreReviews(this)" class="px-8 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-md hover:scale-105 active:scale-95 transition-all">Load More Reviews</button>
+                        </div>
+                    ` : '<p class="text-center text-slate-400 text-xs font-bold uppercase tracking-widest pt-12 italic">— You\'ve reached the end of the shelf —</p>'}
                 </div>
                 `;
-                return html;
             }
 
             function attachActivityListeners() {
@@ -5567,9 +5810,13 @@ If the collection is small or has no finished books, be extra encouraging and su
                             uid: user.uid,
                             email: user.email,
                             displayName: user.displayName || '',
+                            bio: '',
+                            joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            totalBooksCount: 0,
+                            completedBooksCount: 0,
                             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                         });
-                        userProfile = { uid: user.uid, email: user.email, displayName: user.displayName || '' };
+                        userProfile = { uid: user.uid, email: user.email, displayName: user.displayName || '', bio: '', joinedAt: new Date(), totalBooksCount: 0, completedBooksCount: 0 };
                     } else {
                         userProfile = userDoc.data();
                     }
@@ -6176,6 +6423,118 @@ If the collection is small or has no finished books, be extra encouraging and su
             window.openAIChat = openAIChat;
             window.runAILibraryAnalysis = runAILibraryAnalysis;
             window.openBookDetails = openBookDetails;
+
+            window.openPostReviewModal = () => {
+                const modalHtml = `
+                <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div class="glass max-w-2xl w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up border border-blue-100/50 dark:border-slate-800">
+                        <div class="flex justify-between items-center mb-6">
+                            <div>
+                                <h2 class="text-3xl font-black font-serif italic text-slate-900 dark:text-white">Share Your Thoughts</h2>
+                                <p class="text-slate-500 text-sm">Every word matters. Share a review with the community.</p>
+                            </div>
+                            <button data-close class="p-3 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+
+                        <div class="space-y-6">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="rev-title" class="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1">Book Title *</label>
+                                    <input id="rev-title" type="text" placeholder="e.g. The Great Gatsby" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all">
+                                </div>
+                                <div>
+                                    <label for="rev-author" class="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1">Author</label>
+                                    <input id="rev-author" type="text" placeholder="e.g. F. Scott Fitzgerald" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1">Rating</label>
+                                <div class="flex gap-2" id="rev-rating-container">
+                                    ${[1, 2, 3, 4, 5].map(i => `
+                                        <button data-rating="${i}" class="rev-star-btn p-1 text-slate-300 hover:text-amber-400 transition-colors focus-visible:ring-2 focus-visible:ring-amber-500 outline-none rounded-lg" aria-label="${i} stars">
+                                            <svg class="w-8 h-8 fill-current" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                                        </button>
+                                    `).join('')}
+                                </div>
+                            </div>
+
+                            <div class="relative">
+                                <label for="rev-body" class="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1">Review Body *</label>
+                                <textarea id="rev-body" placeholder="What did you think?..." class="w-full px-4 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-primary outline-none transition-all min-h-[200px] text-lg review-body"></textarea>
+                                <div id="rev-char-counter" class="absolute bottom-4 right-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-white/80 dark:bg-slate-800/80 px-2 py-1 rounded-md backdrop-blur-sm">0 / 2000</div>
+                            </div>
+
+                            <button id="submit-review-btn" class="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl hover:scale-[1.02] active:scale-95 transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none">Post Review</button>
+                        </div>
+                    </div>
+                </div>
+                `;
+
+                const close = showModal(modalHtml);
+                let currentRating = 0;
+
+                const stars = document.querySelectorAll('.rev-star-btn');
+                stars.forEach(btn => {
+                    btn.onclick = () => {
+                        currentRating = parseInt(btn.dataset.rating);
+                        stars.forEach((s, idx) => {
+                            s.classList.toggle('text-amber-400', idx < currentRating);
+                            s.classList.toggle('text-slate-300', idx >= currentRating);
+                        });
+                    };
+                });
+
+                const body = document.getElementById('rev-body');
+                const counter = document.getElementById('rev-char-counter');
+                body.oninput = () => {
+                    const len = body.value.length;
+                    counter.innerText = `${len} / 2000`;
+                    counter.classList.toggle('text-rose-500', len > 2000 || len < 10);
+                    counter.classList.toggle('text-emerald-500', len >= 10 && len <= 1800);
+                    counter.classList.toggle('text-amber-500', len > 1800 && len <= 2000);
+                };
+
+                document.getElementById('submit-review-btn').onclick = async () => {
+                    const title = document.getElementById('rev-title').value.trim();
+                    const author = document.getElementById('rev-author').value.trim();
+                    const content = body.value.trim();
+
+                    if (!title) { showToast('Please enter a book title', 'error'); return; }
+                    if (content.length < 10) { showToast('Review must be at least 10 characters', 'error'); return; }
+                    if (content.length > 2000) { showToast('Review is too long (max 2000)', 'error'); return; }
+
+                    const btn = document.getElementById('submit-review-btn');
+                    btn.disabled = true;
+                    btn.innerText = 'Publishing...';
+
+                    try {
+                        const reviewData = {
+                            userId: currentUser.uid,
+                            userName: userProfile.displayName || currentUser.email,
+                            bookTitle: title,
+                            author: author,
+                            body: content,
+                            rating: currentRating,
+                            likesCount: 0,
+                            commentsCount: 0,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        };
+
+                        await db.collection('reviews').add(reviewData);
+                        showToast('Review shared with the community!', 'success');
+                        close();
+                        if (activeTab === 'feed') window.queueRenderMainApp();
+                    } catch (err) {
+                        showToast('Failed to post review: ' + err.message, 'error');
+                        btn.disabled = false;
+                        btn.innerText = 'Post Review';
+                    }
+                };
+            };
             window.toggleFavorite = toggleFavorite;
             window.toggleFavoritesFilter = toggleFavoritesFilter;
             window.addHighlight = addHighlight;
