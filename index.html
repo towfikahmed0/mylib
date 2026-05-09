@@ -210,6 +210,144 @@
             transform-box: fill-box;
             filter: drop-shadow(0 10px 8px rgba(0, 0, 0, 0.1));
         }
+
+        /* Revitalized Landing Page Styles */
+        :root { --scroll: 0; }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(to right, #3b82f6, #60a5fa);
+            transform: scaleX(var(--scroll));
+            transform-origin: left;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        @media (prefers-reduced-motion: no-preference) {
+            /* Hero Headline Revitalization */
+            main h1.animate-slide-up {
+                background: linear-gradient(135deg, #0f172a, #3b82f6, #0f172a);
+                background-size: 200% auto;
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+                position: relative;
+                display: inline-block;
+                animation: shine 5s linear infinite;
+            }
+
+            @keyframes shine {
+                to { background-position: 200% center; }
+            }
+
+            main h1.animate-slide-up::after {
+                content: '';
+                position: absolute;
+                bottom: -8px;
+                left: 0;
+                width: 0;
+                height: 6px;
+                background: #3b82f6;
+                border-radius: 3px;
+                transition: width 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+                transition-delay: 0.8s;
+            }
+
+            main h1.animate-slide-up.visible::after {
+                width: 100px;
+            }
+
+            /* Breathe effect for primary CTA */
+            #google-signin {
+                animation: breathe 3s ease-in-out infinite;
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+
+            #google-signin:hover {
+                animation-play-state: paused;
+                transform: scale(1.05);
+                box-shadow: 0 20px 25px -5px rgba(59, 130, 246, 0.2);
+            }
+
+            @keyframes breathe {
+                0%, 100% { transform: scale(1); }
+                50% { transform: scale(1.03); }
+            }
+
+            /* Feature Icons - Floating */
+            section .grid > div div[class*="rounded-2xl"] {
+                animation: float 4s ease-in-out infinite;
+            }
+
+            section .grid > div:nth-child(even) div[class*="rounded-2xl"] {
+                animation-delay: -2s;
+            }
+
+            @keyframes float {
+                0%, 100% { transform: translateY(0); }
+                50% { transform: translateY(-6px); }
+            }
+
+            /* Features Grid Revitalization */
+            section .grid > div {
+                transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            }
+
+            section .grid > div:hover {
+                transform: translateY(-12px) scale(1.02);
+                box-shadow: 0 25px 50px -12px rgba(59, 130, 246, 0.15);
+                border-color: rgba(59, 130, 246, 0.3);
+            }
+
+            /* Scroll Reveal Utilities */
+            main, section, footer {
+                opacity: 0;
+                transform: translateY(30px);
+                transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+                will-change: transform, opacity;
+            }
+
+            main.visible, section.visible, footer.visible {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            /* Staggered reveals for features */
+            section .grid > div {
+                opacity: 0;
+                transform: translateY(20px);
+                transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+                will-change: transform, opacity;
+            }
+
+            footer a {
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                display: inline-block;
+            }
+
+            footer a:hover {
+                color: #3b82f6;
+                transform: translateY(-2px) scale(1.05);
+            }
+
+            section.visible .grid > div {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            /* Add delays for stagger effect */
+            section.visible .grid > div:nth-child(1) { transition-delay: 0.1s; }
+            section.visible .grid > div:nth-child(2) { transition-delay: 0.2s; }
+            section.visible .grid > div:nth-child(3) { transition-delay: 0.3s; }
+            section.visible .grid > div:nth-child(4) { transition-delay: 0.4s; }
+            section.visible .grid > div:nth-child(5) { transition-delay: 0.5s; }
+            section.visible .grid > div:nth-child(6) { transition-delay: 0.6s; }
+        }
     </style>
 </head>
 
@@ -728,7 +866,7 @@
             // ---------- Firebase Auth UI ----------
             function renderAuth() {
                 appEl.innerHTML = `
-                <div class="min-h-screen bg-[#fdfbf7] text-slate-800 flex flex-col">
+                <div class="min-h-screen bg-[#fdfbf7] text-slate-800 flex flex-col overflow-x-hidden">
                     <!-- Hero Section -->
                     <main class="flex-1 flex flex-col lg:flex-row">
                         <div class="flex-1 flex flex-col justify-center px-8 lg:px-24 py-16 lg:py-0">
@@ -832,6 +970,50 @@
                     </footer>
                 </div>
             `;
+
+                // Revitalized Scroll Effects (Modern Craftsman Approach)
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            entry.target.classList.add('visible');
+                            // Specifically trigger the underline animation on the h1 if it's visible
+                            const h1 = entry.target.querySelector('h1.animate-slide-up');
+                            if (h1) h1.classList.add('visible');
+                        }
+                    });
+                }, { threshold: 0.1 });
+
+                // Target existing tags for reveals to respect HTML structure
+                const observeLanding = () => {
+                    const targets = document.querySelectorAll('main, section, footer');
+                    if (targets.length) {
+                        targets.forEach(el => observer.observe(el));
+                    } else {
+                        setTimeout(observeLanding, 100);
+                    }
+                };
+                observeLanding();
+
+                if (!window._revitalized) {
+                    window._revitalized = true;
+                    const root = document.documentElement;
+                    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+                    const scrollHandler = () => {
+                        const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+                        const scrollPercent = maxScroll > 0 ? window.scrollY / maxScroll : 0;
+                        root.style.setProperty('--scroll', scrollPercent);
+
+                        // Subtle Parallax for Hero Image - respect accessibility
+                        if (!reduceMotion.matches) {
+                            const heroImg = document.querySelector('main img[alt="Library Background"]');
+                            if (heroImg) {
+                                heroImg.style.transform = `translateY(${window.scrollY * 0.3}px)`;
+                            }
+                        }
+                    };
+                    window.addEventListener('scroll', scrollHandler, { passive: true });
+                }
 
                 // Google Sign-In
                 document.getElementById('google-signin').addEventListener('click', () => {
