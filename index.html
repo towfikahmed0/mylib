@@ -20,7 +20,19 @@
             theme: {
                 extend: {
                     colors: {
-                        primary: 'var(--primary-color)',
+                        primary: {
+                            50: '#f5f7ff',
+                            100: '#ebf0fe',
+                            200: '#ced9fd',
+                            300: '#b1c2fb',
+                            400: '#7695f8',
+                            500: '#3b68f5',
+                            600: '#355ddd',
+                            700: '#2c4eb8',
+                            800: '#233e93',
+                            900: '#1d3378',
+                            DEFAULT: 'var(--primary-color)',
+                        },
                         sepia: {
                             50: '#fbf0e3',
                             100: '#f7e4cf',
@@ -83,24 +95,25 @@
         }
 
         .glass {
-            background: rgba(240, 249, 255, 0.8);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: 1.5rem;
         }
 
         .dark .glass {
-            background: rgba(15, 23, 42, 0.8);
-            border-color: rgba(255, 255, 255, 0.1);
+            background: rgba(15, 23, 42, 0.7);
+            border-color: rgba(255, 255, 255, 0.08);
         }
 
         .sepia .glass {
-            background: rgba(251, 240, 227, 0.8);
-            border-color: rgba(129, 72, 14, 0.1);
+            background: rgba(251, 240, 227, 0.7);
+            border-color: rgba(129, 72, 14, 0.08);
         }
 
         .book-card {
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
         .density-relaxed {
@@ -108,33 +121,49 @@
         }
 
         .density-compact {
-            padding: 0.75rem !important;
+            padding: 1rem !important;
         }
 
-        .book-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 20px 30px -10px rgba(59, 130, 246, 0.2);
-        }
-
-        .animate-slide-up {
-            animation: slideUp 0.3s ease-out;
-        }
-
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
+        @media (hover: hover) {
+            .book-card:hover {
+                transform: translateY(-6px);
+                box-shadow: 0 25px 50px -12px rgba(99, 102, 241, 0.15);
+                border-color: rgba(99, 102, 241, 0.3);
             }
         }
 
-        /* Light blueish theme scrollbar */
+        @media (prefers-reduced-motion: no-preference) {
+            .animate-slide-up {
+                animation: slideUp 0.3s ease-out;
+            }
+
+            @keyframes slideUp {
+                from {
+                    opacity: 0;
+                    transform: translateY(20px);
+                }
+
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            .skeleton {
+                background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+                background-size: 200% 100%;
+                animation: shimmer 1.5s infinite;
+            }
+
+            @keyframes shimmer {
+                0% { background-position: -200% 0; }
+                100% { background-position: 200% 0; }
+            }
+        }
+
+        /* Refined minimalist scrollbar */
         ::-webkit-scrollbar {
-            width: 8px;
+            width: 6px;
         }
 
         ::-webkit-scrollbar-track {
@@ -142,12 +171,17 @@
         }
 
         ::-webkit-scrollbar-thumb {
-            background: #bae6fd;
-            border-radius: 10px;
+            background: rgba(148, 163, 184, 0.2);
+            border-radius: 20px;
+            transition: background 0.3s;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.4);
         }
 
         .dark ::-webkit-scrollbar-thumb {
-            background: #1e293b;
+            background: rgba(51, 65, 85, 0.5);
         }
 
         .dropdown-menu {
@@ -189,7 +223,27 @@
         }
 
         :root {
-            --primary-color: #3b82f6;
+            --primary-color: #4f46e5; /* Premium Indigo (AA Compliant) */
+        }
+
+        /* Global transition for all interactive elements */
+        a, button, input, select, textarea {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Tactical tactile feedback */
+        button:active, .book-card:active {
+            transform: scale(0.98) !important;
+        }
+
+        /* Peaceful focus rings */
+        :focus-visible {
+            outline: none !important;
+            box-shadow: 0 0 0 2px white, 0 0 0 4px rgba(99, 102, 241, 0.4) !important;
+        }
+
+        .dark :focus-visible {
+            box-shadow: 0 0 0 2px rgb(15, 23, 42), 0 0 0 4px rgba(99, 102, 241, 0.4) !important;
         }
 
         /* Utility class to prevent text selection on interactive elements like buttons or book cards */
@@ -293,6 +347,21 @@
                 50% { transform: translateY(-6px); }
             }
 
+            @media (prefers-reduced-motion: no-preference) {
+                @keyframes breathe {
+                    0%, 100% { transform: scale(1); opacity: 1; }
+                    50% { transform: scale(1.05); opacity: 0.9; }
+                }
+
+                #ai-chat-fab {
+                    animation: breathe 4s ease-in-out infinite;
+                }
+
+                #ai-chat-fab:hover {
+                    animation-play-state: paused;
+                }
+            }
+
             /* Features Grid Revitalization */
             section .grid > div {
                 transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -352,7 +421,7 @@
 </head>
 
 <body
-    class="bg-slate-50 dark:bg-slate-900 sepia:bg-sepia-50 text-slate-900 dark:text-white sepia:text-sepia-900 transition-colors duration-300 min-h-screen">
+    class="bg-slate-50/50 dark:bg-slate-950 sepia:bg-sepia-50 text-slate-900 dark:text-slate-100 sepia:text-sepia-900 transition-colors duration-300 min-h-screen">
 
     <!-- ==================== FIREBASE INIT (REPLACE WITH YOUR CONFIG) ==================== -->
     <script>
@@ -396,7 +465,7 @@
     <!-- App Container (conditional rendering based on auth) -->
     <div id="app" class="min-h-screen flex flex-col">
         <!-- Initial Loading State -->
-        <div id="initial-loader" class="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 transition-opacity duration-500">
+        <div id="initial-loader" class="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 transition-opacity duration-500">
             <div class="w-16 h-16 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin mb-6"></div>
             <p class="text-slate-500 font-bold uppercase tracking-widest text-xs animate-pulse">Connecting to Library...</p>
         </div>
@@ -404,7 +473,7 @@
 
     <!-- Toast & Modal containers (global) -->
     <div id="toast" role="status" aria-live="polite"
-        class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-medium shadow-2xl flex items-center gap-3 transition-all duration-300 opacity-0 translate-y-10 pointer-events-none">
+        class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-2xl bg-slate-950 dark:bg-white text-white dark:text-slate-900 text-sm font-medium shadow-2xl flex items-center gap-3 transition-all duration-300 opacity-0 translate-y-10 pointer-events-none">
     </div>
     <div id="modal-container" class="fixed inset-0 z-50 pointer-events-none"></div>
 
@@ -837,8 +906,8 @@
                 const triggerEl = document.activeElement;
                 const modal = document.createElement('div');
                 modal.className = isFullscreen
-                    ? 'fixed inset-0 z-50 flex items-center justify-center bg-slate-50 dark:bg-slate-900 transition-all'
-                    : 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm transition-all';
+                    ? 'fixed inset-0 z-50 flex items-center justify-center bg-slate-50 dark:bg-slate-950 transition-all'
+                    : 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 dark:bg-slate-950/80 backdrop-blur-sm transition-all';
                 modal.innerHTML = html;
                 modalContainer.innerHTML = '';
                 modalContainer.appendChild(modal);
@@ -880,7 +949,7 @@
                                 </p>
 
                                 <div class="flex flex-col sm:flex-row gap-4 items-start animate-slide-up" style="animation-delay: 200ms">
-                                    <button id="google-signin" class="bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold flex items-center gap-3 hover:bg-slate-800 transition shadow-xl shadow-slate-200 active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">
+                                    <button id="google-signin" class="bg-slate-950 text-white px-8 py-4 rounded-2xl font-bold flex items-center gap-3 hover:bg-slate-800 transition shadow-xl shadow-slate-200 active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">
                                         <svg class="w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
                                         Continue with Google
                                     </button>
@@ -912,42 +981,42 @@
                                 <p class="text-slate-500 max-w-2xl mx-auto">Everything you need to manage your personal library with elegance and efficiency.</p>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                                <div class="p-8 rounded-[2.5rem] bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
+                                <div class="p-8 rounded-3xl bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
                                     <div class="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 mb-6">
                                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                                     </div>
                                     <h3 class="text-xl font-black font-serif italic mb-3">Effortless Organization</h3>
                                     <p class="text-slate-500 text-sm leading-relaxed">Smart search and advanced filtering allow you to find any book in your collection instantly, by author, genre, or tag.</p>
                                 </div>
-                                <div class="p-8 rounded-[2.5rem] bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
+                                <div class="p-8 rounded-3xl bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
                                     <div class="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 mb-6">
                                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h2M4 8h12m4 0h2M4 16h4m12 0h2M4 20h12"/></svg>
                                     </div>
                                     <h3 class="text-xl font-black font-serif italic mb-3">Digital Cataloging</h3>
                                     <p class="text-slate-500 text-sm leading-relaxed">Use your camera to scan barcodes and QR codes for quick, automatic book entry. No more manual typing.</p>
                                 </div>
-                                <div class="p-8 rounded-[2.5rem] bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
+                                <div class="p-8 rounded-3xl bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
                                     <div class="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 mb-6">
                                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
                                     </div>
                                     <h3 class="text-xl font-black font-serif italic mb-3">Seamless Sync</h3>
                                     <p class="text-slate-500 text-sm leading-relaxed">Real-time cloud sync with offline support. Access your library from any device, even without an internet connection.</p>
                                 </div>
-                                <div class="p-8 rounded-[2.5rem] bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
+                                <div class="p-8 rounded-3xl bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
                                     <div class="w-12 h-12 bg-rose-100 rounded-2xl flex items-center justify-center text-rose-600 mb-6">
                                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                                     </div>
                                     <h3 class="text-xl font-black font-serif italic mb-3">Collaborative Reading</h3>
                                     <p class="text-slate-500 text-sm leading-relaxed">Share your library with partners and friends. Track activity feeds to see what others are reading and adding.</p>
                                 </div>
-                                <div class="p-8 rounded-[2.5rem] bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
+                                <div class="p-8 rounded-3xl bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
                                     <div class="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600 mb-6">
                                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                                     </div>
                                     <h3 class="text-xl font-black font-serif italic mb-3">Deep Insights</h3>
                                     <p class="text-slate-500 text-sm leading-relaxed">Visualize your reading composition, collection value, and rating distributions with elegant charts and AI-generated reading roadmaps.</p>
                                 </div>
-                                <div class="p-8 rounded-[2.5rem] bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
+                                <div class="p-8 rounded-3xl bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
                                     <div class="w-12 h-12 bg-violet-100 rounded-2xl flex items-center justify-center text-violet-600 mb-6">
                                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
                                     </div>
@@ -1025,7 +1094,7 @@
             function renderSettings() {
                 return `
                 <div class="max-w-2xl mx-auto space-y-8 animate-slide-up">
-                    <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
+                    <div class="glass p-8 rounded-3xl border border-blue-100/50 dark:border-slate-800">
                         <h2 class="text-2xl font-black mb-6 font-serif italic text-blue-600 dark:text-blue-400">AI Librarian Settings</h2>
                         <div class="space-y-4">
                             <div>
@@ -1067,7 +1136,7 @@
                         </div>
                     </div>
 
-                    <div class="glass p-8 rounded-[2.5rem] border border-emerald-100/50 dark:border-emerald-900/30">
+                    <div class="glass p-8 rounded-3xl border border-emerald-100/50 dark:border-emerald-900/30">
                         <h2 class="text-2xl font-black mb-2 font-serif italic text-emerald-600 dark:text-emerald-400">AI Metadata Fixer</h2>
                         <p class="text-sm text-slate-500 mb-6">Automatically find and fix missing descriptions, tags, or inconsistent genres across your library.</p>
                         <button id="ai-cleanup-btn" class="w-full sm:w-auto px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition active:scale-95 shadow-lg shadow-emerald-200 focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none flex items-center justify-center gap-2">
@@ -1076,7 +1145,7 @@
                         </button>
                     </div>
 
-                    <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
+                    <div class="glass p-8 rounded-3xl border border-blue-100/50 dark:border-slate-800">
                         <h2 class="text-2xl font-black mb-6 font-serif italic text-blue-600 dark:text-blue-400">Profile Settings</h2>
                         <div class="space-y-4">
                             <div>
@@ -1089,7 +1158,7 @@
                         </div>
                     </div>
 
-                    <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
+                    <div class="glass p-8 rounded-3xl border border-blue-100/50 dark:border-slate-800">
                         <h2 class="text-2xl font-black mb-6 font-serif">Library Sharing</h2>
                         <p class="text-sm text-slate-500 mb-6">Enter the emails of people you want to share your library with. They will be able to view and edit your collection.</p>
                         <div class="space-y-4">
@@ -1106,7 +1175,7 @@
                         </div>
                     </div>
 
-                    <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
+                    <div class="glass p-8 rounded-3xl border border-blue-100/50 dark:border-slate-800">
                         <h2 class="text-2xl font-black mb-6 font-serif italic">Manage Library Data</h2>
 
                         <div class="space-y-6">
@@ -1160,7 +1229,7 @@
                         </div>
                     </div>
 
-                    <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
+                    <div class="glass p-8 rounded-3xl border border-blue-100/50 dark:border-slate-800">
                         <h2 class="text-2xl font-black mb-6 font-serif">Data Management</h2>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <button id="import-btn" class="flex items-center justify-center gap-3 p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition text-sm focus-visible:ring-2 focus-visible:ring-primary outline-none">
@@ -1174,14 +1243,14 @@
                         </div>
                     </div>
 
-                    <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
+                    <div class="glass p-8 rounded-3xl border border-blue-100/50 dark:border-slate-800">
                         <h2 class="text-2xl font-black mb-6 font-serif">Preferences</h2>
                         <div class="space-y-4">
                             <div>
                                 <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Theme Selection</label>
                                 <div class="grid grid-cols-3 gap-2 mt-1">
                                     <button onclick="window.setTheme('light')" aria-pressed="${localStorage.getItem('mylib_theme') !== 'dark' && localStorage.getItem('mylib_theme') !== 'sepia'}" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') !== 'dark' && localStorage.getItem('mylib_theme') !== 'sepia' ? 'border-primary' : 'border-transparent'} bg-white text-slate-900 text-xs font-bold focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all">Light</button>
-                                    <button onclick="window.setTheme('dark')" aria-pressed="${localStorage.getItem('mylib_theme') === 'dark'}" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'dark' ? 'border-primary' : 'border-transparent'} bg-slate-900 text-white text-xs font-bold focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all">Dark</button>
+                                    <button onclick="window.setTheme('dark')" aria-pressed="${localStorage.getItem('mylib_theme') === 'dark'}" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'dark' ? 'border-primary' : 'border-transparent'} bg-slate-950 text-white text-xs font-bold focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all">Dark</button>
                                     <button onclick="window.setTheme('sepia')" aria-pressed="${localStorage.getItem('mylib_theme') === 'sepia'}" class="px-4 py-2 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'sepia' ? 'border-primary' : 'border-transparent'} bg-sepia-100 text-sepia-900 text-xs font-bold focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all">Sepia</button>
                                 </div>
                             </div>
@@ -1458,7 +1527,7 @@
                 if (!appEl.querySelector('header') || activeTab !== lastActiveTab) {
                     lastActiveTab = activeTab;
                     appEl.innerHTML = `
-                    <div class="fixed inset-0 bg-blue-50/30 dark:bg-slate-900 pointer-events-none -z-10"></div>
+                    <div class="fixed inset-0 bg-blue-50/30 dark:bg-slate-950 pointer-events-none -z-10"></div>
                     <header class="sticky top-0 z-40 glass border-b border-slate-200 dark:border-slate-800">
                         <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
                             <div class="flex items-center gap-3 flex-shrink-0">
@@ -2007,7 +2076,7 @@
                         <div>
                             <h2 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200">My Books (${myOwnBooks.length})</h2>
                             <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3'}">
-                                ${myOwnBooks.map(book => renderBookCard(book, densityClass)).join('')}
+                                ${myOwnBooks.map((book, idx) => renderBookCard(book, densityClass, idx)).join('')}
                             </div>
                         </div>
                         `;
@@ -2026,7 +2095,7 @@
                                     From <span data-name="${escapeHTML(name)}">${escapeHTML(name)}</span>'s Library (${books.length})
                                 </h3>
                                 <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3'}">
-                                    ${books.map(book => renderBookCard(book, densityClass)).join('')}
+                                    ${books.map((book, idx) => renderBookCard(book, densityClass, idx)).join('')}
                                 </div>
                             </div>
                             `;
@@ -2519,7 +2588,7 @@
             function openAdvancedSearch() {
                 const isMobile = window.innerWidth < 768;
                 const modalHtml = `
-                <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up overflow-y-auto max-h-[90vh]">
+                <div class="glass max-w-md w-full rounded-3xl p-8 shadow-2xl animate-slide-up overflow-y-auto max-h-[90vh]">
                     <h2 class="text-2xl font-black mb-6 font-serif italic">Advanced Filters</h2>
                     <div class="space-y-6">
                         ${isMobile ? `
@@ -2980,7 +3049,7 @@
              * ⚡ Bolt: Optimized renderBookCard.
              * Uses pre-calculated densityClass and direct property lookups for status colors.
              */
-            function renderBookCard(book, densityClass) {
+            function renderBookCard(book, densityClass, index = 0) {
                 const statusData = getStatusData(book.id);
                 const isFavorite = statusData.isFavorite || false;
                 const bookStatus = statusData.status;
@@ -3075,16 +3144,16 @@
 
                 const activeDensityClass = densityClass !== undefined ? densityClass : (cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '');
                 return `
-                <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-blue-100/50 dark:border-slate-800'} relative ${activeDensityClass} focus-visible:ring-4 focus-visible:ring-primary/30 outline-none" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}">
+                <div class="book-card glass p-6 rounded-3xl flex gap-6 cursor-pointer group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-2xl' : 'border-slate-100/50 dark:border-slate-800/50'} relative animate-slide-up ${activeDensityClass} focus-visible:ring-4 focus-visible:ring-primary/30 outline-none" style="animation-delay: ${Math.min(index * 50, 1000)}ms" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}">
                     <div class="absolute top-4 left-4 z-20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex flex-col gap-3">
-                        <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-6 h-6 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer" aria-label="Select '${book._escapedTitle}' for bulk actions">
-                                <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="w-6 h-6 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-6 h-6 rounded-xl border-white/20 bg-white/20 backdrop-blur-sm text-indigo-600 focus:ring-indigo-500 shadow-lg cursor-pointer" aria-label="Select '${book._escapedTitle}' for bulk actions">
+                                <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="w-6 h-6 flex items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                             <svg class="w-4 h-4 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'stroke-white'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                         </button>
                     </div>
-                    <div class="w-28 h-40 bg-slate-100 dark:bg-slate-800 rounded-3xl overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 relative shadow-lg">
+                    <div class="w-28 h-40 bg-slate-100 dark:bg-slate-900 rounded-3xl overflow-hidden flex-shrink-0 border border-slate-200/50 dark:border-slate-700 relative shadow-xl">
                         ${bookStatus === 'reading' ? `
-                            <div class="absolute bottom-0 left-0 right-0 h-3.5 bg-slate-900/40 backdrop-blur-sm z-10 flex items-center" role="progressbar" aria-valuenow="${userProgress || book.progress || 0}" aria-valuemin="0" aria-valuemax="100" aria-label="Reading progress: ${userProgress || book.progress || 0}%">
+                            <div class="absolute bottom-0 left-0 right-0 h-3.5 bg-slate-950/40 backdrop-blur-sm z-10 flex items-center" role="progressbar" aria-valuenow="${userProgress || book.progress || 0}" aria-valuemin="0" aria-valuemax="100" aria-label="Reading progress: ${userProgress || book.progress || 0}%">
                                 <div class="h-full bg-primary transition-all duration-500" style="width: ${userProgress || book.progress || 0}%"></div>
                                 <span class="absolute inset-0 flex items-center justify-center text-[8px] font-black text-white drop-shadow-md pointer-events-none">${userProgress || book.progress || 0}%</span>
                                 <button onclick="event.stopPropagation(); window.quickUpdateProgress('${book.id}', this)" class="absolute right-0 bottom-full mb-1 mr-1 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 active:scale-90 transition-all opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary outline-none" title="Quickly increment progress by 5%" aria-label="Quickly increment progress by 5%">
@@ -3093,9 +3162,10 @@
                             </div>
                         ` : ''}
                         ${book.coverUrl || book.thumbnail ?
-                        `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-110" alt="cover" loading="lazy">` :
-                        `<div class="w-full h-full flex items-center justify-center bg-blue-50 dark:bg-slate-800 text-blue-200 dark:text-slate-600 text-[10px] font-bold uppercase p-2 text-center">No Cover</div>`
+                        `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover transition group-hover:scale-105" alt="cover" loading="lazy">` :
+                        `<div class="w-full h-full flex items-center justify-center bg-indigo-50 dark:bg-slate-900 text-indigo-200 dark:text-slate-700 text-[10px] font-bold uppercase p-2 text-center">No Cover</div>`
                     }
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
                         
                     </div>
                     <div class="flex-1 flex flex-col justify-between overflow-hidden py-1">
@@ -3342,7 +3412,7 @@
 
                 return new Promise((resolve) => {
                     let destHtml = `
-                    <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up">
+                    <div class="glass max-w-md w-full rounded-3xl p-8 shadow-2xl animate-slide-up">
                         <h2 class="text-2xl font-black mb-4">Add To Which Library?</h2>
                         <div class="space-y-3">
                             <label class="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer border-2 border-transparent" data-dest="${currentUser.uid}">
@@ -3402,7 +3472,7 @@
                             <button data-close class="p-3 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 transition-colors" aria-label="Close scanner"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                         </div>
                         <div class="flex-1 flex flex-col items-center justify-center">
-                            <div id="reader" class="w-full max-w-lg aspect-square rounded-[3rem] overflow-hidden bg-slate-900 relative shadow-2xl">
+                            <div id="reader" class="w-full max-w-lg aspect-square rounded-[3rem] overflow-hidden bg-slate-950 relative shadow-2xl">
                                 <!-- Overlay for a more professional look -->
                                 <div class="absolute inset-0 border-[40px] border-slate-900/40 pointer-events-none"></div>
                                 <div class="absolute inset-[40px] border-2 border-blue-500/50 rounded-lg pointer-events-none animate-pulse"></div>
@@ -3541,7 +3611,7 @@
             function showApprovalModal(parsed, raw) {
                 const modalHtml = `
                 <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up">
+                    <div class="glass max-w-md w-full rounded-3xl p-8 shadow-2xl animate-slide-up">
                         <h2 class="text-2xl font-black mb-2">Approve Details</h2>
                         <p class="text-slate-500 text-sm mb-6">We extracted this info from the code. Confirm or edit.</p>
                         <div class="space-y-4">
@@ -3607,7 +3677,7 @@
                 };
 
                 const modalHtml = `
-                <div class="w-full h-full flex flex-col p-6 overflow-y-auto bg-slate-50 dark:bg-slate-900">
+                <div class="w-full h-full flex flex-col p-6 overflow-y-auto bg-slate-50 dark:bg-slate-950">
                     <div class="max-w-2xl mx-auto w-full">
                         <div class="flex justify-between items-center mb-8">
                             <h2 class="text-3xl font-black font-serif italic">${isEdit ? 'Edit Book' : 'Add Manually'}</h2>
@@ -3931,7 +4001,7 @@
 
             window.openAddFinishedBookModal = () => {
                 const modalHtml = `
-                <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up">
+                <div class="glass max-w-md w-full rounded-3xl p-8 shadow-2xl animate-slide-up">
                     <h2 class="text-2xl font-black mb-6 font-serif italic text-primary">Add a Finished Book</h2>
                     <div class="grid grid-cols-1 gap-4">
                         <button id="select-existing-btn" class="w-full p-6 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition flex flex-col items-center gap-2 group focus-visible:ring-2 focus-visible:ring-primary outline-none">
@@ -3972,7 +4042,7 @@
                 const myBooks = books.filter(b => b.userId === currentUser.uid && getStatusData(b.id).status !== 'finished');
 
                 const modalHtml = `
-                <div class="glass max-w-2xl w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up overflow-hidden flex flex-col max-h-[90vh]">
+                <div class="glass max-w-2xl w-full rounded-3xl p-8 shadow-2xl animate-slide-up overflow-hidden flex flex-col max-h-[90vh]">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-black font-serif italic">Select from Library</h2>
                         <button data-close class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
@@ -4282,7 +4352,7 @@
 
                     <!-- Filtered List -->
                     <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3'}">
-                        ${displayBooks.length > 0 ? displayBooks.map(b => renderBookCard(b, densityClass)).join('') : `
+                        ${displayBooks.length > 0 ? displayBooks.map((b, idx) => renderBookCard(b, densityClass, idx)).join('') : `
                             <div class="col-span-full py-20 text-center">
                                 <div class="bg-slate-100 dark:bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                                     <svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
@@ -4369,7 +4439,7 @@
                 const colors = ['#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316'];
 
                 return `
-                <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
+                <div class="glass p-8 rounded-3xl border border-blue-100/50 dark:border-slate-800">
                     <div class="flex flex-col md:flex-row items-center gap-12">
                         ${renderPieChart(genreEntries, total, colors, total, 'Finished', 'Finished by Genre')}
                     </div>
@@ -4451,7 +4521,7 @@
 
                 return `
                 <div class="max-w-4xl mx-auto space-y-12 animate-slide-up">
-                    <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
+                    <div class="glass p-8 rounded-3xl border border-blue-100/50 dark:border-slate-800">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                             <h2 class="text-3xl font-black font-serif italic text-blue-600 dark:text-blue-400">Library Analysis</h2>
                             <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 dark:bg-slate-800 px-4 py-2 rounded-full">Updated ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
@@ -4624,7 +4694,7 @@
                             </div>
                         </div>
 
-                        <div id="ai-analysis-content" class="p-8 bg-blue-50/50 dark:bg-slate-800/40 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-700 min-h-[150px] flex flex-col items-center justify-center text-center">
+                        <div id="ai-analysis-content" class="p-8 bg-blue-50/50 dark:bg-slate-800/40 rounded-3xl border border-blue-100/50 dark:border-slate-700 min-h-[150px] flex flex-col items-center justify-center text-center">
                             <p class="text-slate-400 italic text-sm">Tap 'Analyze Library' or 'Reading Roadmap' to get personalized insights from your AI Librarian.</p>
                         </div>
                     </div>
@@ -4669,7 +4739,7 @@
             }
             function showAISummaryModal(book, data) {
                 const modalHtml = `
-                <div class="glass max-w-lg w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up border border-emerald-100 dark:border-emerald-900/30">
+                <div class="glass max-w-lg w-full rounded-3xl p-8 shadow-2xl animate-slide-up border border-emerald-100 dark:border-emerald-900/30">
                     <div class="flex items-center gap-4 mb-6">
                         <div class="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/50 rounded-2xl flex items-center justify-center text-emerald-600">
                             <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
@@ -4739,7 +4809,7 @@
             }
 
             function showCleanupReviewModal(fixes) {
-                const modalHtml = '<div class="w-full h-full flex flex-col p-6 sm:p-10 overflow-y-auto bg-slate-50 dark:bg-slate-900">' +
+                const modalHtml = '<div class="w-full h-full flex flex-col p-6 sm:p-10 overflow-y-auto bg-slate-50 dark:bg-slate-950">' +
                     '<div class="max-w-3xl mx-auto w-full">' +
                     '<div class="flex justify-between items-center mb-8"><div><h2 class="text-3xl font-black font-serif italic text-emerald-600">Review AI Fixes</h2><p class="text-slate-500 text-sm mt-1">AI found ' + fixes.length + ' fixes.</p></div>' +
                     '<button data-close class="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm hover:bg-slate-100"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button></div>' +
@@ -4993,7 +5063,7 @@
                                         </span>
                                     </div>
                                     ${activity.comment ? `
-                                        <div class="mt-4 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 text-sm text-slate-600 dark:text-slate-400 italic">
+                                        <div class="mt-4 p-3 bg-slate-50 dark:bg-slate-950/50 rounded-xl border border-slate-100 dark:border-slate-800 text-sm text-slate-600 dark:text-slate-400 italic">
                                             "${escapeHTML(activity.comment)}"
                                         </div>
                                     ` : ''}
@@ -5524,7 +5594,7 @@ If the collection is small or has no finished books, be extra encouraging and su
             async function openAIChat(initialMessage = '', bookContext = null) {
                 const modalHtml = `
                 <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-                    <div class="glass sm:max-w-2xl lg:max-w-4xl w-full rounded-[2.5rem] flex flex-col h-[80vh] sm:h-[85vh] shadow-2xl animate-slide-up border border-blue-100/50 dark:border-slate-800">
+                    <div class="glass sm:max-w-2xl lg:max-w-4xl w-full rounded-3xl flex flex-col h-[80vh] sm:h-[85vh] shadow-2xl animate-slide-up border border-blue-100/50 dark:border-slate-800">
                         <div class="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/20">
@@ -5786,7 +5856,7 @@ If the collection is small or has no finished books, be extra encouraging and su
 
                 // Show a temporary loading modal while fetching detailed data
                 const closeLoading = showModal(`
-                    <div class="glass max-w-sm w-full rounded-[2.5rem] p-10 flex flex-col items-center justify-center gap-6 animate-pulse">
+                    <div class="glass max-w-sm w-full rounded-3xl p-10 flex flex-col items-center justify-center gap-6 animate-pulse">
                         <div class="w-16 h-16 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin"></div>
                         <p class="text-slate-500 font-bold uppercase tracking-widest text-xs">Opening Book Details...</p>
                     </div>
@@ -5837,7 +5907,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                 closeLoading();
                 const close = showModal(`
                 <div class="fixed inset-0 z-50 flex items-center justify-center sm:p-4">
-                    <div class="bg-sky-50 dark:bg-gray-800 w-full h-full sm:h-auto sm:rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up overflow-y-auto sm:max-h-[95vh]">
+                    <div class="bg-sky-50 dark:bg-gray-800 w-full h-full sm:h-auto sm:rounded-3xl p-6 sm:p-10 shadow-2xl animate-slide-up overflow-y-auto sm:max-h-[95vh]">
                         <div class="flex flex-col sm:flex-row gap-8">
                             <div class="flex-shrink-0 mx-auto sm:mx-0">
                                 <div class="relative group">
@@ -6376,7 +6446,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                     { key: 'Enter', desc: 'Select/Click active element' }
                 ];
                 const html = `
-                <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up border border-blue-100/50 dark:border-slate-800">
+                <div class="glass max-w-md w-full rounded-3xl p-8 shadow-2xl animate-slide-up border border-blue-100/50 dark:border-slate-800">
                     <div class="flex items-center justify-between mb-6">
                         <h2 class="text-2xl font-black font-serif italic text-primary">Keyboard Shortcuts</h2>
                         <button data-close class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
