@@ -112,8 +112,21 @@
         }
 
         .book-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 20px 30px -10px rgba(59, 130, 246, 0.2);
+            transform: translateY(-6px);
+            box-shadow: 0 25px 50px -12px rgba(59, 130, 246, 0.25);
+            border-color: rgba(59, 130, 246, 0.4);
+        }
+
+        .active-filter-chip {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            box-shadow: 0 4px 12px -2px rgba(59, 130, 246, 0.3);
+            animation: breathe 3s ease-in-out infinite;
+        }
+
+        @keyframes breathe {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.9; transform: scale(0.98); }
         }
 
         .animate-slide-up {
@@ -129,6 +142,14 @@
             to {
                 opacity: 1;
                 transform: translateY(0);
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .animate-slide-up, .active-filter-chip, .book-card:hover, .animate-pulse-subtle, .animate-pulse {
+                animation: none !important;
+                transition: none !important;
+                transform: none !important;
             }
         }
 
@@ -171,7 +192,7 @@
             top: 100%;
             left: 0;
             right: 0;
-            z-index: 100;
+            z-index: 60;
             background: white;
             border: 1px solid #e2e8f0;
             border-radius: 1rem;
@@ -1471,6 +1492,7 @@
                             const input = document.getElementById('search-input');
                             input.value = '';
                             input.focus();
+                            input.scrollIntoView({ behavior: 'smooth', block: 'center' });
                             document.getElementById('clear-search-btn').classList.add('hidden');
                             window.queueRenderLibraryOnly();
                         });
@@ -1700,19 +1722,19 @@
                     let html = '';
                     let activeCount = 0;
                     if (advancedFilters.rating !== 'all') {
-                        html += `<span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-bold flex items-center gap-2">${advancedFilters.rating} Stars <button onclick="window.clearAdvancedFilter('rating')" aria-label="Remove rating filter" class="hover:bg-amber-200/50 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-amber-500 outline-none">×</button></span>`;
+                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">${advancedFilters.rating} Stars <button onclick="window.clearAdvancedFilter('rating')" aria-label="Remove rating filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-amber-500 outline-none">×</button></span>`;
                         activeCount++;
                     }
                     if (advancedFilters.minPrice || advancedFilters.maxPrice) {
-                        html += `<span class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold flex items-center gap-2">${getCurrencySymbol()}${advancedFilters.minPrice || 0} - ${getCurrencySymbol()}${advancedFilters.maxPrice || '∞'} <button onclick="window.clearAdvancedFilter('price')" aria-label="Remove price filter" class="hover:bg-emerald-200/50 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none">×</button></span>`;
+                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">${getCurrencySymbol()}${advancedFilters.minPrice || 0} - ${getCurrencySymbol()}${advancedFilters.maxPrice || '∞'} <button onclick="window.clearAdvancedFilter('price')" aria-label="Remove price filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none">×</button></span>`;
                         activeCount++;
                     }
                     if (advancedFilters.startDate || advancedFilters.endDate) {
-                        html += `<span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold flex items-center gap-2">Date Range <button onclick="window.clearAdvancedFilter('date')" aria-label="Remove date filter" class="hover:bg-blue-200/50 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">×</button></span>`;
+                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Date Range <button onclick="window.clearAdvancedFilter('date')" aria-label="Remove date filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">×</button></span>`;
                         activeCount++;
                     }
                     if (favoritesOnly) {
-                        html += `<span class="px-3 py-1 bg-rose-100 text-rose-700 rounded-full text-[10px] font-bold flex items-center gap-2">Favorites <button onclick="window.toggleFavoritesFilter(false)" aria-label="Remove favorites filter">×</button></span>`;
+                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Favorites <button onclick="window.toggleFavoritesFilter(false)" aria-label="Remove favorites filter" class="hover:bg-white/20 rounded px-1 transition-colors">×</button></span>`;
                         activeCount++;
                     }
 
@@ -1730,7 +1752,7 @@
                     }
 
                     if (aiSearchResults) {
-                        html += `<span class="px-3 py-1 bg-blue-600 text-white rounded-full text-[10px] font-bold flex items-center gap-2">AI Search: "${searchQuery}" <button onclick="window.clearAISearch()" aria-label="Clear AI search">×</button></span>`;
+                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">AI Search: "${searchQuery}" <button onclick="window.clearAISearch()" aria-label="Clear AI search" class="hover:bg-white/20 rounded px-1 transition-colors">×</button></span>`;
                         activeCount++;
                     }
 
@@ -1781,9 +1803,9 @@
                     tagContainer.innerHTML = tagFilter ? `
                     <div class="mb-4 flex items-center gap-2">
                         <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Tag:</span>
-                        <span class="px-3 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 rounded-full text-xs font-bold flex items-center gap-2">
+                        <span class="px-3 py-1 active-filter-chip rounded-full text-xs font-bold flex items-center gap-2">
                             ${tagFilter}
-                            <button onclick="window.setTagFilter(null)" class="hover:text-blue-900 dark:hover:text-blue-100" aria-label="Clear tag filter">
+                            <button onclick="window.setTagFilter(null)" class="hover:bg-white/20 rounded px-1 transition-colors" aria-label="Clear tag filter">
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
                         </span>
@@ -1794,9 +1816,9 @@
                 const controlsBar = document.getElementById('controls-bar-container');
                 if (controlsBar) {
                     controlsBar.innerHTML = `
-                    <div class="mb-8">
+                    <div class="mb-8 sticky top-20 z-30 md:static">
                         <!-- Filter card for mobile/desktop -->
-                        <div class="glass rounded-2xl p-4 border border-slate-200 dark:border-slate-700 mb-6 hidden md:block">
+                        <div class="glass rounded-3xl p-5 border border-slate-200 dark:border-slate-700 mb-6 hidden md:block shadow-sm">
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
                                 <div class="flex flex-col gap-2">
                                     <label for="sort-select" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sort by</label>
@@ -1906,7 +1928,7 @@
                         <div>
                             <h2 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200">My Books (${myOwnBooks.length})</h2>
                             <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3'}">
-                                ${myOwnBooks.map(book => renderBookCard(book, densityClass)).join('')}
+                                ${myOwnBooks.map((book, idx) => renderBookCard(book, densityClass, { index: idx })).join('')}
                             </div>
                         </div>
                         `;
@@ -1925,7 +1947,7 @@
                                     From <span data-name="${escapeHTML(name)}">${escapeHTML(name)}</span>'s Library (${books.length})
                                 </h3>
                                 <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3'}">
-                                    ${books.map(book => renderBookCard(book, densityClass)).join('')}
+                                    ${books.map((book, idx) => renderBookCard(book, densityClass, { index: idx })).join('')}
                                 </div>
                             </div>
                             `;
@@ -2320,6 +2342,16 @@
                 }
                 window.queueRenderMainApp();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
+
+                if (tab === 'library') {
+                    setTimeout(() => {
+                        const input = document.getElementById('search-input');
+                        if (input) {
+                            input.focus();
+                            input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    }, 100);
+                }
             };
 
             window.loadMoreReviews = async (btn) => {
@@ -3011,7 +3043,7 @@
              * ⚡ Bolt: Optimized renderBookCard.
              * Uses pre-calculated densityClass and direct property lookups for status colors.
              */
-            function renderBookCard(book, densityClass) {
+            function renderBookCard(book, densityClass, options = {}) {
                 const statusData = getStatusData(book.id);
                 const isFavorite = statusData.isFavorite || false;
                 const bookStatus = statusData.status;
@@ -3105,8 +3137,11 @@
                 }
 
                 const activeDensityClass = densityClass !== undefined ? densityClass : (cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '');
+                const index = options.index || 0;
+                const staggerDelay = `${(index % 10) * 50}ms`;
+
                 return `
-                <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-blue-100/50 dark:border-slate-800'} relative ${activeDensityClass} focus-visible:ring-4 focus-visible:ring-primary/30 outline-none" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}">
+                <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-blue-100/50 dark:border-slate-800'} relative ${activeDensityClass} focus-visible:ring-4 focus-visible:ring-primary/30 outline-none animate-slide-up" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}" style="animation-delay: ${staggerDelay}">
                     <div class="absolute top-4 left-4 z-20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex flex-col gap-3">
                         <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-6 h-6 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer" aria-label="Select '${book._escapedTitle}' for bulk actions">
                                 <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="w-6 h-6 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
@@ -3116,7 +3151,7 @@
                     <div class="w-28 h-40 bg-slate-100 dark:bg-slate-800 rounded-3xl overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 relative shadow-lg">
                         ${bookStatus === 'reading' ? `
                             <div class="absolute bottom-0 left-0 right-0 h-3.5 bg-slate-900/40 backdrop-blur-sm z-10 flex items-center" role="progressbar" aria-valuenow="${userProgress || book.progress || 0}" aria-valuemin="0" aria-valuemax="100" aria-label="Reading progress: ${userProgress || book.progress || 0}%">
-                                <div class="h-full bg-primary transition-all duration-500" style="width: ${userProgress || book.progress || 0}%"></div>
+                                <div class="h-full bg-gradient-to-r from-blue-500 to-indigo-400 transition-all duration-500" style="width: ${userProgress || book.progress || 0}%"></div>
                                 <span class="absolute inset-0 flex items-center justify-center text-[8px] font-black text-white drop-shadow-md pointer-events-none">${userProgress || book.progress || 0}%</span>
                                 <button onclick="event.stopPropagation(); window.quickUpdateProgress('${book.id}', this)" class="absolute right-0 bottom-full mb-1 mr-1 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 active:scale-90 transition-all opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary outline-none" title="Quickly increment progress by 5%" aria-label="Quickly increment progress by 5%">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 6v12m6-6H6"/></svg>
@@ -4313,7 +4348,7 @@
 
                     <!-- Filtered List -->
                     <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3'}">
-                        ${displayBooks.length > 0 ? displayBooks.map(b => renderBookCard(b, densityClass)).join('') : `
+                        ${displayBooks.length > 0 ? displayBooks.map((b, idx) => renderBookCard(b, densityClass, { index: idx })).join('') : `
                             <div class="col-span-full py-20 text-center">
                                 <div class="bg-slate-100 dark:bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                                     <svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
