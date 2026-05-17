@@ -417,6 +417,7 @@
             });
             let books = [];                // local copy for UI, synced with Firestore
             window.__setBooks = (b) => books = b;
+            window.lastDeleted = [];       // Safety net for undo
             let readingStatuses = {};      // local copy for per-user statuses {bookId: status}
             window.__setReadingStatuses = (s) => readingStatuses = s;
             let unsubscribeBooks = null;
@@ -610,6 +611,40 @@
                     .replace(/>/g, '&gt;')
                     .replace(/"/g, '&quot;')
                     .replace(/'/g, '&#039;');
+            }
+
+            function getSimilarity(s1, s2) {
+                let longer = s1;
+                let shorter = s2;
+                if (s1.length < s2.length) {
+                    longer = s2;
+                    shorter = s1;
+                }
+                const longerLength = longer.length;
+                if (longerLength === 0) return 1.0;
+                return (longerLength - editDistance(longer, shorter)) / parseFloat(longerLength);
+            }
+
+            function editDistance(s1, s2) {
+                s1 = s1.toLowerCase();
+                s2 = s2.toLowerCase();
+                const costs = new Array();
+                for (let i = 0; i <= s1.length; i++) {
+                    let lastValue = i;
+                    for (let j = 0; j <= s2.length; j++) {
+                        if (i == 0) costs[j] = j;
+                        else {
+                            if (j > 0) {
+                                let newValue = costs[j - 1];
+                                if (s1.charAt(i - 1) != s2.charAt(j - 1)) newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+                                costs[j - 1] = lastValue;
+                                lastValue = newValue;
+                            }
+                        }
+                    }
+                    if (i > 0) costs[s2.length] = lastValue;
+                }
+                return costs[s2.length];
             }
 
             function formatAIText(text) {
@@ -1231,6 +1266,7 @@
 
             let unsubscribePartners1 = null;
             let unsubscribePartners2 = null;
+            let unsubscribeCollabChat = null;
             let allPartnershipsForUI = [];
 
             function renderPartners() {
@@ -1375,6 +1411,11 @@
                                     <span class="text-[10px] text-slate-300">·</span>
                                     <span class="text-[10px] font-black text-emerald-500">${libraryStats.wishlistCount} Wishlist</span>
                                     </div>
+                                </div>
+                                <!-- Connectivity Indicator -->
+                                <div id="conn-indicator" class="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 transition-all cursor-help" title="Online: Cloud Sync Active">
+                                    <div class="w-1.5 h-1.5 rounded-full ${navigator.onLine ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}"></div>
+                                    <span class="text-[8px] font-black uppercase tracking-tighter text-slate-400">${navigator.onLine ? 'Live' : 'Offline'}</span>
                                 </div>
                             </div>
                             <div class="flex-1"></div>
@@ -1548,19 +1589,72 @@
                     showToast(`Deleting ${selectedBookIds.size} books...`, 'info');
 
                     const ids = Array.from(selectedBookIds);
-                    // Firestore batches are limited to 500 operations. Each delete is 2 operations here.
-                    for (let i = 0; i < ids.length; i += 200) {
-                        const chunk = ids.slice(i, i + 200);
+                    const deletedItems = [];
+
+                    try {
+                        // Populate safety net
+                        ids.forEach(id => {
+                            const book = books.find(b => b.id === id);
+                            if (book) {
+                                deletedItems.push({
+                                    book: { ...book },
+                                    status: { ...getStatusData(id) }
+                                });
+                            }
+                        });
+                        window.lastDeleted = deletedItems;
+
+                        // Firestore batches are limited to 500 operations. Each delete is 2 operations here.
+                        for (let i = 0; i < ids.length; i += 200) {
+                            const chunk = ids.slice(i, i + 200);
+                            const batch = db.batch();
+                            chunk.forEach(id => {
+                                batch.delete(db.collection('books').doc(id));
+                                batch.delete(db.collection('books').doc(id).collection('readingStatus').doc(currentUser.uid));
+                            });
+                            await batch.commit();
+                        }
+
+                        selectedBookIds.clear();
+                        showToast(`Deleted ${ids.length} books successfully. <button onclick="window.undoDelete()" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Undo</button>`, 'success', 10000);
+                    } catch (err) {
+                        console.error('Bulk delete error:', err);
+                        showToast('Failed to delete books: ' + err.message, 'error');
+                    }
+                }
+            };
+
+            window.undoDelete = async () => {
+                if (!window.lastDeleted || window.lastDeleted.length === 0) return;
+                showToast(`Restoring ${window.lastDeleted.length} books...`, 'info');
+
+                try {
+                    for (let i = 0; i < window.lastDeleted.length; i += 200) {
+                        const chunk = window.lastDeleted.slice(i, i + 200);
                         const batch = db.batch();
-                        chunk.forEach(id => {
-                            batch.delete(db.collection('books').doc(id));
-                            batch.delete(db.collection('books').doc(id).collection('readingStatus').doc(currentUser.uid));
+
+                        chunk.forEach(item => {
+                            const bookData = { ...item.book };
+                            const bookId = bookData.id;
+                            delete bookData.id;
+                            // Pre-calculated fields should be removed to avoid duplication of data structure
+                            delete bookData._searchStr;
+                            delete bookData._sortTitle;
+                            delete bookData._sortAuthor;
+                            delete bookData._createdTime;
+                            delete bookData._purchaseTime;
+                            delete bookData._genres;
+
+                            batch.set(db.collection('books').doc(bookId), bookData);
+                            batch.set(db.collection('books').doc(bookId).collection('readingStatus').doc(currentUser.uid), item.status);
                         });
                         await batch.commit();
                     }
-
-                    selectedBookIds.clear();
-                    showToast('Deleted books successfully', 'success');
+                    window.lastDeleted = [];
+                    showToast('Books restored successfully!', 'success');
+                } catch (err) {
+                    console.error('Undo error:', err);
+                    showToast('Failed to restore books: ' + err.message, 'error');
                 }
             };
 
@@ -1991,8 +2085,36 @@
                     if (filteredBooks.length === 0) {
                         const isAnyFilterActive = searchQuery || statusFilter !== 'all' || categoryFilter !== 'all' || authorFilter !== 'all' || ownerFilter !== 'all' || tagFilter || advancedFilters.rating !== 'all' || advancedFilters.minPrice || advancedFilters.maxPrice || advancedFilters.startDate || advancedFilters.endDate;
 
+                        let suggestionHtml = '';
+                        if (searchQuery && !aiSearchResults) {
+                            const trimmedSearch = searchQuery.trim().toLowerCase();
+                            let bestMatch = null;
+                            let maxSim = 0;
+
+                            // Simple heuristic: check titles and authors
+                            for (const b of books) {
+                                const titleSim = getSimilarity(trimmedSearch, b.title.toLowerCase());
+                                const authorSim = getSimilarity(trimmedSearch, b.author.toLowerCase());
+                                const currentMax = Math.max(titleSim, authorSim);
+
+                                if (currentMax > maxSim) {
+                                    maxSim = currentMax;
+                                    bestMatch = currentMax === titleSim ? b.title : b.author;
+                                }
+                                if (maxSim > 0.95) break; // Good enough
+                            }
+
+                            if (maxSim > 0.6 && maxSim < 1) {
+                                suggestionHtml = `
+                                <div class="mb-6 animate-slide-up">
+                                    <p class="text-sm text-slate-500">Did you mean <button onclick="searchQuery='${bestMatch.replace(/'/g, "\\'")}'; document.getElementById('search-input').value='${bestMatch.replace(/'/g, "\\'")}'; window.queueRenderLibraryOnly();" class="text-primary font-bold hover:underline focus-visible:ring-2 focus-visible:ring-primary outline-none rounded px-1">"${escapeHTML(bestMatch)}"</button>?</p>
+                                </div>`;
+                            }
+                        }
+
                         html = `
                         <div class="py-32 text-center">
+                            ${suggestionHtml}
                             <div class="bg-blue-50 dark:bg-slate-800 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
                                 <svg class="w-12 h-12 text-blue-200 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                             </div>
@@ -2056,6 +2178,26 @@
             }
 
             function attachGlobalListeners() {
+                // Online/Offline status listeners
+                const updateConnUI = () => {
+                    const indicator = document.getElementById('conn-indicator');
+                    if (indicator) {
+                        const dot = indicator.querySelector('div');
+                        const label = indicator.querySelector('span');
+                        if (navigator.onLine) {
+                            dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse';
+                            label.textContent = 'Live';
+                            indicator.title = 'Online: Cloud Sync Active';
+                        } else {
+                            dot.className = 'w-1.5 h-1.5 rounded-full bg-amber-500';
+                            label.textContent = 'Offline';
+                            indicator.title = 'Offline: Local changes will sync when reconnected';
+                        }
+                    }
+                };
+                window.addEventListener('online', updateConnUI);
+                window.addEventListener('offline', updateConnUI);
+
                 document.getElementById('scan-btn')?.addEventListener('click', openScanner);
                 document.getElementById('manual-add-btn')?.addEventListener('click', () => openManualEntry(''));
                 document.getElementById('ai-chat-fab')?.addEventListener('click', openAIChat);
@@ -2372,6 +2514,18 @@
                 activeTab = tab;
                 if ((tab === 'feed' || tab === 'activity') && socialReviews.length === 0) {
                     fetchSocialReviews();
+                }
+                if (tab === 'insight') {
+                    setTimeout(() => {
+                        setupCollabChat();
+                        const input = document.getElementById('collab-chat-input');
+                        input?.addEventListener('keydown', e => {
+                            if (e.key === 'Enter') window.sendCollabMessage();
+                        });
+                    }, 500);
+                } else if (unsubscribeCollabChat) {
+                    unsubscribeCollabChat();
+                    unsubscribeCollabChat = null;
                 }
                 window.queueRenderMainApp();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -3112,6 +3266,9 @@
                                 <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="w-5 h-5 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                                     <svg class="w-3.5 h-3.5 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'stroke-white'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                                 </button>
+                                <button onclick="event.stopPropagation(); window.copyToClipboard('${(book.isbn || book.title).replace(/'/g, "\\'")}', 'Copied book info!', this)" class="w-5 h-5 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Copy ISBN/Title" title="Copy ISBN/Title">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                                </button>
                             </div>
                         </div>
                         <div class="mt-2 px-1">
@@ -3154,6 +3311,9 @@
                                 <button class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Edit book details" title="Edit book details">
                                     <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
+                                <button onclick="event.stopPropagation(); window.copyToClipboard('${(book.isbn || book.title).replace(/'/g, "\\'")}', 'Copied book info!', this)" class="p-1 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Copy ISBN/Title" title="Copy ISBN/Title">
+                                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                                </button>
                                 <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge} ${bookStatus === 'reading' ? 'animate-pulse-subtle' : ''}">
                                     ${statusData.isWishlist ? 'Wishlist' : (bookStatus === 'reading' ? `Reading (${userProgress || book.progress || 0}%)` : READING_STATUSES[bookStatus].label)}
                                 </div>
@@ -3179,6 +3339,9 @@
                         <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-6 h-6 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-blue-600 focus:ring-blue-500 shadow-lg cursor-pointer" aria-label="Select '${book._escapedTitle}' for bulk actions">
                                 <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="w-6 h-6 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                             <svg class="w-4 h-4 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'stroke-white'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+                        </button>
+                        <button onclick="event.stopPropagation(); window.copyToClipboard('${(book.isbn || book.title).replace(/'/g, "\\'")}', 'Copied book info!', this)" class="w-6 h-6 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Copy ISBN/Title" title="Copy ISBN/Title">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
                         </button>
                     </div>
                     <div class="w-28 h-40 bg-slate-100 dark:bg-slate-800 rounded-3xl overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 relative shadow-lg">
@@ -4541,6 +4704,96 @@
                 return `<div id="${containerId}"><p class="text-xs text-slate-400 italic">Loading collaborator stats...</p></div>`;
             }
 
+            function setupCollabChat() {
+                if (unsubscribeCollabChat) unsubscribeCollabChat();
+
+                // Find all active partnership IDs for the current user
+                const partnerships = (allPartnerships.length > 0 ? allPartnerships : allPartnershipsForUI)
+                    .filter(p => !p.user1Unsubscribed && !p.user2Unsubscribed);
+
+                if (partnerships.length === 0) return;
+
+                // For simplicity in a multi-partner lounge, we listen to ALL active partnerships messages
+                // and merge them into a single chronological feed.
+                const pIds = partnerships.map(p => p.id);
+
+                // Use a Collection Group query to get all messages from all subcollections named 'lounge'
+                // where the parent partnership is one the user is part of.
+                // NOTE: For true scalability we'd use a single global collection, but this fits the existing schema.
+                unsubscribeCollabChat = db.collectionGroup('lounge')
+                    .orderBy('createdAt', 'desc')
+                    .limit(50)
+                    .onSnapshot(snapshot => {
+                        const messages = snapshot.docs
+                            .map(doc => ({ id: doc.id, ...doc.data(), partnershipId: doc.ref.parent.parent.id }))
+                            .filter(m => pIds.includes(m.partnershipId))
+                            .sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0));
+
+                        const container = document.getElementById('collab-chat-messages');
+                        if (!container) return;
+
+                        if (messages.length === 0) {
+                            container.innerHTML = '<div class="flex items-center justify-center h-full text-slate-400 italic text-sm">No messages yet. Start the conversation!</div>';
+                            return;
+                        }
+
+                        container.innerHTML = messages.map(m => {
+                            const isMe = m.userId === currentUser.uid;
+                            return `
+                                <div class="flex ${isMe ? 'justify-end' : 'justify-start'} animate-slide-up">
+                                    <div class="max-w-[80%]">
+                                        <div class="flex items-center gap-2 mb-1 ${isMe ? 'flex-row-reverse' : ''}">
+                                            <span class="text-[10px] font-black text-primary uppercase">${escapeHTML(m.userName)}</span>
+                                            <span class="text-[8px] font-bold text-slate-400 uppercase">${formatDate(m.createdAt?.toDate ? m.createdAt.toDate() : new Date())}</span>
+                                        </div>
+                                        <div class="${isMe ? 'bg-primary text-white rounded-tr-none' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-tl-none'} p-4 rounded-3xl shadow-sm text-sm">
+                                            ${escapeHTML(m.text)}
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                        container.scrollTop = container.scrollHeight;
+                    }, err => {
+                        console.error("Chat sync error:", err);
+                    });
+            }
+
+            window.sendCollabMessage = async () => {
+                const input = document.getElementById('collab-chat-input');
+                const text = input.value?.trim();
+                if (!text) return;
+
+                const partnerships = (allPartnerships.length > 0 ? allPartnerships : allPartnershipsForUI)
+                    .filter(p => !p.user1Unsubscribed && !p.user2Unsubscribed);
+
+                if (partnerships.length === 0) {
+                    showToast('No active collaborators found.', 'info');
+                    return;
+                }
+
+                // Send to the FIRST active partnership (as a simplified lounge)
+                // In a production app with multiple distinct groups, we'd have a selector.
+                const pId = partnerships[0].id;
+                const msgData = {
+                    userId: currentUser.uid,
+                    userName: userProfile.displayName || currentUser.email,
+                    text: text,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                input.disabled = true;
+                try {
+                    await db.collection('partnerships').doc(pId).collection('lounge').add(msgData);
+                    input.value = '';
+                } catch (err) {
+                    showToast('Failed to send message: ' + err.message, 'error');
+                } finally {
+                    input.disabled = false;
+                    input.focus();
+                }
+            };
+
             function renderLibraryInsight() {
                 // ⚡ Bolt: Use pre-calculated statistics from libraryStats to eliminate redundant O(N) loop
                 const {
@@ -4742,6 +4995,26 @@
 
                         <div id="ai-analysis-content" class="p-8 bg-blue-50/50 dark:bg-slate-800/40 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-700 min-h-[150px] flex flex-col items-center justify-center text-center">
                             <p class="text-slate-400 italic text-sm">Tap 'Analyze Library' or 'Reading Roadmap' to get personalized insights from your AI Librarian.</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-12 pt-12 border-t border-slate-100 dark:border-slate-800">
+                        <div class="mb-8">
+                            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Collaborator Lounge</h3>
+                            <p class="text-lg font-black font-serif italic text-primary">Real-time Connection</p>
+                        </div>
+                        <div id="collab-chat-container" class="glass rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800 overflow-hidden flex flex-col h-[500px]">
+                            <div id="collab-chat-messages" class="flex-1 overflow-y-auto p-6 space-y-4">
+                                <div class="flex items-center justify-center h-full text-slate-400 italic text-sm">
+                                    Loading lounge conversations...
+                                </div>
+                            </div>
+                            <div class="p-4 bg-slate-50/50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex gap-2">
+                                <input id="collab-chat-input" type="text" placeholder="Share a reading recommendation..." class="flex-1 px-4 py-3 bg-white dark:bg-slate-800 rounded-2xl focus:ring-2 focus:ring-primary outline-none text-sm transition-all shadow-sm border border-slate-100 dark:border-slate-700">
+                                <button onclick="window.sendCollabMessage()" class="p-4 bg-primary text-white rounded-2xl hover:bg-blue-700 transition active:scale-95 shadow-lg focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Send message">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -5325,12 +5598,16 @@
             };
 
             window.copyAIResults = (text, element) => {
+                window.copyToClipboard(text, 'Results copied to clipboard!', element);
+            };
+
+            window.copyToClipboard = (text, message = 'Copied to clipboard!', element) => {
                 if (!navigator.clipboard) {
                     showToast('Clipboard not available', 'error');
                     return;
                 }
                 navigator.clipboard.writeText(text).then(() => {
-                    showToast('Results copied to clipboard!', 'success');
+                    showToast(message, 'success');
                     if (element) {
                         const svg = element.querySelector('svg');
                         if (svg) {
@@ -6553,18 +6830,27 @@ If the collection is small or has no finished books, be extra encouraging and su
                         btn.disabled = true;
                         btn.innerText = 'Deleting...';
                         try {
+                            // Populate safety net
+                            window.lastDeleted = [{
+                                book: { ...book },
+                                status: { ...statusData }
+                            }];
+
                             const batch = db.batch();
                             batch.delete(db.collection('books').doc(book.id));
                             // Cleanup user's reading status
                             batch.delete(db.collection('books').doc(book.id).collection('readingStatus').doc(currentUser.uid));
                             await batch.commit();
 
-                            showToast('Book deleted.', 'info');
+                            showToast(`Book deleted. <button onclick="window.undoDelete()" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Undo</button>`, 'info', 10000);
                             close();
                         } catch (err) {
                             showToast('Error deleting: ' + err.message, 'error');
-                            btn.disabled = false;
-                            btn.innerText = originalText;
+                        } finally {
+                            if (btn) {
+                                btn.disabled = false;
+                                btn.innerText = originalText;
+                            }
                         }
                     }
                 });
@@ -6572,6 +6858,8 @@ If the collection is small or has no finished books, be extra encouraging and su
 
             // Expose for testing
             window.renderMainApp = renderMainApp;
+            window.renderLibraryInsight = renderLibraryInsight;
+            window.renderBookCard = renderBookCard;
             window.renderLibraryOnly = renderLibraryOnly;
             window.updateLibraryStats = updateLibraryStats;
             window.normalizeBook = normalizeBook;
