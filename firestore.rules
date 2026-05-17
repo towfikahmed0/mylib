@@ -46,6 +46,25 @@ service cloud.firestore {
       allow delete: if request.auth != null && 
         (request.auth.uid == resource.data.userId1 || 
          request.auth.uid == resource.data.userId2);
+
+      match /lounge/{messageId} {
+        allow read: if request.auth != null && (
+          get(/databases/$(database)/documents/partnerships/$(partnershipId)).data.userId1 == request.auth.uid ||
+          get(/databases/$(database)/documents/partnerships/$(partnershipId)).data.userId2 == request.auth.uid
+        );
+        allow create: if request.auth != null && (
+          get(/databases/$(database)/documents/partnerships/$(partnershipId)).data.userId1 == request.auth.uid ||
+          get(/databases/$(database)/documents/partnerships/$(partnershipId)).data.userId2 == request.auth.uid
+        ) && request.resource.data.userId == request.auth.uid;
+      }
+    }
+
+    // Support for Collection Group queries for lounge messages
+    match /{path=**}/lounge/{messageId} {
+      allow read: if request.auth != null && (
+        get(/databases/$(database)/documents/partnerships/$(path[path.size()-1])).data.userId1 == request.auth.uid ||
+        get(/databases/$(database)/documents/partnerships/$(path[path.size()-1])).data.userId2 == request.auth.uid
+      );
     }
 
     // ========== BOOKS COLLECTION ==========
