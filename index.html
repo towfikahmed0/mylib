@@ -423,6 +423,7 @@
             let unsubscribeBooks = null;
             let unsubscribeStatus = null;
             let activeTab = 'library';     // 'library', 'wishlist', 'activity', 'settings'
+            window.isLoungeOpen = false;
             let chatHistory = [];
             let aiResponseCache = [];      // Cache last 5 responses [{prompt, response}]
             let lastActiveTab = null;
@@ -2515,7 +2516,7 @@
                 if ((tab === 'feed' || tab === 'activity') && socialReviews.length === 0) {
                     fetchSocialReviews();
                 }
-                if (tab === 'insight') {
+                if (tab === 'activity' && window.isLoungeOpen) {
                     setTimeout(() => {
                         setupCollabChat();
                         const input = document.getElementById('collab-chat-input');
@@ -4713,20 +4714,15 @@
 
                 if (partnerships.length === 0) return;
 
-                // For simplicity in a multi-partner lounge, we listen to ALL active partnerships messages
-                // and merge them into a single chronological feed.
-                const pIds = partnerships.map(p => p.id);
+                // Use the FIRST active partnership (as a simplified lounge)
+                const pId = partnerships[0].id;
 
-                // Use a Collection Group query to get all messages from all subcollections named 'lounge'
-                // where the parent partnership is one the user is part of.
-                // NOTE: For true scalability we'd use a single global collection, but this fits the existing schema.
-                unsubscribeCollabChat = db.collectionGroup('lounge')
+                unsubscribeCollabChat = db.collection('partnerships').doc(pId).collection('lounge')
                     .orderBy('createdAt', 'desc')
                     .limit(50)
                     .onSnapshot(snapshot => {
                         const messages = snapshot.docs
-                            .map(doc => ({ id: doc.id, ...doc.data(), partnershipId: doc.ref.parent.parent.id }))
-                            .filter(m => pIds.includes(m.partnershipId))
+                            .map(doc => ({ id: doc.id, ...doc.data() }))
                             .sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0));
 
                         const container = document.getElementById('collab-chat-messages');
@@ -4998,25 +4994,6 @@
                         </div>
                     </div>
 
-                    <div class="mt-12 pt-12 border-t border-slate-100 dark:border-slate-800">
-                        <div class="mb-8">
-                            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Collaborator Lounge</h3>
-                            <p class="text-lg font-black font-serif italic text-primary">Real-time Connection</p>
-                        </div>
-                        <div id="collab-chat-container" class="glass rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800 overflow-hidden flex flex-col h-[500px]">
-                            <div id="collab-chat-messages" class="flex-1 overflow-y-auto p-6 space-y-4">
-                                <div class="flex items-center justify-center h-full text-slate-400 italic text-sm">
-                                    Loading lounge conversations...
-                                </div>
-                            </div>
-                            <div class="p-4 bg-slate-50/50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex gap-2">
-                                <input id="collab-chat-input" type="text" placeholder="Share a reading recommendation..." class="flex-1 px-4 py-3 bg-white dark:bg-slate-800 rounded-2xl focus:ring-2 focus:ring-primary outline-none text-sm transition-all shadow-sm border border-slate-100 dark:border-slate-700">
-                                <button onclick="window.sendCollabMessage()" class="p-4 bg-primary text-white rounded-2xl hover:bg-blue-700 transition active:scale-95 shadow-lg focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Send message">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
                 </div>
                 `;
             }
@@ -5393,20 +5370,61 @@
             }
 
             function renderActivity() {
+                let loungeHTML = "";
+                if (window.isLoungeOpen) {
+                    loungeHTML = `
+                    <div class="mt-4 mb-12 animate-slide-up">
+                        <div class="mb-6">
+                            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Collaborator Lounge</h3>
+                            <p class="text-lg font-black font-serif italic text-primary">Real-time Connection</p>
+                        </div>
+                        <div id="collab-chat-container" class="glass rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800 overflow-hidden flex flex-col h-[500px]">
+                            <div id="collab-chat-messages" class="flex-1 overflow-y-auto p-6 space-y-4">
+                                <div class="flex items-center justify-center h-full text-slate-400 italic text-sm">
+                                    Loading lounge conversations...
+                                </div>
+                            </div>
+                            <div class="p-4 bg-slate-50/50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex gap-2">
+                                <input id="collab-chat-input" type="text" placeholder="Share a reading recommendation..." class="flex-1 px-4 py-3 bg-white dark:bg-slate-800 rounded-2xl focus:ring-2 focus:ring-primary outline-none text-sm transition-all shadow-sm border border-slate-100 dark:border-slate-700">
+                                <button onclick="window.sendCollabMessage()" class="p-4 bg-primary text-white rounded-2xl hover:bg-blue-700 transition active:scale-95 shadow-lg focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Send message">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    `;
+                }
+
                 if (activities.length === 0) {
                     return `
-                    <div class="flex flex-col items-center justify-center py-24 text-center">
-                        <div class="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 text-slate-300">
-                            <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                    <div class="max-w-2xl mx-auto animate-slide-up">
+                        <div class="flex justify-center mb-8">
+                            <button onclick="window.toggleLounge()" class="px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-black uppercase tracking-widest text-xs shadow-md hover:scale-105 active:scale-95 transition-all text-primary flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                                ${window.isLoungeOpen ? 'Close Lounge' : 'Open Lounge'}
+                            </button>
                         </div>
-                        <h2 class="text-xl font-bold text-slate-600 dark:text-slate-400">No Activity Yet</h2>
-                        <p class="text-slate-400 text-sm mt-2">Recent actions in your library will appear here.</p>
+                        ${loungeHTML}
+                        <div class="flex flex-col items-center justify-center py-24 text-center">
+                            <div class="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 text-slate-300">
+                                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                            </div>
+                            <h2 class="text-xl font-bold text-slate-600 dark:text-slate-400">No Activity Yet</h2>
+                            <p class="text-slate-400 text-sm mt-2">Recent actions in your library will appear here.</p>
+                        </div>
                     </div>
                     `;
                 }
 
                 return `
                 <div class="max-w-2xl mx-auto space-y-4 animate-slide-up">
+                    <div class="flex justify-center mb-8">
+                        <button onclick="window.toggleLounge()" class="px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-black uppercase tracking-widest text-xs shadow-md hover:scale-105 active:scale-95 transition-all text-primary flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                            ${window.isLoungeOpen ? 'Close Lounge' : 'Open Lounge'}
+                        </button>
+                    </div>
+                    ${loungeHTML}
                     <div class="mb-8">
                         <h2 class="text-3xl font-black font-serif italic">Library Activity</h2>
                         <p class="text-slate-500 text-sm">Recent changes and updates across your collections.</p>
@@ -5622,6 +5640,25 @@
                 }).catch(err => {
                     showToast('Failed to copy results', 'error');
                 });
+            };
+
+            window.toggleLounge = () => {
+                window.isLoungeOpen = !window.isLoungeOpen;
+                if (window.isLoungeOpen) {
+                    setTimeout(() => {
+                        setupCollabChat();
+                        const input = document.getElementById('collab-chat-input');
+                        input?.addEventListener('keydown', e => {
+                            if (e.key === 'Enter') window.sendCollabMessage();
+                        });
+                    }, 50);
+                } else {
+                    if (unsubscribeCollabChat) {
+                        unsubscribeCollabChat();
+                        unsubscribeCollabChat = null;
+                    }
+                }
+                window.queueRenderMainApp();
             };
 
             window.jumpToBook = async (bookId) => {
