@@ -416,6 +416,7 @@
                 if (activeTab === 'settings') window.queueRenderMainApp();
             });
             let books = [];                // local copy for UI, synced with Firestore
+            let chatHistory = [];          // AI chat session history
             window.__setBooks = (b) => books = b;
             window.lastDeleted = [];       // Safety net for undo
             let readingStatuses = {};      // local copy for per-user statuses {bookId: status}
@@ -659,8 +660,12 @@
                     .replace(/^## (.*$)/gim, '<h3 class="text-lg font-bold mt-6 mb-2 text-primary">$1</h3>')
                     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                     .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                    .replace(/^\s*[\-\*]\s*(.*)/gm, '<li class="ml-4 my-1">$1</li>')
-                    .replace(/\n/g, '<br>');
+                    .replace(/^\s*[\-\*]\s*(.*)/gm, '<li class="ml-4 my-1">$1</li>');
+
+                // Wrap <li> groups in <ul>
+                formatted = formatted.replace(/(<li.*<\/li>)+/g, '<ul class="list-disc my-2">$1</ul>');
+
+                formatted = formatted.replace(/\n/g, '<br>');
 
                 return formatted;
             }
@@ -2482,9 +2487,11 @@
                 if (tab === 'activity') {
                     setTimeout(() => {
                         const input = document.getElementById('activity-message-input');
-                        input?.addEventListener('keydown', e => {
-                            if (e.key === 'Enter') window.postActivityMessage();
-                        });
+                        if (input) {
+                            input.onkeydown = e => {
+                                if (e.key === 'Enter') window.postActivityMessage();
+                            };
+                        }
                     }, 500);
                 }
                 window.queueRenderMainApp();
@@ -3826,14 +3833,9 @@
                     container.innerHTML = currentGenres.map((g, i) => `
                     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
                         ${g}
-                        <button onclick="window.removeGenre(${i})" class="ml-2 hover:text-blue-900 dark:hover:text-blue-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded px-1 transition-all" aria-label="Remove genre: ${g}">&times;</button>
+                        <button data-genre-index="${i}" class="genre-remove-btn ml-2 hover:text-blue-900 dark:hover:text-blue-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded px-1 transition-all" aria-label="Remove genre: ${g}">&times;</button>
                     </span>
                 `).join('');
-                };
-
-                window.removeGenre = (index) => {
-                    currentGenres.splice(index, 1);
-                    renderGenres();
                 };
 
                 const modalHtml = `
@@ -3948,6 +3950,15 @@
                 });
                 renderGenres();
                 updateDescCount();
+
+                document.getElementById('genres-badge-container')?.addEventListener('click', (e) => {
+                    const btn = e.target.closest('.genre-remove-btn');
+                    if (btn) {
+                        const index = parseInt(btn.dataset.genreIndex);
+                        currentGenres.splice(index, 1);
+                        renderGenres();
+                    }
+                });
 
                 const saveDraft = () => {
                     if (isEdit) return;
@@ -5981,6 +5992,9 @@ If the collection is small or has no finished books, be extra encouraging and su
             }
 
             async function openAIChat(initialMessage = '', bookContext = null) {
+                // If triggered by event listener, initialMessage might be an Event object
+                if (initialMessage && typeof initialMessage !== 'string') initialMessage = '';
+
                 const modalHtml = `
                 <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
                     <div class="glass sm:max-w-2xl lg:max-w-4xl w-full rounded-[2.5rem] flex flex-col h-[80vh] sm:h-[85vh] shadow-2xl animate-slide-up border border-blue-100/50 dark:border-slate-800">
@@ -6062,8 +6076,17 @@ If the collection is small or has no finished books, be extra encouraging and su
                 // Load existing chat history if any
                 if (chatHistory.length > 0) {
                     chatHistory.forEach(msg => {
-                        if (msg.parts[0].text.startsWith('SYSTEM:')) return;
-                        renderChatMessage(msg.role === 'user' ? 'user' : 'ai', msg.parts[0].text);
+                        let text = msg.parts[0].text;
+                        if (text.startsWith('SYSTEM:')) {
+                            // Extract user message from the initial system prompt if present
+                            const userMatch = text.match(/\n\nUSER: (.*)$/s);
+                            if (userMatch) {
+                                text = userMatch[1];
+                            } else {
+                                return; // Skip purely system messages
+                            }
+                        }
+                        renderChatMessage(msg.role === 'user' ? 'user' : 'ai', text);
                     });
                 }
 
