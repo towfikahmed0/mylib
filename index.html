@@ -1487,6 +1487,9 @@
                                         <option value="">Change Genre...</option>
                                         ${metadataCache.genres.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
                                     </select>
+                                    <button onclick="window.bulkTransfer()" class="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" title="Transfer Selected" aria-label="Transfer selected books">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                                    </button>
                                     <button onclick="window.bulkDelete()" class="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" title="Delete Selected" aria-label="Delete selected books">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                     </button>
@@ -1552,6 +1555,116 @@
                 }
             };
 
+            window.bulkTransfer = async () => {
+                if (!selectedBookIds.size) return;
+
+                const activePartnerships = allPartnerships.filter(p => {
+                    const isUser1 = p.userId1 === currentUser.uid;
+                    return !(isUser1 ? p.user1Unsubscribed : p.user2Unsubscribed);
+                });
+
+                if (activePartnerships.length === 0) {
+                    showToast('You need an active collaborator to transfer books. Add one in Settings.', 'info');
+                    return;
+                }
+
+                const closeLoading = showModal(`
+                    <div class="glass max-w-sm w-full rounded-[2.5rem] p-10 flex flex-col items-center justify-center gap-6 animate-pulse">
+                        <div class="w-16 h-16 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin"></div>
+                        <p class="text-slate-500 font-bold uppercase tracking-widest text-xs">Loading Collaborators...</p>
+                    </div>
+                `);
+
+                try {
+                    const partnerIds = activePartnerships.map(p => p.userId1 === currentUser.uid ? p.userId2 : p.userId1);
+                    const userDocs = await Promise.all(partnerIds.map(id => db.collection('users').doc(id).get()));
+                    const partners = userDocs.map(doc => ({ uid: doc.id, ...doc.data() }));
+
+                    closeLoading();
+
+                    const modalHtml = `
+                    <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up border border-blue-100/50 dark:border-slate-800">
+                        <h2 class="text-2xl font-black font-serif italic mb-2">Transfer Books</h2>
+                        <p class="text-sm text-slate-500 mb-6">Transfer ${selectedBookIds.size} selected books to a collaborator's library. You will lose ownership of these books.</p>
+
+                        <div class="space-y-3 mb-8">
+                            ${partners.map(p => `
+                                <button onclick="window.executeBulkTransfer('${p.uid}', '${escapeHTML(p.displayName || p.email)}')" class="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all text-left group focus-visible:ring-2 focus-visible:ring-primary outline-none">
+                                    <div>
+                                        <span class="block text-sm font-bold">${escapeHTML(p.displayName || 'Unknown')}</span>
+                                        <span class="block text-[10px] text-slate-400 uppercase tracking-widest font-medium">${escapeHTML(p.email)}</span>
+                                    </div>
+                                    <svg class="w-5 h-5 text-slate-300 group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                </button>
+                            `).join('')}
+                        </div>
+
+                        <button data-close class="w-full py-4 text-slate-400 hover:text-slate-600 font-bold uppercase tracking-widest text-xs transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none rounded-xl">Cancel</button>
+                    </div>
+                    `;
+                    showModal(modalHtml);
+                } catch (err) {
+                    closeLoading();
+                    showToast('Failed to load collaborators', 'error');
+                }
+            };
+
+            window.executeBulkTransfer = async (targetUserId, targetName) => {
+                if (!confirm(`Transfer ${selectedBookIds.size} books to ${targetName}? This action cannot be undone.`)) return;
+
+                const ids = Array.from(selectedBookIds);
+                showToast(`Transferring ${ids.length} books...`, 'info');
+
+                try {
+                    // Chunks of 150 because we have 3 writes per book (update book + 2 activity feed entries)
+                    // 150 * 3 = 450, which is safely under the Firestore batch limit of 500
+                    for (let i = 0; i < ids.length; i += 150) {
+                        const chunk = ids.slice(i, i + 150);
+                        const batch = db.batch();
+
+                        chunk.forEach(id => {
+                            const book = books.find(b => b.id === id);
+                            batch.update(db.collection('books').doc(id), {
+                                userId: targetUserId,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+
+                            // Add activity entry for sender
+                            const activityRef = db.collection('activityFeed').doc();
+                            batch.set(activityRef, {
+                                type: 'user_message',
+                                text: `transferred "${book?.title || 'a book'}" to ${targetName}.`,
+                                userName: currentUser.displayName || currentUser.email || currentUser.uid,
+                                userId: currentUser.uid,
+                                libraryId: currentUser.uid,
+                                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+
+                            // Add activity entry for recipient
+                            const activityRef2 = db.collection('activityFeed').doc();
+                            batch.set(activityRef2, {
+                                type: 'book_added',
+                                bookId: id,
+                                bookTitle: book?.title || 'Unknown Book',
+                                userName: currentUser.displayName || currentUser.email || currentUser.uid,
+                                userId: targetUserId,
+                                addedTo: 'My',
+                                libraryId: targetUserId,
+                                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        });
+                        await batch.commit();
+                    }
+
+                    selectedBookIds.clear();
+                    if (currentModalCloseHandler) currentModalCloseHandler();
+                    showToast(`Successfully transferred ${ids.length} books to ${targetName}.`, 'success');
+                    window.queueRenderMainApp();
+                } catch (err) {
+                    showToast('Transfer failed: ' + err.message, 'error');
+                }
+            };
+
             window.bulkDelete = async () => {
                 if (!selectedBookIds.size) return;
                 if (confirm(`Delete ${selectedBookIds.size} selected books?`)) {
@@ -1574,6 +1687,7 @@
                         window.lastDeleted = deletedItems;
 
                         // Firestore batches are limited to 500 operations. Each delete is 2 operations here.
+                        // 200 * 2 = 400 operations, which is within the 500 limit.
                         for (let i = 0; i < ids.length; i += 200) {
                             const chunk = ids.slice(i, i + 200);
                             const batch = db.batch();
@@ -1598,6 +1712,7 @@
                 showToast(`Restoring ${window.lastDeleted.length} books...`, 'info');
 
                 try {
+                    // Chunks of 200 * 2 writes = 400 operations, under the 500 limit.
                     for (let i = 0; i < window.lastDeleted.length; i += 200) {
                         const chunk = window.lastDeleted.slice(i, i + 200);
                         const batch = db.batch();
@@ -6863,8 +6978,12 @@ If the collection is small or has no finished books, be extra encouraging and su
             window.openPostReviewModal = () => {
                 const modalHtml = `
                 <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div class="glass max-w-2xl w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up border border-blue-100/50 dark:border-slate-800">
-                        <div class="flex justify-between items-center mb-6">
+                    <div class="glass max-w-2xl w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up border border-blue-100/50 dark:border-slate-800 relative overflow-hidden max-h-[90vh] overflow-y-auto">
+                        <!-- Decorative background elements -->
+                        <div class="absolute -top-24 -left-24 w-64 h-64 bg-blue-400/10 rounded-full blur-3xl pointer-events-none"></div>
+                        <div class="absolute -bottom-24 -right-24 w-64 h-64 bg-indigo-400/10 rounded-full blur-3xl pointer-events-none"></div>
+
+                        <div class="flex justify-between items-center mb-6 relative z-10">
                             <div>
                                 <h2 class="text-3xl font-black font-serif italic text-slate-900 dark:text-white">Share Your Thoughts</h2>
                                 <p class="text-slate-500 text-sm">Every word matters. Share a review with the community.</p>
@@ -6874,21 +6993,21 @@ If the collection is small or has no finished books, be extra encouraging and su
                             </button>
                         </div>
 
-                        <div class="space-y-6">
+                        <div class="space-y-6 relative z-10">
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label for="rev-title" class="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1">Book Title *</label>
+                                    <label for="rev-title" class="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1.5">Book Title *</label>
                                     <input id="rev-title" type="text" placeholder="e.g. The Great Gatsby" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all">
                                 </div>
                                 <div>
-                                    <label for="rev-author" class="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1">Author</label>
+                                    <label for="rev-author" class="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1.5">Author</label>
                                     <input id="rev-author" type="text" placeholder="e.g. F. Scott Fitzgerald" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all">
                                 </div>
                             </div>
 
                             <div>
-                                <label for="rev-category" class="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1">Category *</label>
-                                <select id="rev-category" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all">
+                                <label for="rev-category" class="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1.5">Category *</label>
+                                <select id="rev-category" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all appearance-none" style="background-image: url('data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%2394a3b8\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right 1rem center; background-size: 1.5em;">
                                     <option value="Review">Review</option>
                                     <option value="Help">Help</option>
                                     <option value="Others">Others</option>
@@ -6896,7 +7015,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                             </div>
 
                             <div id="rev-rating-section">
-                                <div class="flex justify-between items-center mb-1">
+                                <div class="flex justify-between items-center mb-1.5">
                                     <label class="text-[10px] font-bold text-slate-400 uppercase ml-1 block">Rating</label>
                                     <span id="rev-rating-label" aria-live="polite" class="text-[10px] font-black text-amber-500 uppercase tracking-widest"></span>
                                 </div>
@@ -6910,7 +7029,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                             </div>
 
                             <div class="relative">
-                                <label for="rev-body" class="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1">Review Body *</label>
+                                <label for="rev-body" class="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1.5">Review Body *</label>
                                 <textarea id="rev-body" placeholder="What did you think?..." class="w-full px-4 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-primary outline-none transition-all min-h-[200px] text-lg review-body"></textarea>
                                 <div id="rev-char-counter" aria-live="polite" class="absolute bottom-4 right-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-white/80 dark:bg-slate-800/80 px-2 py-1 rounded-md backdrop-blur-sm">0 / 2000</div>
                             </div>
