@@ -5102,7 +5102,7 @@
                 const modalHtml = '<div class="w-full h-full flex flex-col p-6 sm:p-10 overflow-y-auto bg-slate-50 dark:bg-slate-900">' +
                     '<div class="max-w-3xl mx-auto w-full">' +
                     '<div class="flex justify-between items-center mb-8"><div><h2 class="text-3xl font-black font-serif italic text-emerald-600">Review AI Fixes</h2><p class="text-slate-500 text-sm mt-1">AI found ' + fixes.length + ' fixes.</p></div>' +
-                    '<button data-close class="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm hover:bg-slate-100"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button></div>' +
+                    '<button data-close aria-label="Close modal" class="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button></div>' +
                     '<div class="space-y-4 mb-10">' +
                     fixes.map((f, i) => {
                         const book = books.find(b => b.id === f.id);
@@ -6982,7 +6982,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                                 <h2 class="text-3xl font-black font-serif italic text-slate-900 dark:text-white">Share Your Thoughts</h2>
                                 <p class="text-slate-500 text-sm">Every word matters. Share a review with the community.</p>
                             </div>
-                            <button data-close class="p-3 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none">
+                            <button data-close aria-label="Close Share Your Thoughts" class="p-3 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
                         </div>
@@ -7118,7 +7118,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                 <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up border border-blue-100/50 dark:border-slate-800">
                     <div class="flex items-center justify-between mb-6">
                         <h2 class="text-2xl font-black font-serif italic text-primary">Keyboard Shortcuts</h2>
-                        <button data-close class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                        <button data-close aria-label="Close shortcuts" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                     </div>
                     <div class="grid grid-cols-1 gap-3">
                         ${shortcuts.map(s => `
@@ -7128,7 +7128,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                             </div>
                         `).join('')}
                     </div>
-                    <button data-close class="w-full mt-8 py-4 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 dark:shadow-none hover:scale-[1.02] active:scale-95 transition-all">Got it!</button>
+                    <button data-close class="w-full mt-8 py-4 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 dark:shadow-none hover:scale-[1.02] active:scale-95 transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none">Got it!</button>
                 </div>
                 `;
                 showModal(html);
