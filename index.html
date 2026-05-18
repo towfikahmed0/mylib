@@ -423,6 +423,7 @@
             let unsubscribeBooks = null;
             let unsubscribeStatus = null;
             let activeTab = 'library';     // 'library', 'wishlist', 'activity', 'settings'
+            let allPartnerships = [];
             window.isLoungeOpen = false;
             let chatHistory = [];
             let aiResponseCache = [];      // Cache last 5 responses [{prompt, response}]
@@ -1265,88 +1266,52 @@
                 }
             };
 
-            let unsubscribePartners1 = null;
-            let unsubscribePartners2 = null;
             let unsubscribeCollabChat = null;
-            let allPartnershipsForUI = [];
 
-            function renderPartners() {
+            async function renderPartners() {
                 const listEl = document.getElementById('collaborators-list');
                 if (!listEl) return;
 
-                if (unsubscribePartners1) unsubscribePartners1();
-                if (unsubscribePartners2) unsubscribePartners2();
-
-                let partners1 = [];
-                let partners2 = [];
-
-                // Query partnerships where current user is userId1
-                unsubscribePartners1 = db.collection('partnerships')
-                    .where('userId1', '==', currentUser.uid)
-                    .onSnapshot(snapshot => {
-                        partners1 = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        allPartnershipsForUI = [...partners1, ...partners2];
-                        displayPartnerships();
-                    }, err => {
-                        console.error("Partners Query 1 Error:", err);
-                    });
-
-                // Query partnerships where current user is userId2
-                unsubscribePartners2 = db.collection('partnerships')
-                    .where('userId2', '==', currentUser.uid)
-                    .onSnapshot(snapshot => {
-                        partners2 = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        allPartnershipsForUI = [...partners1, ...partners2];
-                        displayPartnerships();
-                    }, err => {
-                        console.error("Partners Query 2 Error:", err);
-                    });
-
-                async function displayPartnerships() {
-                    const listEl = document.getElementById('collaborators-list');
-                    if (!listEl) return;
-
-                    if (allPartnershipsForUI.length === 0) {
-                        listEl.innerHTML = '<p class="text-xs text-slate-400 italic px-1">No partnerships yet. Share your library to connect with friends!</p>';
-                        return;
-                    }
-
-                    // Fetch partner user details
-                    const partnerIds = allPartnershipsForUI.map(doc => {
-                        const data = doc;
-                        return data.userId1 === currentUser.uid ? data.userId2 : data.userId1;
-                    });
-
-                    const userDocs = await Promise.all(
-                        partnerIds.map(id => db.collection('users').doc(id).get())
-                    );
-
-                    listEl.innerHTML = allPartnershipsForUI.map((partnership, idx) => {
-                        const isUser1 = partnership.userId1 === currentUser.uid;
-                        const isUnsubscribed = isUser1 ? partnership.user1Unsubscribed : partnership.user2Unsubscribed;
-                        const partnerUnsubscribed = isUser1 ? partnership.user2Unsubscribed : partnership.user1Unsubscribed;
-                        const partnerName = userDocs[idx].data()?.displayName || userDocs[idx].data()?.email || 'Unknown';
-                        const allowAddBooks = partnership.allowAddBooks || false;
-
-                        return `
-                        <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800 gap-4">
-                            <div class="flex-1">
-                                <span class="text-sm font-medium block">${escapeHTML(partnerName)}</span>
-                                ${isUnsubscribed ? '<span class="text-xs text-slate-500 italic">You unfollowed this partnership</span>' : partnerUnsubscribed ? '<span class="text-xs text-slate-500 italic">Partner unfollowed this partnership</span>' : '<span class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Active partnership</span>'}
-                            </div>
-                            <div class="flex items-center gap-3">
-                                <label class="flex items-center gap-2 cursor-pointer ${isUnsubscribed ? 'opacity-50 pointer-events-none' : ''}">
-                                    <input type="checkbox" ${allowAddBooks ? 'checked' : ''} onchange="window.updatePartnershipPermission('${partnership.id}', this.checked)" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500" title="Allow this partner to add books to your library">
-                                    <span class="text-xs font-medium whitespace-nowrap">Can add books</span>
-                                </label>
-                                <button onclick="window.leavePartnership('${partnership.id}')" class="text-rose-500 hover:text-rose-600 p-1 font-medium text-xs whitespace-nowrap">
-                                    ${isUnsubscribed ? 'Rejoin' : 'Unfollow'}
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                    }).join('');
+                if (allPartnerships.length === 0) {
+                    listEl.innerHTML = '<p class="text-xs text-slate-400 italic px-1">No partnerships yet. Share your library to connect with friends!</p>';
+                    return;
                 }
+
+                // Fetch partner user details
+                const partnerIds = allPartnerships.map(doc => {
+                    const data = doc;
+                    return data.userId1 === currentUser.uid ? data.userId2 : data.userId1;
+                });
+
+                const userDocs = await Promise.all(
+                    partnerIds.map(id => db.collection('users').doc(id).get())
+                );
+
+                listEl.innerHTML = allPartnerships.map((partnership, idx) => {
+                    const isUser1 = partnership.userId1 === currentUser.uid;
+                    const isUnsubscribed = isUser1 ? partnership.user1Unsubscribed : partnership.user2Unsubscribed;
+                    const partnerUnsubscribed = isUser1 ? partnership.user2Unsubscribed : partnership.user1Unsubscribed;
+                    const partnerName = userDocs[idx].data()?.displayName || userDocs[idx].data()?.email || 'Unknown';
+                    const allowAddBooks = partnership.allowAddBooks || false;
+
+                    return `
+                    <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800 gap-4">
+                        <div class="flex-1">
+                            <span class="text-sm font-medium block">${escapeHTML(partnerName)}</span>
+                            ${isUnsubscribed ? '<span class="text-xs text-slate-500 italic">You unfollowed this partnership</span>' : partnerUnsubscribed ? '<span class="text-xs text-slate-500 italic">Partner unfollowed this partnership</span>' : '<span class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Active partnership</span>'}
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <label class="flex items-center gap-2 cursor-pointer ${isUnsubscribed ? 'opacity-50 pointer-events-none' : ''}">
+                                <input type="checkbox" ${allowAddBooks ? 'checked' : ''} onchange="window.updatePartnershipPermission('${partnership.id}', this.checked)" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500" title="Allow this partner to add books to your library">
+                                <span class="text-xs font-medium whitespace-nowrap">Can add books</span>
+                            </label>
+                            <button onclick="window.leavePartnership('${partnership.id}')" class="text-rose-500 hover:text-rose-600 p-1 font-medium text-xs whitespace-nowrap">
+                                ${isUnsubscribed ? 'Rejoin' : 'Unfollow'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+                }).join('');
             }
 
             window.leavePartnership = async (partnershipId) => {
@@ -3410,7 +3375,6 @@
             let unsubscribePartnershipBooks2 = null;
             let unsubscribeOwnBooks = null;
             let unsubscribeActivity = null;
-            let allPartnerships = [];
 
             async function subscribeToBooks() {
                 if (unsubscribeBooks) unsubscribeBooks();
@@ -3430,6 +3394,8 @@
                     .onSnapshot(snapshot => {
                         partnerships1 = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         allPartnerships = [...partnerships1, ...partnerships2];
+                        if (activeTab === 'settings') renderPartners();
+                        if (activeTab === 'activity' && window.isLoungeOpen) setupCollabChat();
                         fetchBooksFromPartnerships();
                     }, err => {
                         console.error("Partnership Query 1 Error:", err);
@@ -3441,6 +3407,8 @@
                     .onSnapshot(snapshot => {
                         partnerships2 = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         allPartnerships = [...partnerships1, ...partnerships2];
+                        if (activeTab === 'settings') renderPartners();
+                        if (activeTab === 'activity' && window.isLoungeOpen) setupCollabChat();
                         fetchBooksFromPartnerships();
                     }, err => {
                         console.error("Partnership Query 2 Error:", err);
@@ -3592,7 +3560,7 @@
 
             // Helper: Show library selector for scanner
             async function showLibrarySelectorForScan() {
-                const partnersWhoAllowAdding = allPartnershipsForUI.filter(p => p.allowAddBooks === true).map(p => {
+                const partnersWhoAllowAdding = allPartnerships.filter(p => p.allowAddBooks === true).map(p => {
                     const isUser1 = p.userId1 === currentUser.uid;
                     const partnerId = isUser1 ? p.userId2 : p.userId1;
                     return { partnershipId: p.id, userId: partnerId, isActive: isUser1 ? !p.user1Unsubscribed : !p.user2Unsubscribed };
@@ -4044,7 +4012,7 @@
                     const destContainer = document.getElementById('library-destination-container');
                     if (destContainer) {
                         // Get list of partnerships where we can add books
-                        const partnersWhoAllowAdding = allPartnershipsForUI.filter(p => p.allowAddBooks === true).map(p => {
+                        const partnersWhoAllowAdding = allPartnerships.filter(p => p.allowAddBooks === true).map(p => {
                             const isUser1 = p.userId1 === currentUser.uid;
                             const partnerId = isUser1 ? p.userId2 : p.userId1;
                             return { partnershipId: p.id, userId: partnerId, isActive: isUser1 ? !p.user1Unsubscribed : !p.user2Unsubscribed };
@@ -4437,7 +4405,7 @@
                     showToast('Book added!', 'success');
 
                     // Track activity for everyone
-                    const partner = allPartnershipsForUI?.find(p => (p.userId1 === targetUserId || p.userId2 === targetUserId) && (p.userId1 !== targetUserId || p.userId2 !== targetUserId));
+                    const partner = allPartnerships?.find(p => (p.userId1 === targetUserId || p.userId2 === targetUserId) && (p.userId1 !== targetUserId || p.userId2 !== targetUserId));
                     const targetUserName = targetUserId === currentUser.uid ? 'My' : 'Partner';
                     await db.collection('activityFeed').add({
                         type: 'book_added',
@@ -4662,7 +4630,7 @@
 
             function renderCollaboratorStats() {
                 // ⚡ Bolt: Filter out inactive partnerships where either user has unsubscribed.
-                const partnerships = (allPartnerships.length > 0 ? allPartnerships : allPartnershipsForUI)
+                const partnerships = allPartnerships
                     .filter(p => !p.user1Unsubscribed && !p.user2Unsubscribed);
 
                 if (!partnerships || partnerships.length === 0) {
@@ -4709,13 +4677,29 @@
                 if (unsubscribeCollabChat) unsubscribeCollabChat();
 
                 // Find all active partnership IDs for the current user
-                const partnerships = (allPartnerships.length > 0 ? allPartnerships : allPartnershipsForUI)
-                    .filter(p => !p.user1Unsubscribed && !p.user2Unsubscribed);
+                // Sort by ID to ensure both users pick the same "first" one
+                const partnerships = allPartnerships
+                    .filter(p => !p.user1Unsubscribed && !p.user2Unsubscribed)
+                    .sort((a, b) => a.id.localeCompare(b.id));
 
-                if (partnerships.length === 0) return;
+                if (partnerships.length === 0) {
+                    const container = document.getElementById('collab-chat-messages');
+                    if (container) container.innerHTML = '<div class="flex items-center justify-center h-full text-slate-400 italic text-sm text-center px-6">No active collaborators found.<br>Share your library to start a lounge!</div>';
+                    return;
+                }
 
                 // Use the FIRST active partnership (as a simplified lounge)
                 const pId = partnerships[0].id;
+
+                // Update UI with collaborator name
+                const isUser1 = partnerships[0].userId1 === currentUser.uid;
+                const partnerId = isUser1 ? partnerships[0].userId2 : partnerships[0].userId1;
+                db.collection('users').doc(partnerId).get().then(doc => {
+                    const nameEl = document.getElementById('lounge-partner-name');
+                    if (nameEl && doc.exists) {
+                        nameEl.innerText = `With ${doc.data().displayName || doc.data().email || 'Partner'}`;
+                    }
+                });
 
                 unsubscribeCollabChat = db.collection('partnerships').doc(pId).collection('lounge')
                     .orderBy('createdAt', 'desc')
@@ -4760,8 +4744,10 @@
                 const text = input.value?.trim();
                 if (!text) return;
 
-                const partnerships = (allPartnerships.length > 0 ? allPartnerships : allPartnershipsForUI)
-                    .filter(p => !p.user1Unsubscribed && !p.user2Unsubscribed);
+                // Sort by ID to ensure consistency
+                const partnerships = allPartnerships
+                    .filter(p => !p.user1Unsubscribed && !p.user2Unsubscribed)
+                    .sort((a, b) => a.id.localeCompare(b.id));
 
                 if (partnerships.length === 0) {
                     showToast('No active collaborators found.', 'info');
@@ -5377,6 +5363,7 @@
                         <div class="mb-6">
                             <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Collaborator Lounge</h3>
                             <p class="text-lg font-black font-serif italic text-primary">Real-time Connection</p>
+                            <p id="lounge-partner-name" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1"></p>
                         </div>
                         <div id="collab-chat-container" class="glass rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800 overflow-hidden flex flex-col h-[500px]">
                             <div id="collab-chat-messages" class="flex-1 overflow-y-auto p-6 space-y-4">
