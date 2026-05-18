@@ -6293,7 +6293,10 @@ If the collection is small or has no finished books, be extra encouraging and su
                     const counter = document.getElementById('detail-char-count');
                     if (textarea && counter) {
                         const count = textarea.value.length;
-                        counter.textContent = `${count} character${count !== 1 ? 's' : ''}`;
+                        const words = textarea.value.trim() ? textarea.value.trim().split(/\s+/).length : 0;
+                        const readTime = Math.ceil(words / 200);
+                        const readTimeStr = readTime > 0 ? ` · ${readTime} min read` : '';
+                        counter.textContent = `${count} character${count !== 1 ? 's' : ''}${readTimeStr}`;
                     }
                 };
 
@@ -6386,7 +6389,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                                 <div class="mt-4 px-4">
                                     <div class="flex justify-between items-center mb-1">
                                         <label for="detail-rating-select" class="text-[10px] font-bold text-slate-400 uppercase block">My Rating & Review</label>
-                                        <span id="detail-char-count" class="text-[9px] font-bold text-slate-400 uppercase opacity-60">0 characters</span>
+                                        <span id="detail-char-count" aria-live="polite" class="text-[9px] font-bold text-slate-400 uppercase opacity-60">0 characters</span>
                                     </div>
                                     <div class="space-y-3">
                                         <select id="detail-rating-select" class="w-full px-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
@@ -6870,10 +6873,13 @@ If the collection is small or has no finished books, be extra encouraging and su
                             </div>
 
                             <div id="rev-rating-section">
-                                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1">Rating</label>
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1 block">Rating</label>
+                                    <span id="rev-rating-label" aria-live="polite" class="text-[10px] font-black text-amber-500 uppercase tracking-widest"></span>
+                                </div>
                                 <div class="flex gap-2" id="rev-rating-container">
                                     ${[1, 2, 3, 4, 5].map(i => `
-                                        <button data-rating="${i}" class="rev-star-btn p-1 text-slate-400 dark:text-slate-500 hover:text-amber-400 transition-colors focus-visible:ring-2 focus-visible:ring-amber-500 outline-none rounded-lg" aria-label="${i} stars">
+                                        <button data-rating="${i}" class="rev-star-btn p-1 text-slate-400 dark:text-slate-500 hover:text-amber-400 transition-colors focus-visible:ring-2 focus-visible:ring-amber-500 outline-none rounded-lg" aria-label="${i} stars" title="${i} stars">
                                             <svg class="w-8 h-8 fill-current" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
                                         </button>
                                     `).join('')}
@@ -6883,7 +6889,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                             <div class="relative">
                                 <label for="rev-body" class="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1">Review Body *</label>
                                 <textarea id="rev-body" placeholder="What did you think?..." class="w-full px-4 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-primary outline-none transition-all min-h-[200px] text-lg review-body"></textarea>
-                                <div id="rev-char-counter" class="absolute bottom-4 right-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-white/80 dark:bg-slate-800/80 px-2 py-1 rounded-md backdrop-blur-sm">0 / 2000</div>
+                                <div id="rev-char-counter" aria-live="polite" class="absolute bottom-4 right-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-white/80 dark:bg-slate-800/80 px-2 py-1 rounded-md backdrop-blur-sm">0 / 2000</div>
                             </div>
 
                             <button id="submit-review-btn" class="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl hover:scale-[1.02] active:scale-95 transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none">Post Review</button>
@@ -6897,6 +6903,8 @@ If the collection is small or has no finished books, be extra encouraging and su
 
                 const catSelect = document.getElementById('rev-category');
                 const ratingSection = document.getElementById('rev-rating-section');
+                const ratingLabel = document.getElementById('rev-rating-label');
+                const ratingLabels = { 1: '1 - Poor', 2: '2 - Fair', 3: '3 - Good', 4: '4 - Very Good', 5: '5 - Excellent' };
 
                 const updateRatingVisibility = () => {
                     if (catSelect.value === 'Review') {
@@ -6904,6 +6912,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                     } else {
                         ratingSection.classList.add('hidden');
                         currentRating = 0;
+                        if (ratingLabel) ratingLabel.innerText = '';
                         stars.forEach(s => {
                             s.classList.remove('text-amber-400');
                             s.classList.add('text-slate-400', 'dark:text-slate-500');
@@ -6912,12 +6921,12 @@ If the collection is small or has no finished books, be extra encouraging and su
                 };
 
                 catSelect.onchange = updateRatingVisibility;
-                updateRatingVisibility();
 
                 const stars = document.querySelectorAll('.rev-star-btn');
                 stars.forEach(btn => {
                     btn.onclick = () => {
                         currentRating = parseInt(btn.dataset.rating);
+                        if (ratingLabel) ratingLabel.innerText = ratingLabels[currentRating] || '';
                         stars.forEach((s, idx) => {
                             s.classList.toggle('text-amber-400', idx < currentRating);
                             s.classList.toggle('text-slate-400', idx >= currentRating);
@@ -6926,11 +6935,16 @@ If the collection is small or has no finished books, be extra encouraging and su
                     };
                 });
 
+                updateRatingVisibility();
+
                 const body = document.getElementById('rev-body');
                 const counter = document.getElementById('rev-char-counter');
                 body.oninput = () => {
                     const len = body.value.length;
-                    counter.innerText = `${len} / 2000`;
+                    const words = body.value.trim() ? body.value.trim().split(/\s+/).length : 0;
+                    const readTime = Math.ceil(words / 200);
+                    const readTimeStr = readTime > 0 ? ` · ${readTime} min read` : '';
+                    counter.innerText = `${len} / 2000${readTimeStr}`;
                     counter.classList.toggle('text-rose-500', len > 2000 || len < 10);
                     counter.classList.toggle('text-emerald-500', len >= 10 && len <= 1800);
                     counter.classList.toggle('text-amber-500', len > 1800 && len <= 2000);
