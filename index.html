@@ -4419,28 +4419,6 @@
 
                     return docRef.id;
                 } catch (err) {
-                    console.error("=== SAVE ERROR ===");
-                    console.error('Error message:', err.message);
-                    console.error('Error code:', err.code);
-                    console.error('Full error:', err);
-
-                    // Enhanced debugging for permission errors
-                    if (err.code === 'permission-denied') {
-                        console.error('PERMISSION DENIED - Debugging info:');
-                        console.error('- Trying to add book to userId:', targetUserId);
-                        console.error('- Current user:', currentUser.uid);
-                        console.error('- Is shared library:', isAddingToSharedLibrary);
-
-                        if (isAddingToSharedLibrary) {
-                            const partnershipId = currentUser.uid < targetUserId ?
-                                currentUser.uid + '_' + targetUserId :
-                                targetUserId + '_' + currentUser.uid;
-                            console.error('- Partnership ID:', partnershipId);
-                            console.error('- Check Firestore: partnerships/' + partnershipId);
-                            console.error('- Verify allowAddBooks field is set to true');
-                        }
-                    }
-
                     showToast('Error saving: ' + err.message, 'error');
                 }
             }
@@ -5302,7 +5280,7 @@
                         </button>
                         <div class="flex items-center gap-3">
                             <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${catClass}">${rev.category || 'Review'}</span>
-                            <div class="text-amber-500 text-sm font-black">${stars}</div>
+                            ${(rev.category === 'Review' || !rev.category) ? `<div class="text-amber-500 text-sm font-black">${stars}</div>` : ''}
                         </div>
                     </div>
 
@@ -6891,7 +6869,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                                 </select>
                             </div>
 
-                            <div>
+                            <div id="rev-rating-section">
                                 <label class="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1">Rating</label>
                                 <div class="flex gap-2" id="rev-rating-container">
                                     ${[1, 2, 3, 4, 5].map(i => `
@@ -6916,6 +6894,25 @@ If the collection is small or has no finished books, be extra encouraging and su
 
                 const close = showModal(modalHtml);
                 let currentRating = 0;
+
+                const catSelect = document.getElementById('rev-category');
+                const ratingSection = document.getElementById('rev-rating-section');
+
+                const updateRatingVisibility = () => {
+                    if (catSelect.value === 'Review') {
+                        ratingSection.classList.remove('hidden');
+                    } else {
+                        ratingSection.classList.add('hidden');
+                        currentRating = 0;
+                        stars.forEach(s => {
+                            s.classList.remove('text-amber-400');
+                            s.classList.add('text-slate-400', 'dark:text-slate-500');
+                        });
+                    }
+                };
+
+                catSelect.onchange = updateRatingVisibility;
+                updateRatingVisibility();
 
                 const stars = document.querySelectorAll('.rev-star-btn');
                 stars.forEach(btn => {
