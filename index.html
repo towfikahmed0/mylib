@@ -1776,6 +1776,12 @@
                                     </div>
                                 </div>
 
+                                ${userId !== currentUser.uid ? `
+                                    <button id="visit-library-btn" onclick="window.visitCollaboratorLibrary('${userId}')" class="mt-6 px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-bold hover:scale-105 active:scale-95 transition-all shadow-lg focus-visible:ring-2 focus-visible:ring-primary outline-none whitespace-nowrap text-sm">
+                                        Visit Library
+                                    </button>
+                                ` : ''}
+
                                 ${profile.bio ? `<p class="mt-8 text-slate-600 dark:text-slate-300 max-w-md leading-relaxed italic review-body text-lg">"${escapeHTML(profile.bio)}"</p>` : ''}
                             </div>
 
@@ -1797,6 +1803,301 @@
                     console.error(err);
                 }
             };
+
+            window.visitCollaboratorLibrary = async (profileUserId) => {
+                const closeLoading = showModal(`
+                    <div class="glass max-w-sm w-full rounded-[2.5rem] p-10 flex flex-col items-center justify-center gap-6 animate-pulse">
+                        <div class="w-16 h-16 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin"></div>
+                        <p class="text-slate-500 font-bold uppercase tracking-widest text-xs">Loading Library...</p>
+                    </div>
+                `);
+
+                try {
+                    // Check partnership status
+                    const ids = [currentUser.uid, profileUserId].sort();
+                    const partnershipId = `${ids[0]}_${ids[1]}`;
+                    const partnershipDoc = await db.collection('partnerships').doc(partnershipId).get();
+                    const partnership = partnershipDoc.exists ? partnershipDoc.data() : null;
+
+                    if (!partnership || (partnership.status !== 'accepted' && partnership.status !== undefined)) {
+                        closeLoading();
+                        showToast("You can only visit libraries of accepted collaborators.", "error");
+                        return;
+                    }
+
+                    // Fetch profile user's name
+                    const profileDoc = await db.collection('users').doc(profileUserId).get();
+                    const profileName = profileDoc.data()?.displayName || profileDoc.data()?.email || 'User';
+
+                    // Fetch profile user's accepted collaborators
+                    const p1Snapshot = await db.collection('partnerships')
+                        .where('userId1', '==', profileUserId)
+                        .where('status', '==', 'accepted')
+                        .get();
+                    const p2Snapshot = await db.collection('partnerships')
+                        .where('userId2', '==', profileUserId)
+                        .where('status', '==', 'accepted')
+                        .get();
+
+                    const collaborators = new Set([profileUserId]);
+                    p1Snapshot.docs.forEach(doc => collaborators.add(doc.data().userId2));
+                    p2Snapshot.docs.forEach(doc => collaborators.add(doc.data().userId1));
+                    const collaboratorIds = Array.from(collaborators);
+
+                    // Fetch books belonging to collaborators
+                    let visitedBooks = [];
+                    for (let i = 0; i < collaboratorIds.length; i += 10) {
+                        const chunk = collaboratorIds.slice(i, i + 10);
+                        const booksSnapshot = await db.collection('books').where('userId', 'in', chunk).get();
+                        booksSnapshot.docs.forEach(doc => {
+                            visitedBooks.push({ id: doc.id, ...doc.data() });
+                        });
+                    }
+
+                    closeLoading();
+
+                    const modalHtml = `
+                    <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div class="bg-slate-50 dark:bg-slate-900 w-full h-full sm:h-auto sm:max-w-4xl sm:rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up overflow-y-auto sm:max-h-[90vh]">
+                            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
+                                <div>
+                                    <h2 class="text-2xl font-black font-serif italic">${escapeHTML(profileName)}'s Library</h2>
+                                    <p class="text-xs text-slate-500 uppercase tracking-widest font-bold mt-1">Books and reviews from ${escapeHTML(profileName)} & collaborators</p>
+                                </div>
+                                <button data-close class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500 focus-visible:ring-2 focus-visible:ring-primary outline-none">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                </button>
+                            </div>
+
+                            ${visitedBooks.length === 0 ? `
+                                <div class="text-center py-20">
+                                    <svg class="w-16 h-16 text-slate-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                                    <p class="text-slate-400 italic">No books in this library yet.</p>
+                                </div>
+                            ` : `
+                                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                                    ${visitedBooks.map((book, idx) => {
+                                        const title = book.title || 'Untitled';
+                                        const author = book.author || 'Unknown Author';
+                                        const coverUrl = book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover';
+                                        return `
+                                        <div onclick="window.openVisitedBookDetails('${book.id}', ${JSON.stringify(collaboratorIds).replace(/"/g, '&quot;')})" class="bg-white dark:bg-slate-800 p-4 rounded-3xl flex gap-4 cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all border border-slate-100 dark:border-slate-800" role="button" aria-label="${escapeHTML(title)} by ${escapeHTML(author)}">
+                                            <img src="${coverUrl}" class="w-16 h-24 object-cover rounded-2xl shadow-md border border-slate-200 dark:border-slate-700 flex-shrink-0">
+                                            <div class="flex-1 flex flex-col justify-center min-w-0">
+                                                <h4 class="font-bold text-slate-800 dark:text-white truncate text-sm leading-snug">${escapeHTML(title)}</h4>
+                                                <p class="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5 italic font-medium">${escapeHTML(author)}</p>
+                                                ${book.rating ? `<div class="text-amber-400 text-xs mt-1.5">${'★'.repeat(book.rating)}${'☆'.repeat(5 - book.rating)}</div>` : ''}
+                                            </div>
+                                        </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            `}
+
+                            <div class="mt-8 flex justify-end">
+                                <button data-close class="px-8 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none text-xs">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                    `;
+                    showModal(modalHtml);
+                } catch (err) {
+                    closeLoading();
+                    showToast('Failed to load library: ' + err.message, 'error');
+                    console.error(err);
+                }
+            };
+
+            window.openVisitedBookDetails = async (bookId, collaboratorIds) => {
+                const closeLoading = showModal(`
+                    <div class="glass max-w-sm w-full rounded-[2.5rem] p-10 flex flex-col items-center justify-center gap-6 animate-pulse">
+                        <div class="w-16 h-16 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin"></div>
+                        <p class="text-slate-500 font-bold uppercase tracking-widest text-xs">Opening Details...</p>
+                    </div>
+                `);
+
+                try {
+                    const bookDoc = await db.collection('books').doc(bookId).get();
+                    if (!bookDoc.exists) {
+                        closeLoading();
+                        showToast('Book not found.', 'error');
+                        return;
+                    }
+                    const book = { id: bookDoc.id, ...bookDoc.data() };
+
+                    // Fetch all reading statuses/reviews
+                    const allStatusesSnapshot = await db.collection('books').doc(bookId).collection('readingStatus').get();
+                    const allStatuses = allStatusesSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+
+                    // Filter only status/reviews from the collaborator ids
+                    const collaboratorStatuses = allStatuses.filter(s => collaboratorIds.includes(s.uid));
+
+                    // Fetch user profiles for display names
+                    const userProfiles = {};
+                    const missingUserIds = collaboratorStatuses.map(s => s.uid);
+                    if (missingUserIds.length > 0) {
+                        for (let i = 0; i < missingUserIds.length; i += 10) {
+                            const chunk = missingUserIds.slice(i, i + 10);
+                            const usersSnapshot = await db.collection('users').where('uid', 'in', chunk).get();
+                            usersSnapshot.docs.forEach(doc => {
+                                userProfiles[doc.id] = doc.data();
+                            });
+                        }
+                    }
+
+                    closeLoading();
+
+                    const stars = STAR_CACHE[book.rating] || STAR_CACHE[0];
+
+                    const modalHtml = `
+                    <div class="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                        <div class="bg-sky-50 dark:bg-gray-800 w-full h-full sm:h-auto sm:max-w-3xl sm:rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up overflow-y-auto sm:max-h-[90vh]">
+                            <div class="flex flex-col sm:flex-row gap-8">
+                                <div class="flex-shrink-0 mx-auto sm:mx-0">
+                                    <img src="${book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover'}" class="w-36 h-52 object-cover rounded-3xl shadow-2xl border border-white/20">
+                                </div>
+                                <div class="flex-1 text-center sm:text-left">
+                                    <h2 class="text-2xl font-black leading-tight font-serif mb-2">${escapeHTML(book.title)}</h2>
+                                    <p class="text-lg text-slate-500 dark:text-slate-400 font-medium italic mb-4">${escapeHTML(book.author)}</p>
+                                    ${book.description ? `<p class="text-sm text-slate-600 dark:text-slate-300 mb-6 leading-relaxed text-left">${escapeHTML(book.description)}</p>` : ''}
+                                    <div class="flex flex-wrap gap-1 justify-center sm:justify-start">
+                                        ${(book.categories || []).map(g => `<span class="px-2 py-1 bg-blue-100/50 dark:bg-slate-700 text-xs font-semibold rounded-lg text-blue-700 dark:text-blue-300">${escapeHTML(g)}</span>`).join('')}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mt-8 pt-8 border-t border-slate-100 dark:border-slate-700">
+                                <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Reviews from Owner & Collaborators (${collaboratorStatuses.length})</h3>
+
+                                ${collaboratorStatuses.length === 0 ? `
+                                    <p class="text-xs text-slate-400 italic">No reviews or ratings shared yet.</p>
+                                ` : `
+                                    <div class="space-y-4">
+                                        ${collaboratorStatuses.map(s => `
+                                            <div class="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
+                                                <div class="flex justify-between items-center mb-2">
+                                                    <span class="text-xs font-bold text-primary">${escapeHTML(userProfiles[s.uid]?.displayName || userProfiles[s.uid]?.email || 'Unknown User')}</span>
+                                                    <div class="text-amber-500 text-sm">${s.rating ? '★'.repeat(s.rating) + '☆'.repeat(5 - s.rating) : 'Unrated'}</div>
+                                                </div>
+                                                ${s.comment ? `<p class="text-sm text-slate-600 dark:text-slate-300 italic">"${escapeHTML(s.comment)}"</p>` : ''}
+                                                <p class="text-[8px] text-slate-400 mt-2 uppercase font-medium">${s.updatedAt ? new Date(s.updatedAt.toMillis ? s.updatedAt.toMillis() : s.updatedAt).toLocaleDateString() : ''}</p>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                `}
+                            </div>
+
+                            <div class="mt-8 flex justify-end">
+                                <button data-close class="px-8 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none text-xs">Close Details</button>
+                            </div>
+                        </div>
+                    </div>
+                    `;
+                    showModal(modalHtml);
+                } catch (err) {
+                    closeLoading();
+                    showToast('Failed to load book details: ' + err.message, 'error');
+                    console.error(err);
+                }
+            };
+
+            window.updateNotificationBadge = () => {
+                const hasPendingRequests = allPartnerships.some(p => p.status === 'pending' && p.initiatorId !== currentUser.uid);
+                const badge = document.getElementById('notification-badge');
+                if (badge) {
+                    if (hasPendingRequests) {
+                        badge.classList.remove('hidden');
+                    } else {
+                        badge.classList.add('hidden');
+                    }
+                }
+            };
+
+            window.openNotificationsModal = async () => {
+                const closeLoading = showModal(`
+                    <div class="glass max-w-sm w-full rounded-[2.5rem] p-10 flex flex-col items-center justify-center gap-6 animate-pulse">
+                        <div class="w-16 h-16 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin"></div>
+                        <p class="text-slate-500 font-bold uppercase tracking-widest text-xs">Loading Notifications...</p>
+                    </div>
+                `);
+
+                try {
+                    // Fetch pending partnerships
+                    const pendingPartnerships = allPartnerships.filter(p => p.status === 'pending');
+
+                    // Fetch user profiles for display names
+                    const partnerIds = pendingPartnerships.map(p => {
+                        return p.userId1 === currentUser.uid ? p.userId2 : p.userId1;
+                    });
+
+                    const userDocs = await Promise.all(
+                        partnerIds.map(id => db.collection('users').doc(id).get())
+                    );
+
+                    const userNames = {};
+                    partnerIds.forEach((id, idx) => {
+                        userNames[id] = userDocs[idx].data()?.displayName || userDocs[idx].data()?.email || 'Unknown';
+                    });
+
+                    closeLoading();
+
+                    const modalHtml = `
+                    <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div class="bg-slate-50 dark:bg-slate-900 w-full h-full sm:h-auto sm:max-w-xl sm:rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up overflow-y-auto sm:max-h-[85vh]">
+                            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
+                                <h2 class="text-2xl font-black font-serif italic">Sharing Requests</h2>
+                                <button data-close class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500 focus-visible:ring-2 focus-visible:ring-primary outline-none">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                </button>
+                            </div>
+
+                            <div class="space-y-4">
+                                ${pendingPartnerships.length === 0 ? `
+                                    <div class="text-center py-10">
+                                        <svg class="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                                        <p class="text-slate-400 italic">No pending requests at the moment.</p>
+                                    </div>
+                                ` : pendingPartnerships.map(p => {
+                                    const partnerId = p.userId1 === currentUser.uid ? p.userId2 : p.userId1;
+                                    const partnerName = userNames[partnerId];
+                                    const isInitiator = p.initiatorId === currentUser.uid;
+
+                                    return `
+                                    <div class="flex items-center justify-between p-4 bg-amber-50/50 dark:bg-amber-950/10 rounded-xl border border-amber-100 dark:border-amber-900/50 gap-4">
+                                        <div class="flex-1">
+                                            <span class="text-sm font-bold block">${escapeHTML(partnerName)}</span>
+                                            <span class="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wider">
+                                                ${isInitiator ? 'Invitation Sent (Pending)' : 'Invitation Received (Pending)'}
+                                            </span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            ${isInitiator ? `
+                                                <button onclick="window.cancelInvitation('${p.id}'); document.querySelector('[data-close]').click();" class="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg font-bold text-xs transition active:scale-95">Cancel</button>
+                                            ` : `
+                                                <button onclick="window.acceptInvitation('${p.id}'); document.querySelector('[data-close]').click();" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs transition active:scale-95">Accept</button>
+                                                <button onclick="window.declineInvitation('${p.id}'); document.querySelector('[data-close]').click();" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs transition active:scale-95">Decline</button>
+                                            `}
+                                        </div>
+                                    </div>
+                                    `;
+                                }).join('')}
+                            </div>
+
+                            <div class="mt-8 flex justify-end">
+                                <button data-close class="px-8 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none text-xs">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                    `;
+                    showModal(modalHtml);
+                } catch (err) {
+                    closeLoading();
+                    showToast('Failed to load notifications: ' + err.message, 'error');
+                    console.error(err);
+                }
+            };
+
+            async function runAISearch() {
 
             async function runAISearch() {
                 const config = getAIConfig();
