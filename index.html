@@ -1813,13 +1813,12 @@
                 `);
 
                 try {
-                    // Check partnership status
+                    // Check partnership status locally using allPartnerships array to avoid direct query permission issues
                     const ids = [currentUser.uid, profileUserId].sort();
                     const partnershipId = `${ids[0]}_${ids[1]}`;
-                    const partnershipDoc = await db.collection('partnerships').doc(partnershipId).get();
-                    const partnership = partnershipDoc.exists ? partnershipDoc.data() : null;
+                    const localPartnership = allPartnerships.find(p => p.id === partnershipId);
 
-                    if (!partnership || (partnership.status !== 'accepted' && partnership.status !== undefined)) {
+                    if (!localPartnership || (localPartnership.status !== 'accepted' && localPartnership.status !== undefined)) {
                         closeLoading();
                         showToast("You can only visit libraries of accepted collaborators.", "error");
                         return;
@@ -1829,30 +1828,15 @@
                     const profileDoc = await db.collection('users').doc(profileUserId).get();
                     const profileName = profileDoc.data()?.displayName || profileDoc.data()?.email || 'User';
 
-                    // Fetch profile user's accepted collaborators
-                    const p1Snapshot = await db.collection('partnerships')
-                        .where('userId1', '==', profileUserId)
-                        .where('status', '==', 'accepted')
-                        .get();
-                    const p2Snapshot = await db.collection('partnerships')
-                        .where('userId2', '==', profileUserId)
-                        .where('status', '==', 'accepted')
-                        .get();
-
-                    const collaborators = new Set([profileUserId]);
-                    p1Snapshot.docs.forEach(doc => collaborators.add(doc.data().userId2));
-                    p2Snapshot.docs.forEach(doc => collaborators.add(doc.data().userId1));
-                    const collaboratorIds = Array.from(collaborators);
+                    // Restrict visited library query to books owned directly by this collaborator to respect Firestore security rules
+                    const collaboratorIds = [profileUserId];
 
                     // Fetch books belonging to collaborators
                     let visitedBooks = [];
-                    for (let i = 0; i < collaboratorIds.length; i += 10) {
-                        const chunk = collaboratorIds.slice(i, i + 10);
-                        const booksSnapshot = await db.collection('books').where('userId', 'in', chunk).get();
-                        booksSnapshot.docs.forEach(doc => {
-                            visitedBooks.push({ id: doc.id, ...doc.data() });
-                        });
-                    }
+                    const booksSnapshot = await db.collection('books').where('userId', '==', profileUserId).get();
+                    booksSnapshot.docs.forEach(doc => {
+                        visitedBooks.push({ id: doc.id, ...doc.data() });
+                    });
 
                     closeLoading();
 
@@ -1862,7 +1846,7 @@
                             <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
                                 <div>
                                     <h2 class="text-2xl font-black font-serif italic">${escapeHTML(profileName)}'s Library</h2>
-                                    <p class="text-xs text-slate-500 uppercase tracking-widest font-bold mt-1">Books and reviews from ${escapeHTML(profileName)} & collaborators</p>
+                                    <p class="text-xs text-slate-500 uppercase tracking-widest font-bold mt-1">Books and reviews from ${escapeHTML(profileName)}</p>
                                 </div>
                                 <button data-close class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500 focus-visible:ring-2 focus-visible:ring-primary outline-none">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
