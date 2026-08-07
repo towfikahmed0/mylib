@@ -56,6 +56,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <!-- Canvas Confetti -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
             font-family: 'Inter', sans-serif;
@@ -1391,7 +1393,7 @@
                             <nav class="hidden md:flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
                                 <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'library' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Library</button>
                                 <button onclick="window.setTab('mybooks')" ${activeTab === 'mybooks' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'mybooks' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">My Books</button>
-                                <button onclick="window.setTab('feed')" ${activeTab === 'feed' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'feed' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Feed</button>
+                                <button onclick="window.setTab('explore')" ${activeTab === 'explore' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'explore' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Explore</button>
                                 <button onclick="window.setTab('insight')" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'insight' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Insights</button>
                             </nav>
                             <div class="flex items-center gap-1">
@@ -1427,9 +1429,9 @@
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                             <span class="text-[8px] font-bold">My Books</span>
                         </button>
-                        <button onclick="window.setTab('feed')" ${activeTab === 'feed' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'feed' ? 'text-primary' : 'text-slate-400'}">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h10M7 12h10"/></svg>
-                            <span class="text-[8px] font-bold">Feed</span>
+                        <button onclick="window.setTab('explore')" ${activeTab === 'explore' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'explore' ? 'text-primary' : 'text-slate-400'}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                            <span class="text-[8px] font-bold">Explore</span>
                         </button>
                         <button onclick="window.setTab('insight')" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'insight' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
@@ -1444,8 +1446,8 @@
                 if (activeTab === 'settings') {
                     mainContentEl.innerHTML = renderSettings();
                     attachSettingsListeners();
-                } else if (activeTab === 'feed') {
-                    mainContentEl.innerHTML = renderFeed();
+                } else if (activeTab === 'explore') {
+                    mainContentEl.innerHTML = renderExplore();
                     attachActivityListeners();
                 } else if (activeTab === 'mybooks') {
                     mainContentEl.innerHTML = renderMyBooks();
@@ -1546,6 +1548,9 @@
                     }
                     window.queueRenderLibraryOnly();
                 }
+                if (window.processPendingCharts) {
+                    window.processPendingCharts();
+                }
             }
 
             window.clearSelection = () => {
@@ -1606,6 +1611,57 @@
                 } catch (err) {
                     closeLoading();
                     showToast('Failed to load collaborators', 'error');
+                }
+            };
+
+            window.executeBookTransfer = async (bookId, targetUserId, targetName) => {
+                if (!confirm(`Are you sure you want to transfer ownership of this book to ${targetName}? You will lose ownership and cannot undo this action.`)) return;
+
+                const closeLoading = showModal(`
+                    <div class="glass max-w-sm w-full rounded-[2.5rem] p-10 flex flex-col items-center justify-center gap-6 animate-pulse">
+                        <div class="w-16 h-16 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin"></div>
+                        <p class="text-slate-500 font-bold uppercase tracking-widest text-xs">Transferring book...</p>
+                    </div>
+                `);
+
+                try {
+                    const bookDoc = await db.collection('books').doc(bookId).get();
+                    if (!bookDoc.exists) {
+                        closeLoading();
+                        showToast('Book not found.', 'error');
+                        return;
+                    }
+                    const book = bookDoc.data();
+
+                    // Update ownership in Firestore
+                    await db.collection('books').doc(bookId).update({
+                        userId: targetUserId,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    // Add transfer message to recipient activityFeed
+                    await db.collection('activityFeed').add({
+                        type: 'book_transfer',
+                        bookId: bookId,
+                        bookTitle: book.title || 'Unknown Book',
+                        userName: currentUser.displayName || currentUser.email || 'A collaborator',
+                        userId: currentUser.uid,
+                        recipientId: targetUserId,
+                        libraryId: targetUserId,
+                        message: `${currentUser.displayName || currentUser.email || 'A collaborator'} transferred the book "${book.title}" to you.`,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    closeLoading();
+
+                    // Close all modals
+                    document.querySelectorAll('[data-close]').forEach(btn => btn.click());
+
+                    showToast(`Successfully transferred "${book.title}" to ${targetName}.`, 'success');
+                    window.queueRenderMainApp();
+                } catch (err) {
+                    closeLoading();
+                    showToast('Transfer failed: ' + err.message, 'error');
                 }
             };
 
@@ -2835,43 +2891,63 @@
                 window.queueRenderLibraryOnly();
             };
 
-            window.addHighlight = async (bookId, text) => {
-                if (!text.trim()) return;
+            window.addHighlight = async (bookId, text, page) => {
+                if (!text || !text.trim()) return;
                 try {
-                    const statusData = getStatusData(bookId);
-                    const highlights = [...(statusData.highlights || [])];
-                    highlights.unshift({
-                        text: text.trim(),
-                        timestamp: new Date().toISOString()
-                    });
+                    const bookDoc = await db.collection('books').doc(bookId).get();
+                    if (!bookDoc.exists) {
+                        showToast('Book not found', 'error');
+                        return;
+                    }
+                    const bookData = bookDoc.data();
+                    const highlights = [...(bookData.highlights || [])];
 
-                    await db.collection('books').doc(bookId).collection('readingStatus').doc(currentUser.uid).set({
+                    const newHighlight = {
+                        id: Math.random().toString(36).substring(2, 11),
+                        text: text.trim(),
+                        page: page && page.trim() ? page.trim() : null,
+                        userId: currentUser.uid,
+                        userName: userProfile?.displayName || currentUser.email || 'Anonymous',
+                        timestamp: new Date().toISOString()
+                    };
+
+                    highlights.unshift(newHighlight);
+
+                    await db.collection('books').doc(bookId).update({
                         highlights: highlights,
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    }, { merge: true });
+                    });
 
                     showToast('Highlight added!', 'success');
-                    // refresh modal
-                    openBookDetails(books.find(b => b.id === bookId));
+
+                    // refresh modal with fresh data
+                    const updatedDoc = await db.collection('books').doc(bookId).get();
+                    openBookDetails({ id: bookId, ...updatedDoc.data() });
                 } catch (err) {
                     showToast('Error adding highlight: ' + err.message, 'error');
                 }
             };
 
-            window.deleteHighlight = async (bookId, index) => {
+            window.deleteHighlight = async (bookId, highlightId) => {
                 try {
-                    const statusData = getStatusData(bookId);
-                    const highlights = [...(statusData.highlights || [])];
-                    highlights.splice(index, 1);
+                    const bookDoc = await db.collection('books').doc(bookId).get();
+                    if (!bookDoc.exists) {
+                        showToast('Book not found', 'error');
+                        return;
+                    }
+                    const bookData = bookDoc.data();
+                    const highlights = (bookData.highlights || []).filter(h => h.id !== highlightId);
 
-                    await db.collection('books').doc(bookId).collection('readingStatus').doc(currentUser.uid).set({
+                    await db.collection('books').doc(bookId).update({
                         highlights: highlights,
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    }, { merge: true });
+                    });
 
                     showToast('Highlight removed', 'info');
-                    // refresh modal
-                    openBookDetails(books.find(b => b.id === bookId));
+
+                    // refresh modal with fresh data
+                    const updatedDoc = await db.collection('books').doc(bookId).get();
+                    openBookDetails({ id: bookId, ...updatedDoc.data() });
                 } catch (err) {
                     showToast('Error deleting highlight: ' + err.message, 'error');
                 }
@@ -2879,7 +2955,7 @@
 
             window.setTab = (tab) => {
                 activeTab = tab;
-                if ((tab === 'feed' || tab === 'activity') && socialReviews.length === 0) {
+                if ((tab === 'explore' || tab === 'activity') && socialReviews.length === 0) {
                     fetchSocialReviews();
                 }
                 if (tab === 'activity') {
@@ -3916,7 +3992,7 @@
                                 }
                                 activities = allActivities.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
 
-                                if (activeTab === 'feed' || activeTab === 'activity') window.queueRenderMainApp();
+                                if (activeTab === 'explore' || activeTab === 'activity') window.queueRenderMainApp();
                             }, err => {
                                 console.error("Activity Listener Error for chunk:", chunk, err);
                             });
@@ -4477,8 +4553,8 @@
                     if (!isEdit) saveDraft();
                 });
 
-                // Add Enter key support for manual entry fields
-                ['man-title', 'man-author', 'man-isbn', 'man-category', 'man-owner', 'man-tags', 'man-price', 'man-date'].forEach(id => {
+                // Add Enter key support for manual entry fields (excluding man-category)
+                ['man-title', 'man-author', 'man-isbn', 'man-owner', 'man-tags', 'man-price', 'man-date'].forEach(id => {
                     document.getElementById(id)?.addEventListener('keydown', (e) => {
                         if (e.key === 'Enter') {
                             // Only trigger save if no dropdown is currently active/selected
@@ -4488,6 +4564,23 @@
                             }
                         }
                     });
+                });
+
+                // Add special Enter key support for man-category to add to genre chips
+                document.getElementById('man-category')?.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const val = e.target.value.trim();
+                        if (val) {
+                            if (!currentGenres.includes(val)) {
+                                currentGenres.push(val);
+                                renderGenres();
+                                if (!isEdit) saveDraft();
+                            }
+                            e.target.value = '';
+                        }
+                    }
                 });
 
                 document.getElementById('ai-magic-fill')?.addEventListener('click', async () => {
@@ -4931,8 +5024,132 @@
                 `;
             }
 
+            window.activeChartInstances = new Map();
+            window.pendingCharts = [];
+
+            window.processPendingCharts = () => {
+                console.log('Processing pending charts, count:', window.pendingCharts ? window.pendingCharts.length : 0);
+                if (!window.pendingCharts || window.pendingCharts.length === 0) return;
+                const isDark = document.documentElement.classList.contains('dark');
+
+                window.pendingCharts.forEach(chart => {
+                    const ctx = document.getElementById(chart.id);
+                    if (!ctx) return;
+
+                    // Destroy existing chart if any is associated with this canvas to avoid glitches/overlapping
+                    if (window.activeChartInstances.has(chart.id)) {
+                        try {
+                            window.activeChartInstances.get(chart.id).destroy();
+                        } catch (e) {
+                            console.error('Failed to destroy chart', e);
+                        }
+                        window.activeChartInstances.delete(chart.id);
+                    }
+
+                    try {
+                        let chartInstance;
+                        if (chart.type === 'doughnut' || chart.type === 'pie') {
+                            chartInstance = new Chart(ctx, {
+                                type: 'doughnut',
+                                data: {
+                                    labels: chart.labels,
+                                    datasets: [{
+                                        data: chart.data,
+                                        backgroundColor: chart.colors,
+                                        borderColor: isDark ? '#0f172a' : '#ffffff',
+                                        borderWidth: 2,
+                                        hoverOffset: 6
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: { display: false },
+                                        tooltip: {
+                                            backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                                            titleColor: isDark ? '#ffffff' : '#1e293b',
+                                            bodyColor: isDark ? '#e2e8f0' : '#475569',
+                                            borderColor: isDark ? '#334155' : '#e2e8f0',
+                                            borderWidth: 1,
+                                            callbacks: {
+                                                label: function(context) {
+                                                    const value = context.raw;
+                                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                                    const pct = Math.round((value / total) * 100) || 0;
+                                                    return ` ${context.label}: ${value} books (${pct}%)`;
+                                                }
+                                            }
+                                        }
+                                    },
+                                    cutout: '70%',
+                                    animation: {
+                                        animateScale: true,
+                                        animateRotate: true
+                                    }
+                                }
+                            });
+                        } else if (chart.type === 'bar') {
+                            chartInstance = new Chart(ctx, {
+                                type: 'bar',
+                                data: {
+                                    labels: chart.labels,
+                                    datasets: [{
+                                        data: chart.data,
+                                        backgroundColor: chart.colors || '#3b82f6',
+                                        borderRadius: 6,
+                                        borderWidth: 0
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    indexAxis: chart.indexAxis || 'x',
+                                    scales: {
+                                        x: {
+                                            grid: { display: false },
+                                            ticks: {
+                                                color: isDark ? '#94a3b8' : '#64748b',
+                                                font: { size: 10, weight: 'bold' }
+                                            }
+                                        },
+                                        y: {
+                                            grid: { color: isDark ? '#334155' : '#f1f5f9' },
+                                            ticks: {
+                                                color: isDark ? '#94a3b8' : '#64748b',
+                                                font: { size: 10 },
+                                                precision: 0
+                                            }
+                                        }
+                                    },
+                                    plugins: {
+                                        legend: { display: false },
+                                        tooltip: {
+                                            backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                                            titleColor: isDark ? '#ffffff' : '#1e293b',
+                                            bodyColor: isDark ? '#e2e8f0' : '#475569',
+                                            borderColor: isDark ? '#334155' : '#e2e8f0',
+                                            borderWidth: 1
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                        if (chartInstance) {
+                            ctx.__chartInstance = chartInstance;
+                            window.activeChartInstances.set(chart.id, chartInstance);
+                        }
+                    } catch (err) {
+                        console.error("Error building Chart.js chart for: " + chart.id, err);
+                    }
+                });
+
+                // Clear pending charts list once processed
+                window.pendingCharts = [];
+            };
+
             function renderPieChart(entries, total, colors, centerValue, centerLabel, title, filterType, showCenter = true) {
-                let currentPercent = 0;
+                const chartId = `chart-${Math.random().toString(36).substr(2, 9)}`;
 
                 // Standard Color Palette
                 const palette = colors && colors.length > 0 ? colors : [
@@ -4940,29 +5157,21 @@
                     '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#6366f1'
                 ];
 
-                const chartSegments = entries.map(([label, count], i) => {
-                    if (total === 0) return '';
-                    const percent = (count / total) * 100;
-                    const offset = currentPercent;
-                    currentPercent += percent;
-                    const color = palette[i % palette.length];
-
-                    return `<circle cx="50" cy="50" r="40" fill="none" stroke="${color}" stroke-width="12"
-                        stroke-dasharray="${percent} ${100 - percent}" stroke-dashoffset="${-offset}"
-                        pathLength="100" class="pie-slice cursor-pointer transition-all duration-500 hover:stroke-[14] hover:opacity-80 focus-visible:outline-none focus-visible:stroke-[14] focus-visible:opacity-80"
-                        tabindex="0" role="button" aria-label="${label}: ${count} books (${Math.round(percent)}%)"
-                        onclick="const isExp = this.classList.contains('exploding'); this.parentElement.querySelectorAll('.pie-slice').forEach(s => s.classList.remove('exploding')); if(!isExp) this.classList.add('exploding');">
-                        <title>${label}: ${count} books (${Math.round(percent)}%)</title>
-                    </circle>`;
-                }).join('');
+                if (!window.pendingCharts) window.pendingCharts = [];
+                window.pendingCharts.push({
+                    id: chartId,
+                    type: 'doughnut',
+                    labels: entries.map(e => e[0]),
+                    data: entries.map(e => e[1]),
+                    colors: palette,
+                    showCenter,
+                    centerValue,
+                    centerLabel
+                });
 
                 return `
                     <div class="relative w-44 h-44 flex-shrink-0 mx-auto sm:mx-0">
-                        <svg viewBox="0 0 100 100" class="w-full h-full transform -rotate-90 overflow-visible">
-                            <circle cx="50" cy="50" r="40" fill="none" stroke="#f1f5f9" stroke-width="12" class="dark:stroke-slate-800 opacity-20" />
-                            ${chartSegments}
-                            <circle cx="50" cy="50" r="28" fill="white" class="dark:fill-slate-900 shadow-inner" />
-                        </svg>
+                        <canvas id="${chartId}" class="w-full h-full"></canvas>
                         ${showCenter ? `
                         <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
                             <span class="text-2xl font-black font-serif italic text-primary">${centerValue}</span>
@@ -4983,7 +5192,8 @@
                                     </div>
                                     <span class="font-bold text-primary">${count}</span>
                                 </div>
-                            `;}).join('')}
+                                `;
+                            }).join('')}
                             ${entries.length === 0 ? '<p class="text-xs text-slate-400 italic">No data available.</p>' : ''}
                         </div>
                     </div>
@@ -5116,6 +5326,27 @@
                 const readingVelocity = (statusCounts.finished / monthsActive).toFixed(1);
                 const goalPercent = Math.min(100, Math.round((statusCounts.finished / readingGoal) * 100));
 
+                if (!window.pendingCharts) window.pendingCharts = [];
+                window.pendingCharts.push({
+                    id: 'rating-distribution-chart',
+                    type: 'bar',
+                    labels: ['5★', '4★', '3★', '2★', '1★'],
+                    data: [ratingDist[5], ratingDist[4], ratingDist[3], ratingDist[2], ratingDist[1]],
+                    colors: ['#fbbf24', '#fbbf24', '#fbbf24', '#fbbf24', '#fbbf24'],
+                    indexAxis: 'y'
+                });
+
+                window.pendingCharts.push({
+                    id: 'reading-composition-chart',
+                    type: 'doughnut',
+                    labels: Object.keys(statusCounts).map(status => READING_STATUSES[status].label),
+                    data: Object.values(statusCounts),
+                    colors: ['#10b981', '#3b82f6', '#64748b'],
+                    showCenter: true,
+                    centerValue: libBooksCount,
+                    centerLabel: 'Total Books'
+                });
+
                 return `
                 <div class="max-w-4xl mx-auto space-y-12 animate-slide-up">
                     <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
@@ -5193,45 +5424,37 @@
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-10 mb-10">
-                            <div>
-                                <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Reading Composition</h3>
-                                <div class="space-y-5">
-                                    ${Object.entries(statusCounts).map(([status, count]) => {
-                                        const percent = libBooksCount ? Math.round((count / libBooksCount) * 100) : 0;
-                                        const color = status === 'finished' ? 'bg-emerald-500' : status === 'reading' ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600';
-                                        return `
-                                            <div>
-                                                <div class="flex justify-between text-[11px] font-black mb-2 uppercase tracking-tight">
-                                                    <span>${READING_STATUSES[status].label}</span>
-                                                    <span class="text-slate-400">${count} (${percent}%)</span>
+                            <div class="flex flex-col sm:flex-row items-center gap-6">
+                                <div class="relative w-44 h-44 flex-shrink-0 mx-auto sm:mx-0">
+                                    <canvas id="reading-composition-chart" class="w-full h-full"></canvas>
+                                    <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                                        <span class="text-2xl font-black font-serif italic text-primary">${libBooksCount}</span>
+                                        <span class="text-[8px] font-bold text-slate-400 uppercase tracking-widest font-sans">Total Books</span>
+                                    </div>
+                                </div>
+                                <div class="flex-1 w-full text-left">
+                                    <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Reading Composition</h3>
+                                    <div class="space-y-2">
+                                        ${Object.entries(statusCounts).map(([status, count]) => {
+                                            const percent = libBooksCount ? Math.round((count / libBooksCount) * 100) : 0;
+                                            const colorClass = status === 'finished' ? 'bg-emerald-500' : status === 'reading' ? 'bg-blue-500' : 'bg-slate-400 dark:bg-slate-500';
+                                            return `
+                                                <div class="flex items-center justify-between text-sm py-1 border-b border-slate-50 dark:border-slate-800/50">
+                                                    <div class="flex items-center gap-2 truncate">
+                                                        <div class="w-2 h-2 rounded-full ${colorClass}"></div>
+                                                        <span class="font-medium truncate">${READING_STATUSES[status].label}</span>
+                                                    </div>
+                                                    <span class="font-bold text-primary">${count} <span class="text-[10px] font-normal text-slate-400">(${percent}%)</span></span>
                                                 </div>
-                                                <div class="relative h-3.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden" role="progressbar" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100" aria-label="${READING_STATUSES[status].label}: ${percent}%">
-                                                    <!-- ⚡ Bolt: Use direct property lookup for 'solid' color -->
-                                                    <div class="h-full ${READING_STATUSES[status].solid} transition-all duration-1000" style="width: ${percent}%"></div>
-                                                    <span class="absolute inset-0 flex items-center justify-center text-[9px] font-black ${percent > 50 ? 'text-white' : 'text-slate-500'} pointer-events-none">${percent}%</span>
-                                                </div>
-                                            </div>
-                                        `;
-                                    }).join('')}
+                                            `;
+                                        }).join('')}
+                                    </div>
                                 </div>
                             </div>
-                            <div>
-                                <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Rating Distribution</h3>
-                                <div class="space-y-3">
-                                    ${[5, 4, 3, 2, 1].map(star => {
-                                        const count = ratingDist[star];
-                                        const ratedTotal = Object.values(ratingDist).reduce((a,b) => a+b, 0);
-                                        const percent = ratedTotal ? Math.round((count / ratedTotal) * 100) : 0;
-                                        return `
-                                            <div class="flex items-center gap-3">
-                                                <span class="text-xs font-bold w-4">${star}★</span>
-                                                <div class="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden" role="progressbar" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100" aria-label="${star} stars: ${percent}%">
-                                                    <div class="h-full bg-amber-400" style="width: ${percent}%"></div>
-                                                </div>
-                                                <span class="text-[10px] font-bold text-slate-400 w-8 text-right">${count}</span>
-                                            </div>
-                                        `;
-                                    }).join('')}
+                            <div class="flex-1 min-w-[280px]">
+                                <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Rating Distribution</h3>
+                                <div class="relative h-44 w-full">
+                                    <canvas id="rating-distribution-chart"></canvas>
                                 </div>
                             </div>
                         </div>
@@ -5604,7 +5827,7 @@
                 const snapshot = await query.get();
                 if (snapshot.empty) {
                     hasMoreReviews = false;
-                    if (activeTab === 'feed') window.queueRenderMainApp();
+                    if (activeTab === 'explore') window.queueRenderMainApp();
                     return;
                 }
 
@@ -5622,7 +5845,7 @@
 
                 socialReviews = [...socialReviews, ...newReviews];
 
-                if (activeTab === 'feed') window.queueRenderMainApp();
+                if (activeTab === 'explore') window.queueRenderMainApp();
             }
 
             window.setFeedCategory = (cat) => {
@@ -5636,7 +5859,7 @@
                     await db.collection('reviews').doc(reviewId).delete();
                     showToast('Review deleted successfully', 'success');
                     socialReviews = socialReviews.filter(r => r.id !== reviewId);
-                    if (activeTab === 'feed') window.queueRenderMainApp();
+                    if (activeTab === 'explore') window.queueRenderMainApp();
                 } catch (err) {
                     showToast('Failed to delete review: ' + err.message, 'error');
                 }
@@ -5808,7 +6031,130 @@
                 `;
             }
 
-            function renderFeed() {
+            window.lastUserSearchQuery = "";
+
+            window.searchUserByEmail = async () => {
+                const input = document.getElementById('user-search-input');
+                if (!input) return;
+                const email = input.value.trim().toLowerCase();
+                if (!email) { showToast('Please enter an email address', 'error'); return; }
+
+                window.lastUserSearchQuery = email;
+                const container = document.getElementById('user-search-results-container');
+                container.classList.remove('hidden');
+                container.innerHTML = `
+                    <div class="flex flex-col items-center justify-center py-10">
+                        <div class="w-10 h-10 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin mb-4"></div>
+                        <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">Searching user...</p>
+                    </div>
+                `;
+
+                try {
+                    const userSnapshot = await db.collection('users').where('email', '==', email).limit(1).get();
+                    if (userSnapshot.empty) {
+                        container.innerHTML = `
+                            <div class="p-8 text-center bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                <p class="text-sm text-slate-500 italic">No user found with email "${escapeHTML(email)}"</p>
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    const userDoc = userSnapshot.docs[0];
+                    const foundUserId = userDoc.id;
+                    const profile = userDoc.data();
+                    const profileName = profile.displayName || profile.email || 'User';
+
+                    // Fetch books owned by this user
+                    let foundBooks = [];
+                    let isCollaborator = false;
+
+                    const ids = [currentUser.uid, foundUserId].sort();
+                    const partnershipId = `${ids[0]}_${ids[1]}`;
+                    const localPartnership = allPartnerships.find(p => p.id === partnershipId);
+                    if (localPartnership && localPartnership.status === 'accepted') {
+                        isCollaborator = true;
+                    }
+
+                    if (foundUserId === currentUser.uid) {
+                        isCollaborator = true;
+                    }
+
+                    let errorMsg = "";
+                    if (isCollaborator) {
+                        try {
+                            const booksSnapshot = await db.collection('books').where('userId', '==', foundUserId).get();
+                            booksSnapshot.docs.forEach(doc => {
+                                foundBooks.push({ id: doc.id, ...doc.data() });
+                            });
+                        } catch (err) {
+                            errorMsg = "Unable to fetch books: " + err.message;
+                        }
+                    } else {
+                        errorMsg = "Books are only visible to accepted collaborators. Send a collaborator request in Settings!";
+                    }
+
+                    container.innerHTML = `
+                        <div class="p-6 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 animate-slide-up space-y-6">
+                            <div class="flex flex-col sm:flex-row items-center gap-6 justify-between border-b border-slate-200 dark:border-slate-700 pb-6">
+                                <div class="flex items-center gap-4 text-left">
+                                    <div class="w-14 h-14 rounded-full bg-primary text-white flex items-center justify-center font-black text-xl uppercase shadow-md">${profileName.substring(0, 2)}</div>
+                                    <div>
+                                        <h4 class="text-lg font-black text-slate-900 dark:text-white">${escapeHTML(profileName)}</h4>
+                                        <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">${escapeHTML(profile.email)}</p>
+                                        ${profile.bio ? `<p class="text-sm text-slate-500 dark:text-slate-400 italic mt-2">"${escapeHTML(profile.bio)}"</p>` : ''}
+                                    </div>
+                                </div>
+                                <div class="flex gap-4">
+                                    <div class="bg-white dark:bg-slate-800 px-4 py-3 rounded-xl border border-slate-100 dark:border-slate-800 text-center min-w-[100px]">
+                                        <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Books</span>
+                                        <span class="text-base font-black text-primary">${profile.totalBooksCount || 0}</span>
+                                    </div>
+                                    <div class="bg-white dark:bg-slate-800 px-4 py-3 rounded-xl border border-slate-100 dark:border-slate-800 text-center min-w-[100px]">
+                                        <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Finished</span>
+                                        <span class="text-base font-black text-emerald-500">${profile.completedBooksCount || 0}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Books Owned</h4>
+                                ${foundBooks.length > 0 ? `
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                        ${foundBooks.map(book => {
+                                            const title = book.title || 'Untitled';
+                                            const author = book.author || 'Unknown Author';
+                                            const coverUrl = book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover';
+                                            return `
+                                                <div onclick="window.openVisitedBookDetails('${book.id}', ['${foundUserId}'])" class="bg-white dark:bg-slate-800 p-4 rounded-2xl flex gap-4 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all border border-slate-100 dark:border-slate-700" role="button" aria-label="${escapeHTML(title)} by ${escapeHTML(author)}">
+                                                    <img src="${coverUrl}" class="w-12 h-20 object-cover rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex-shrink-0">
+                                                    <div class="flex-1 flex flex-col justify-center min-w-0">
+                                                        <h5 class="font-bold text-slate-800 dark:text-white truncate text-xs leading-snug">${escapeHTML(title)}</h5>
+                                                        <p class="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5 italic font-medium">${escapeHTML(author)}</p>
+                                                        ${book.rating ? `<div class="text-amber-400 text-[10px] mt-1">${'★'.repeat(book.rating)}${'☆'.repeat(5 - book.rating)}</div>` : ''}
+                                                    </div>
+                                                </div>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                ` : `
+                                    <div class="p-8 text-center bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                                        <p class="text-xs text-slate-400 italic">${errorMsg || "No books in this library yet."}</p>
+                                    </div>
+                                `}
+                            </div>
+                        </div>
+                    `;
+                } catch (err) {
+                    container.innerHTML = `
+                        <div class="p-8 text-center bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-800">
+                            <p class="text-sm text-rose-500 italic">Search failed: ${escapeHTML(err.message)}</p>
+                        </div>
+                    `;
+                }
+            };
+
+            function renderExplore() {
                 const categories = ['All', 'Help', 'Review', 'Others'];
                 const categorySelector = `
                     <div class="flex flex-wrap gap-2 mb-8">
@@ -5818,12 +6164,37 @@
                     </div>
                 `;
 
+                const searchBarHTML = `
+                    <div class="glass p-6 rounded-[2rem] border border-blue-100/50 dark:border-slate-800 bg-gradient-to-br from-indigo-500/5 to-transparent mb-8">
+                        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Explore Users</h3>
+                        <div class="flex gap-2">
+                            <div class="relative flex-1">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-slate-400">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 100-8 4 4 0 000 8zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                                </span>
+                                <input id="user-search-input" type="email" placeholder="Search user by email address..." value="${window.lastUserSearchQuery || ''}" class="w-full pl-11 pr-4 py-3.5 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-primary outline-none text-sm transition-all text-slate-800 dark:text-white font-medium" />
+                            </div>
+                            <button onclick="window.searchUserByEmail()" class="px-6 py-3.5 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-md shadow-primary/20 flex items-center gap-2 text-sm">
+                                Search
+                            </button>
+                        </div>
+                        <div id="user-search-results-container" class="mt-6 hidden"></div>
+                    </div>
+                `;
+
+                if (window.lastUserSearchQuery) {
+                    setTimeout(() => {
+                        window.searchUserByEmail();
+                    }, 50);
+                }
+
                 if (socialReviews.length === 0) {
                     if (isInitialSync) {
                         return `<div class="max-w-3xl mx-auto py-24 flex flex-col items-center"><div class="w-12 h-12 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin"></div></div>`;
                     }
                     return `
                     <div class="max-w-3xl mx-auto animate-slide-up">
+                        ${searchBarHTML}
                         <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800 bg-gradient-to-br from-blue-500/5 to-transparent mb-8">
                             <div class="flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-left">
                                 <div>
@@ -5850,6 +6221,7 @@
 
                 return `
                 <div class="max-w-3xl mx-auto space-y-8 animate-slide-up">
+                    ${searchBarHTML}
                     <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800 bg-gradient-to-br from-blue-500/5 to-transparent">
                         <div class="flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-left">
                             <div>
@@ -6868,29 +7240,35 @@ If the collection is small or has no finished books, be extra encouraging and su
 
                         <!-- Highlights & Quotes Section -->
                         <div class="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800">
-                            <p class="text-[10px] font-bold text-slate-400 uppercase mb-4">Highlights & Quotes</p>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase mb-4">Highlights & Quotes (Shared)</p>
                             <div class="space-y-4 mb-6">
-                                ${userHighlightsVal.map((h, i) => `
+                                ${(book.highlights || []).map((h) => `
                                     <div class="group relative p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm transition-all hover:shadow-md">
-                                        <p class="text-sm text-slate-700 dark:text-slate-300 italic leading-relaxed">"${escapeHTML(h.text)}"</p>
+                                        <p class="text-sm text-slate-700 dark:text-slate-300 italic leading-relaxed">"${escapeHTML(h.text)}"${h.page ? ` <span class="text-xs font-semibold text-slate-400 font-mono">(p. ${escapeHTML(h.page)})</span>` : ''}</p>
                                         <div class="flex items-center justify-between mt-3">
-                                            <span class="text-[8px] font-bold text-slate-400 uppercase tracking-widest">${new Date(h.timestamp).toLocaleDateString()}</span>
+                                            <div>
+                                                <span class="text-[8px] font-bold text-slate-400 uppercase tracking-widest">${new Date(h.timestamp).toLocaleDateString()}</span>
+                                                <span class="text-[9px] font-bold text-blue-500 block">Added by ${escapeHTML(h.userName || 'Anonymous')}</span>
+                                            </div>
                                             <div class="flex items-center gap-2">
                                                 <button onclick="window.copyQuote('${h.text.replace(/'/g, "\\'")}', '${book.title.replace(/'/g, "\\'")}', '${(book.author || 'Unknown').replace(/'/g, "\\'")}', this)" class="text-blue-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity p-1 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Copy highlight" title="Copy highlight">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
                                                 </button>
-                                                <button onclick="window.deleteHighlight('${book.id}', ${i})" class="text-rose-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="Delete highlight" title="Delete highlight">
+                                                ${h.userId === currentUser.uid ? `
+                                                <button onclick="window.deleteHighlight('${book.id}', '${h.id}')" class="text-rose-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="Delete highlight" title="Delete highlight">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                                 </button>
+                                                ` : ''}
                                             </div>
                                         </div>
                                     </div>
                                 `).join('')}
-                                ${!userHighlightsVal.length ? '<p class="text-xs text-slate-400 italic">No highlights saved yet.</p>' : ''}
+                                ${(book.highlights || []).length === 0 ? '<p class="text-xs text-slate-400 italic">No highlights saved yet.</p>' : ''}
                             </div>
-                            <div class="flex gap-2">
-                                <input id="new-highlight-input" type="text" aria-label="Add a quote or highlight" placeholder="Add a quote or highlight..." class="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
-                                <button onclick="window.addHighlight('${book.id}', document.getElementById('new-highlight-input').value)" class="p-3 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700 transition active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Add highlight">
+                            <div class="flex gap-2 items-center">
+                                <input id="new-highlight-input" type="text" aria-label="Add a quote or highlight" placeholder="Add a quote or highlight..." class="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all font-medium">
+                                <input id="new-highlight-page-input" type="text" aria-label="Page number" placeholder="Page #" class="w-20 px-3 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all text-center font-semibold">
+                                <button onclick="window.addHighlight('${book.id}', document.getElementById('new-highlight-input').value, document.getElementById('new-highlight-page-input').value)" class="p-3.5 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700 transition active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none flex items-center justify-center" aria-label="Add highlight">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                 </button>
                             </div>
@@ -6918,6 +7296,12 @@ If the collection is small or has no finished books, be extra encouraging and su
                                     <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
                                     Ask AI
                                 </button>
+                                ${book.userId === currentUser.uid ? `
+                                <button id="transfer-book-btn" class="px-4 py-3 sm:px-8 sm:py-4 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-2xl font-bold hover:bg-amber-200 transition-all text-xs sm:text-base focus-visible:ring-2 focus-visible:ring-amber-500 outline-none flex items-center justify-center gap-2">
+                                    <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                                    Transfer
+                                </button>
+                                ` : ''}
                                 <button id="edit-book-btn" class="px-4 py-3 sm:px-8 sm:py-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-blue-50 dark:hover:bg-slate-700 transition-all text-xs sm:text-base focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Edit Details</button>
                                 <button data-close class="px-4 py-3 sm:px-10 sm:py-4 bg-primary dark:bg-white text-white dark:text-primary rounded-2xl font-bold shadow-xl shadow-primary/20 dark:shadow-none hover:scale-105 active:scale-95 transition-all text-xs sm:text-base focus-visible:ring-2 focus-visible:ring-primary outline-none">Close</button>
                             </div>
@@ -6976,10 +7360,73 @@ If the collection is small or has no finished books, be extra encouraging and su
                     openManualEntry(null, book);
                 });
 
+                document.getElementById('transfer-book-btn')?.addEventListener('click', async () => {
+                    const activePartnerships = allPartnerships.filter(p => {
+                        const isUser1 = p.userId1 === currentUser.uid;
+                        return !(isUser1 ? p.user1Unsubscribed : p.user2Unsubscribed) && p.status === 'accepted';
+                    });
+
+                    if (activePartnerships.length === 0) {
+                        showToast('You need an active accepted collaborator to transfer books. Add one in Settings.', 'info');
+                        return;
+                    }
+
+                    const closeCollabLoading = showModal(`
+                        <div class="glass max-w-sm w-full rounded-[2.5rem] p-10 flex flex-col items-center justify-center gap-6 animate-pulse">
+                            <div class="w-16 h-16 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin"></div>
+                            <p class="text-slate-500 font-bold uppercase tracking-widest text-xs">Loading Collaborators...</p>
+                        </div>
+                    `);
+
+                    try {
+                        const partnerIds = activePartnerships.map(p => p.userId1 === currentUser.uid ? p.userId2 : p.userId1);
+                        const userDocs = await Promise.all(partnerIds.map(id => db.collection('users').doc(id).get()));
+                        const partners = userDocs.map(doc => ({ uid: doc.id, ...doc.data() }));
+
+                        closeCollabLoading();
+
+                        const collabModalHtml = `
+                        <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up border border-blue-100/50 dark:border-slate-800">
+                            <h2 class="text-2xl font-black font-serif italic mb-2">Transfer Book</h2>
+                            <p class="text-sm text-slate-500 mb-6">Select a collaborator to transfer ownership of "${escapeHTML(book.title)}". You will no longer own this book.</p>
+
+                            <div class="space-y-3 mb-8">
+                                ${partners.map(p => `
+                                    <button onclick="window.executeBookTransfer('${book.id}', '${p.uid}', '${escapeHTML(p.displayName || p.email)}')" class="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all text-left group focus-visible:ring-2 focus-visible:ring-primary outline-none">
+                                        <div>
+                                            <span class="block text-sm font-bold">${escapeHTML(p.displayName || 'Unknown')}</span>
+                                            <span class="block text-[10px] text-slate-400 uppercase tracking-widest font-medium">${escapeHTML(p.email)}</span>
+                                        </div>
+                                        <svg class="w-5 h-5 text-slate-300 group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                    </button>
+                                `).join('')}
+                            </div>
+                            <div class="flex justify-end">
+                                <button data-close class="px-6 py-2.5 bg-slate-200 dark:bg-slate-700 rounded-xl font-bold hover:opacity-90 transition active:scale-95 text-xs uppercase tracking-wider focus-visible:ring-2 focus-visible:ring-slate-400 outline-none">Cancel</button>
+                            </div>
+                        </div>
+                        `;
+                        showModal(collabModalHtml);
+                    } catch (err) {
+                        closeCollabLoading();
+                        showToast('Failed to load collaborators: ' + err.message, 'error');
+                    }
+                });
+
                 document.getElementById('new-highlight-input')?.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter') {
                         e.preventDefault();
-                        window.addHighlight(book.id, e.target.value);
+                        const text = e.target.value;
+                        const page = document.getElementById('new-highlight-page-input')?.value || '';
+                        window.addHighlight(book.id, text, page);
+                    }
+                });
+                document.getElementById('new-highlight-page-input')?.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const text = document.getElementById('new-highlight-input')?.value || '';
+                        const page = e.target.value;
+                        window.addHighlight(book.id, text, page);
                     }
                 });
 
@@ -7408,7 +7855,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                         await db.collection('reviews').add(reviewData);
                         showToast('Review shared with the community!', 'success');
                         close();
-                        if (activeTab === 'feed') window.queueRenderMainApp();
+                        if (activeTab === 'explore') window.queueRenderMainApp();
                     } catch (err) {
                         showToast('Failed to post review: ' + err.message, 'error');
                         btn.disabled = false;
