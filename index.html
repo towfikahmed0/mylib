@@ -337,6 +337,7 @@
         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-medium shadow-2xl flex items-center gap-3 transition-all duration-300 opacity-0 translate-y-10 pointer-events-none">
     </div>
     <div id="modal-container" class="fixed inset-0 z-50 pointer-events-none"></div>
+    <div id="user-search-results-container" class="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-md hidden flex items-center justify-center p-4"></div>
 
     <!-- PWA Service Worker Registration -->
     <script>
@@ -1111,6 +1112,16 @@
                                 Export CSV
                             </button>
                         </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                            <button id="import-json-btn" class="flex items-center justify-center gap-3 p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-indigo-50 dark:hover:bg-slate-700 transition text-sm focus-visible:ring-2 focus-visible:ring-primary outline-none">
+                                <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                                Import JSON
+                            </button>
+                            <button id="export-json-btn" class="flex items-center justify-center gap-3 p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-indigo-50 dark:hover:bg-slate-700 transition text-sm focus-visible:ring-2 focus-visible:ring-primary outline-none">
+                                <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                Export JSON
+                            </button>
+                        </div>
                     </div>
 
                     <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
@@ -1430,7 +1441,7 @@
                             <span class="text-[8px] font-bold">My Books</span>
                         </button>
                         <button onclick="window.setTab('explore')" ${activeTab === 'explore' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'explore' ? 'text-primary' : 'text-slate-400'}">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
                             <span class="text-[8px] font-bold">Explore</span>
                         </button>
                         <button onclick="window.setTab('insight')" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'insight' ? 'text-primary' : 'text-slate-400'}">
@@ -1565,7 +1576,9 @@
 
                 const activePartnerships = allPartnerships.filter(p => {
                     const isUser1 = p.userId1 === currentUser.uid;
-                    return !(isUser1 ? p.user1Unsubscribed : p.user2Unsubscribed);
+                    const isUnsubscribed = isUser1 ? p.user1Unsubscribed : p.user2Unsubscribed;
+                    const isAccepted = p.status === 'accepted' || p.status === undefined;
+                    return !isUnsubscribed && isAccepted;
                 });
 
                 if (activePartnerships.length === 0) {
@@ -2654,6 +2667,8 @@
                 });
                 document.getElementById('import-btn')?.addEventListener('click', importCSV);
                 document.getElementById('export-btn')?.addEventListener('click', exportCSV);
+                document.getElementById('import-json-btn')?.addEventListener('click', importJSON);
+                document.getElementById('export-json-btn')?.addEventListener('click', exportJSON);
                 document.getElementById('notify-btn')?.addEventListener('click', requestNotificationPermission);
                 document.getElementById('save-sharing-btn')?.addEventListener('click', saveSharingSettings);
                 document.getElementById('ai-cleanup-btn')?.addEventListener('click', runLibraryCleanup);
@@ -3432,6 +3447,7 @@
             const GENRE_FALLBACK = ['Other'];
             // Helper to get book genres as an array
             function getBookGenres(book) {
+                if (Array.isArray(book.genres)) return book.genres;
                 if (Array.isArray(book.categories)) return book.categories;
                 if (book.category) return [book.category];
                 return GENRE_FALLBACK;
@@ -3472,11 +3488,11 @@
                     // ⚡ Bolt: Pre-calculate UI strings to shift computation from render-time (O(N)) to sync-time (O(1))
                     _formattedRating: book.averageRating ? book.averageRating.toFixed(1) : (book.rating || 0).toFixed(1),
                     _formattedDate: book.purchaseDate ? new Date(book.purchaseDate).toLocaleDateString() : '',
-                    _genresHTML: genres.map((g, i) => {
+                    _genresHTML: genres.map(g => {
                         const escapedG = escapeHTML(g);
                         const jsEscapedG = g.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-                        return `<button onclick="event.stopPropagation(); window.setCategoryFilter('${jsEscapedG}')" class="hover:text-blue-700 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none rounded" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>${i < genres.length - 1 ? '<span class="text-slate-300">, </span>' : ''}`;
-                    }).join(''),
+                        return `<button onclick="event.stopPropagation(); window.setCategoryFilter('${jsEscapedG}')" class="inline-block bg-blue-50 hover:bg-blue-100 text-blue-600 dark:bg-blue-950/30 dark:hover:bg-blue-900/50 dark:text-blue-400 px-2 py-0.5 rounded-full text-[9px] font-bold transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none whitespace-nowrap" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>`;
+                    }).join(' '),
                     _tagsHTML_grid: tags.map(tag => {
                         const escapedTag = escapeHTML(tag);
                         return `<button onclick="event.stopPropagation(); window.setTagFilter('${escapedTag.replace(/'/g, "\\'")}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-blue-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by tag: ${escapedTag}">${escapedTag}</button>`;
@@ -3748,7 +3764,7 @@
                         </div>
                         <div class="text-right flex-shrink-0 flex flex-col items-end">
                             <div class="text-amber-400 text-[10px]">${stars}</div>
-                            <div class="text-[10px] font-bold text-primary dark:text-primary mt-1 truncate max-w-[120px] text-right">
+                            <div class="flex flex-wrap gap-1 justify-end mt-1 max-w-[150px]">
                                 ${book._genresHTML}
                             </div>
                             ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-blue-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${book._jsOwner}')" aria-label="Filter by owner: ${book._escapedOwner}">Owner: ${book._escapedOwner}</button>` : ''}
@@ -3811,7 +3827,7 @@
                     <div class="flex-1 flex flex-col justify-between overflow-hidden py-1">
                         <div>
                             <div class="flex justify-between items-start gap-2">
-                                <div class="text-[9px] font-black uppercase tracking-widest text-primary truncate max-w-[150px]">
+                                <div class="flex flex-wrap gap-1 max-w-[160px]">
                                     ${book._genresHTML}
                                 </div>
                                 <div class="text-amber-400 text-[13px] tracking-tighter">${stars}${book.averageRating ? `<span class="ml-1 text-slate-400">(${book._formattedRating})</span>` : ''}</div>
@@ -4301,15 +4317,30 @@
                 if (currentGenres.length === 1 && currentGenres[0] === 'Other' && !isEdit) currentGenres = [];
                 let selectedLibraryUserId = currentUser.uid; // Track which library this book is being added to
 
+                const POPULAR_GENRES = ['Fiction', 'Non-Fiction', 'Science', 'History', 'Biography', 'Mystery', 'Fantasy', 'Self-Help', 'Business', 'Other'];
+
                 const renderGenres = () => {
                     const container = document.getElementById('genres-badge-container');
-                    if (!container) return;
-                    container.innerHTML = currentGenres.map((g, i) => `
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
-                        ${g}
-                        <button data-genre-index="${i}" class="genre-remove-btn ml-2 hover:text-blue-900 dark:hover:text-blue-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded px-1 transition-all" aria-label="Remove genre: ${g}">&times;</button>
-                    </span>
-                `).join('');
+                    if (container) {
+                        container.innerHTML = currentGenres.map((g, i) => `
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                            ${g}
+                            <button data-genre-index="${i}" class="genre-remove-btn ml-2 hover:text-blue-900 dark:hover:text-blue-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded px-1 transition-all" aria-label="Remove genre: ${g}">&times;</button>
+                        </span>
+                        `).join('');
+                    }
+
+                    const selectContainer = document.getElementById('genres-multiselect-container');
+                    if (selectContainer) {
+                        selectContainer.innerHTML = POPULAR_GENRES.map(g => {
+                            const isActive = currentGenres.includes(g);
+                            return `
+                            <button type="button" data-genre-pill="${g}" class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none active:scale-95 ${isActive ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}" aria-pressed="${isActive}">
+                                ${g}
+                            </button>
+                            `;
+                        }).join('');
+                    }
                 };
 
                 const modalHtml = `
@@ -4365,9 +4396,11 @@
                             </div>
 
                             <div class="relative">
-                                <label for="man-category" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Genres</label>
+                                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-2">Select Genres</label>
+                                <div id="genres-multiselect-container" class="flex flex-wrap gap-2 mb-3"></div>
+                                <label for="man-category" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Custom Genre / Selected</label>
                                 <div id="genres-badge-container" class="flex flex-wrap gap-2 mb-2"></div>
-                                <input id="man-category" placeholder="Add a genre..." class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" autocomplete="off">
+                                <input id="man-category" placeholder="Add custom genre..." class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" autocomplete="off">
                                 <div id="category-dropdown" class="dropdown-menu"></div>
                             </div>
 
@@ -4431,6 +4464,21 @@
                         const index = parseInt(btn.dataset.genreIndex);
                         currentGenres.splice(index, 1);
                         renderGenres();
+                    }
+                });
+
+                document.getElementById('genres-multiselect-container')?.addEventListener('click', (e) => {
+                    const btn = e.target.closest('[data-genre-pill]');
+                    if (btn) {
+                        const genre = btn.dataset.genrePill;
+                        const idx = currentGenres.indexOf(genre);
+                        if (idx > -1) {
+                            currentGenres.splice(idx, 1);
+                        } else {
+                            currentGenres.push(genre);
+                        }
+                        renderGenres();
+                        if (!isEdit) saveDraft();
                     }
                 });
 
@@ -4642,6 +4690,7 @@
                         const bookData = {
                             title: titleVal,
                             author: authorVal,
+                            genres: currentGenres.length > 0 ? currentGenres : ['Other'],
                             categories: currentGenres.length > 0 ? currentGenres : ['Other'],
                             owner: document.getElementById('man-owner').value || '',
                             description: document.getElementById('man-description').value || '',
@@ -4833,6 +4882,11 @@
                 if (!currentUser) return;
                 targetUserId = targetUserId || currentUser.uid;
                 const isAddingToSharedLibrary = targetUserId !== currentUser.uid;
+
+                // Sync genres and categories arrays
+                const finalGenres = bookData.genres || bookData.categories || (bookData.category ? [bookData.category] : ['Other']);
+                bookData.genres = finalGenres;
+                bookData.categories = finalGenres;
 
                 try {
                     // Check for duplicate in TARGET library
@@ -6041,9 +6095,38 @@
 
                 window.lastUserSearchQuery = email;
                 const container = document.getElementById('user-search-results-container');
+                container.className = "fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4";
                 container.classList.remove('hidden');
+
+                // Escape key listener to close modal
+                const handleEscape = (e) => {
+                    if (e.key === 'Escape') {
+                        window.closeUserSearchModal();
+                    }
+                };
+
+                window.closeUserSearchModal = () => {
+                    container.className = "mt-6 hidden";
+                    container.innerHTML = "";
+                    window.lastUserSearchQuery = "";
+                    if (input) input.value = "";
+                    document.removeEventListener('keydown', handleEscape);
+                };
+
+                document.addEventListener('keydown', handleEscape);
+
+                // Backdrop click to close
+                container.onclick = (e) => {
+                    if (e.target === container) {
+                        window.closeUserSearchModal();
+                    }
+                };
+
                 container.innerHTML = `
-                    <div class="flex flex-col items-center justify-center py-10">
+                    <div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up relative flex flex-col items-center justify-center py-20 text-center">
+                        <button onclick="window.closeUserSearchModal()" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close search results">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
                         <div class="w-10 h-10 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin mb-4"></div>
                         <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">Searching user...</p>
                     </div>
@@ -6053,8 +6136,13 @@
                     const userSnapshot = await db.collection('users').where('email', '==', email).limit(1).get();
                     if (userSnapshot.empty) {
                         container.innerHTML = `
-                            <div class="p-8 text-center bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-800">
-                                <p class="text-sm text-slate-500 italic">No user found with email "${escapeHTML(email)}"</p>
+                            <div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up relative text-center py-20">
+                                <button onclick="window.closeUserSearchModal()" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close search results">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                </button>
+                                <div class="p-8">
+                                    <p class="text-sm text-slate-500 italic">No user found with email "${escapeHTML(email)}"</p>
+                                </div>
                             </div>
                         `;
                         return;
@@ -6072,7 +6160,7 @@
                     const ids = [currentUser.uid, foundUserId].sort();
                     const partnershipId = `${ids[0]}_${ids[1]}`;
                     const localPartnership = allPartnerships.find(p => p.id === partnershipId);
-                    if (localPartnership && localPartnership.status === 'accepted') {
+                    if (localPartnership && (localPartnership.status === 'accepted' || localPartnership.status === undefined)) {
                         isCollaborator = true;
                     }
 
@@ -6095,8 +6183,11 @@
                     }
 
                     container.innerHTML = `
-                        <div class="p-6 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 animate-slide-up space-y-6">
-                            <div class="flex flex-col sm:flex-row items-center gap-6 justify-between border-b border-slate-200 dark:border-slate-700 pb-6">
+                        <div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up relative space-y-6 text-left overflow-y-auto max-h-[90vh]">
+                            <button onclick="window.closeUserSearchModal()" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none animate-pulse-subtle" aria-label="Close search results">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                            <div class="flex flex-col sm:flex-row items-center gap-6 justify-between border-b border-slate-200 dark:border-slate-700 pb-6 pt-4">
                                 <div class="flex items-center gap-4 text-left">
                                     <div class="w-14 h-14 rounded-full bg-primary text-white flex items-center justify-center font-black text-xl uppercase shadow-md">${profileName.substring(0, 2)}</div>
                                     <div>
@@ -6106,11 +6197,11 @@
                                     </div>
                                 </div>
                                 <div class="flex gap-4">
-                                    <div class="bg-white dark:bg-slate-800 px-4 py-3 rounded-xl border border-slate-100 dark:border-slate-800 text-center min-w-[100px]">
+                                    <div class="bg-slate-50 dark:bg-slate-800 px-4 py-3 rounded-xl border border-slate-100 dark:border-slate-800 text-center min-w-[100px]">
                                         <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Books</span>
                                         <span class="text-base font-black text-primary">${profile.totalBooksCount || 0}</span>
                                     </div>
-                                    <div class="bg-white dark:bg-slate-800 px-4 py-3 rounded-xl border border-slate-100 dark:border-slate-800 text-center min-w-[100px]">
+                                    <div class="bg-slate-50 dark:bg-slate-800 px-4 py-3 rounded-xl border border-slate-100 dark:border-slate-800 text-center min-w-[100px]">
                                         <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Finished</span>
                                         <span class="text-base font-black text-emerald-500">${profile.completedBooksCount || 0}</span>
                                     </div>
@@ -6126,7 +6217,7 @@
                                             const author = book.author || 'Unknown Author';
                                             const coverUrl = book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover';
                                             return `
-                                                <div onclick="window.openVisitedBookDetails('${book.id}', ['${foundUserId}'])" class="bg-white dark:bg-slate-800 p-4 rounded-2xl flex gap-4 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all border border-slate-100 dark:border-slate-700" role="button" aria-label="${escapeHTML(title)} by ${escapeHTML(author)}">
+                                                <div onclick="window.openVisitedBookDetails('${book.id}', ['${foundUserId}'])" class="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl flex gap-4 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all border border-slate-100 dark:border-slate-700" role="button" aria-label="${escapeHTML(title)} by ${escapeHTML(author)}">
                                                     <img src="${coverUrl}" class="w-12 h-20 object-cover rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex-shrink-0">
                                                     <div class="flex-1 flex flex-col justify-center min-w-0">
                                                         <h5 class="font-bold text-slate-800 dark:text-white truncate text-xs leading-snug">${escapeHTML(title)}</h5>
@@ -6138,7 +6229,7 @@
                                         }).join('')}
                                     </div>
                                 ` : `
-                                    <div class="p-8 text-center bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                                    <div class="p-8 text-center bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
                                         <p class="text-xs text-slate-400 italic">${errorMsg || "No books in this library yet."}</p>
                                     </div>
                                 `}
@@ -6147,8 +6238,13 @@
                     `;
                 } catch (err) {
                     container.innerHTML = `
-                        <div class="p-8 text-center bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-800">
-                            <p class="text-sm text-rose-500 italic">Search failed: ${escapeHTML(err.message)}</p>
+                        <div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up relative text-center py-20">
+                            <button onclick="window.closeUserSearchModal()" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close search results">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                            <div class="p-8">
+                                <p class="text-sm text-rose-500 italic">Search failed: ${escapeHTML(err.message)}</p>
+                            </div>
                         </div>
                     `;
                 }
@@ -6178,7 +6274,6 @@
                                 Search
                             </button>
                         </div>
-                        <div id="user-search-results-container" class="mt-6 hidden"></div>
                     </div>
                 `;
 
@@ -6531,6 +6626,7 @@
                                 const bookData = {
                                     title,
                                     author,
+                                    genres: categories,
                                     categories,
                                     owner,
                                     isbn,
@@ -6606,6 +6702,240 @@
                 a.href = URL.createObjectURL(blob);
                 a.download = 'mylib_export.csv';
                 a.click();
+            }
+
+            function showFullScreenLoading(text) {
+                const overlay = document.createElement('div');
+                overlay.id = 'full-screen-loading-overlay';
+                overlay.className = 'fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center text-white';
+                overlay.innerHTML = `
+                    <div class="glass max-w-md w-full rounded-[2.5rem] p-10 flex flex-col items-center justify-center gap-6 shadow-2xl border border-white/10">
+                        <div class="w-16 h-16 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin"></div>
+                        <p class="text-white font-bold uppercase tracking-widest text-xs leading-relaxed">${text}</p>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+                return () => {
+                    const el = document.getElementById('full-screen-loading-overlay');
+                    if (el) el.remove();
+                };
+            }
+
+            async function exportJSON() {
+                const btn = document.getElementById('export-json-btn');
+                const originalText = btn ? btn.innerHTML : 'Export JSON';
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = 'Exporting...';
+                }
+
+                try {
+                    const myBooks = books.filter(b => b.userId === currentUser.uid);
+
+                    const exportedBooks = await Promise.all(myBooks.map(async b => {
+                        // Fetch reading status
+                        const statusDoc = await db.collection('books').doc(b.id).collection('readingStatus').doc(currentUser.uid).get();
+                        const statusData = statusDoc.exists ? statusDoc.data() : {};
+
+                        // Fetch community reviews
+                        const reviewsSnapshot = await db.collection('reviews')
+                            .where('userId', '==', currentUser.uid)
+                            .where('bookTitle', '==', b.title)
+                            .get();
+                        const reviews = reviewsSnapshot.docs.map(doc => ({
+                            body: doc.data().body || "",
+                            rating: doc.data().rating || 0,
+                            createdAt: doc.data().createdAt?.toDate()?.toISOString() || new Date().toISOString()
+                        }));
+
+                        // Fallback: if comment exists on readingStatus but no community review, add as a review object
+                        if (statusData.comment && !reviews.some(r => r.body === statusData.comment)) {
+                            reviews.push({
+                                body: statusData.comment,
+                                rating: statusData.rating || b.rating || 0,
+                                createdAt: new Date().toISOString()
+                            });
+                        }
+
+                        return {
+                            title: b.title || "Untitled",
+                            author: b.author || "Unknown",
+                            authors: b.author ? [b.author] : ["Unknown"],
+                            coverUrl: b.coverUrl || b.thumbnail || "",
+                            isbn: b.isbn || "",
+                            description: b.description || "",
+                            owner: b.owner || "",
+                            price: b.price || null,
+                            prices: b.price ? [b.price] : [],
+                            purchaseDate: b.purchaseDate || null,
+                            purchasedDate: b.purchaseDate || null,
+                            tags: b.tags || [],
+                            genres: getBookGenres(b),
+                            rating: statusData.rating || b.rating || 0,
+                            ratings: [statusData.rating || b.rating || 0],
+                            status: statusData.status || "want_to_read",
+                            progress: statusData.progress || 0,
+                            isWishlist: statusData.isWishlist || b.isWishlist || false,
+                            highlights: b.highlights || [],
+                            reviews: reviews
+                        };
+                    }));
+
+                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportedBooks, null, 2));
+                    const downloadAnchor = document.createElement('a');
+                    downloadAnchor.setAttribute("href", dataStr);
+                    downloadAnchor.setAttribute("download", "mylib_library_export.json");
+                    document.body.appendChild(downloadAnchor);
+                    downloadAnchor.click();
+                    downloadAnchor.remove();
+
+                    showToast('Library exported successfully as JSON!', 'success');
+                } catch (err) {
+                    showToast('Export failed: ' + err.message, 'error');
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
+                    }
+                }
+            }
+
+            function importJSON() {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.json';
+                input.onchange = async e => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    const closeOverlay = showFullScreenLoading("importing your library, do not close the screen. it will take a minute");
+
+                    try {
+                        const text = await file.text();
+                        const data = JSON.parse(text);
+
+                        if (!Array.isArray(data)) {
+                            throw new Error("Invalid format: Top-level JSON must be an array of book objects.");
+                        }
+
+                        // We can process books in chunks/batches
+                        for (let i = 0; i < data.length; i++) {
+                            const item = data[i];
+                            const title = (item.title || "Untitled").trim();
+                            const author = (item.author || (item.authors && item.authors[0]) || "Unknown").trim();
+                            const genres = item.genres || item.categories || ["Other"];
+                            const tags = item.tags || [];
+                            const isbn = item.isbn || "";
+                            const coverUrl = item.coverUrl || item.thumbnail || null;
+                            const description = item.description || "";
+                            const owner = item.owner || "";
+                            const price = item.price || (item.prices && item.prices[0]) || null;
+                            const purchaseDate = item.purchaseDate || item.purchasedDate || new Date().toISOString();
+                            const highlights = item.highlights || [];
+
+                            const bookData = {
+                                title,
+                                author,
+                                genres,
+                                categories: genres,
+                                isbn,
+                                coverUrl,
+                                description,
+                                owner,
+                                price,
+                                purchaseDate,
+                                highlights,
+                                source: 'imported_json',
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                userId: currentUser.uid
+                            };
+
+                            // Check duplicate
+                            const duplicate = findDuplicateBook(bookData, currentUser.uid);
+                            let bookId;
+
+                            if (duplicate) {
+                                bookId = duplicate.id;
+                                // Merge highlights
+                                const existingHighlights = duplicate.highlights || [];
+                                const mergedHighlights = [...existingHighlights];
+                                highlights.forEach(ih => {
+                                    if (!mergedHighlights.some(eh => eh.text === ih.text)) {
+                                        mergedHighlights.push(ih);
+                                    }
+                                });
+
+                                await db.collection('books').doc(bookId).update({
+                                    ...bookData,
+                                    highlights: mergedHighlights
+                                });
+                            } else {
+                                bookData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                                const docRef = await db.collection('books').add(bookData);
+                                bookId = docRef.id;
+                            }
+
+                            // Write reading status
+                            const status = item.status || "want_to_read";
+                            const rating = item.rating || (item.ratings && item.ratings[0]) || 0;
+                            const progress = item.progress || 0;
+                            const comment = item.comment || (item.reviews && item.reviews[0] && item.reviews[0].body) || "";
+
+                            await db.collection('books').doc(bookId).collection('readingStatus').doc(currentUser.uid).set({
+                                status,
+                                rating,
+                                progress,
+                                comment,
+                                isWishlist: item.isWishlist || false,
+                                userId: currentUser.uid,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            }, { merge: true });
+
+                            // Import community reviews if any
+                            if (item.reviews && Array.isArray(item.reviews)) {
+                                for (const rev of item.reviews) {
+                                    const bodyText = typeof rev === 'string' ? rev : rev.body;
+                                    const revRating = typeof rev === 'string' ? rating : (rev.rating || rating);
+                                    if (bodyText) {
+                                        const dupReview = await db.collection('reviews')
+                                            .where('userId', '==', currentUser.uid)
+                                            .where('bookTitle', '==', title)
+                                            .where('body', '==', bodyText)
+                                            .limit(1)
+                                            .get();
+                                        if (dupReview.empty) {
+                                            await db.collection('reviews').add({
+                                                userId: currentUser.uid,
+                                                userName: userProfile.displayName || currentUser.email,
+                                                bookTitle: title,
+                                                author: author,
+                                                category: genres[0] || "Other",
+                                                body: bodyText,
+                                                rating: revRating,
+                                                likesCount: 0,
+                                                commentsCount: 0,
+                                                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        closeOverlay();
+                        showToast(`Successfully imported ${data.length} books from JSON!`, 'success');
+
+                        // Explicitly trigger a refresh
+                        subscribeToBooks();
+                        window.queueRenderMainApp();
+                    } catch (err) {
+                        closeOverlay();
+                        showToast(`Import failed: ${err.message}. Please retry with a valid file.`, 'error');
+                        console.error(err);
+                    }
+                };
+                input.click();
             }
 
             // ---------- AI Librarian Service ----------
@@ -7110,11 +7440,11 @@ If the collection is small or has no finished books, be extra encouraging and su
                             </div>
                             <div class="flex-1 text-center sm:text-left">
                                 <div class="flex flex-col sm:flex-row sm:items-center gap-2 justify-center sm:justify-start">
-                                    <div class="flex flex-wrap gap-1">
-                                        ${bookGenres.map((g, i) => {
+                                    <div class="flex flex-wrap gap-2">
+                                        ${bookGenres.map(g => {
                                             const escapedG = escapeHTML(g);
                                             const jsEscapedG = g.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-                                            return `<button onclick="window.setCategoryFilter('${jsEscapedG}'); close();" class="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest hover:opacity-80 transition-opacity focus-visible:ring-2 focus-visible:ring-primary outline-none rounded px-1" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>${i < bookGenres.length - 1 ? '<span class="text-slate-300 mx-1">·</span>' : ''}`;
+                                            return `<button onclick="window.setCategoryFilter('${jsEscapedG}'); close();" class="px-3 py-1 bg-blue-100/80 hover:bg-blue-200 dark:bg-blue-900/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>`;
                                         }).join('')}
                                     </div>
                                     ${book.owner ? `<span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-auto">Owner: ${escapeHTML(book.owner)}</span>` : ''}
@@ -7363,7 +7693,9 @@ If the collection is small or has no finished books, be extra encouraging and su
                 document.getElementById('transfer-book-btn')?.addEventListener('click', async () => {
                     const activePartnerships = allPartnerships.filter(p => {
                         const isUser1 = p.userId1 === currentUser.uid;
-                        return !(isUser1 ? p.user1Unsubscribed : p.user2Unsubscribed) && p.status === 'accepted';
+                        const isUnsubscribed = isUser1 ? p.user1Unsubscribed : p.user2Unsubscribed;
+                        const isAccepted = p.status === 'accepted' || p.status === undefined;
+                        return !isUnsubscribed && isAccepted;
                     });
 
                     if (activePartnerships.length === 0) {
