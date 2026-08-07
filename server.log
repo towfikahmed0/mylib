@@ -1,29 +1,38 @@
-127.0.0.1 - - [07/Aug/2026 11:51:05] "HEAD /index.html HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:53:46] "GET /index.html HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:53:47] "GET /sw.js HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:53:47] "GET /img/hero.jpg HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:53:47] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:55:06] "GET /index.html HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:55:06] "GET /sw.js HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:55:06] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:55:06] "GET /img/hero.jpg HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:56:04] "GET /index.html HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:56:04] "GET /sw.js HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:56:04] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:56:04] "GET /img/hero.jpg HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:57:05] "GET /index.html HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:57:06] "GET /sw.js HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:57:06] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:57:06] "GET /img/hero.jpg HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:58:29] "GET /index.html HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:58:30] "GET /sw.js HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:58:30] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:58:30] "GET /img/hero.jpg HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:59:39] "GET /index.html HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:59:40] "GET /sw.js HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 11:59:40] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:06:37] "HEAD /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:11:56] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:11:58] "GET /sw.js HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:11:58] "GET /img/hero.jpg HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:11:58] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:13:12] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:13:13] "GET /sw.js HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:13:13] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:13:13] "GET /img/hero.jpg HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:14:27] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:14:27] "GET /sw.js HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:14:27] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:15:42] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:15:43] "GET /sw.js HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:15:43] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:17:01] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:17:01] "GET /sw.js HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:17:01] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:18:10] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:18:10] "GET /sw.js HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:18:10] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:19:15] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:19:15] "GET /sw.js HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:19:15] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:20:25] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:20:25] "GET /sw.js HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:20:25] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:25:42] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:25:42] "GET /sw.js HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:25:42] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:26:55] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:26:56] "GET /sw.js HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:26:56] "GET / HTTP/1.1" 200 -
 ----------------------------------------
-Exception occurred during processing of request from ('127.0.0.1', 41858)
+Exception occurred during processing of request from ('127.0.0.1', 33146)
 Traceback (most recent call last):
   File "/home/jules/.pyenv/versions/3.12.13/lib/python3.12/socketserver.py", line 697, in process_request_thread
     self.finish_request(request, client_address)
@@ -47,16 +56,6 @@ Traceback (most recent call last):
     self._sock.sendall(b)
 ConnectionResetError: [Errno 104] Connection reset by peer
 ----------------------------------------
-127.0.0.1 - - [07/Aug/2026 11:59:40] "GET /img/hero.jpg HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 12:00:37] "GET /index.html HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 12:00:38] "GET /sw.js HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 12:00:38] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 12:00:38] "GET /img/hero.jpg HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 12:01:34] "GET /index.html HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 12:01:35] "GET /sw.js HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 12:01:35] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 12:01:35] "GET /img/hero.jpg HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 12:04:30] "GET /index.html HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 12:04:31] "GET /sw.js HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 12:04:31] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [07/Aug/2026 12:04:31] "GET /img/hero.jpg HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:33:37] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:33:37] "GET /sw.js HTTP/1.1" 200 -
+127.0.0.1 - - [07/Aug/2026 16:33:37] "GET / HTTP/1.1" 200 -
