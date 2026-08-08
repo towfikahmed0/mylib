@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyLib · User Guide</title>
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/2232/2232688.png" type="image/x-icon">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: 'var(--primary-color, #3b82f6)'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #3b82f6;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .font-serif {
+            font-family: 'Playfair Display', serif;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+        }
+        .dark .glass {
+            background: rgba(15, 23, 42, 0.7);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-300">
+
+    <!-- Theme Initialization Script -->
+    <script>
+        const savedTheme = localStorage.getItem('mylib_theme');
+        if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+
+    <!-- Header Banner -->
+    <header class="border-b border-slate-200/50 dark:border-slate-800/50 py-6 sticky top-0 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md z-40">
+        <div class="max-w-5xl mx-auto px-6 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <img src="https://cdn-icons-png.flaticon.com/512/2232/2232688.png" class="w-8 h-8 object-contain" alt="MyLib Logo">
+                <span class="font-serif italic text-xl font-bold tracking-tight">MyLib <span class="text-xs font-sans not-italic bg-blue-100 dark:bg-slate-800 px-2 py-1 text-blue-600 dark:text-blue-400 rounded-full font-bold ml-2">User Guide</span></span>
+            </div>
+            <a href="/index.html" class="text-sm font-bold text-primary hover:underline transition">Back to App</a>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-5xl mx-auto w-full px-6 py-12 space-y-16">
+
+        <!-- Hero Section -->
+        <section class="text-center max-w-2xl mx-auto space-y-4">
+            <h1 class="text-4xl sm:text-5xl font-black font-serif italic text-slate-800 dark:text-white leading-tight">Master your sanctuary.</h1>
+            <p class="text-sm sm:text-base text-slate-500 dark:text-slate-400 leading-relaxed">
+                Welcome to the complete guide to MyLib. Discover how to effortlessly catalog, review, share, and preserve every precious story in your collection.
+            </p>
+        </section>
+
+        <!-- Guide Sections -->
+        <section class="space-y-12">
+            <!-- Section 1: Cataloging books -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center border-b border-slate-100 dark:border-slate-900 pb-12">
+                <div class="space-y-4">
+                    <span class="text-[10px] font-black text-primary uppercase tracking-widest">Chapter One</span>
+                    <h2 class="text-2xl font-bold font-serif italic text-slate-800 dark:text-white">Adding Books to Your Library</h2>
+                    <!-- text placeholder -->
+                    <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        Cataloging your sanctuary is elegant and seamless. Tap the '+' button in the main library screen to open manual entry or barcode scanners. You can scan barcodes directly with your device's camera, fetch metadata dynamically from Google Books, or import full collections from CSV/JSON.
+                    </p>
+                </div>
+                <!-- image placeholder -->
+                <div class="h-64 rounded-3xl bg-slate-100 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 flex items-center justify-center text-slate-400 text-xs shadow-inner">
+                    <div class="text-center space-y-2">
+                        <svg class="w-8 h-8 mx-auto text-slate-300 dark:text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        <span>[Image Placeholder: Add/Import Books Interface]</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 2: Reviewing & Categorizing -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center border-b border-slate-100 dark:border-slate-900 pb-12 md:flex-row-reverse">
+                <div class="space-y-4 md:order-2">
+                    <span class="text-[10px] font-black text-primary uppercase tracking-widest">Chapter Two</span>
+                    <h2 class="text-2xl font-bold font-serif italic text-slate-800 dark:text-white">Organization & Interactive Filtering</h2>
+                    <!-- text placeholder -->
+                    <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        Keep your digital sanctuary perfectly aligned. Organize files by custom tags, multi-genre chips, reading statuses, or financial price values. The advanced real-time filters let you navigate hundreds of files smoothly, finding exact matches by ratings or purchase date range instantly.
+                    </p>
+                </div>
+                <!-- image placeholder -->
+                <div class="h-64 rounded-3xl bg-slate-100 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 flex items-center justify-center text-slate-400 text-xs shadow-inner md:order-1 flex-1">
+                    <div class="text-center space-y-2">
+                        <svg class="w-8 h-8 mx-auto text-slate-300 dark:text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        <span>[Image Placeholder: Library Advanced Filters]</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 3: Collaborating -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                <div class="space-y-4">
+                    <span class="text-[10px] font-black text-primary uppercase tracking-widest">Chapter Three</span>
+                    <h2 class="text-2xl font-bold font-serif italic text-slate-800 dark:text-white">Collaborators & Shared Libraries</h2>
+                    <!-- text placeholder -->
+                    <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        MyLib is social. Add trusted collaborators via their emails in Settings. Once your partner request is accepted, your libraries synchronize in real-time, allowing you to browse, transfer book ownerships, comment, like reviews, and share deep literary analysis together.
+                    </p>
+                </div>
+                <!-- image placeholder -->
+                <div class="h-64 rounded-3xl bg-slate-100 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 flex items-center justify-center text-slate-400 text-xs shadow-inner">
+                    <div class="text-center space-y-2">
+                        <svg class="w-8 h-8 mx-auto text-slate-300 dark:text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        <span>[Image Placeholder: Shared Partnerships Panel]</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FAQ Section -->
+        <section class="glass p-8 sm:p-12 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800 shadow-xl space-y-8">
+            <div class="text-center max-w-xl mx-auto space-y-2">
+                <h2 class="text-3xl font-bold font-serif italic text-slate-800 dark:text-white">Frequently Asked Questions</h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Quick answers to common questions about MyLib.</p>
+            </div>
+
+            <div class="space-y-4 max-w-3xl mx-auto">
+                <!-- FAQ 1 -->
+                <div class="border-b border-slate-100 dark:border-slate-800 pb-4">
+                    <button onclick="toggleFAQ(1)" class="w-full flex items-center justify-between text-left py-2 font-bold text-slate-700 dark:text-slate-200 hover:text-primary transition focus:outline-none text-sm">
+                        <span>How do I add a book?</span>
+                        <svg id="faq-icon-1" class="w-4 h-4 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div id="faq-ans-1" class="hidden mt-2 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        To add a book, click the '+' icon on the library toolbar. You can enter details manually, scan a barcode using your device's camera to auto-populate metadata, or import items using a formatted CSV or JSON file from the Settings section.
+                    </div>
+                </div>
+
+                <!-- FAQ 2 -->
+                <div class="border-b border-slate-100 dark:border-slate-800 pb-4">
+                    <button onclick="toggleFAQ(2)" class="w-full flex items-center justify-between text-left py-2 font-bold text-slate-700 dark:text-slate-200 hover:text-primary transition focus:outline-none text-sm">
+                        <span>How does collaboration work?</span>
+                        <svg id="faq-icon-2" class="w-4 h-4 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div id="faq-ans-2" class="hidden mt-2 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        You can send collaboration requests under Settings by entering your partner's exact email address. Once they accept your invitation, your libraries are connected. You can view each other's owned collections, transfer ownership of book items, write mutual reviews, and interact via likes/comments.
+                    </div>
+                </div>
+
+                <!-- FAQ 3 -->
+                <div class="border-b border-slate-100 dark:border-slate-800 pb-4">
+                    <button onclick="toggleFAQ(3)" class="w-full flex items-center justify-between text-left py-2 font-bold text-slate-700 dark:text-slate-200 hover:text-primary transition focus:outline-none text-sm">
+                        <span>Can I access my library offline?</span>
+                        <svg id="faq-icon-3" class="w-4 h-4 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div id="faq-ans-3" class="hidden mt-2 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                        Absolutely! MyLib is structured as a Progressive Web App (PWA) with offline-first indexing. Your books and reviews are cached locally. You can add, edit, or delete items while completely offline, and Firestore persistence will automatically synchronize your modifications when your internet connection is restored.
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="py-8 border-t border-slate-200/50 dark:border-slate-800/50">
+        <p class="text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest">&copy; 2026 MyLib sanctuary indexer. All rights reserved.</p>
+    </footer>
+
+    <!-- FAQ Accordion Logic -->
+    <script>
+        function toggleFAQ(id) {
+            const ans = document.getElementById(`faq-ans-${id}`);
+            const icon = document.getElementById(`faq-icon-${id}`);
+            if (ans && icon) {
+                const isOpen = !ans.classList.contains('hidden');
+
+                // Close all other FAQs
+                document.querySelectorAll('[id^="faq-ans-"]').forEach(el => el.classList.add('hidden'));
+                document.querySelectorAll('[id^="faq-icon-"]').forEach(el => el.classList.remove('rotate-180'));
+
+                if (!isOpen) {
+                    ans.classList.remove('hidden');
+                    icon.classList.add('rotate-180');
+                }
+            }
+        }
+    </script>
+</body>
+</html>

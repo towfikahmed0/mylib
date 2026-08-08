@@ -493,7 +493,7 @@
             let readingGoal = parseInt(localStorage.getItem('mylib_readingGoal')) || 50;
             let sharedWithMe = [];         // UIDs of users who shared their library with me
             let activities = [];           // activity log for book additions
-            let metadataCache = { authors: [], genres: [], owners: [] }; // Performance optimization: single-pass cache
+            let metadataCache = { authors: [], genres: [] }; // Performance optimization: single-pass cache
             let userProfileCache = {}; // Cache for user profiles (names/emails)
             let libraryStats = {
                 libBooksCount: 0,
@@ -504,7 +504,6 @@
                 ratingDist: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
                 genresCount: {},
                 authorsCount: {},
-                ownersCount: {},
                 tagsCount: {},
                 firstBookTime: Date.now(),
                 recentMomentum: 0,
@@ -521,7 +520,6 @@
             let statusFilter = localStorage.getItem('mylib_statusFilter') || 'all';
             let categoryFilter = 'all';
             let authorFilter = 'all';
-            let ownerFilter = 'all';
             let tagFilter = null;
             let favoritesOnly = false;
             let selectedBookIds = new Set();
@@ -965,6 +963,17 @@
             function renderSettings() {
                 return `
                 <div class="max-w-2xl mx-auto space-y-8 animate-slide-up">
+                    <!-- Learn how to use MyLib Card -->
+                    <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800 space-y-4">
+                        <h2 class="text-2xl font-black font-serif italic text-primary">Learn how to use MyLib</h2>
+                        <p class="text-slate-500 dark:text-slate-400 text-sm leading-relaxed">
+                            Discover how to catalog your personal library, manage reviews, customize settings, and collaborate seamlessly with friends on MyLib.
+                        </p>
+                        <a href="/learn.html" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white font-bold rounded-xl hover:bg-opacity-95 active:scale-98 transition text-sm focus-visible:ring-2 focus-visible:ring-primary outline-none" role="button">
+                            Open Guide
+                        </a>
+                    </div>
+
                     <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
                         <h2 class="text-2xl font-black mb-6 font-serif italic text-blue-600 dark:text-blue-400">AI Librarian Settings</h2>
                         <div class="space-y-4">
@@ -2244,7 +2253,6 @@
                     // ⚡ Bolt: Use pre-normalized _genres
                     const matchesCategory = categoryFilter === 'all' || b._genres.includes(categoryFilter);
                     const matchesAuthor = authorFilter === 'all' || b.author === authorFilter;
-                    const matchesOwner = ownerFilter === 'all' || b.owner === ownerFilter;
                     const matchesTag = !tagFilter || (b.tags && b.tags.includes(tagFilter));
                     const matchesFavorites = !favoritesOnly || statusData.isFavorite;
 
@@ -2311,7 +2319,6 @@
                         if (categoryFilter !== 'all') activeCount++;
                         if (statusFilter !== 'all') activeCount++;
                         if (authorFilter !== 'all') activeCount++;
-                        if (ownerFilter !== 'all') activeCount++;
                     }
 
                     if (aiSearchResults) {
@@ -2419,15 +2426,6 @@
                                         `).join('')}
                                     </select>
                                 </div>
-                                <div class="flex flex-col gap-2">
-                                    <label for="owner-filter" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Owner</label>
-                                    <select id="owner-filter" class="bg-white dark:bg-slate-800 border-none rounded-lg text-xs font-bold px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
-                                        <option value="all" ${ownerFilter === 'all' ? 'selected' : ''}>All Owners</option>
-                                        ${metadataCache.owners.map(owner => `
-                                            <option value="${owner}" ${ownerFilter === owner ? 'selected' : ''}>${owner}</option>
-                                        `).join('')}
-                                    </select>
-                                </div>
                             </div>
                         </div>
                         
@@ -2519,7 +2517,7 @@
 
                     // Empty state
                     if (filteredBooks.length === 0) {
-                        const isAnyFilterActive = searchQuery || statusFilter !== 'all' || categoryFilter !== 'all' || authorFilter !== 'all' || ownerFilter !== 'all' || tagFilter || advancedFilters.rating !== 'all' || advancedFilters.minPrice || advancedFilters.maxPrice || advancedFilters.startDate || advancedFilters.endDate;
+                        const isAnyFilterActive = searchQuery || statusFilter !== 'all' || categoryFilter !== 'all' || authorFilter !== 'all' || tagFilter || advancedFilters.rating !== 'all' || advancedFilters.minPrice || advancedFilters.maxPrice || advancedFilters.startDate || advancedFilters.endDate;
 
                         let suggestionHtml = '';
                         if (searchQuery && !aiSearchResults) {
@@ -2857,11 +2855,6 @@
                     window.queueRenderLibraryOnly();
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
-                document.getElementById('owner-filter')?.addEventListener('change', e => {
-                    ownerFilter = e.target.value;
-                    window.queueRenderLibraryOnly();
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                });
                 document.getElementById('grid-view-btn')?.addEventListener('click', () => {
                     viewMode = 'grid';
                     localStorage.setItem('mylib_viewMode', 'grid');
@@ -3151,12 +3144,6 @@
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
-            window.setOwnerFilter = (owner) => {
-                ownerFilter = owner;
-                window.queueRenderMainApp();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            };
-
             window.setCategoryFilter = (category) => {
                 categoryFilter = category;
                 window.queueRenderMainApp();
@@ -3169,7 +3156,6 @@
                 tagFilter = type === 'tag' ? value : null;
                 categoryFilter = type === 'genre' ? value : 'all';
                 authorFilter = type === 'author' ? value : 'all';
-                ownerFilter = type === 'owner' ? value : 'all';
                 advancedFilters = { rating: 'all', minPrice: null, maxPrice: null, startDate: null, endDate: null };
                 window.queueRenderMainApp();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -3220,7 +3206,6 @@
                 tagFilter = null;
                 categoryFilter = 'all';
                 authorFilter = 'all';
-                ownerFilter = 'all';
                 favoritesOnly = false;
                 advancedFilters = { rating: 'all', minPrice: null, maxPrice: null, startDate: null, endDate: null };
                 const searchInput = document.getElementById('search-input');
@@ -3267,13 +3252,6 @@
                                 <select id="adv-author" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none">
                                     <option value="all" ${authorFilter === 'all' ? 'selected' : ''}>All Authors</option>
                                     ${metadataCache.authors.map(author => `<option value="${author}" ${authorFilter === author ? 'selected' : ''}>${author}</option>`).join('')}
-                                </select>
-                            </div>
-                            <div>
-                                <label for="adv-owner" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Owner</label>
-                                <select id="adv-owner" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none">
-                                    <option value="all" ${ownerFilter === 'all' ? 'selected' : ''}>All Owners</option>
-                                    ${metadataCache.owners.map(owner => `<option value="${owner}" ${ownerFilter === owner ? 'selected' : ''}>${owner}</option>`).join('')}
                                 </select>
                             </div>
                         </div>
@@ -3325,7 +3303,6 @@
                         categoryFilter = document.getElementById('adv-genre').value;
                         statusFilter = document.getElementById('adv-status').value;
                         authorFilter = document.getElementById('adv-author').value;
-                        ownerFilter = document.getElementById('adv-owner').value;
                         localStorage.setItem('mylib_sortBy', sortBy);
                         localStorage.setItem('mylib_statusFilter', statusFilter);
                     }
@@ -3521,7 +3498,6 @@
             function updateLibraryStats() {
                 const authorsSet = new Set();
                 const genresSet = new Set();
-                const ownersSet = new Set();
 
                 // Reset stats
                 libraryStats = {
@@ -3533,7 +3509,6 @@
                     ratingDist: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
                     genresCount: {},
                     authorsCount: {},
-                    ownersCount: {},
                     tagsCount: {},
                     firstBookTime: Date.now(),
                     recentMomentum: 0,
@@ -3563,7 +3538,6 @@
 
                     // ⚡ Bolt: Collect metadata for ALL books (including wishlist) to preserve autocomplete/global filters.
                     if (b.author) authorsSet.add(b.author);
-                    if (b.owner) ownersSet.add(b.owner);
                     (b._genres || []).forEach(g => { if (g) genresSet.add(g); });
 
                     // Original logic for main app header: Finished wishlist books are counted.
@@ -3579,9 +3553,6 @@
                     // Analysis Metadata (Library only)
                     if (b.author) {
                         libraryStats.authorsCount[b.author] = (libraryStats.authorsCount[b.author] || 0) + 1;
-                    }
-                    if (b.owner) {
-                        libraryStats.ownersCount[b.owner] = (libraryStats.ownersCount[b.owner] || 0) + 1;
                     }
 
                     (b._genres || []).forEach(g => {
@@ -3632,7 +3603,6 @@
                 // Finalize Metadata Cache
                 metadataCache.authors = [...authorsSet].sort();
                 metadataCache.genres = [...genresSet].sort();
-                metadataCache.owners = [...ownersSet].sort();
 
                 // Finalize AI Context
                 libraryStats.aiContext.topGenres = Object.entries(genreCountsForAI)
@@ -4404,12 +4374,6 @@
                                 <div id="category-dropdown" class="dropdown-menu"></div>
                             </div>
 
-                            <div class="relative">
-                                <label for="man-owner" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Owner</label>
-                                <input id="man-owner" placeholder="Owner Name" value="${existingBook?.owner || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" autocomplete="off">
-                                <div id="owner-dropdown" class="dropdown-menu"></div>
-                            </div>
-
                             <div>
                                 <div class="flex justify-between items-center ml-1 mb-1">
                                     <label for="man-description" class="text-[10px] font-bold text-slate-400 uppercase">Description</label>
@@ -4489,7 +4453,6 @@
                         author: document.getElementById('man-author').value,
                         cover: document.getElementById('man-cover').value,
                         isbn: document.getElementById('man-isbn').value,
-                        owner: document.getElementById('man-owner').value,
                         tags: document.getElementById('man-tags').value,
                         description: document.getElementById('man-description').value,
                         price: document.getElementById('man-price').value,
@@ -4511,7 +4474,6 @@
                                 document.getElementById('man-author').value = draft.author || '';
                                 document.getElementById('man-cover').value = draft.cover || '';
                                 document.getElementById('man-isbn').value = draft.isbn || '';
-                                document.getElementById('man-owner').value = draft.owner || '';
                                 document.getElementById('man-tags').value = draft.tags || '';
                                 document.getElementById('man-description').value = draft.description || '';
                                 document.getElementById('man-price').value = draft.price || '';
@@ -4531,7 +4493,7 @@
                     }
 
                     // Attach auto-save listeners
-                    ['man-title', 'man-author', 'man-cover', 'man-isbn', 'man-owner', 'man-tags', 'man-description', 'man-price', 'man-date'].forEach(id => {
+                    ['man-title', 'man-author', 'man-cover', 'man-isbn', 'man-tags', 'man-description', 'man-price', 'man-date'].forEach(id => {
                         document.getElementById(id)?.addEventListener('input', saveDraft);
                     });
                     document.getElementById('man-wishlist')?.addEventListener('change', saveDraft);
@@ -4596,13 +4558,9 @@
                     }
                     document.getElementById('man-category').value = '';
                 });
-                setupSearchableDropdown('man-owner', 'owner-dropdown', metadataCache.owners, (val) => {
-                    document.getElementById('man-owner').value = val;
-                    if (!isEdit) saveDraft();
-                });
 
                 // Add Enter key support for manual entry fields (excluding man-category)
-                ['man-title', 'man-author', 'man-isbn', 'man-owner', 'man-tags', 'man-price', 'man-date'].forEach(id => {
+                ['man-title', 'man-author', 'man-isbn', 'man-tags', 'man-price', 'man-date'].forEach(id => {
                     document.getElementById(id)?.addEventListener('keydown', (e) => {
                         if (e.key === 'Enter') {
                             // Only trigger save if no dropdown is currently active/selected
@@ -4692,7 +4650,6 @@
                             author: authorVal,
                             genres: currentGenres.length > 0 ? currentGenres : ['Other'],
                             categories: currentGenres.length > 0 ? currentGenres : ['Other'],
-                            owner: document.getElementById('man-owner').value || '',
                             description: document.getElementById('man-description').value || '',
                             tags: tags,
                             coverUrl: document.getElementById('man-cover').value || null,
@@ -5360,7 +5317,6 @@
                 // ⚡ Bolt: Use pre-calculated statistics from libraryStats to eliminate redundant O(N) loop
                 const {
                     authorsCount,
-                    ownersCount,
                     genresCount,
                     tagsCount,
                     totalValue,
@@ -6610,7 +6566,6 @@
                                 const title = (row.Title || row.title || 'Untitled').trim();
                                 const author = (row.Author || row.author || 'Unknown').trim() || 'Unknown';
                                 let genreRaw = row.Genre || row.Genre || row.Category || row.category || '';
-                                const owner = (row.Owner || row.owner || '').trim();
                                 const isbn = (row.ISBN || row.isbn || '').trim();
                                 const notes = (row.Notes || row.notes || row.Comments || row.comments || '').trim();
                                 const price = row.Price || row.price ? parseFloat(row.Price || row.price) : null;
@@ -6628,7 +6583,6 @@
                                     author,
                                     genres: categories,
                                     categories,
-                                    owner,
                                     isbn,
                                     comments: notes,
                                     price,
@@ -6764,7 +6718,6 @@
                             coverUrl: b.coverUrl || b.thumbnail || "",
                             isbn: b.isbn || "",
                             description: b.description || "",
-                            owner: b.owner || "",
                             price: b.price || null,
                             prices: b.price ? [b.price] : [],
                             purchaseDate: b.purchaseDate || null,
@@ -6828,7 +6781,6 @@
                             const isbn = item.isbn || "";
                             const coverUrl = item.coverUrl || item.thumbnail || null;
                             const description = item.description || "";
-                            const owner = item.owner || "";
                             const price = item.price || (item.prices && item.prices[0]) || null;
                             const purchaseDate = item.purchaseDate || item.purchasedDate || new Date().toISOString();
                             const highlights = item.highlights || [];
@@ -6841,7 +6793,6 @@
                                 isbn,
                                 coverUrl,
                                 description,
-                                owner,
                                 price,
                                 purchaseDate,
                                 highlights,
