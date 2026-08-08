@@ -1437,7 +1437,7 @@
                             <span class="text-[8px] font-bold">Library</span>
                         </button>
                         <button onclick="window.setTab('mybooks')" ${activeTab === 'mybooks' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'mybooks' ? 'text-primary' : 'text-slate-400'}">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
                             <span class="text-[8px] font-bold">My Books</span>
                         </button>
                         <button onclick="window.setTab('explore')" ${activeTab === 'explore' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'explore' ? 'text-primary' : 'text-slate-400'}">
@@ -2390,6 +2390,8 @@
                                         <option value="oldest" ${sortBy === 'oldest' ? 'selected' : ''}>Oldest First</option>
                                         <option value="title" ${sortBy === 'title' ? 'selected' : ''}>Title (A-Z)</option>
                                         <option value="author" ${sortBy === 'author' ? 'selected' : ''}>Author</option>
+                                        <option value="borrowed_to_others" ${sortBy === 'borrowed_to_others' ? 'selected' : ''}>Borrowed to Others</option>
+                                        <option value="copy_type" ${sortBy === 'copy_type' ? 'selected' : ''}>Copy Type</option>
                                     </select>
                                 </div>
                                 <div class="flex flex-col gap-2">
@@ -3244,6 +3246,8 @@
                                     <option value="oldest" ${sortBy === 'oldest' ? 'selected' : ''}>Oldest First</option>
                                     <option value="title" ${sortBy === 'title' ? 'selected' : ''}>Title (A-Z)</option>
                                     <option value="author" ${sortBy === 'author' ? 'selected' : ''}>Author</option>
+                                    <option value="borrowed_to_others" ${sortBy === 'borrowed_to_others' ? 'selected' : ''}>Borrowed to Others</option>
+                                    <option value="copy_type" ${sortBy === 'copy_type' ? 'selected' : ''}>Copy Type</option>
                                 </select>
                             </div>
                             <div>
@@ -4432,6 +4436,29 @@
                                 </div>
                             </div>
 
+                            <div class="border-t border-slate-200 dark:border-slate-800 pt-4">
+                                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-2">Book Copy Type</label>
+                                <div class="flex flex-wrap gap-4 px-1">
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name="man-copytype" value="New Copy" ${(!existingBook || existingBook.copyType === 'New Copy' || !existingBook.copyType) ? 'checked' : ''} class="w-4 h-4 text-blue-600">
+                                        <span class="text-xs font-medium text-slate-700 dark:text-slate-300">New Copy</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name="man-copytype" value="Old Copy" ${(existingBook && existingBook.copyType === 'Old Copy') ? 'checked' : ''} class="w-4 h-4 text-blue-600">
+                                        <span class="text-xs font-medium text-slate-700 dark:text-slate-300">Old Copy</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name="man-copytype" value="Gifted" ${(existingBook && existingBook.copyType === 'Gifted') ? 'checked' : ''} class="w-4 h-4 text-blue-600">
+                                        <span class="text-xs font-medium text-slate-700 dark:text-slate-300">Gifted</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div id="man-gifter-container" class="${(existingBook && existingBook.copyType === 'Gifted') ? '' : 'hidden'} transition-all">
+                                <label for="man-gifter" class="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1">Gifted By</label>
+                                <input id="man-gifter" placeholder="Name of the person who gifted this book" value="${existingBook?.gifterName || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                            </div>
+
                             <div class="grid grid-cols-2 gap-4">
                                 <div><label for="man-price" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Price (${getCurrencySymbol()})</label><input id="man-price" type="number" step="0.01" placeholder="0.00" value="${existingBook?.price || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
                                 <div><label for="man-date" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Date</label><input id="man-date" type="date" value="${(existingBook?.purchaseDate || new Date().toISOString()).split('T')[0]}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
@@ -4495,7 +4522,9 @@
                         price: document.getElementById('man-price').value,
                         date: document.getElementById('man-date').value,
                         wishlist: document.getElementById('man-wishlist').checked,
-                        genres: currentGenres
+                        genres: currentGenres,
+                        copyType: document.querySelector('input[name="man-copytype"]:checked')?.value || 'New Copy',
+                        gifterName: document.getElementById('man-gifter').value
                     };
                     sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
                 };
@@ -4521,6 +4550,20 @@
                                     currentGenres = draft.genres;
                                     renderGenres();
                                 }
+                                const restoredCopyType = draft.copyType || 'New Copy';
+                                const targetRadio = document.querySelector(`input[name="man-copytype"][value="${restoredCopyType}"]`);
+                                if (targetRadio) {
+                                    targetRadio.checked = true;
+                                }
+                                document.getElementById('man-gifter').value = draft.gifterName || '';
+                                const gifterContainer = document.getElementById('man-gifter-container');
+                                if (gifterContainer) {
+                                    if (restoredCopyType === 'Gifted') {
+                                        gifterContainer.classList.remove('hidden');
+                                    } else {
+                                        gifterContainer.classList.add('hidden');
+                                    }
+                                }
                                 updateDescCount();
                             } else {
                                 sessionStorage.removeItem(DRAFT_KEY);
@@ -4531,11 +4574,26 @@
                     }
 
                     // Attach auto-save listeners
-                    ['man-title', 'man-author', 'man-cover', 'man-isbn', 'man-owner', 'man-tags', 'man-description', 'man-price', 'man-date'].forEach(id => {
+                    ['man-title', 'man-author', 'man-cover', 'man-isbn', 'man-owner', 'man-tags', 'man-description', 'man-price', 'man-date', 'man-gifter'].forEach(id => {
                         document.getElementById(id)?.addEventListener('input', saveDraft);
                     });
                     document.getElementById('man-wishlist')?.addEventListener('change', saveDraft);
                 }
+
+                // Attach copy type radio listeners
+                document.querySelectorAll('input[name="man-copytype"]').forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        const gifterContainer = document.getElementById('man-gifter-container');
+                        if (gifterContainer) {
+                            if (e.target.value === 'Gifted') {
+                                gifterContainer.classList.remove('hidden');
+                            } else {
+                                gifterContainer.classList.add('hidden');
+                            }
+                        }
+                        saveDraft();
+                    });
+                });
 
                 document.getElementById('man-description')?.addEventListener('input', updateDescCount);
 
@@ -4687,6 +4745,9 @@
                             return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
                         };
 
+                        const selectedCopyType = document.querySelector('input[name="man-copytype"]:checked')?.value || 'New Copy';
+                        const gifterNameVal = selectedCopyType === 'Gifted' ? document.getElementById('man-gifter').value.trim() : null;
+
                         const bookData = {
                             title: titleVal,
                             author: authorVal,
@@ -4702,6 +4763,8 @@
                             isbn: document.getElementById('man-isbn').value || existingBook?.isbn || code || '',
                             thumbnail: existingBook?.thumbnail || null,
                             source: existingBook?.source || (code ? 'scanned' : 'manual'),
+                            copyType: selectedCopyType,
+                            gifterName: gifterNameVal,
                             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                             ...options
                         };
@@ -5553,6 +5616,53 @@
                                 </div>
                             </div>
                         </div>
+
+                        ${(() => {
+                            const borrowedBooks = books.filter(b => b.borrowedBy || (b.borrowHistory && b.borrowHistory.length > 0 && !b.borrowHistory[b.borrowHistory.length - 1].returnDate));
+                            if (borrowedBooks.length > 0) {
+                                return `
+                                <div class="mt-12 pt-12 border-t border-slate-100 dark:border-slate-800">
+                                    <div class="mb-6">
+                                        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Currently Borrowed Books</h3>
+                                        <p class="text-lg font-black font-serif italic text-slate-800 dark:text-slate-100">Books Lent Out to Others</p>
+                                    </div>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        ${borrowedBooks.map(b => {
+                                            const lastEntry = b.borrowHistory && b.borrowHistory.length > 0 ? b.borrowHistory[b.borrowHistory.length - 1] : null;
+                                            const borrower = lastEntry ? lastEntry.borrowerName : b.borrowedBy;
+                                            const bDate = lastEntry && lastEntry.borrowDate ? lastEntry.borrowDate : b.borrowDate;
+                                            const dateStr = bDate ? new Date(bDate).toLocaleDateString() : 'N/A';
+                                            return `
+                                            <div class="glass p-5 rounded-3xl border border-blue-100/30 dark:border-slate-800 flex justify-between items-center shadow-sm hover:scale-[1.01] transition-transform duration-300">
+                                                <div class="min-w-0 flex-1">
+                                                    <h4 class="font-black text-sm text-slate-800 dark:text-slate-100 truncate">${escapeHTML(b.title)}</h4>
+                                                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                                        Borrowed by <span class="font-bold text-primary">${escapeHTML(borrower || 'Unknown')}</span>
+                                                    </p>
+                                                </div>
+                                                <div class="text-right ml-4">
+                                                    <span class="text-[10px] font-bold text-slate-400 uppercase block tracking-wider">Lent Date</span>
+                                                    <span class="text-xs font-bold text-slate-600 dark:text-slate-300">${dateStr}</span>
+                                                </div>
+                                            </div>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                </div>
+                                `;
+                            } else {
+                                return `
+                                <div class="mt-12 pt-12 border-t border-slate-100 dark:border-slate-800">
+                                    <div class="mb-4">
+                                        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Currently Borrowed Books</h3>
+                                        <p class="text-lg font-black font-serif italic text-slate-800 dark:text-slate-100">Books Lent Out to Others</p>
+                                    </div>
+                                    <p class="text-sm text-slate-400 dark:text-slate-500 italic">No books are currently lent out.</p>
+                                </div>
+                                `;
+                            }
+                        })()}
+
                     <div id="ai-insights-section" class="mt-12 pt-12 border-t border-slate-100 dark:border-slate-800">
                         <div class="flex items-center justify-between mb-8">
                             <div>
@@ -5966,12 +6076,12 @@
                         </button>
                         <div class="flex items-center gap-3">
                             <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${catClass}">${rev.category || 'Review'}</span>
-                            ${(rev.category === 'Review' || !rev.category) ? `<div class="text-amber-500 text-sm font-black">${stars}</div>` : ''}
                         </div>
                     </div>
 
                     <div class="mb-6">
-                        <div class="flex items-center gap-2 mb-2">
+                        <div class="flex flex-wrap items-center gap-2 mb-2">
+                            ${(rev.category === 'Review' || !rev.category) ? `<span class="text-amber-500 text-sm font-black mr-1">${stars}</span>` : ''}
                             <h3 class="text-xl font-black font-serif italic text-primary">${escapeHTML(rev.bookTitle)}</h3>
                             ${rev.author ? `<span class="text-slate-400 text-sm">by ${escapeHTML(rev.author)}</span>` : ''}
                         </div>
@@ -7426,7 +7536,12 @@ If the collection is small or has no finished books, be extra encouraging and su
                 closeLoading();
                 const close = showModal(`
                 <div class="fixed inset-0 z-50 flex items-center justify-center sm:p-4">
-                    <div class="bg-sky-50 dark:bg-gray-800 w-full h-full sm:h-auto sm:rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up overflow-y-auto sm:max-h-[95vh]">
+                    <div class="bg-sky-50 dark:bg-gray-800 w-full h-full sm:h-auto sm:rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up overflow-y-auto sm:max-h-[95vh] relative">
+                        <button data-close class="absolute top-4 right-4 sm:top-6 sm:right-6 p-3 bg-white dark:bg-slate-850 rounded-full shadow-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus-visible:ring-2 focus-visible:ring-slate-400 outline-none z-10" aria-label="Close details modal">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
                         <div class="flex flex-col sm:flex-row gap-8">
                             <div class="flex-shrink-0 mx-auto sm:mx-0">
                                 <div class="relative group">
