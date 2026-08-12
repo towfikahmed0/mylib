@@ -399,7 +399,7 @@
             };
 
             // ---------- State ----------
-            const APP_VERSION = '3.0';
+            const APP_VERSION = '3.1';
             const DRAFT_KEY = 'mylib_manual_draft';
             window.DRAFT_KEY = DRAFT_KEY; // Expose for testing
             let deferredPrompt = null;
@@ -948,7 +948,7 @@
                             </div>
                             <span class="text-xl font-black font-serif italic">My Lib</span>
                         </div>
-                        <p class="text-slate-400 text-xs uppercase tracking-[0.2em] font-bold">&copy; 2026 My Lib · v3.0 · Preserve Every Word</p>
+                        <p class="text-slate-400 text-xs uppercase tracking-[0.2em] font-bold">&copy; 2026 My Lib · v3.1 · Preserve Every Word</p>
                     </footer>
                 </div>
             `;
@@ -2254,7 +2254,10 @@
                         if (endTime && bTime > endTime) matchesDate = false;
                     }
 
-                    return matchesTab && matchesSearch && matchesStatus && matchesCategory && matchesAuthor && matchesTag && matchesFavorites && matchesAdvancedRating && matchesPrice && matchesDate;
+                    const isCurrentlyBorrowed = !!b.borrowedBy || (Array.isArray(b.borrowHistory) && b.borrowHistory.length > 0 && (!b.borrowHistory[b.borrowHistory.length - 1].returnDate || b.borrowHistory.some(entry => !entry.returnDate || entry.returnDate === null)));
+                    const matchesBorrowed = sortBy !== 'borrowed_to_others' || isCurrentlyBorrowed;
+
+                    return matchesTab && matchesSearch && matchesStatus && matchesCategory && matchesAuthor && matchesTag && matchesFavorites && matchesAdvancedRating && matchesPrice && matchesDate && matchesBorrowed;
                 });
 
                 // ⚡ Bolt: Select the comparator once to avoid branching inside the sort loop
@@ -2265,6 +2268,24 @@
                     sortComparator = (a, b) => (a._sortAuthor < b._sortAuthor ? -1 : (a._sortAuthor > b._sortAuthor ? 1 : 0));
                 } else if (sortBy === 'oldest') {
                     sortComparator = (a, b) => a._createdTime - b._createdTime;
+                } else if (sortBy === 'copy_type') {
+                    const copyTypeOrder = {
+                        'New Copy': 1,
+                        'Old Copy': 2,
+                        'Gifted': 3
+                    };
+                    sortComparator = (a, b) => {
+                        const valA = a.copyType || 'New Copy';
+                        const valB = b.copyType || 'New Copy';
+                        const orderA = copyTypeOrder[valA] || 99;
+                        const orderB = copyTypeOrder[valB] || 99;
+                        if (orderA !== orderB) {
+                            return orderA - orderB;
+                        }
+                        const titleA = a._sortTitle || '';
+                        const titleB = b._sortTitle || '';
+                        return titleA.localeCompare(titleB);
+                    };
                 } else { // default: newest
                     sortComparator = (a, b) => b._createdTime - a._createdTime;
                 }
@@ -2291,6 +2312,14 @@
                     }
                     if (favoritesOnly) {
                         html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Favorites <button onclick="window.toggleFavoritesFilter(false)" aria-label="Remove favorites filter" class="hover:bg-white/20 rounded px-1 transition-colors">×</button></span>`;
+                        activeCount++;
+                    }
+                    if (sortBy === 'borrowed_to_others') {
+                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Borrowed to Others <button onclick="window.clearSortFilter('borrowed_to_others')" aria-label="Remove borrowed filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-amber-500 outline-none">×</button></span>`;
+                        activeCount++;
+                    }
+                    if (sortBy === 'copy_type') {
+                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Copy Type <button onclick="window.clearSortFilter('copy_type')" aria-label="Remove copy type filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">×</button></span>`;
                         activeCount++;
                     }
 
@@ -3183,6 +3212,17 @@
                 if (type === 'price') { advancedFilters.minPrice = null; advancedFilters.maxPrice = null; }
                 if (type === 'date') { advancedFilters.startDate = null; advancedFilters.endDate = null; }
                 window.queueRenderLibraryOnly();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+
+            window.clearSortFilter = (type) => {
+                sortBy = 'newest';
+                localStorage.setItem('mylib_sortBy', 'newest');
+                const sortSelect = document.getElementById('sort-select');
+                if (sortSelect) sortSelect.value = 'newest';
+                const advSort = document.getElementById('adv-sort');
+                if (advSort) advSort.value = 'newest';
+                window.queueRenderMainApp();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
@@ -7505,9 +7545,18 @@ If the collection is small or has no finished books, be extra encouraging and su
                                     ${averageRating ? `<span class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-lg text-[11px] font-black">Avg: ${averageRating} ★</span>` : ''}
                                 </div>
 
-                                <div class="grid grid-cols-2 gap-8 mt-8">
+                                <div class="grid grid-cols-2 sm:grid-cols-3 gap-8 mt-8">
                                     <div class="bg-blue-50/50 dark:bg-slate-800/40 p-4 rounded-2xl border border-blue-100/50 dark:border-slate-700"><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Price</p><p class="text-xl font-black text-blue-600 dark:text-blue-400 font-sans">${book.price ? getCurrencySymbol() + book.price : '—'}</p></div>
                                     <div class="bg-blue-50/50 dark:bg-slate-800/40 p-4 rounded-2xl border border-blue-100/50 dark:border-slate-700"><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Purchased</p><p class="text-xl font-black font-mono">${book.purchaseDate ? new Date(book.purchaseDate).toLocaleDateString() : '—'}</p></div>
+                                    ${book.copyType ? `
+                                    <div class="col-span-2 sm:col-span-1 bg-blue-50/50 dark:bg-slate-800/40 p-4 rounded-2xl border border-blue-100/50 dark:border-slate-700">
+                                        <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Copy Type</p>
+                                        <p class="text-lg font-black text-blue-600 dark:text-blue-400">
+                                            ${escapeHTML(book.copyType)}
+                                            ${book.copyType === 'Gifted' && book.gifterName ? `<span class="block text-xs font-normal text-slate-500 dark:text-slate-400 mt-1">Gifted by ${escapeHTML(book.gifterName)}</span>` : ''}
+                                        </p>
+                                    </div>
+                                    ` : ''}
                                 </div>
 
                                 ${book.isbn ? `
