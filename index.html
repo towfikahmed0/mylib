@@ -519,6 +519,7 @@
             let sortBy = localStorage.getItem('mylib_sortBy') || defaultSort;
             let statusFilter = localStorage.getItem('mylib_statusFilter') || 'all';
             let categoryFilter = 'all';
+            let copyTypeFilter = 'all';
             let authorFilter = 'all';
             let tagFilter = null;
             let favoritesOnly = false;
@@ -1505,6 +1506,7 @@
                         </div>
                         <div id="recent-searches-bar" class="mb-4 flex flex-wrap gap-2"></div>
                         <div id="active-filters-bar" class="mb-4 flex flex-wrap gap-2"></div>
+                        <div id="copy-type-filters-container"></div>
                         <div id="tag-filter-container"></div>
                         <div id="controls-bar-container"></div>
                         <div id="library-container-wrapper"></div>
@@ -2237,6 +2239,7 @@
                     const matchesStatus = statusFilter === 'all' || bookStatus === statusFilter;
                     // ⚡ Bolt: Use pre-normalized _genres
                     const matchesCategory = categoryFilter === 'all' || b._genres.includes(categoryFilter);
+                    const matchesCopyType = copyTypeFilter === 'all' || b.copyType === copyTypeFilter;
                     const matchesAuthor = authorFilter === 'all' || b.author === authorFilter;
                     const matchesTag = !tagFilter || (b.tags && b.tags.includes(tagFilter));
                     const matchesFavorites = !favoritesOnly || statusData.isFavorite;
@@ -2257,7 +2260,7 @@
                     const isCurrentlyBorrowed = !!b.borrowedBy || (Array.isArray(b.borrowHistory) && b.borrowHistory.length > 0 && (!b.borrowHistory[b.borrowHistory.length - 1].returnDate || b.borrowHistory.some(entry => !entry.returnDate || entry.returnDate === null)));
                     const matchesBorrowed = sortBy !== 'borrowed_to_others' || isCurrentlyBorrowed;
 
-                    return matchesTab && matchesSearch && matchesStatus && matchesCategory && matchesAuthor && matchesTag && matchesFavorites && matchesAdvancedRating && matchesPrice && matchesDate && matchesBorrowed;
+                    return matchesTab && matchesSearch && matchesStatus && matchesCategory && matchesCopyType && matchesAuthor && matchesTag && matchesFavorites && matchesAdvancedRating && matchesPrice && matchesDate && matchesBorrowed;
                 });
 
                 // ⚡ Bolt: Select the comparator once to avoid branching inside the sort loop
@@ -2318,8 +2321,8 @@
                         html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Borrowed to Others <button onclick="window.clearSortFilter('borrowed_to_others')" aria-label="Remove borrowed filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-amber-500 outline-none">×</button></span>`;
                         activeCount++;
                     }
-                    if (sortBy === 'copy_type') {
-                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Copy Type <button onclick="window.clearSortFilter('copy_type')" aria-label="Remove copy type filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">×</button></span>`;
+                    if (copyTypeFilter !== 'all') {
+                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Copy Type: ${escapeHTML(copyTypeFilter)} <button onclick="window.setCopyTypeFilter('all')" aria-label="Remove copy type filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">×</button></span>`;
                         activeCount++;
                     }
 
@@ -2331,6 +2334,7 @@
                         if (sortBy !== defaultSort) activeCount++;
                         if (favoritesOnly) activeCount++;
                         if (categoryFilter !== 'all') activeCount++;
+                        if (copyTypeFilter !== 'all') activeCount++;
                         if (statusFilter !== 'all') activeCount++;
                         if (authorFilter !== 'all') activeCount++;
                     }
@@ -2397,6 +2401,19 @@
                 ` : '';
                 }
 
+                const copyTypeContainer = document.getElementById('copy-type-filters-container');
+                if (copyTypeContainer) {
+                    copyTypeContainer.innerHTML = `
+                    <div class="flex items-center gap-2 flex-wrap mb-4">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-1">Copy Type:</span>
+                        <button onclick="window.setCopyTypeFilter('all')" class="px-3 py-1.5 rounded-full text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${copyTypeFilter === 'all' ? 'active-filter-chip text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}" aria-pressed="${copyTypeFilter === 'all'}" aria-label="Show all copy types">All</button>
+                        <button onclick="window.setCopyTypeFilter('New Copy')" class="px-3 py-1.5 rounded-full text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${copyTypeFilter === 'New Copy' ? 'active-filter-chip text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}" aria-pressed="${copyTypeFilter === 'New Copy'}" aria-label="Filter by New copies">New copies</button>
+                        <button onclick="window.setCopyTypeFilter('Old Copy')" class="px-3 py-1.5 rounded-full text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${copyTypeFilter === 'Old Copy' ? 'active-filter-chip text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}" aria-pressed="${copyTypeFilter === 'Old Copy'}" aria-label="Filter by Old copies">Old copies</button>
+                        <button onclick="window.setCopyTypeFilter('Gifted')" class="px-3 py-1.5 rounded-full text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${copyTypeFilter === 'Gifted' ? 'active-filter-chip text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}" aria-pressed="${copyTypeFilter === 'Gifted'}" aria-label="Filter by Gifted copies">Gifted copies</button>
+                    </div>
+                    `;
+                }
+
                 const controlsBar = document.getElementById('controls-bar-container');
                 if (controlsBar) {
                     controlsBar.innerHTML = `
@@ -2412,7 +2429,6 @@
                                         <option value="title" ${sortBy === 'title' ? 'selected' : ''}>Title (A-Z)</option>
                                         <option value="author" ${sortBy === 'author' ? 'selected' : ''}>Author</option>
                                         <option value="borrowed_to_others" ${sortBy === 'borrowed_to_others' ? 'selected' : ''}>Borrowed to Others</option>
-                                        <option value="copy_type" ${sortBy === 'copy_type' ? 'selected' : ''}>Copy Type</option>
                                     </select>
                                 </div>
                                 <div class="flex flex-col gap-2">
@@ -2533,7 +2549,7 @@
 
                     // Empty state
                     if (filteredBooks.length === 0) {
-                        const isAnyFilterActive = searchQuery || statusFilter !== 'all' || categoryFilter !== 'all' || authorFilter !== 'all' || tagFilter || advancedFilters.rating !== 'all' || advancedFilters.minPrice || advancedFilters.maxPrice || advancedFilters.startDate || advancedFilters.endDate;
+                        const isAnyFilterActive = searchQuery || statusFilter !== 'all' || categoryFilter !== 'all' || copyTypeFilter !== 'all' || authorFilter !== 'all' || tagFilter || advancedFilters.rating !== 'all' || advancedFilters.minPrice || advancedFilters.maxPrice || advancedFilters.startDate || advancedFilters.endDate;
 
                         let suggestionHtml = '';
                         if (searchQuery && !aiSearchResults) {
@@ -3148,6 +3164,18 @@
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
+            window.setCopyTypeFilter = (copyType) => {
+                if (copyType === 'all') {
+                    copyTypeFilter = 'all';
+                } else if (copyTypeFilter === copyType) {
+                    copyTypeFilter = 'all';
+                } else {
+                    copyTypeFilter = copyType;
+                }
+                window.queueRenderMainApp();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+
             window.setTagFilter = (tag) => {
                 tagFilter = tag;
                 window.queueRenderMainApp();
@@ -3172,6 +3200,7 @@
                 tagFilter = type === 'tag' ? value : null;
                 categoryFilter = type === 'genre' ? value : 'all';
                 authorFilter = type === 'author' ? value : 'all';
+                copyTypeFilter = type === 'copy_type' ? value : 'all';
                 advancedFilters = { rating: 'all', minPrice: null, maxPrice: null, startDate: null, endDate: null };
                 window.queueRenderMainApp();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -3232,6 +3261,7 @@
                 aiSearchResultsSet = null;
                 tagFilter = null;
                 categoryFilter = 'all';
+                copyTypeFilter = 'all';
                 authorFilter = 'all';
                 favoritesOnly = false;
                 advancedFilters = { rating: 'all', minPrice: null, maxPrice: null, startDate: null, endDate: null };
@@ -3257,7 +3287,6 @@
                                     <option value="title" ${sortBy === 'title' ? 'selected' : ''}>Title (A-Z)</option>
                                     <option value="author" ${sortBy === 'author' ? 'selected' : ''}>Author</option>
                                     <option value="borrowed_to_others" ${sortBy === 'borrowed_to_others' ? 'selected' : ''}>Borrowed to Others</option>
-                                    <option value="copy_type" ${sortBy === 'copy_type' ? 'selected' : ''}>Copy Type</option>
                                 </select>
                             </div>
                             <div>
@@ -3539,6 +3568,7 @@
                     genresCount: {},
                     authorsCount: {},
                     tagsCount: {},
+                    copyTypesCount: { 'New Copy': 0, 'Old Copy': 0, 'Gifted': 0 },
                     firstBookTime: Date.now(),
                     recentMomentum: 0,
                     readingStreak: 0,
@@ -3578,6 +3608,10 @@
                     if (b.excludeFromLibrary) return;
 
                     libraryStats.libBooksCount++;
+
+                    // Copy type distribution count
+                    const cType = b.copyType || 'New Copy';
+                    libraryStats.copyTypesCount[cType] = (libraryStats.copyTypesCount[cType] || 0) + 1;
 
                     // Analysis Metadata (Library only)
                     if (b.author) {
@@ -5149,7 +5183,7 @@
                         let chartInstance;
                         if (chart.type === 'doughnut' || chart.type === 'pie') {
                             chartInstance = new Chart(ctx, {
-                                type: 'doughnut',
+                                type: chart.type || 'doughnut',
                                 data: {
                                     labels: chart.labels,
                                     datasets: [{
@@ -5181,7 +5215,7 @@
                                             }
                                         }
                                     },
-                                    cutout: '70%',
+                                    cutout: chart.type === 'pie' ? '0%' : '70%',
                                     animation: {
                                         animateScale: true,
                                         animateRotate: true
@@ -5247,7 +5281,7 @@
                 window.pendingCharts = [];
             };
 
-            function renderPieChart(entries, total, colors, centerValue, centerLabel, title, filterType, showCenter = true) {
+            function renderPieChart(entries, total, colors, centerValue, centerLabel, title, filterType, showCenter = true, showPercentageInLegend = false, chartType = 'doughnut') {
                 const chartId = `chart-${Math.random().toString(36).substr(2, 9)}`;
 
                 // Standard Color Palette
@@ -5259,7 +5293,7 @@
                 if (!window.pendingCharts) window.pendingCharts = [];
                 window.pendingCharts.push({
                     id: chartId,
-                    type: 'doughnut',
+                    type: chartType,
                     labels: entries.map(e => e[0]),
                     data: entries.map(e => e[1]),
                     colors: palette,
@@ -5283,13 +5317,15 @@
                         <div class="grid grid-cols-1 gap-x-6 gap-y-2">
                             ${entries.slice(0, 6).map(([label, count], i) => {
                                 const clickHandler = filterType ? `onclick='window.applyInsightFilter("${filterType}", "${label.replace(/"/g, "&quot;")}")'` : '';
+                                const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                                const displayCount = showPercentageInLegend ? `${count} <span class="text-[10px] font-normal text-slate-400">(${pct}%)</span>` : count;
                                 return `
                                 <div class="flex items-center justify-between text-sm py-1 border-b border-slate-50 dark:border-slate-800/50 ${filterType ? 'cursor-pointer group' : ''}" ${clickHandler}>
                                     <div class="flex items-center gap-2 truncate">
                                         <div class="w-2 h-2 rounded-full" style="background-color: ${palette[i % palette.length]}"></div>
                                         <span class="font-medium truncate ${filterType ? 'group-hover:text-primary transition-colors' : ''}">${label}</span>
                                     </div>
-                                    <span class="font-bold text-primary">${count}</span>
+                                    <span class="font-bold text-primary">${displayCount}</span>
                                 </div>
                                 `;
                             }).join('')}
@@ -5570,6 +5606,16 @@
                                     const entries = Object.entries(authorsCount).sort((a, b) => b[1] - a[1]);
                                     const totalEntries = entries.reduce((acc, [_, count]) => acc + count, 0);
                                     return renderPieChart(entries, totalEntries, ['#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6'], libBooksCount, 'Books', 'Author Distribution', 'author', false);
+                                })()}
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-10 mb-10 pt-10 border-t border-slate-100 dark:border-slate-800">
+                            <div class="flex flex-col sm:flex-row items-center gap-8">
+                                ${(() => {
+                                    const entries = Object.entries(libraryStats.copyTypesCount || { 'New Copy': 0, 'Old Copy': 0, 'Gifted': 0 }).sort((a, b) => b[1] - a[1]);
+                                    const totalEntries = entries.reduce((acc, [_, count]) => acc + count, 0);
+                                    return renderPieChart(entries, totalEntries, ['#10b981', '#3b82f6', '#f59e0b'], libBooksCount, 'Books', 'Copy Type Distribution', 'copy_type', false, true, 'pie');
                                 })()}
                             </div>
                         </div>
