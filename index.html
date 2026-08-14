@@ -672,12 +672,38 @@
                 return formatted;
             }
 
+            window.activeTTSState = null;
+
             window.speakText = (text, element) => {
                 if (!('speechSynthesis' in window)) {
                     showToast('TTS not supported', 'error');
                     return;
                 }
-                window.speechSynthesis.cancel();
+
+                const speakerSvg = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>';
+                const stopSvg = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9h6v6H9V9z" /></svg>';
+
+                const resetBtn = (btn) => {
+                    if (!btn) return;
+                    btn.classList.remove('text-emerald-500', 'animate-pulse');
+                    btn.title = "Listen to response";
+                    btn.setAttribute('aria-label', "Listen to response");
+                    btn.innerHTML = speakerSvg;
+                };
+
+                if (window.speechSynthesis.speaking && window.activeTTSState) {
+                    const prevState = window.activeTTSState;
+                    window.speechSynthesis.cancel();
+
+                    if (prevState.element === element) {
+                        resetBtn(prevState.element);
+                        window.activeTTSState = null;
+                        return;
+                    } else {
+                        resetBtn(prevState.element);
+                    }
+                }
+
                 const utterance = new SpeechSynthesisUtterance(text);
                 const language = localStorage.getItem('mylib_ai_language') || 'English';
                 if (language === 'Bengali') utterance.lang = 'bn-BD';
@@ -687,14 +713,27 @@
                 else utterance.lang = 'en-US';
 
                 utterance.onstart = () => {
-                    if (element) element.classList.add('text-emerald-500', 'animate-pulse');
+                    if (element) {
+                        element.classList.add('text-emerald-500', 'animate-pulse');
+                        element.title = "Stop listening";
+                        element.setAttribute('aria-label', "Stop listening");
+                        element.innerHTML = stopSvg;
+                    }
                 };
-                utterance.onend = () => {
-                    if (element) element.classList.remove('text-emerald-500', 'animate-pulse');
+
+                const cleanup = () => {
+                    if (element) {
+                        resetBtn(element);
+                    }
+                    if (window.activeTTSState && window.activeTTSState.element === element) {
+                        window.activeTTSState = null;
+                    }
                 };
-                utterance.onerror = () => {
-                    if (element) element.classList.remove('text-emerald-500', 'animate-pulse');
-                };
+
+                utterance.onend = cleanup;
+                utterance.onerror = cleanup;
+
+                window.activeTTSState = { element, text };
                 window.speechSynthesis.speak(utterance);
             };
 
@@ -7416,7 +7455,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                         if (contentDiv) {
                             contentDiv.innerHTML = formatAIText(text);
                             // Add TTS button if it's AI response and not already present
-                            if (!el.querySelector('button[title="Listen to response"]')) {
+                            if (!el.querySelector('button[title="Listen to response"], button[title="Stop listening"]')) {
                                 const btn = document.createElement('button');
                                 btn.onclick = function() { window.speakText(this.parentElement.innerText, this); };
                                 btn.className = "absolute -right-2 -bottom-2 p-1.5 bg-white dark:bg-slate-700 rounded-lg shadow-md border border-slate-100 dark:border-slate-600 opacity-0 group-hover/msg:opacity-100 transition-opacity hover:text-primary focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-primary outline-none";
