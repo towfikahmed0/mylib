@@ -1586,8 +1586,9 @@
                             const input = document.getElementById('search-input');
                             input.value = '';
                             input.focus();
-                            input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            if (searchHint) searchHint.classList.add('opacity-0');
                             document.getElementById('clear-search-btn').classList.add('hidden');
+                            input.scrollIntoView({ behavior: 'smooth', block: 'center' });
                             window.queueRenderLibraryOnly();
                         });
                         document.getElementById('advanced-search-btn').addEventListener('click', openAdvancedSearch);
