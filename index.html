@@ -420,12 +420,14 @@
             });
             let books = [];                // local copy for UI, synced with Firestore
             let chatHistory = [];          // AI chat session history
+            let bookRequests = [];         // book borrowing requests
             window.__setBooks = (b) => books = b;
             window.lastDeleted = [];       // Safety net for undo
             let readingStatuses = {};      // local copy for per-user statuses {bookId: status}
             window.__setReadingStatuses = (s) => readingStatuses = s;
             let unsubscribeBooks = null;
             let unsubscribeStatus = null;
+            let unsubscribeBookRequests = null;
             let activeTab = 'library';     // 'library', 'wishlist', 'activity', 'settings'
             let allPartnerships = [];
             let aiResponseCache = [];      // Cache last 5 responses [{prompt, response}]
@@ -4121,6 +4123,16 @@
                     }, err => {
                         console.error("Status Listener Error (Ensure index is created):", err);
                     });
+
+                if (unsubscribeBookRequests) unsubscribeBookRequests();
+                unsubscribeBookRequests = db.collection('bookRequests')
+                    .where('toUserId', '==', currentUser.uid)
+                    .onSnapshot(snapshot => {
+                        bookRequests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        if (activeTab === 'activity') window.queueRenderMainApp();
+                    }, err => {
+                        console.error("Book Requests Listener Error:", err);
+                    });
             }
 
             // ---------- Scanner Logic ----------
@@ -6165,6 +6177,32 @@
             }
 
             function renderActivity() {
+                const pendingRequests = bookRequests.filter(r => r.status === 'pending');
+                const pendingRequestsHTML = pendingRequests.length > 0 ? `
+                    <div class="glass p-6 rounded-[2.5rem] border border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20 mb-8 space-y-4">
+                        <div class="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+                            <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                            <h3 class="text-sm font-black uppercase tracking-wider">Pending Book Requests (${pendingRequests.length})</h3>
+                        </div>
+                        <div class="space-y-3">
+                            ${pendingRequests.map(req => `
+                                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-amber-100 dark:border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                    <div>
+                                        <p class="text-sm text-slate-800 dark:text-slate-100 font-bold">
+                                            <strong>${escapeHTML(req.requesterName || req.fromEmail)}</strong> requested to borrow <strong>"${escapeHTML(req.bookTitle)}"</strong>
+                                        </p>
+                                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">${req.createdAt?.toDate ? formatDate(req.createdAt.toDate()) : 'Recently'}</p>
+                                    </div>
+                                    <div class="flex items-center gap-2 w-full sm:w-auto">
+                                        <button onclick="window.acceptBookRequest('${req.id}')" class="flex-1 sm:flex-initial px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition active:scale-95 shadow-md focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none">Accept</button>
+                                        <button onclick="window.rejectBookRequest('${req.id}')" class="flex-1 sm:flex-initial px-4 py-2 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 hover:bg-rose-100 text-xs font-bold rounded-xl transition active:scale-95 focus-visible:ring-2 focus-visible:ring-rose-500 outline-none">Reject</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : '';
+
                 const messageInputHTML = `
                     <div class="glass p-6 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800 mb-8">
                         <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Post a Message</h3>
@@ -6177,9 +6215,10 @@
                     </div>
                 `;
 
-                if (activities.length === 0) {
+                if (activities.length === 0 && pendingRequests.length === 0) {
                     return `
                     <div class="max-w-2xl mx-auto animate-slide-up">
+                        ${pendingRequestsHTML}
                         ${messageInputHTML}
                         <div class="flex flex-col items-center justify-center py-24 text-center">
                             <div class="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 text-slate-300">
@@ -6194,6 +6233,7 @@
 
                 return `
                 <div class="max-w-2xl mx-auto space-y-4 animate-slide-up">
+                    ${pendingRequestsHTML}
                     ${messageInputHTML}
                     <div class="mb-8">
                         <h2 class="text-3xl font-black font-serif italic">Library Activity</h2>
@@ -6230,6 +6270,14 @@
                                 icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>';
                                 color = 'bg-violet-100 text-violet-600';
                                 text = `<strong>${escapeHTML(a.userName)}</strong>: ${escapeHTML(a.text)}`;
+                            } else if (a.type === 'request_accepted') {
+                                icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+                                color = 'bg-emerald-100 text-emerald-600';
+                                text = `<strong>${escapeHTML(a.userName)}</strong> ${escapeHTML(a.text)}`;
+                            } else if (a.type === 'request_rejected') {
+                                icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+                                color = 'bg-rose-100 text-rose-600';
+                                text = `<strong>${escapeHTML(a.userName)}</strong> ${escapeHTML(a.text)}`;
                             }
 
                             return `
@@ -6255,6 +6303,204 @@
             }
 
             window.lastUserSearchQuery = "";
+
+            window.sendBookRequest = async (bookId, toUserId, bookTitle, btnElement) => {
+                if (!currentUser) return;
+                if (toUserId === currentUser.uid) {
+                    showToast('You cannot request your own book.', 'error');
+                    return;
+                }
+
+                if (btnElement) {
+                    btnElement.disabled = true;
+                    btnElement.innerText = 'Sending...';
+                }
+
+                try {
+                    const existingSnap = await db.collection('bookRequests')
+                        .where('fromUserId', '==', currentUser.uid)
+                        .where('bookId', '==', bookId)
+                        .where('status', '==', 'pending')
+                        .get();
+
+                    if (!existingSnap.empty) {
+                        showToast('You have already requested this book.', 'info');
+                        if (btnElement) {
+                            btnElement.innerText = 'Request Pending';
+                            btnElement.className = 'px-4 py-2 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 font-bold rounded-xl text-xs cursor-not-allowed';
+                        }
+                        return;
+                    }
+
+                    await db.collection('bookRequests').add({
+                        fromUserId: currentUser.uid,
+                        fromEmail: currentUser.email || '',
+                        toUserId: toUserId,
+                        bookId: bookId,
+                        bookTitle: bookTitle,
+                        requesterName: userProfile?.displayName || currentUser.displayName || currentUser.email || 'Reader',
+                        status: 'pending',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    showToast(`Request sent for "${bookTitle}"!`, 'success');
+                    if (btnElement) {
+                        btnElement.disabled = true;
+                        btnElement.innerText = 'Request Pending';
+                        btnElement.className = 'px-4 py-2 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 font-bold rounded-xl text-xs cursor-not-allowed';
+                    }
+                } catch (err) {
+                    showToast('Failed to send request: ' + err.message, 'error');
+                    if (btnElement) {
+                        btnElement.disabled = false;
+                        btnElement.innerText = 'Request Book';
+                    }
+                }
+            };
+
+            window.acceptBookRequest = async (requestId) => {
+                try {
+                    const reqDoc = await db.collection('bookRequests').doc(requestId).get();
+                    if (!reqDoc.exists) {
+                        showToast('Request no longer exists.', 'error');
+                        return;
+                    }
+                    const req = { id: reqDoc.id, ...reqDoc.data() };
+
+                    const bookDoc = await db.collection('books').doc(req.bookId).get();
+                    if (!bookDoc.exists) {
+                        showToast('Book not found.', 'error');
+                        return;
+                    }
+                    const bookData = bookDoc.data();
+                    if (bookData.borrowedBy) {
+                        showToast('Book is already borrowed by someone else.', 'error');
+                        return;
+                    }
+
+                    const borrowerDisplayName = req.requesterName || req.fromEmail || 'Borrower';
+                    const nowIso = new Date().toISOString();
+
+                    await db.collection('bookRequests').doc(requestId).update({
+                        status: 'accepted',
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    const existingHistory = Array.isArray(bookData.borrowHistory) ? bookData.borrowHistory : [];
+                    const newHistoryEntry = {
+                        borrowerName: borrowerDisplayName,
+                        borrowerEmail: req.fromEmail || '',
+                        borrowerUid: req.fromUserId || '',
+                        borrowDate: nowIso,
+                        returnDate: null
+                    };
+
+                    await db.collection('books').doc(req.bookId).update({
+                        borrowedBy: borrowerDisplayName,
+                        borrowDate: nowIso,
+                        borrowHistory: [...existingHistory, newHistoryEntry]
+                    });
+
+                    const actMessage = `accepted ${borrowerDisplayName}'s request to borrow "${req.bookTitle}".`;
+                    await db.collection('activityFeed').add({
+                        type: 'request_accepted',
+                        bookId: req.bookId,
+                        bookTitle: req.bookTitle,
+                        userName: userProfile?.displayName || currentUser.displayName || currentUser.email,
+                        userId: currentUser.uid,
+                        targetUserId: req.fromUserId,
+                        text: actMessage,
+                        libraryId: currentUser.uid,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    if (req.fromUserId !== currentUser.uid) {
+                        await db.collection('activityFeed').add({
+                            type: 'request_accepted',
+                            bookId: req.bookId,
+                            bookTitle: req.bookTitle,
+                            userName: userProfile?.displayName || currentUser.displayName || currentUser.email,
+                            userId: currentUser.uid,
+                            targetUserId: req.fromUserId,
+                            text: actMessage,
+                            libraryId: req.fromUserId,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
+
+                    showToast(`Request accepted! Marked as borrowed to ${borrowerDisplayName}.`, 'success');
+                    if (activeTab === 'activity') window.queueRenderMainApp();
+                } catch (err) {
+                    showToast('Failed to accept request: ' + err.message, 'error');
+                }
+            };
+
+            window.rejectBookRequest = async (requestId) => {
+                try {
+                    const reqDoc = await db.collection('bookRequests').doc(requestId).get();
+                    if (!reqDoc.exists) {
+                        showToast('Request no longer exists.', 'error');
+                        return;
+                    }
+                    const req = { id: reqDoc.id, ...reqDoc.data() };
+
+                    await db.collection('bookRequests').doc(requestId).update({
+                        status: 'rejected',
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    const actMessage = `declined the request for "${req.bookTitle}".`;
+                    if (req.fromUserId !== currentUser.uid) {
+                        await db.collection('activityFeed').add({
+                            type: 'request_rejected',
+                            bookId: req.bookId,
+                            bookTitle: req.bookTitle,
+                            userName: userProfile?.displayName || currentUser.displayName || currentUser.email,
+                            userId: currentUser.uid,
+                            targetUserId: req.fromUserId,
+                            text: actMessage,
+                            libraryId: req.fromUserId,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
+
+                    showToast('Request declined.', 'info');
+                    if (activeTab === 'activity') window.queueRenderMainApp();
+                } catch (err) {
+                    showToast('Failed to decline request: ' + err.message, 'error');
+                }
+            };
+
+            window.toggleSearchBookDropdown = (bookId) => {
+                const dropdown = document.getElementById(`dropdown-${bookId}`);
+                const arrow = document.getElementById(`arrow-${bookId}`);
+                const header = document.getElementById(`book-header-${bookId}`);
+                if (!dropdown) return;
+
+                const isHidden = dropdown.classList.contains('hidden');
+
+                // Collapse all other dropdowns in search results
+                document.querySelectorAll('[id^="dropdown-"]').forEach(el => {
+                    if (el.id !== `dropdown-${bookId}`) {
+                        el.classList.add('hidden');
+                        const otherId = el.id.replace('dropdown-', '');
+                        const otherArrow = document.getElementById(`arrow-${otherId}`);
+                        const otherHeader = document.getElementById(`book-header-${otherId}`);
+                        if (otherArrow) otherArrow.classList.remove('rotate-180');
+                        if (otherHeader) otherHeader.setAttribute('aria-expanded', 'false');
+                    }
+                });
+
+                if (isHidden) {
+                    dropdown.classList.remove('hidden');
+                    if (arrow) arrow.classList.add('rotate-180');
+                    if (header) header.setAttribute('aria-expanded', 'true');
+                } else {
+                    dropdown.classList.add('hidden');
+                    if (arrow) arrow.classList.remove('rotate-180');
+                    if (header) header.setAttribute('aria-expanded', 'false');
+                }
+            };
 
             window.searchUserByEmail = async () => {
                 const input = document.getElementById('user-search-input');
@@ -6341,8 +6587,18 @@
                     if (isCollaborator) {
                         try {
                             const booksSnapshot = await db.collection('books').where('userId', '==', foundUserId).get();
-                            booksSnapshot.docs.forEach(doc => {
-                                foundBooks.push({ id: doc.id, ...doc.data() });
+                            const statusSnapshots = await Promise.all(booksSnapshot.docs.map(doc =>
+                                db.collection('books').doc(doc.id).collection('readingStatus').doc(foundUserId).get()
+                            ));
+
+                            booksSnapshot.docs.forEach((doc, idx) => {
+                                const data = doc.data();
+                                const statusData = statusSnapshots[idx].exists ? statusSnapshots[idx].data() : {};
+                                const isWishlist = data.isWishlist === true || statusData.isWishlist === true;
+
+                                if (data.userId === foundUserId && !isWishlist) {
+                                    foundBooks.push({ id: doc.id, ...data, _statusData: statusData });
+                                }
                             });
                         } catch (err) {
                             errorMsg = "Unable to fetch books: " + err.message;
@@ -6380,18 +6636,67 @@
                             <div>
                                 <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Books Owned</h4>
                                 ${foundBooks.length > 0 ? `
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                    <div class="space-y-4">
                                         ${foundBooks.map(book => {
                                             const title = book.title || 'Untitled';
                                             const author = book.author || 'Unknown Author';
                                             const coverUrl = book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover';
+                                            const bookGenres = getBookGenres(book);
+                                            const copyType = book.copyType || 'New Copy';
+
+                                            const isCurrentlyBorrowed = !!book.borrowedBy || (Array.isArray(book.borrowHistory) && book.borrowHistory.length > 0 && (!book.borrowHistory[book.borrowHistory.length - 1].returnDate || book.borrowHistory.some(entry => !entry.returnDate)));
+                                            const isSelf = currentUser && foundUserId === currentUser.uid;
+
                                             return `
-                                                <div onclick="window.openVisitedBookDetails('${book.id}', ['${foundUserId}'])" class="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl flex gap-4 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all border border-slate-100 dark:border-slate-700" role="button" aria-label="${escapeHTML(title)} by ${escapeHTML(author)}">
-                                                    <img src="${coverUrl}" class="w-12 h-20 object-cover rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex-shrink-0">
-                                                    <div class="flex-1 flex flex-col justify-center min-w-0">
-                                                        <h5 class="font-bold text-slate-800 dark:text-white truncate text-xs leading-snug">${escapeHTML(title)}</h5>
-                                                        <p class="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5 italic font-medium">${escapeHTML(author)}</p>
-                                                        ${book.rating ? `<div class="text-amber-400 text-[10px] mt-1">${'★'.repeat(book.rating)}${'☆'.repeat(5 - book.rating)}</div>` : ''}
+                                                <div class="bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden transition-all shadow-sm hover:shadow-md">
+                                                    <div onclick="window.toggleSearchBookDropdown('${book.id}')" class="p-4 flex items-center justify-between gap-4 cursor-pointer" role="button" aria-expanded="false" id="book-header-${book.id}">
+                                                        <div class="flex items-center gap-4 min-w-0">
+                                                            <img src="${coverUrl}" class="w-12 h-16 object-cover rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex-shrink-0">
+                                                            <div class="min-w-0">
+                                                                <h5 class="font-bold text-slate-800 dark:text-white truncate text-sm leading-snug">${escapeHTML(title)}</h5>
+                                                                <p class="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5 italic font-medium">${escapeHTML(author)}</p>
+                                                                <div class="flex items-center gap-2 mt-1 flex-wrap">
+                                                                    ${book.rating ? `<span class="text-amber-400 text-xs">${'★'.repeat(book.rating)}${'☆'.repeat(5 - book.rating)}</span>` : ''}
+                                                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100/80 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">${escapeHTML(copyType)}</span>
+                                                                    ${isCurrentlyBorrowed ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">Currently borrowed</span>` : ''}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <svg id="arrow-${book.id}" class="w-5 h-5 text-slate-400 transition-transform duration-200 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                                    </div>
+                                                    <div id="dropdown-${book.id}" class="hidden border-t border-slate-200 dark:border-slate-700/60 p-5 bg-white/50 dark:bg-slate-800/50 space-y-4 animate-slide-up">
+                                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                                                            <div>
+                                                                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Genres</span>
+                                                                <div class="flex flex-wrap gap-1">
+                                                                    ${bookGenres.map(g => `<span class="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded text-[10px] font-medium">${escapeHTML(g)}</span>`).join('')}
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Copy Details</span>
+                                                                <p class="font-medium text-slate-700 dark:text-slate-300">${escapeHTML(copyType)}${book.copyType === 'Gifted' && book.gifterName ? ` (Gifted by ${escapeHTML(book.gifterName)})` : ''}</p>
+                                                            </div>
+                                                        </div>
+                                                        ${book.description ? `
+                                                            <div>
+                                                                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Description</span>
+                                                                <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">${escapeHTML(book.description)}</p>
+                                                            </div>
+                                                        ` : ''}
+                                                        <div class="pt-2 flex items-center justify-between border-t border-slate-200/60 dark:border-slate-700/60">
+                                                            <div>
+                                                                ${isCurrentlyBorrowed ? `<span class="text-xs font-bold text-amber-600 dark:text-amber-400">Currently borrowed by ${escapeHTML(book.borrowedBy || 'someone')}</span>` : `<span class="text-xs font-bold text-emerald-600 dark:text-emerald-400">Available</span>`}
+                                                            </div>
+                                                            <div id="request-btn-container-${book.id}">
+                                                                ${isSelf ? `
+                                                                    <span class="text-xs font-bold text-slate-400 italic">Your Book</span>
+                                                                ` : isCurrentlyBorrowed ? `
+                                                                    <button disabled class="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-400 font-bold rounded-xl text-xs cursor-not-allowed">Currently borrowed</button>
+                                                                ` : `
+                                                                    <button id="req-btn-${book.id}" onclick="window.sendBookRequest('${book.id}', '${foundUserId}', '${escapeHTML(title.replace(/'/g, "\\'"))}', this)" class="px-4 py-2 bg-primary text-white font-bold rounded-xl text-xs hover:bg-blue-700 transition active:scale-95 shadow-md shadow-primary/20 focus-visible:ring-2 focus-visible:ring-primary outline-none">Request Book</button>
+                                                                `}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             `;
