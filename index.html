@@ -2286,8 +2286,9 @@
                     const matchesTag = !tagFilter || (b.tags && b.tags.includes(tagFilter));
                     const matchesFavorites = !favoritesOnly || statusData.isFavorite;
 
-                    // ⚡ Bolt: Use cached advRating
-                    const matchesAdvancedRating = advRating === -1 || (b.rating || 0) >= advRating;
+                    // ⚡ Bolt: Exact rating matching (checks user rating first, falls back to book rating)
+                    const bookRating = statusData.rating || b.rating || 0;
+                    const matchesAdvancedRating = advRating === -1 || bookRating === advRating;
                     const matchesPrice = (!advancedFilters.minPrice || b.price >= advancedFilters.minPrice) &&
                         (!advancedFilters.maxPrice || b.price <= advancedFilters.maxPrice);
 
@@ -2299,7 +2300,7 @@
                         if (endTime && bTime > endTime) matchesDate = false;
                     }
 
-                    const isCurrentlyBorrowed = !!b.borrowedBy || (Array.isArray(b.borrowHistory) && b.borrowHistory.length > 0 && (!b.borrowHistory[b.borrowHistory.length - 1].returnDate || b.borrowHistory.some(entry => !entry.returnDate || entry.returnDate === null)));
+                    const isCurrentlyBorrowed = !!b.borrowedBy && (!Array.isArray(b.borrowHistory) || b.borrowHistory.length === 0 || !b.borrowHistory[b.borrowHistory.length - 1].returnDate);
                     const matchesBorrowed = sortBy !== 'borrowed_to_others' || isCurrentlyBorrowed;
 
                     return matchesTab && matchesSearch && matchesStatus && matchesCategory && matchesCopyType && matchesAuthor && matchesTag && matchesFavorites && matchesAdvancedRating && matchesPrice && matchesDate && matchesBorrowed;
@@ -3357,13 +3358,13 @@
                         </div>
                         ` : ''}
                         <div>
-                            <label for="adv-rating" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Minimum Rating</label>
+                            <label for="adv-rating" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Star Rating</label>
                             <select id="adv-rating" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none">
                                 <option value="all">Any Rating</option>
-                                <option value="1" ${advancedFilters.rating == 1 ? 'selected' : ''}>1+ Star</option>
-                                <option value="2" ${advancedFilters.rating == 2 ? 'selected' : ''}>2+ Stars</option>
-                                <option value="3" ${advancedFilters.rating == 3 ? 'selected' : ''}>3+ Stars</option>
-                                <option value="4" ${advancedFilters.rating == 4 ? 'selected' : ''}>4+ Stars</option>
+                                <option value="1" ${advancedFilters.rating == 1 ? 'selected' : ''}>1 Star</option>
+                                <option value="2" ${advancedFilters.rating == 2 ? 'selected' : ''}>2 Stars</option>
+                                <option value="3" ${advancedFilters.rating == 3 ? 'selected' : ''}>3 Stars</option>
+                                <option value="4" ${advancedFilters.rating == 4 ? 'selected' : ''}>4 Stars</option>
                                 <option value="5" ${advancedFilters.rating == 5 ? 'selected' : ''}>5 Stars</option>
                             </select>
                         </div>
@@ -5689,7 +5690,7 @@
                         </div>
 
                         ${(() => {
-                            const borrowedBooks = books.filter(b => b.borrowedBy || (b.borrowHistory && b.borrowHistory.length > 0 && !b.borrowHistory[b.borrowHistory.length - 1].returnDate));
+                            const borrowedBooks = books.filter(b => !!b.borrowedBy && (!Array.isArray(b.borrowHistory) || b.borrowHistory.length === 0 || !b.borrowHistory[b.borrowHistory.length - 1].returnDate));
                             if (borrowedBooks.length > 0) {
                                 return `
                                 <div class="mt-12 pt-12 border-t border-slate-100 dark:border-slate-800">
@@ -6644,7 +6645,7 @@
                                             const bookGenres = getBookGenres(book);
                                             const copyType = book.copyType || 'New Copy';
 
-                                            const isCurrentlyBorrowed = !!book.borrowedBy || (Array.isArray(book.borrowHistory) && book.borrowHistory.length > 0 && (!book.borrowHistory[book.borrowHistory.length - 1].returnDate || book.borrowHistory.some(entry => !entry.returnDate)));
+                                            const isCurrentlyBorrowed = !!book.borrowedBy && (!Array.isArray(book.borrowHistory) || book.borrowHistory.length === 0 || !book.borrowHistory[book.borrowHistory.length - 1].returnDate);
                                             const isSelf = currentUser && foundUserId === currentUser.uid;
 
                                             return `
@@ -8278,9 +8279,18 @@ If the collection is small or has no finished books, be extra encouraging and su
                     btn.disabled = true;
                     btn.innerText = 'Borrowing...';
                     try {
+                        const nowIso = new Date().toISOString();
+                        const existingHistory = Array.isArray(book.borrowHistory) ? book.borrowHistory : [];
+                        const newHistoryEntry = {
+                            borrowerName: name,
+                            borrowDate: nowIso,
+                            returnDate: null
+                        };
+
                         await db.collection('books').doc(book.id).update({
                             borrowedBy: name,
-                            borrowDate: new Date().toISOString()
+                            borrowDate: nowIso,
+                            borrowHistory: [...existingHistory, newHistoryEntry]
                         });
 
                         await db.collection('activityFeed').add({
@@ -8445,9 +8455,19 @@ If the collection is small or has no finished books, be extra encouraging and su
                     btn.disabled = true;
                     btn.innerText = 'Returning...';
                     try {
+                        const nowIso = new Date().toISOString();
+                        const existingHistory = Array.isArray(book.borrowHistory) ? book.borrowHistory : [];
+                        const updatedHistory = existingHistory.map((entry, index) => {
+                            if (!entry.returnDate) {
+                                return { ...entry, returnDate: nowIso };
+                            }
+                            return entry;
+                        });
+
                         await db.collection('books').doc(book.id).update({
                             borrowedBy: firebase.firestore.FieldValue.delete(),
-                            borrowDate: firebase.firestore.FieldValue.delete()
+                            borrowDate: firebase.firestore.FieldValue.delete(),
+                            borrowHistory: updatedHistory
                         });
 
                         await db.collection('activityFeed').add({
