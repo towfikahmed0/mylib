@@ -10,6 +10,7 @@
     <meta name="description"
         content="Manage your personal book collection with offline support, QR scanning, and cloud sync.">
     <meta name="theme-color" content="#3b82f6">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json">
     <!-- Tailwind + Inter & Playfair Display fonts -->
@@ -127,8 +128,17 @@
         }
 
         @keyframes breathe {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.9; transform: scale(0.98); }
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.9;
+                transform: scale(0.98);
+            }
         }
 
         .animate-slide-up {
@@ -157,17 +167,20 @@
                 opacity: 0;
                 transform: translateY(10px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
             }
         }
 
-        button, .clickable {
+        button,
+        .clickable {
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        button:active, .clickable:active {
+        button:active,
+        .clickable:active {
             transform: scale(0.96);
         }
 
@@ -177,7 +190,12 @@
         }
 
         @media (prefers-reduced-motion: reduce) {
-            .animate-slide-up, .active-filter-chip, .book-card:hover, .animate-pulse-subtle, .animate-pulse {
+
+            .animate-slide-up,
+            .active-filter-chip,
+            .book-card:hover,
+            .animate-pulse-subtle,
+            .animate-pulse {
                 animation: none !important;
                 transition: none !important;
                 transform: none !important;
@@ -195,9 +213,17 @@
         }
 
         @keyframes heartBurst {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.4); }
-            100% { transform: scale(1); }
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.4);
+            }
+
+            100% {
+                transform: scale(1);
+            }
         }
 
         /* Light blueish theme scrollbar */
@@ -326,9 +352,11 @@
     <!-- App Container (conditional rendering based on auth) -->
     <div id="app" class="min-h-screen flex flex-col">
         <!-- Initial Loading State -->
-        <div id="initial-loader" class="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 transition-opacity duration-500">
+        <div id="initial-loader"
+            class="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 transition-opacity duration-500">
             <div class="w-16 h-16 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin mb-6"></div>
-            <p class="text-slate-500 font-bold uppercase tracking-widest text-xs animate-pulse">Connecting to Library...</p>
+            <p class="text-slate-500 font-bold uppercase tracking-widest text-xs animate-pulse">Connecting to Library...
+            </p>
         </div>
     </div>
 
@@ -337,7 +365,9 @@
         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-medium shadow-2xl flex items-center gap-3 transition-all duration-300 opacity-0 translate-y-10 pointer-events-none">
     </div>
     <div id="modal-container" class="fixed inset-0 z-50 pointer-events-none"></div>
-    <div id="user-search-results-container" class="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-md hidden flex items-center justify-center p-4"></div>
+    <div id="user-search-results-container"
+        class="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-md hidden flex items-center justify-center p-4">
+    </div>
 
     <!-- PWA Service Worker Registration -->
     <script>
@@ -846,7 +876,7 @@
                 const firstFocusableEl = focusableEls[0];
                 const lastFocusableEl = focusableEls[focusableEls.length - 1];
 
-                element.addEventListener('keydown', function(e) {
+                element.addEventListener('keydown', function (e) {
                     const isTabPressed = (e.key === 'Tab');
                     if (!isTabPressed) return;
 
@@ -902,109 +932,474 @@
             // ---------- Firebase Auth UI ----------
             function renderAuth() {
                 appEl.innerHTML = `
-                <div class="min-h-screen bg-[#fdfbf7] text-slate-800 flex flex-col">
-                    <!-- Hero Section -->
-                    <main class="flex-1 flex flex-col lg:flex-row">
-                        <div class="flex-1 flex flex-col justify-center px-8 lg:px-24 py-16 lg:py-0">
-                            <div class="max-w-xl mt-10">
-                                <div class="w-16 h-16 rounded-2xl flex items-center justify-center mb-8">
-                                   <img src="https://cdn-icons-png.flaticon.com/512/2232/2232688.png">
-                                </div>
-                                <h1 class="text-5xl lg:text-7xl font-black font-serif italic text-slate-900 leading-tight mb-6 animate-slide-up">Your personal sanctuary for <span class="text-blue-600">every story.</span></h1>
-                                <p class="text-lg text-slate-600 mb-10 leading-relaxed animate-slide-up" style="animation-delay: 100ms">
-                                    My Lib is a professional library manager designed for book lovers who appreciate organization and peace of mind. Catalog your collection, track your progress, and share your passion with a community of readers.
-                                </p>
+               <div class="min-h-screen bg-[#fdfbf7] text-slate-800 flex flex-col">
+    <!-- Hero Section -->
+    <main class="flex-1 flex flex-col lg:flex-row">
+        <div class="flex-1 flex flex-col justify-center px-8 lg:px-24 py-16 lg:py-0">
+            <div class="max-w-xl mt-10">
+                <div class="w-16 h-16 rounded-2xl flex items-center justify-center mb-8">
+                    <img src="https://cdn-icons-png.flaticon.com/512/2232/2232688.png">
+                </div>
 
-                                <div class="flex flex-col sm:flex-row gap-4 items-start animate-slide-up" style="animation-delay: 200ms">
-                                    <button id="google-signin" class="bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold flex items-center gap-3 hover:bg-slate-800 transition shadow-xl shadow-slate-200 active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">
-                                        <svg class="w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-                                        Continue with Google
-                                    </button>
-                                    <div class="py-4 px-2">
-                                        <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">Trusted by readers</p>
-                                    </div>
-                                </div>
+                <h1 class="text-5xl lg:text-7xl font-black font-serif italic text-slate-900 leading-tight mb-6 animate-slide-up">
+                    Your personal sanctuary for <span class="text-blue-600">every story.</span>
+                </h1>
 
-                                <div class="mt-16 pt-8 border-t border-slate-200 animate-slide-up" style="animation-delay: 300ms">
-                                    <p class="text-sm text-slate-500 italic">
-                                        Application created by <a href="https://github.com/towfikahmed0" class="text-blue-600 font-bold hover:underline">Towfik Ahmed</a>
+                <p class="text-lg text-slate-600 mb-10 leading-relaxed animate-slide-up" style="animation-delay: 100ms">
+                    MyLib is your digital home for books. Build your personal library, track your reading journey, discover meaningful insights, and connect with fellow readers—all in one beautifully organized space.
+                </p>
+
+                <div class="flex flex-col sm:flex-row gap-4 items-start animate-slide-up" style="animation-delay: 200ms">
+                    <button id="google-signin" class="bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold flex items-center gap-3 hover:bg-slate-800 transition shadow-xl shadow-slate-200 active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">
+                        <svg class="w-5 h-5" viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                            <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                        </svg>
+                        Continue with Google
+                    </button>
+
+                    <div class="py-4 px-2">
+                        <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">
+                            YOUR BOOKS. YOUR SPACE.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mt-16 pt-8 border-t border-slate-200 animate-slide-up" style="animation-delay: 300ms">
+                    <p class="text-sm text-slate-500 italic">
+                        Crafted with care by
+                        <a href="https://github.com/towfikahmed0" class="text-blue-600 font-bold hover:underline">
+                            Towfik Ahmed
+                        </a>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="hidden lg:block flex-1 relative bg-blue-50 overflow-hidden">
+            <img src="https://images.unsplash.com/photo-1481627546389-07a83f9a7a7d?auto=format&fit=crop&q=80&w=1200"
+                 class="absolute inset-0 w-full h-full object-cover mix-blend-multiply opacity-80"
+                 alt="Library Background">
+
+            <div class="absolute inset-0 bg-gradient-to-r from-[#fdfbf7] to-transparent">
+                <img src="/img/hero.jpg">
+            </div>
+        </div>
+    </main>
+
+    <!-- Features Section -->
+<section class="bg-white py-24 px-8 lg:px-24">
+    <div class="max-w-6xl mx-auto">
+
+        <!-- Section Header -->
+        <div class="text-center mb-16">
+            <h2 class="text-4xl lg:text-5xl font-black font-serif italic mb-4">
+                A Better Way to Live With Your Books
+            </h2>
+
+            <p class="text-slate-500 max-w-2xl mx-auto leading-relaxed">
+                MyLib brings your collection, reading journey, insights, and reading community together in one beautifully organized space.
+            </p>
+        </div>
+
+        <!-- Core Features -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+
+            <!-- Organization -->
+            <div class="p-8 rounded-[2.5rem] bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
+                <div class="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 mb-6">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+
+                <h3 class="text-xl font-black font-serif italic mb-3">
+                    Effortless Organization
+                </h3>
+
+                <p class="text-slate-500 text-sm leading-relaxed">
+                    Find any book in seconds with smart search, advanced filters, tags, genres, ratings, favorites, and reading status.
+                </p>
+            </div>
+
+            <!-- Cataloging -->
+            <div class="p-8 rounded-[2.5rem] bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
+                <div class="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 mb-6">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h2M4 8h12m4 0h2M4 16h4m12 0h2M4 20h12"/>
+                    </svg>
+                </div>
+
+                <h3 class="text-xl font-black font-serif italic mb-3">
+                    Smart Book Cataloging
+                </h3>
+
+                <p class="text-slate-500 text-sm leading-relaxed">
+                    Scan a barcode or QR code to add books in seconds, automatically retrieve book details, or enter everything manually.
+                </p>
+            </div>
+
+            <!-- Reading -->
+            <div class="p-8 rounded-[2.5rem] bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
+                <div class="w-12 h-12 bg-rose-100 rounded-2xl flex items-center justify-center text-rose-600 mb-6">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5S19.832 5.477 21 6.253v13C19.832 18.477 18.246 18 16.5 18s-3.332.477-4.5 1.253"/>
+                    </svg>
+                </div>
+
+                <h3 class="text-xl font-black font-serif italic mb-3">
+                    Your Reading Journey
+                </h3>
+
+                <p class="text-slate-500 text-sm leading-relaxed">
+                    Track what you're reading, record your progress, rate books, save favorites, write notes, and preserve meaningful highlights.
+                </p>
+            </div>
+
+            <!-- Sync -->
+            <div class="p-8 rounded-[2.5rem] bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
+                <div class="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 mb-6">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                </div>
+
+                <h3 class="text-xl font-black font-serif italic mb-3">
+                    Seamless Sync
+                </h3>
+
+                <p class="text-slate-500 text-sm leading-relaxed">
+                    Keep your library synchronized across devices with real-time cloud storage and offline support when your connection disappears.
+                </p>
+            </div>
+
+            <!-- Insights -->
+            <div class="p-8 rounded-[2.5rem] bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
+                <div class="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600 mb-6">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                </div>
+
+                <h3 class="text-xl font-black font-serif italic mb-3">
+                    Reading Insights
+                </h3>
+
+                <p class="text-slate-500 text-sm leading-relaxed">
+                    Turn your collection into meaningful insights. Explore genres, authors, ratings, reading progress, collection value, and personal goals.
+                </p>
+            </div>
+
+            <!-- AI -->
+            <div class="p-8 rounded-[2.5rem] bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
+                <div class="w-12 h-12 bg-violet-100 rounded-2xl flex items-center justify-center text-violet-600 mb-6">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                    </svg>
+                </div>
+
+                <h3 class="text-xl font-black font-serif italic mb-3">
+                    AI Librarian
+                </h3>
+
+                <p class="text-slate-500 text-sm leading-relaxed">
+                    Ask questions about your collection, search naturally, discover recommendations, and uncover patterns in your reading life.
+                </p>
+            </div>
+
+        </div>
+
+
+        <!-- Collaboration Showcase -->
+        <div class="mt-24 rounded-[3rem] bg-slate-900 text-white overflow-hidden">
+            <div class="grid lg:grid-cols-2">
+
+                <div class="p-10 lg:p-16">
+                    <div class="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center mb-8">
+                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M17 20h5v-1a6 6 0 00-12 0v1h7M9 20H4v-1a6 6 0 0112 0v1M15 7a4 4 0 11-8 0 4 4 0 018 0zm6 3a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                    </div>
+
+                    <p class="text-blue-400 text-xs font-bold uppercase tracking-[0.2em] mb-4">
+                        COLLABORATION
+                    </p>
+
+                    <h2 class="text-3xl lg:text-4xl font-black font-serif italic mb-6">
+                        Your Library Doesn't Have to Be Yours Alone.
+                    </h2>
+
+                    <p class="text-slate-300 leading-relaxed mb-8">
+                        Build a shared reading space with friends, family, or reading partners. Connect your libraries, share books, and keep your reading worlds connected.
+                    </p>
+
+                    <div class="grid sm:grid-cols-2 gap-6">
+
+                        <div>
+                            <h3 class="font-bold mb-2">
+                                <i class="fa fa-handshake-o" aria-hidden="true"></i>&nbsp; Shared Libraries
+                            </h3>
+                            <p class="text-sm text-slate-400 leading-relaxed">
+                                Invite people you trust and create a shared library experience.
+                            </p>
+                        </div>
+
+                        <div>
+                            <h3 class="font-bold mb-2">
+                                <i class="fa fa-lock" aria-hidden="true"></i>&nbsp; Flexible Permissions
+                            </h3>
+                            <p class="text-sm text-slate-400 leading-relaxed">
+                                Control what collaborators can do with your collection.
+                            </p>
+                        </div>
+
+                        <div>
+                            <h3 class="font-bold mb-2">
+                                <i class="fa fa-exchange" aria-hidden="true"></i>&nbsp; Book Transfers
+                            </h3>
+                            <p class="text-sm text-slate-400 leading-relaxed">
+                                Transfer individual books or multiple books between collaborators.
+                            </p>
+                        </div>
+
+                        <div>
+                            <h3 class="font-bold mb-2">
+                                <i class="fa fa-bell" aria-hidden="true"></i>&nbsp; Shared Activity
+                            </h3>
+                            <p class="text-sm text-slate-400 leading-relaxed">
+                                Stay informed about changes and activity across shared libraries.
+                            </p>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="bg-blue-600/20 p-10 lg:p-16 flex items-center">
+                    <div class="w-full">
+
+                        <div class="border border-white/10 rounded-3xl p-6 bg-white/5 mb-4">
+                            <p class="text-xs text-slate-400 uppercase tracking-widest mb-3">
+                                Shared Library
+                            </p>
+
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="font-bold">
+                                        Your Reading Circle
+                                    </p>
+                                    <p class="text-sm text-slate-400">
+                                        Books & activity shared together
                                     </p>
                                 </div>
-                            </div>
-                        </div>
-                        <div class="hidden lg:block flex-1 relative bg-blue-50 overflow-hidden">
-                            <img src="https://images.unsplash.com/photo-1481627546389-07a83f9a7a7d?auto=format&fit=crop&q=80&w=1200" class="absolute inset-0 w-full h-full object-cover mix-blend-multiply opacity-80" alt="Library Background">
-                            <div class="absolute inset-0 bg-gradient-to-r from-[#fdfbf7] to-transparent">
-                                <img src="/img/hero.jpg">
-                            </div>
-                        </div>
-                    </main>
 
-                    <!-- Features Section -->
-                    <section class="bg-white py-24 px-8 lg:px-24">
-                        <div class="max-w-6xl mx-auto">
-                            <div class="text-center mb-16">
-                                <h2 class="text-4xl font-black font-serif italic mb-4">Masterfully Crafted Features</h2>
-                                <p class="text-slate-500 max-w-2xl mx-auto">Everything you need to manage your personal library with elegance and efficiency.</p>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                                <div class="p-8 rounded-[2.5rem] bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
-                                    <div class="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 mb-6">
-                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                <div class="flex -space-x-2">
+                                    <div class="w-9 h-9 rounded-full bg-blue-500 border-2 border-slate-900 flex items-center justify-center text-xs font-bold">
+                                        Y
                                     </div>
-                                    <h3 class="text-xl font-black font-serif italic mb-3">Effortless Organization</h3>
-                                    <p class="text-slate-500 text-sm leading-relaxed">Smart search and advanced filtering allow you to find any book in your collection instantly, by author, genre, or tag.</p>
-                                </div>
-                                <div class="p-8 rounded-[2.5rem] bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
-                                    <div class="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 mb-6">
-                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h2M4 8h12m4 0h2M4 16h4m12 0h2M4 20h12"/></svg>
-                                    </div>
-                                    <h3 class="text-xl font-black font-serif italic mb-3">Digital Cataloging</h3>
-                                    <p class="text-slate-500 text-sm leading-relaxed">Use your camera to scan barcodes and QR codes for quick, automatic book entry. No more manual typing.</p>
-                                </div>
-                                <div class="p-8 rounded-[2.5rem] bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
-                                    <div class="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 mb-6">
-                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-                                    </div>
-                                    <h3 class="text-xl font-black font-serif italic mb-3">Seamless Sync</h3>
-                                    <p class="text-slate-500 text-sm leading-relaxed">Real-time cloud sync with offline support. Access your library from any device, even without an internet connection.</p>
-                                </div>
-                                <div class="p-8 rounded-[2.5rem] bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
-                                    <div class="w-12 h-12 bg-rose-100 rounded-2xl flex items-center justify-center text-rose-600 mb-6">
-                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-                                    </div>
-                                    <h3 class="text-xl font-black font-serif italic mb-3">Social Feed v3</h3>
-                                    <p class="text-slate-500 text-sm leading-relaxed">Share your reviews with a global community. Like, comment, and discover your next favorite book through fellow readers.</p>
-                                </div>
-                                <div class="p-8 rounded-[2.5rem] bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
-                                    <div class="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600 mb-6">
-                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-                                    </div>
-                                    <h3 class="text-xl font-black font-serif italic mb-3">Activity Notifications</h3>
-                                    <p class="text-slate-500 text-sm leading-relaxed">Stay updated with a real-time activity tab. Track additions, status changes, and borrows across your shared libraries.</p>
-                                </div>
-                                <div class="p-8 rounded-[2.5rem] bg-[#fdfbf7] border border-slate-100 hover:shadow-xl transition-all">
-                                    <div class="w-12 h-12 bg-violet-100 rounded-2xl flex items-center justify-center text-violet-600 mb-6">
-                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
-                                    </div>
-                                    <h3 class="text-xl font-black font-serif italic mb-3">AI Librarian</h3>
-                                    <p class="text-slate-500 text-sm leading-relaxed">Chat with your personal AI Librarian for tailored recommendations, natural language search, and deep collection analysis.</p>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
 
-                    <!-- Footer -->
-                    <footer class="py-12 px-8 lg:px-24 border-t border-slate-100 text-center bg-[#fdfbf7]">
-                        <div class="flex items-center justify-center gap-2 mb-4">
-                            <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-200">
-                                <img src="https://cdn-icons-png.flaticon.com/512/2232/2232688.png" class="w-5 h-5 invert">
+                                    <div class="w-9 h-9 rounded-full bg-emerald-500 border-2 border-slate-900 flex items-center justify-center text-xs font-bold">
+                                        R
+                                    </div>
+
+                                    <div class="w-9 h-9 rounded-full bg-amber-500 border-2 border-slate-900 flex items-center justify-center text-xs font-bold">
+                                        +
+                                    </div>
+                                </div>
                             </div>
-                            <span class="text-xl font-black font-serif italic">My Lib</span>
                         </div>
-                        <p class="text-slate-400 text-xs uppercase tracking-[0.2em] font-bold">&copy; 2026 My Lib · v3.1 · Preserve Every Word</p>
-                    </footer>
+
+                        <p class="text-center text-sm text-slate-400 italic">
+                            Read together. Share together. Build something together.
+                        </p>
+
+                    </div>
                 </div>
+
+            </div>
+        </div>
+
+
+        <!-- Community Showcase -->
+        <div class="mt-16 text-center max-w-3xl mx-auto">
+
+            <p class="text-blue-600 text-xs font-bold uppercase tracking-[0.2em] mb-4">
+                THE READING COMMUNITY
+            </p>
+
+            <h2 class="text-3xl lg:text-4xl font-black font-serif italic mb-5">
+                More Than a Library. A Community.
+            </h2>
+
+            <p class="text-slate-500 leading-relaxed mb-10">
+                Books are better when there's someone to talk about them with. Share thoughtful reviews, discover other readers, like and comment on posts, and follow the activity around the books you love.
+            </p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 text-left">
+
+                <div class="p-6 rounded-3xl bg-[#fdfbf7] border border-slate-100">
+                    <div class="text-2xl mb-3"><i class="fa fa-edit" aria-hidden="true"></i></div>
+                    <h3 class="font-black font-serif italic mb-2">
+                        Reviews
+                    </h3>
+                    <p class="text-sm text-slate-500 leading-relaxed">
+                        Share your thoughts and tell other readers what a book meant to you.
+                    </p>
+                </div>
+
+                <div class="p-6 rounded-3xl bg-[#fdfbf7] border border-slate-100">
+                    <div class="text-2xl mb-3"><i class="fa fa-comments" aria-hidden="true"></i></div>
+                    <h3 class="font-black font-serif italic mb-2">
+                        Conversations
+                    </h3>
+                    <p class="text-sm text-slate-500 leading-relaxed">
+                        Join discussions, respond to reviews, and exchange ideas with readers.
+                    </p>
+                </div>
+
+                <div class="p-6 rounded-3xl bg-[#fdfbf7] border border-slate-100">
+                    <div class="text-2xl mb-3"><i class="fa fa-user" aria-hidden="true"></i></div>
+                    <h3 class="font-black font-serif italic mb-2">
+                        Reader Profiles
+                    </h3>
+                    <p class="text-sm text-slate-500 leading-relaxed">
+                        Discover other readers and explore their reading worlds.
+                    </p>
+                </div>
+
+            </div>
+        </div>
+
+
+        <!-- AI Librarian Showcase -->
+        <div class="mt-24 rounded-[3rem] bg-blue-50 border border-blue-100 p-10 lg:p-16 text-center">
+
+            <div class="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto mb-8">
+                <span class="text-3xl"><i class="fa fa-user" aria-hidden="true"></i></span>
+            </div>
+
+            <p class="text-blue-600 text-xs font-bold uppercase tracking-[0.2em] mb-4">
+                YOUR PERSONAL AI
+            </p>
+
+            <h2 class="text-3xl lg:text-4xl font-black font-serif italic mb-5">
+                Meet Your AI Librarian.
+            </h2>
+
+            <p class="text-slate-500 max-w-2xl mx-auto leading-relaxed mb-10">
+                A librarian who already knows your shelves. Ask questions about your collection, find books naturally, discover recommendations, and uncover connections you might have missed.
+            </p>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto text-left">
+
+                <div class="bg-white rounded-2xl p-5 border border-blue-100">
+                    <p class="text-sm font-medium text-slate-700 italic">
+                        "Which books in my library haven't I read yet?"
+                    </p>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 border border-blue-100">
+                    <p class="text-sm font-medium text-slate-700 italic">
+                        "What are my highest-rated books?"
+                    </p>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 border border-blue-100">
+                    <p class="text-sm font-medium text-slate-700 italic">
+                        "Recommend something based on my reading history."
+                    </p>
+                </div>
+
+            </div>
+        </div>
+
+
+        <!-- More Features -->
+        <div class="mt-20">
+
+            <div class="text-center mb-10">
+                <h2 class="text-2xl lg:text-3xl font-black font-serif italic mb-3">
+                    And There's More.
+                </h2>
+
+                <p class="text-slate-500 text-sm">
+                    Thoughtful details designed around your everyday reading life.
+                </p>
+            </div>
+
+            <div class="flex flex-wrap justify-center gap-3">
+
+                <span class="px-5 py-3 rounded-full bg-slate-50 border border-slate-100 text-sm font-semibold text-slate-600">
+                    <i class="fa fa-barcode" aria-hidden="true"></i>&nbsp; Barcode & QR Scanning
+                </span>
+
+                <span class="px-5 py-3 rounded-full bg-slate-50 border border-slate-100 text-sm font-semibold text-slate-600">
+                    <i class="fa fa-sticky-note" aria-hidden="true"></i>&nbsp; Notes & Highlights
+                </span>
+
+                <span class="px-5 py-3 rounded-full bg-slate-50 border border-slate-100 text-sm font-semibold text-slate-600">
+                    <i class="fa fa-heart" aria-hidden="true"></i>&nbsp; Favorites & Wishlist
+                </span>
+
+                <span class="px-5 py-3 rounded-full bg-slate-50 border border-slate-100 text-sm font-semibold text-slate-600">
+                    <i class="fa fa-trophy" aria-hidden="true"></i>&nbsp; Reading Goals
+                </span>
+
+                <span class="px-5 py-3 rounded-full bg-slate-50 border border-slate-100 text-sm font-semibold text-slate-600">
+                    <i class="fa fa-download" aria-hidden="true"></i>&nbsp; CSV & JSON Import
+                </span>
+
+                <span class="px-5 py-3 rounded-full bg-slate-50 border border-slate-100 text-sm font-semibold text-slate-600">
+                    <i class="fa fa-bell" aria-hidden="true"></i>&nbsp; Activity & Notifications
+                </span>
+
+                <span class="px-5 py-3 rounded-full bg-slate-50 border border-slate-100 text-sm font-semibold text-slate-600">
+                    <i class="fa fa-moon-o" aria-hidden="true"></i>&nbsp; Light, Dark & Sepia Themes
+                </span>
+
+                <span class="px-5 py-3 rounded-full bg-slate-50 border border-slate-100 text-sm font-semibold text-slate-600">
+                    <i class="fa fa-wifi" aria-hidden="true"></i>&nbsp; Offline Support
+                </span>
+
+                <span class="px-5 py-3 rounded-full bg-slate-50 border border-slate-100 text-sm font-semibold text-slate-600">
+                    <i class="fa fa-mobile" aria-hidden="true"></i>&nbsp; Installable PWA
+                </span>
+
+                <span class="px-5 py-3 rounded-full bg-slate-50 border border-slate-100 text-sm font-semibold text-slate-600">
+                    <i class="fa fa-keyboard-o" aria-hidden="true"></i>&nbsp; Keyboard Shortcuts
+                </span>
+
+            </div>
+        </div>
+
+    </div>
+</section>
+
+    <!-- Footer -->
+    <footer class="py-12 px-8 lg:px-24 border-t border-slate-100 text-center bg-[#fdfbf7]">
+        <div class="flex items-center justify-center gap-2 mb-4">
+            <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-200">
+                <img src="https://cdn-icons-png.flaticon.com/512/2232/2232688.png" class="w-5 h-5 invert">
+            </div>
+
+            <span class="text-xl font-black font-serif italic">
+                My Lib
+            </span>
+        </div>
+
+        <p class="text-slate-400 text-xs uppercase tracking-[0.2em] font-bold">
+            &copy; 2026 My Lib · v3.1 · Preserve Every Word
+        </p>
+    </footer>
+</div>
             `;
 
                 // Google Sign-In
@@ -1044,26 +1439,26 @@
                             <div>
                                 <label for="gemini-model" class="text-[10px] font-bold text-slate-400 uppercase ml-1">AI Model</label>
                                 <select id="gemini-model" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
-                                    <option value="gemma-3-12b-it" ${ (localStorage.getItem('mylib_gemini_model') || 'gemma-3-12b-it') === 'gemma-3-12b-it' ? 'selected' : '' }>gemma-3-12b-it (Recommended)</option>
-                                    <option value="gemma-3-4b-it" ${ localStorage.getItem('mylib_gemini_model') === 'gemma-3-4b-it' ? 'selected' : '' }>gemma-3-4b-it</option>
-                                    <option value="gemma-3-1b-it" ${ localStorage.getItem('mylib_gemini_model') === 'gemma-3-1b-it' ? 'selected' : '' }>gemma-3-1b-it</option>
-                                    <option value="gemma-3-27b-it" ${ localStorage.getItem('mylib_gemini_model') === 'gemma-3-27b-it' ? 'selected' : '' }>gemma-3-27b-it</option>
-                                    <option value="gemini-2.5-flash-lite" ${ localStorage.getItem('mylib_gemini_model') === 'gemini-2.5-flash-lite' ? 'selected' : '' }>gemini-2.5-flash-lite</option>
-                                    <option value="gemini-2.5-flash" ${ localStorage.getItem('mylib_gemini_model') === 'gemini-2.5-flash' ? 'selected' : '' }>gemini-2.5-flash</option>
-                                    <option value="gemini-3-flash-preview" ${ localStorage.getItem('mylib_gemini_model') === 'gemini-3-flash-preview' ? 'selected' : '' }>gemini-3-flash-preview</option>
-                                    <option value="gemini-3.1-flash-lite-preview" ${ localStorage.getItem('mylib_gemini_model') === 'gemini-3.1-flash-lite-preview' ? 'selected' : '' }>gemini-3.1-flash-lite-preview</option>
+                                    <option value="gemma-3-12b-it" ${(localStorage.getItem('mylib_gemini_model') || 'gemma-3-12b-it') === 'gemma-3-12b-it' ? 'selected' : ''}>gemma-3-12b-it (Recommended)</option>
+                                    <option value="gemma-3-4b-it" ${localStorage.getItem('mylib_gemini_model') === 'gemma-3-4b-it' ? 'selected' : ''}>gemma-3-4b-it</option>
+                                    <option value="gemma-3-1b-it" ${localStorage.getItem('mylib_gemini_model') === 'gemma-3-1b-it' ? 'selected' : ''}>gemma-3-1b-it</option>
+                                    <option value="gemma-3-27b-it" ${localStorage.getItem('mylib_gemini_model') === 'gemma-3-27b-it' ? 'selected' : ''}>gemma-3-27b-it</option>
+                                    <option value="gemini-2.5-flash-lite" ${localStorage.getItem('mylib_gemini_model') === 'gemini-2.5-flash-lite' ? 'selected' : ''}>gemini-2.5-flash-lite</option>
+                                    <option value="gemini-2.5-flash" ${localStorage.getItem('mylib_gemini_model') === 'gemini-2.5-flash' ? 'selected' : ''}>gemini-2.5-flash</option>
+                                    <option value="gemini-3-flash-preview" ${localStorage.getItem('mylib_gemini_model') === 'gemini-3-flash-preview' ? 'selected' : ''}>gemini-3-flash-preview</option>
+                                    <option value="gemini-3.1-flash-lite-preview" ${localStorage.getItem('mylib_gemini_model') === 'gemini-3.1-flash-lite-preview' ? 'selected' : ''}>gemini-3.1-flash-lite-preview</option>
                                 </select>
                             </div>
                             <div>
                                 <label for="gemini-language" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Preferred Language</label>
                                 <select id="gemini-language" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
-                                    <option value="English" ${ (localStorage.getItem('mylib_ai_language') || 'English') === 'English' ? 'selected' : '' }>English</option>
-                                    <option value="Bengali" ${ localStorage.getItem('mylib_ai_language') === 'Bengali' ? 'selected' : '' }>Bengali</option>
-                                    <option value="Spanish" ${ localStorage.getItem('mylib_ai_language') === 'Spanish' ? 'selected' : '' }>Spanish</option>
-                                    <option value="French" ${ localStorage.getItem('mylib_ai_language') === 'French' ? 'selected' : '' }>French</option>
-                                    <option value="German" ${ localStorage.getItem('mylib_ai_language') === 'German' ? 'selected' : '' }>German</option>
-                                    <option value="Arabic" ${ localStorage.getItem('mylib_ai_language') === 'Arabic' ? 'selected' : '' }>Arabic</option>
-                                    <option value="Hindi" ${ localStorage.getItem('mylib_ai_language') === 'Hindi' ? 'selected' : '' }>Hindi</option>
+                                    <option value="English" ${(localStorage.getItem('mylib_ai_language') || 'English') === 'English' ? 'selected' : ''}>English</option>
+                                    <option value="Bengali" ${localStorage.getItem('mylib_ai_language') === 'Bengali' ? 'selected' : ''}>Bengali</option>
+                                    <option value="Spanish" ${localStorage.getItem('mylib_ai_language') === 'Spanish' ? 'selected' : ''}>Spanish</option>
+                                    <option value="French" ${localStorage.getItem('mylib_ai_language') === 'French' ? 'selected' : ''}>French</option>
+                                    <option value="German" ${localStorage.getItem('mylib_ai_language') === 'German' ? 'selected' : ''}>German</option>
+                                    <option value="Arabic" ${localStorage.getItem('mylib_ai_language') === 'Arabic' ? 'selected' : ''}>Arabic</option>
+                                    <option value="Hindi" ${localStorage.getItem('mylib_ai_language') === 'Hindi' ? 'selected' : ''}>Hindi</option>
                                 </select>
                             </div>
                             <button id="save-ai-settings-btn" class="w-full sm:w-auto px-6 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 dark:shadow-none focus-visible:ring-2 focus-visible:ring-primary outline-none">Save AI Settings</button>
@@ -1321,7 +1716,7 @@
                     // Check if duplicate pending collaboration request exists
                     const existingPending = collaborationRequests.find(r =>
                         ((r.fromUserId === currentUser.uid && r.toUserId === partnerId) ||
-                         (r.fromUserId === partnerId && r.toUserId === currentUser.uid)) &&
+                            (r.fromUserId === partnerId && r.toUserId === currentUser.uid)) &&
                         r.status === 'pending'
                     );
                     if (existingPending) {
@@ -1716,15 +2111,12 @@
                                 window.queueRenderLibraryOnly();
                             }
                             if (e.key === 'Escape') {
-                                if (searchQuery) {
-                                    searchQuery = '';
-                                    searchInput.value = '';
-                                    document.getElementById('clear-search-btn')?.classList.add('hidden');
-                                    window.queueRenderLibraryOnly();
-                                } else {
-                                    searchInput.blur();
-                                    if (searchHint) searchHint.classList.remove('opacity-0');
-                                }
+                                searchQuery = '';
+                                searchInput.value = '';
+                                searchInput.blur();
+                                document.getElementById('clear-search-btn').classList.add('hidden');
+                                if (searchHint) searchHint.classList.remove('opacity-0');
+                                window.queueRenderLibraryOnly();
                             }
                         });
                         searchInput.addEventListener('focus', () => {
@@ -2118,10 +2510,10 @@
                             ` : `
                                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                                     ${visitedBooks.map((book, idx) => {
-                                        const title = book.title || 'Untitled';
-                                        const author = book.author || 'Unknown Author';
-                                        const coverUrl = book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover';
-                                        return `
+                        const title = book.title || 'Untitled';
+                        const author = book.author || 'Unknown Author';
+                        const coverUrl = book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover';
+                        return `
                                         <div onclick="window.openVisitedBookDetails('${book.id}', ${JSON.stringify(collaboratorIds).replace(/"/g, '&quot;')})" class="bg-white dark:bg-slate-800 p-4 rounded-3xl flex gap-4 cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all border border-slate-100 dark:border-slate-800" role="button" aria-label="${escapeHTML(title)} by ${escapeHTML(author)}">
                                             <img src="${coverUrl}" class="w-16 h-24 object-cover rounded-2xl shadow-md border border-slate-200 dark:border-slate-700 flex-shrink-0">
                                             <div class="flex-1 flex flex-col justify-center min-w-0">
@@ -2131,7 +2523,7 @@
                                             </div>
                                         </div>
                                         `;
-                                    }).join('')}
+                    }).join('')}
                                 </div>
                             `}
 
@@ -2299,11 +2691,11 @@
                                         <p class="text-slate-400 italic">No pending requests at the moment.</p>
                                     </div>
                                 ` : pendingPartnerships.map(p => {
-                                    const partnerId = p.userId1 === currentUser.uid ? p.userId2 : p.userId1;
-                                    const partnerName = userNames[partnerId];
-                                    const isInitiator = p.initiatorId === currentUser.uid;
+                        const partnerId = p.userId1 === currentUser.uid ? p.userId2 : p.userId1;
+                        const partnerName = userNames[partnerId];
+                        const isInitiator = p.initiatorId === currentUser.uid;
 
-                                    return `
+                        return `
                                     <div class="flex items-center justify-between p-4 bg-amber-50/50 dark:bg-amber-950/10 rounded-xl border border-amber-100 dark:border-amber-900/50 gap-4">
                                         <div class="flex-1">
                                             <span class="text-sm font-bold block">${escapeHTML(partnerName)}</span>
@@ -2321,7 +2713,7 @@
                                         </div>
                                     </div>
                                     `;
-                                }).join('')}
+                    }).join('')}
                             </div>
 
                             <div class="mt-8 flex justify-end">
@@ -2560,18 +2952,18 @@
                             if (!newCat || !selectedBookIds.size) return;
                             showToast(`Updating ${selectedBookIds.size} books...`, 'info');
 
-                                    const ids = Array.from(selectedBookIds);
-                                    for (let i = 0; i < ids.length; i += 500) {
-                                        const chunk = ids.slice(i, i + 500);
-                                        const batch = db.batch();
-                                        chunk.forEach(id => {
-                                            batch.update(db.collection('books').doc(id), {
-                                                categories: [newCat],
-                                                category: firebase.firestore.FieldValue.delete()
-                                            });
-                                        });
-                                        await batch.commit();
-                                    }
+                            const ids = Array.from(selectedBookIds);
+                            for (let i = 0; i < ids.length; i += 500) {
+                                const chunk = ids.slice(i, i + 500);
+                                const batch = db.batch();
+                                chunk.forEach(id => {
+                                    batch.update(db.collection('books').doc(id), {
+                                        categories: [newCat],
+                                        category: firebase.firestore.FieldValue.delete()
+                                    });
+                                });
+                                await batch.commit();
+                            }
 
                             selectedBookIds.clear();
                             showToast('Updated books successfully', 'success');
@@ -4416,7 +4808,7 @@
                 });
             }
 
-            window.openScanner = function() {
+            window.openScanner = function () {
                 showLibrarySelectorForScan().then(() => {
                     const modalHtml = `
                     <div class="w-full h-full flex flex-col p-6 overflow-y-auto">
@@ -5469,7 +5861,7 @@
                                             borderColor: isDark ? '#334155' : '#e2e8f0',
                                             borderWidth: 1,
                                             callbacks: {
-                                                label: function(context) {
+                                                label: function (context) {
                                                     const value = context.raw;
                                                     const total = context.dataset.data.reduce((a, b) => a + b, 0);
                                                     const pct = Math.round((value / total) * 100) || 0;
@@ -5579,10 +5971,10 @@
                         <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">${title}</h3>
                         <div class="grid grid-cols-1 gap-x-6 gap-y-2">
                             ${entries.slice(0, 6).map(([label, count], i) => {
-                                const clickHandler = filterType ? `onclick='window.applyInsightFilter("${filterType}", "${label.replace(/"/g, "&quot;")}")'` : '';
-                                const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-                                const displayCount = showPercentageInLegend ? `${count} <span class="text-[10px] font-normal text-slate-400">(${pct}%)</span>` : count;
-                                return `
+                    const clickHandler = filterType ? `onclick='window.applyInsightFilter("${filterType}", "${label.replace(/"/g, "&quot;")}")'` : '';
+                    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                    const displayCount = showPercentageInLegend ? `${count} <span class="text-[10px] font-normal text-slate-400">(${pct}%)</span>` : count;
+                    return `
                                 <div class="flex items-center justify-between text-sm py-1 border-b border-slate-50 dark:border-slate-800/50 ${filterType ? 'cursor-pointer group' : ''}" ${clickHandler}>
                                     <div class="flex items-center gap-2 truncate">
                                         <div class="w-2 h-2 rounded-full" style="background-color: ${palette[i % palette.length]}"></div>
@@ -5591,7 +5983,7 @@
                                     <span class="font-bold text-primary">${displayCount}</span>
                                 </div>
                                 `;
-                            }).join('')}
+                }).join('')}
                             ${entries.length === 0 ? '<p class="text-xs text-slate-400 italic">No data available.</p>' : ''}
                         </div>
                     </div>
@@ -5749,7 +6141,7 @@
                     <div class="glass p-8 rounded-[2.5rem] border border-blue-100/50 dark:border-slate-800">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                             <h2 class="text-3xl font-black font-serif italic text-blue-600 dark:text-blue-400">Library Analysis</h2>
-                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 dark:bg-slate-800 px-4 py-2 rounded-full">Updated ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 dark:bg-slate-800 px-4 py-2 rounded-full">Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                         </div>
 
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-10">
@@ -5833,9 +6225,9 @@
                                     <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Reading Composition</h3>
                                     <div class="space-y-2">
                                         ${Object.entries(statusCounts).map(([status, count]) => {
-                                            const percent = libBooksCount ? Math.round((count / libBooksCount) * 100) : 0;
-                                            const colorClass = status === 'finished' ? 'bg-emerald-500' : status === 'reading' ? 'bg-blue-500' : 'bg-slate-400 dark:bg-slate-500';
-                                            return `
+                    const percent = libBooksCount ? Math.round((count / libBooksCount) * 100) : 0;
+                    const colorClass = status === 'finished' ? 'bg-emerald-500' : status === 'reading' ? 'bg-blue-500' : 'bg-slate-400 dark:bg-slate-500';
+                    return `
                                                 <div class="flex items-center justify-between text-sm py-1 border-b border-slate-50 dark:border-slate-800/50">
                                                     <div class="flex items-center gap-2 truncate">
                                                         <div class="w-2 h-2 rounded-full ${colorClass}"></div>
@@ -5844,7 +6236,7 @@
                                                     <span class="font-bold text-primary">${count} <span class="text-[10px] font-normal text-slate-400">(${percent}%)</span></span>
                                                 </div>
                                             `;
-                                        }).join('')}
+                }).join('')}
                                     </div>
                                 </div>
                             </div>
@@ -5859,27 +6251,27 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-10 mb-10 pt-10 border-t border-slate-100 dark:border-slate-800">
                             <div class="flex flex-col sm:flex-row items-center gap-8">
                                 ${(() => {
-                                    const entries = Object.entries(genresCount).sort((a, b) => b[1] - a[1]);
-                                    const totalEntries = entries.reduce((acc, [_, count]) => acc + count, 0);
-                                    return renderPieChart(entries, totalEntries, ['#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6'], libBooksCount, 'Books', 'Genre Distribution', 'genre', false);
-                                })()}
+                        const entries = Object.entries(genresCount).sort((a, b) => b[1] - a[1]);
+                        const totalEntries = entries.reduce((acc, [_, count]) => acc + count, 0);
+                        return renderPieChart(entries, totalEntries, ['#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6'], libBooksCount, 'Books', 'Genre Distribution', 'genre', false);
+                    })()}
                             </div>
                             <div class="flex flex-col sm:flex-row items-center gap-8">
                                 ${(() => {
-                                    const entries = Object.entries(authorsCount).sort((a, b) => b[1] - a[1]);
-                                    const totalEntries = entries.reduce((acc, [_, count]) => acc + count, 0);
-                                    return renderPieChart(entries, totalEntries, ['#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6'], libBooksCount, 'Books', 'Author Distribution', 'author', false);
-                                })()}
+                        const entries = Object.entries(authorsCount).sort((a, b) => b[1] - a[1]);
+                        const totalEntries = entries.reduce((acc, [_, count]) => acc + count, 0);
+                        return renderPieChart(entries, totalEntries, ['#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6'], libBooksCount, 'Books', 'Author Distribution', 'author', false);
+                    })()}
                             </div>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-10 mb-10 pt-10 border-t border-slate-100 dark:border-slate-800">
                             <div class="flex flex-col sm:flex-row items-center gap-8">
                                 ${(() => {
-                                    const entries = Object.entries(libraryStats.copyTypesCount || { 'New Copy': 0, 'Old Copy': 0, 'Gifted': 0 }).sort((a, b) => b[1] - a[1]);
-                                    const totalEntries = entries.reduce((acc, [_, count]) => acc + count, 0);
-                                    return renderPieChart(entries, totalEntries, ['#10b981', '#3b82f6', '#f59e0b'], libBooksCount, 'Books', 'Copy Type Distribution', 'copy_type', false, true, 'pie');
-                                })()}
+                        const entries = Object.entries(libraryStats.copyTypesCount || { 'New Copy': 0, 'Old Copy': 0, 'Gifted': 0 }).sort((a, b) => b[1] - a[1]);
+                        const totalEntries = entries.reduce((acc, [_, count]) => acc + count, 0);
+                        return renderPieChart(entries, totalEntries, ['#10b981', '#3b82f6', '#f59e0b'], libBooksCount, 'Books', 'Copy Type Distribution', 'copy_type', false, true, 'pie');
+                    })()}
                             </div>
                         </div>
 
@@ -5900,9 +6292,9 @@
                         </div>
 
                         ${(() => {
-                            const borrowedBooks = books.filter(b => !!b.borrowedBy && (!Array.isArray(b.borrowHistory) || b.borrowHistory.length === 0 || !b.borrowHistory[b.borrowHistory.length - 1].returnDate));
-                            if (borrowedBooks.length > 0) {
-                                return `
+                        const borrowedBooks = books.filter(b => !!b.borrowedBy && (!Array.isArray(b.borrowHistory) || b.borrowHistory.length === 0 || !b.borrowHistory[b.borrowHistory.length - 1].returnDate));
+                        if (borrowedBooks.length > 0) {
+                            return `
                                 <div class="mt-12 pt-12 border-t border-slate-100 dark:border-slate-800">
                                     <div class="mb-6">
                                         <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Currently Borrowed Books</h3>
@@ -5910,11 +6302,11 @@
                                     </div>
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         ${borrowedBooks.map(b => {
-                                            const lastEntry = b.borrowHistory && b.borrowHistory.length > 0 ? b.borrowHistory[b.borrowHistory.length - 1] : null;
-                                            const borrower = lastEntry ? lastEntry.borrowerName : b.borrowedBy;
-                                            const bDate = lastEntry && lastEntry.borrowDate ? lastEntry.borrowDate : b.borrowDate;
-                                            const dateStr = bDate ? new Date(bDate).toLocaleDateString() : 'N/A';
-                                            return `
+                                const lastEntry = b.borrowHistory && b.borrowHistory.length > 0 ? b.borrowHistory[b.borrowHistory.length - 1] : null;
+                                const borrower = lastEntry ? lastEntry.borrowerName : b.borrowedBy;
+                                const bDate = lastEntry && lastEntry.borrowDate ? lastEntry.borrowDate : b.borrowDate;
+                                const dateStr = bDate ? new Date(bDate).toLocaleDateString() : 'N/A';
+                                return `
                                             <div class="glass p-5 rounded-3xl border border-blue-100/30 dark:border-slate-800 flex justify-between items-center shadow-sm hover:scale-[1.01] transition-transform duration-300">
                                                 <div class="min-w-0 flex-1">
                                                     <h4 class="font-black text-sm text-slate-800 dark:text-slate-100 truncate">${escapeHTML(b.title)}</h4>
@@ -5928,12 +6320,12 @@
                                                 </div>
                                             </div>
                                             `;
-                                        }).join('')}
+                            }).join('')}
                                     </div>
                                 </div>
                                 `;
-                            } else {
-                                return `
+                        } else {
+                            return `
                                 <div class="mt-12 pt-12 border-t border-slate-100 dark:border-slate-800">
                                     <div class="mb-4">
                                         <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Currently Borrowed Books</h3>
@@ -5942,8 +6334,8 @@
                                     <p class="text-sm text-slate-400 dark:text-slate-500 italic">No books are currently lent out.</p>
                                 </div>
                                 `;
-                            }
-                        })()}
+                        }
+                    })()}
 
                     <div id="ai-insights-section" class="mt-12 pt-12 border-t border-slate-100 dark:border-slate-800">
                         <div class="flex items-center justify-between mb-8">
@@ -5997,7 +6389,7 @@
                         try {
                             const fixes = JSON.parse(response.replace(/```json|```/g, '').trim());
                             allFixes = allFixes.concat(fixes);
-                        } catch (e) {}
+                        } catch (e) { }
                     }
                     if (allFixes.length === 0) { showToast('No fixes needed!', 'success'); return; }
                     showCleanupReviewModal(allFixes);
@@ -6486,46 +6878,46 @@
                     </div>
                     <div class="space-y-3">
                         ${activities.map((a, i) => {
-                            let icon = '';
-                            let color = 'bg-blue-100 text-blue-600';
-                            let text = '';
+                    let icon = '';
+                    let color = 'bg-blue-100 text-blue-600';
+                    let text = '';
 
-                            if (a.type === 'book_added') {
-                                icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>';
-                                color = 'bg-emerald-100 text-emerald-600';
-                                text = `<strong>${escapeHTML(a.userName)}</strong> added <strong>${escapeHTML(a.bookTitle)}</strong> to ${a.addedTo} library.`;
-                            } else if (a.type === 'status_updated') {
-                                icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
-                                color = 'bg-blue-100 text-blue-600';
-                                const statusLabel = READING_STATUSES[a.status]?.label || a.status;
-                                text = `<strong>${escapeHTML(a.userName)}</strong> marked <strong>${escapeHTML(a.bookTitle)}</strong> as <strong>${statusLabel}</strong>.`;
-                            } else if (a.type === 'rating_updated') {
-                                icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.175 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.382-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>';
-                                color = 'bg-amber-100 text-amber-600';
-                                text = `<strong>${escapeHTML(a.userName)}</strong> reviewed <strong>${escapeHTML(a.bookTitle)}</strong> with ${a.rating} stars.`;
-                            } else if (a.type === 'book_borrowed') {
-                                icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>';
-                                color = 'bg-violet-100 text-violet-600';
-                                text = `<strong>${escapeHTML(a.userName)}</strong> borrowed <strong>${escapeHTML(a.bookTitle)}</strong>.`;
-                            } else if (a.type === 'book_returned') {
-                                icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>';
-                                color = 'bg-indigo-100 text-indigo-600';
-                                text = `<strong>${escapeHTML(a.userName)}</strong> returned <strong>${escapeHTML(a.bookTitle)}</strong>.`;
-                            } else if (a.type === 'user_message') {
-                                icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>';
-                                color = 'bg-violet-100 text-violet-600';
-                                text = `<strong>${escapeHTML(a.userName)}</strong>: ${escapeHTML(a.text)}`;
-                            } else if (a.type === 'request_accepted') {
-                                icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
-                                color = 'bg-emerald-100 text-emerald-600';
-                                text = `<strong>${escapeHTML(a.userName)}</strong> ${escapeHTML(a.text)}`;
-                            } else if (a.type === 'request_rejected') {
-                                icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
-                                color = 'bg-rose-100 text-rose-600';
-                                text = `<strong>${escapeHTML(a.userName)}</strong> ${escapeHTML(a.text)}`;
-                            }
+                    if (a.type === 'book_added') {
+                        icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>';
+                        color = 'bg-emerald-100 text-emerald-600';
+                        text = `<strong>${escapeHTML(a.userName)}</strong> added <strong>${escapeHTML(a.bookTitle)}</strong> to ${a.addedTo} library.`;
+                    } else if (a.type === 'status_updated') {
+                        icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+                        color = 'bg-blue-100 text-blue-600';
+                        const statusLabel = READING_STATUSES[a.status]?.label || a.status;
+                        text = `<strong>${escapeHTML(a.userName)}</strong> marked <strong>${escapeHTML(a.bookTitle)}</strong> as <strong>${statusLabel}</strong>.`;
+                    } else if (a.type === 'rating_updated') {
+                        icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.175 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.382-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>';
+                        color = 'bg-amber-100 text-amber-600';
+                        text = `<strong>${escapeHTML(a.userName)}</strong> reviewed <strong>${escapeHTML(a.bookTitle)}</strong> with ${a.rating} stars.`;
+                    } else if (a.type === 'book_borrowed') {
+                        icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>';
+                        color = 'bg-violet-100 text-violet-600';
+                        text = `<strong>${escapeHTML(a.userName)}</strong> borrowed <strong>${escapeHTML(a.bookTitle)}</strong>.`;
+                    } else if (a.type === 'book_returned') {
+                        icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>';
+                        color = 'bg-indigo-100 text-indigo-600';
+                        text = `<strong>${escapeHTML(a.userName)}</strong> returned <strong>${escapeHTML(a.bookTitle)}</strong>.`;
+                    } else if (a.type === 'user_message') {
+                        icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>';
+                        color = 'bg-violet-100 text-violet-600';
+                        text = `<strong>${escapeHTML(a.userName)}</strong>: ${escapeHTML(a.text)}`;
+                    } else if (a.type === 'request_accepted') {
+                        icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+                        color = 'bg-emerald-100 text-emerald-600';
+                        text = `<strong>${escapeHTML(a.userName)}</strong> ${escapeHTML(a.text)}`;
+                    } else if (a.type === 'request_rejected') {
+                        icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+                        color = 'bg-rose-100 text-rose-600';
+                        text = `<strong>${escapeHTML(a.userName)}</strong> ${escapeHTML(a.text)}`;
+                    }
 
-                            return `
+                    return `
                             <div class="glass p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 staggered-fade-in" style="animation-delay: ${i * 50}ms">
                                 <div class="w-10 h-10 rounded-xl ${color} flex items-center justify-center flex-shrink-0">
                                     ${icon}
@@ -6541,7 +6933,7 @@
                                 ` : ''}
                             </div>
                             `;
-                        }).join('')}
+                }).join('')}
                     </div>
                 </div>
                 `;
@@ -6885,16 +7277,16 @@
                                 ${foundBooks.length > 0 ? `
                                     <div class="space-y-4">
                                         ${foundBooks.map(book => {
-                                            const title = book.title || 'Untitled';
-                                            const author = book.author || 'Unknown Author';
-                                            const coverUrl = book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover';
-                                            const bookGenres = getBookGenres(book);
-                                            const copyType = book.copyType || 'New Copy';
+                        const title = book.title || 'Untitled';
+                        const author = book.author || 'Unknown Author';
+                        const coverUrl = book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover';
+                        const bookGenres = getBookGenres(book);
+                        const copyType = book.copyType || 'New Copy';
 
-                                            const isCurrentlyBorrowed = !!book.borrowedBy && (!Array.isArray(book.borrowHistory) || book.borrowHistory.length === 0 || !book.borrowHistory[book.borrowHistory.length - 1].returnDate);
-                                            const isSelf = currentUser && foundUserId === currentUser.uid;
+                        const isCurrentlyBorrowed = !!book.borrowedBy && (!Array.isArray(book.borrowHistory) || book.borrowHistory.length === 0 || !book.borrowHistory[book.borrowHistory.length - 1].returnDate);
+                        const isSelf = currentUser && foundUserId === currentUser.uid;
 
-                                            return `
+                        return `
                                                 <div class="bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden transition-all shadow-sm hover:shadow-md">
                                                     <div onclick="window.toggleSearchBookDropdown('${book.id}')" class="p-4 flex items-center justify-between gap-4 cursor-pointer" role="button" aria-expanded="false" id="book-header-${book.id}">
                                                         <div class="flex items-center gap-4 min-w-0">
@@ -6947,7 +7339,7 @@
                                                     </div>
                                                 </div>
                                             `;
-                                        }).join('')}
+                    }).join('')}
                                     </div>
                                 ` : `
                                     <div class="p-8 text-center bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
@@ -8010,7 +8402,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                             // Add TTS button if it's AI response and not already present
                             if (!el.querySelector('button[title="Listen to response"], button[title="Stop listening"]')) {
                                 const btn = document.createElement('button');
-                                btn.onclick = function() { window.speakText(this.parentElement.innerText, this); };
+                                btn.onclick = function () { window.speakText(this.parentElement.innerText, this); };
                                 btn.className = "absolute -right-2 -bottom-2 p-1.5 bg-white dark:bg-slate-700 rounded-lg shadow-md border border-slate-100 dark:border-slate-600 opacity-0 group-hover/msg:opacity-100 transition-opacity hover:text-primary focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-primary outline-none";
                                 btn.title = "Listen to response";
                                 btn.setAttribute('aria-label', "Listen to response");
@@ -8025,7 +8417,7 @@ If the collection is small or has no finished books, be extra encouraging and su
             }
 
             // ---------- Auth State Observer ----------
-            window.startApp = function() {
+            window.startApp = function () {
                 if (window.authObserverStarted) return;
                 window.authObserverStarted = true;
                 window.__appReady = true;
@@ -8040,26 +8432,26 @@ If the collection is small or has no finished books, be extra encouraging and su
 
                     currentUser = user;
                     if (user) {
-                    // Ensure user profile exists in Firestore
-                    const userDoc = await db.collection('users').doc(user.uid).get();
-                    if (!userDoc.exists) {
-                        await db.collection('users').doc(user.uid).set({
-                            uid: user.uid,
-                            email: user.email,
-                            displayName: user.displayName || '',
-                            bio: '',
-                            joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            totalBooksCount: 0,
-                            completedBooksCount: 0,
-                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                        userProfile = { uid: user.uid, email: user.email, displayName: user.displayName || '', bio: '', joinedAt: new Date(), totalBooksCount: 0, completedBooksCount: 0 };
-                    } else {
-                        userProfile = userDoc.data();
-                    }
+                        // Ensure user profile exists in Firestore
+                        const userDoc = await db.collection('users').doc(user.uid).get();
+                        if (!userDoc.exists) {
+                            await db.collection('users').doc(user.uid).set({
+                                uid: user.uid,
+                                email: user.email,
+                                displayName: user.displayName || '',
+                                bio: '',
+                                joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                totalBooksCount: 0,
+                                completedBooksCount: 0,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                            userProfile = { uid: user.uid, email: user.email, displayName: user.displayName || '', bio: '', joinedAt: new Date(), totalBooksCount: 0, completedBooksCount: 0 };
+                        } else {
+                            userProfile = userDoc.data();
+                        }
 
-                    subscribeToBooks();
-                    window.queueRenderMainApp();
+                        subscribeToBooks();
+                        window.queueRenderMainApp();
                     } else {
                         if (unsubscribeBooks) unsubscribeBooks();
                         if (unsubscribeStatus) unsubscribeStatus();
@@ -8163,10 +8555,10 @@ If the collection is small or has no finished books, be extra encouraging and su
                                 <div class="flex flex-col sm:flex-row sm:items-center gap-2 justify-center sm:justify-start">
                                     <div class="flex flex-wrap gap-2">
                                         ${bookGenres.map(g => {
-                                            const escapedG = escapeHTML(g);
-                                            const jsEscapedG = g.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-                                            return `<button onclick="window.setCategoryFilter('${jsEscapedG}'); close();" class="px-3 py-1 bg-blue-100/80 hover:bg-blue-200 dark:bg-blue-900/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>`;
-                                        }).join('')}
+                    const escapedG = escapeHTML(g);
+                    const jsEscapedG = g.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                    return `<button onclick="window.setCategoryFilter('${jsEscapedG}'); close();" class="px-3 py-1 bg-blue-100/80 hover:bg-blue-200 dark:bg-blue-900/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>`;
+                }).join('')}
                                     </div>
                                     ${book.owner ? `<span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-auto">Owner: ${escapeHTML(book.owner)}</span>` : ''}
                                 </div>
@@ -9064,9 +9456,19 @@ If the collection is small or has no finished books, be extra encouraging and su
         }
 
         @keyframes pulse-subtle {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.85; transform: scale(0.98); }
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.85;
+                transform: scale(0.98);
+            }
         }
+
         .animate-pulse-subtle {
             animation: pulse-subtle 3s ease-in-out infinite;
         }
