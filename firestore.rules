@@ -112,6 +112,25 @@ service cloud.firestore {
       );
     }
 
+    // ========== COLLABORATION REQUESTS COLLECTION ==========
+    match /collaborationRequests/{requestId} {
+      allow read: if request.auth != null && (
+        resource == null ||
+        request.auth.uid == resource.data.fromUserId ||
+        request.auth.uid == resource.data.toUserId
+      );
+      allow create: if request.auth != null &&
+        request.auth.uid == request.resource.data.fromUserId;
+      allow update: if request.auth != null && (
+        request.auth.uid == resource.data.fromUserId ||
+        request.auth.uid == resource.data.toUserId
+      );
+      allow delete: if request.auth != null && (
+        request.auth.uid == resource.data.fromUserId ||
+        request.auth.uid == resource.data.toUserId
+      );
+    }
+
     // ========== REVIEWS COLLECTION ==========
     match /reviews/{reviewId} {
       allow read: if request.auth != null;

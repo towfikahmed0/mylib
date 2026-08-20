@@ -421,6 +421,7 @@
             let books = [];                // local copy for UI, synced with Firestore
             let chatHistory = [];          // AI chat session history
             let bookRequests = [];         // book borrowing requests
+            let collaborationRequests = [];// collaboration requests
             window.__setBooks = (b) => books = b;
             window.lastDeleted = [];       // Safety net for undo
             let readingStatuses = {};      // local copy for per-user statuses {bookId: status}
@@ -428,6 +429,8 @@
             let unsubscribeBooks = null;
             let unsubscribeStatus = null;
             let unsubscribeBookRequests = null;
+            let unsubscribeCollabReq1 = null;
+            let unsubscribeCollabReq2 = null;
             let activeTab = 'library';     // 'library', 'wishlist', 'activity', 'settings'
             let allPartnerships = [];
             let aiResponseCache = [];      // Cache last 5 responses [{prompt, response}]
@@ -1081,10 +1084,20 @@
                         <div class="space-y-4">
                             <div>
                                 <label for="profile-display-name" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Display Name</label>
-                                <div class="flex flex-col sm:flex-row gap-2">
-                                    <input id="profile-display-name" type="text" placeholder="Your Name" value="${escapeHTML(userProfile?.displayName || '')}" class="flex-1 min-w-0 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
-                                    <button id="save-profile-btn" class="sm:px-6 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 dark:shadow-none focus-visible:ring-2 focus-visible:ring-primary outline-none">Save Profile</button>
+                                <input id="profile-display-name" type="text" placeholder="Your Name" value="${escapeHTML(userProfile?.displayName || '')}" class="w-full min-w-0 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="profile-phone-number" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Phone Number</label>
+                                    <input id="profile-phone-number" type="tel" placeholder="+1 234 567 8900" value="${escapeHTML(userProfile?.phoneNumber || '')}" class="w-full min-w-0 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
                                 </div>
+                                <div>
+                                    <label for="profile-address" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Address</label>
+                                    <input id="profile-address" type="text" placeholder="123 Main St, City, Country" value="${escapeHTML(userProfile?.address || '')}" class="w-full min-w-0 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
+                                </div>
+                            </div>
+                            <div class="pt-2 flex justify-end">
+                                <button id="save-profile-btn" class="w-full sm:w-auto px-6 py-3 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 dark:shadow-none focus-visible:ring-2 focus-visible:ring-primary outline-none">Save Profile</button>
                             </div>
                         </div>
                     </div>
@@ -1275,9 +1288,14 @@
                 const btn = document.getElementById('save-sharing-btn');
                 const originalText = btn.innerText;
                 btn.disabled = true;
-                btn.innerText = 'Adding...';
+                btn.innerText = 'Sending...';
 
                 try {
+                    if (email === (currentUser.email || '').toLowerCase()) {
+                        showToast('You cannot share with yourself.', 'error');
+                        return;
+                    }
+
                     // Find the user by email
                     const userSnapshot = await db.collection('users').where('email', '==', email).limit(1).get();
                     if (userSnapshot.empty) {
@@ -1291,29 +1309,120 @@
                         return;
                     }
 
-                    // Create a bidirectional partnership with sorted UIDs
+                    // Check if already accepted collaborators
                     const ids = [currentUser.uid, partnerId].sort();
                     const partnershipId = `${ids[0]}_${ids[1]}`;
+                    const existingPartnership = allPartnerships.find(p => p.id === partnershipId);
+                    if (existingPartnership && (existingPartnership.status === 'accepted' || existingPartnership.status === undefined)) {
+                        showToast('You are already collaborating with this user.', 'info');
+                        return;
+                    }
 
-                    await db.collection('partnerships').doc(partnershipId).set({
-                        userId1: ids[0],
-                        userId2: ids[1],
-                        initiatorId: currentUser.uid,
-                        user1Unsubscribed: false,
-                        user2Unsubscribed: false,
-                        allowAddBooks: false,
+                    // Check if duplicate pending collaboration request exists
+                    const existingPending = collaborationRequests.find(r =>
+                        ((r.fromUserId === currentUser.uid && r.toUserId === partnerId) ||
+                         (r.fromUserId === partnerId && r.toUserId === currentUser.uid)) &&
+                        r.status === 'pending'
+                    );
+                    if (existingPending) {
+                        showToast('A collaboration request is already pending for this user.', 'info');
+                        return;
+                    }
+
+                    await db.collection('collaborationRequests').add({
+                        fromUserId: currentUser.uid,
+                        fromEmail: currentUser.email || '',
+                        fromName: userProfile?.displayName || currentUser.displayName || currentUser.email || 'A user',
+                        toUserId: partnerId,
+                        toEmail: email,
+                        status: 'pending',
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    }, { merge: true });
+                    });
 
-                    showToast(`Partnership created with ${email}!`, 'success');
+                    showToast(`Collaboration request sent to ${email}!`, 'success');
                     document.getElementById('share-email').value = '';
                 } catch (err) {
-                    showToast('Error creating partnership: ' + err.message, 'error');
+                    showToast('Error sending collaboration request: ' + err.message, 'error');
                 } finally {
                     btn.disabled = false;
                     btn.innerText = originalText;
                 }
             }
+
+            window.acceptCollaborationRequest = async (requestId) => {
+                try {
+                    const reqDoc = await db.collection('collaborationRequests').doc(requestId).get();
+                    if (!reqDoc.exists) {
+                        showToast('Collaboration request no longer exists.', 'error');
+                        return;
+                    }
+                    const req = { id: reqDoc.id, ...reqDoc.data() };
+                    if (req.status !== 'pending') {
+                        showToast('This request is no longer pending.', 'info');
+                        return;
+                    }
+
+                    await db.collection('collaborationRequests').doc(requestId).update({
+                        status: 'accepted',
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    const ids = [req.fromUserId, req.toUserId].sort();
+                    const partnershipId = `${ids[0]}_${ids[1]}`;
+
+                    await db.collection('partnerships').doc(partnershipId).set({
+                        userId1: ids[0],
+                        userId2: ids[1],
+                        initiatorId: req.fromUserId,
+                        status: 'accepted',
+                        user1Unsubscribed: false,
+                        user2Unsubscribed: false,
+                        allowAddBooks: false,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+
+                    showToast('Collaboration request accepted!', 'success');
+                    window.queueRenderMainApp();
+                } catch (err) {
+                    showToast('Failed to accept request: ' + err.message, 'error');
+                }
+            };
+
+            window.rejectCollaborationRequest = async (requestId) => {
+                try {
+                    const reqDoc = await db.collection('collaborationRequests').doc(requestId).get();
+                    if (!reqDoc.exists) {
+                        showToast('Collaboration request no longer exists.', 'error');
+                        return;
+                    }
+
+                    await db.collection('collaborationRequests').doc(requestId).update({
+                        status: 'rejected',
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    showToast('Collaboration request rejected.', 'info');
+                    window.queueRenderMainApp();
+                } catch (err) {
+                    showToast('Failed to reject request: ' + err.message, 'error');
+                }
+            };
+
+            window.acceptInvitation = window.acceptCollaborationRequest;
+            window.declineInvitation = window.rejectCollaborationRequest;
+            window.cancelInvitation = async (requestId) => {
+                try {
+                    await db.collection('collaborationRequests').doc(requestId).update({
+                        status: 'cancelled',
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    showToast('Collaboration request cancelled.', 'info');
+                    window.queueRenderMainApp();
+                } catch (err) {
+                    showToast('Error cancelling request: ' + err.message, 'error');
+                }
+            };
 
             // Update partnership permission to allow/disallow adding books
             window.updatePartnershipPermission = async (partnershipId, allowAddBooks) => {
@@ -1333,13 +1442,16 @@
                 const listEl = document.getElementById('collaborators-list');
                 if (!listEl) return;
 
-                if (allPartnerships.length === 0) {
+                const acceptedPartnerships = allPartnerships.filter(p => p.status === 'accepted' || p.status === undefined);
+                const pendingRequests = collaborationRequests.filter(r => r.status === 'pending');
+
+                if (acceptedPartnerships.length === 0 && pendingRequests.length === 0) {
                     listEl.innerHTML = '<p class="text-xs text-slate-400 italic px-1">No partnerships yet. Share your library to connect with friends!</p>';
                     return;
                 }
 
-                // Fetch partner user details
-                const partnerIds = allPartnerships.map(doc => {
+                // Fetch partner user details for accepted partnerships
+                const partnerIds = acceptedPartnerships.map(doc => {
                     const data = doc;
                     return data.userId1 === currentUser.uid ? data.userId2 : data.userId1;
                 });
@@ -1348,7 +1460,31 @@
                     partnerIds.map(id => db.collection('users').doc(id).get())
                 );
 
-                listEl.innerHTML = allPartnerships.map((partnership, idx) => {
+                const pendingHTML = pendingRequests.map(r => {
+                    const isOutgoing = r.fromUserId === currentUser.uid;
+                    const displayName = isOutgoing ? r.toEmail : (r.fromName || r.fromEmail);
+
+                    return `
+                    <div class="flex items-center justify-between p-4 bg-amber-50/50 dark:bg-amber-950/10 rounded-xl border border-amber-100 dark:border-amber-900/50 gap-4">
+                        <div class="flex-1">
+                            <span class="text-sm font-bold block">${escapeHTML(displayName)}</span>
+                            <span class="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                                ${isOutgoing ? 'Collaboration request sent' : 'Collaboration request received'}
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            ${isOutgoing ? `
+                                <button onclick="window.cancelInvitation('${r.id}')" class="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg font-bold text-xs transition active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">Cancel</button>
+                            ` : `
+                                <button onclick="window.acceptCollaborationRequest('${r.id}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs transition active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none">Accept</button>
+                                <button onclick="window.rejectCollaborationRequest('${r.id}')" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs transition active:scale-95 focus-visible:ring-2 focus-visible:ring-rose-500 outline-none">Reject</button>
+                            `}
+                        </div>
+                    </div>
+                    `;
+                }).join('');
+
+                const acceptedHTML = acceptedPartnerships.map((partnership, idx) => {
                     const isUser1 = partnership.userId1 === currentUser.uid;
                     const isUnsubscribed = isUser1 ? partnership.user1Unsubscribed : partnership.user2Unsubscribed;
                     const partnerUnsubscribed = isUser1 ? partnership.user2Unsubscribed : partnership.user1Unsubscribed;
@@ -1373,6 +1509,8 @@
                     </div>
                 `;
                 }).join('');
+
+                listEl.innerHTML = pendingHTML + acceptedHTML;
             }
 
             window.leavePartnership = async (partnershipId) => {
@@ -2770,6 +2908,12 @@
                 document.getElementById('profile-display-name')?.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter') document.getElementById('save-profile-btn')?.click();
                 });
+                document.getElementById('profile-phone-number')?.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') document.getElementById('save-profile-btn')?.click();
+                });
+                document.getElementById('profile-address')?.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') document.getElementById('save-profile-btn')?.click();
+                });
                 document.getElementById('share-email')?.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter') document.getElementById('save-sharing-btn')?.click();
                 });
@@ -2791,15 +2935,36 @@
                     const btn = e.currentTarget;
                     const originalText = btn.innerText;
                     const displayName = document.getElementById('profile-display-name').value.trim();
+                    const phoneNumber = document.getElementById('profile-phone-number').value.trim();
+                    const address = document.getElementById('profile-address').value.trim();
+
+                    // Client-side phone number validation
+                    if (phoneNumber) {
+                        const phoneRegex = /^\+?[0-9\s\-]{7,20}$/;
+                        if (!phoneRegex.test(phoneNumber)) {
+                            showToast('Please enter a valid phone number (e.g. +1 234 567 8900).', 'error');
+                            return;
+                        }
+                    }
+
                     btn.disabled = true;
                     btn.innerText = 'Saving...';
                     try {
                         await db.collection('users').doc(currentUser.uid).update({
                             displayName,
+                            phoneNumber,
+                            address,
                             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                         });
-                        await currentUser.updateProfile({ displayName });
+                        if (displayName !== currentUser.displayName) {
+                            await currentUser.updateProfile({ displayName });
+                        }
+                        if (!userProfile) userProfile = {};
                         userProfile.displayName = displayName;
+                        userProfile.phoneNumber = phoneNumber;
+                        userProfile.address = address;
+                        userProfileCache[currentUser.uid] = userProfile;
+
                         showToast('Profile updated!', 'success');
                         window.queueRenderMainApp();
                     } catch (err) {
@@ -3966,10 +4131,40 @@
                 if (unsubscribePartnershipBooks2) unsubscribePartnershipBooks2();
                 if (unsubscribeOwnBooks) unsubscribeOwnBooks();
                 if (unsubscribeActivity) unsubscribeActivity();
+                if (unsubscribeCollabReq1) unsubscribeCollabReq1();
+                if (unsubscribeCollabReq2) unsubscribeCollabReq2();
                 if (!currentUser) return;
 
                 let partnerships1 = [];
                 let partnerships2 = [];
+                let collabReqs1 = [];
+                let collabReqs2 = [];
+
+                // Query collaboration requests where current user is fromUserId
+                unsubscribeCollabReq1 = db.collection('collaborationRequests')
+                    .where('fromUserId', '==', currentUser.uid)
+                    .onSnapshot(snapshot => {
+                        collabReqs1 = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        collaborationRequests = [...collabReqs1, ...collabReqs2];
+                        if (activeTab === 'settings') renderPartners();
+                        if (activeTab === 'activity') window.queueRenderMainApp();
+                        window.updateNotificationBadge();
+                    }, err => {
+                        console.error("Collab Req Query 1 Error:", err);
+                    });
+
+                // Query collaboration requests where current user is toUserId
+                unsubscribeCollabReq2 = db.collection('collaborationRequests')
+                    .where('toUserId', '==', currentUser.uid)
+                    .onSnapshot(snapshot => {
+                        collabReqs2 = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        collaborationRequests = [...collabReqs1, ...collabReqs2];
+                        if (activeTab === 'settings') renderPartners();
+                        if (activeTab === 'activity') window.queueRenderMainApp();
+                        window.updateNotificationBadge();
+                    }, err => {
+                        console.error("Collab Req Query 2 Error:", err);
+                    });
 
                 // Query partnerships where current user is userId1
                 unsubscribePartnershipBooks1 = db.collection('partnerships')
@@ -4000,6 +4195,9 @@
                     let userIdsToFetch = [currentUser.uid];
 
                     allPartnerships.forEach(partnership => {
+                        const isAccepted = partnership.status === 'accepted' || partnership.status === undefined;
+                        if (!isAccepted) return;
+
                         const isUser1 = partnership.userId1 === currentUser.uid;
                         // Only include partner if current user hasn't unsubscribed
                         const currentUserUnsubscribed = isUser1 ? partnership.user1Unsubscribed : partnership.user2Unsubscribed;
@@ -6187,6 +6385,32 @@
             }
 
             function renderActivity() {
+                const pendingCollabRequests = collaborationRequests.filter(r => r.toUserId === currentUser?.uid && r.status === 'pending');
+                const pendingCollabHTML = pendingCollabRequests.length > 0 ? `
+                    <div class="glass p-6 rounded-[2.5rem] border border-blue-200 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/20 mb-8 space-y-4">
+                        <div class="flex items-center gap-2 text-blue-800 dark:text-blue-200">
+                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                            <h3 class="text-sm font-black uppercase tracking-wider">Pending Collaboration Requests (${pendingCollabRequests.length})</h3>
+                        </div>
+                        <div class="space-y-3">
+                            ${pendingCollabRequests.map(req => `
+                                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-blue-100 dark:border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                    <div>
+                                        <p class="text-sm text-slate-800 dark:text-slate-100 font-bold">
+                                            <strong>${escapeHTML(req.fromName || req.fromEmail)}</strong> requested to collaborate with you
+                                        </p>
+                                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">${req.createdAt?.toDate ? formatDate(req.createdAt.toDate()) : 'Recently'}</p>
+                                    </div>
+                                    <div class="flex items-center gap-2 w-full sm:w-auto">
+                                        <button onclick="window.acceptCollaborationRequest('${req.id}')" class="flex-1 sm:flex-initial px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition active:scale-95 shadow-md focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none">Accept</button>
+                                        <button onclick="window.rejectCollaborationRequest('${req.id}')" class="flex-1 sm:flex-initial px-4 py-2 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 hover:bg-rose-100 text-xs font-bold rounded-xl transition active:scale-95 focus-visible:ring-2 focus-visible:ring-rose-500 outline-none">Reject</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : '';
+
                 const pendingRequests = bookRequests.filter(r => r.status === 'pending');
                 const pendingRequestsHTML = pendingRequests.length > 0 ? `
                     <div class="glass p-6 rounded-[2.5rem] border border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20 mb-8 space-y-4">
@@ -6201,6 +6425,12 @@
                                         <p class="text-sm text-slate-800 dark:text-slate-100 font-bold">
                                             <strong>${escapeHTML(req.requesterName || req.fromEmail)}</strong> requested to borrow <strong>"${escapeHTML(req.bookTitle)}"</strong>
                                         </p>
+                                        ${(req.phoneNumber || req.address) ? `
+                                            <div class="text-xs text-slate-500 dark:text-slate-400 mt-1 space-y-0.5">
+                                                ${req.phoneNumber ? `<div><span class="font-semibold text-slate-600 dark:text-slate-300">Phone:</span> ${escapeHTML(req.phoneNumber)}</div>` : ''}
+                                                ${req.address ? `<div><span class="font-semibold text-slate-600 dark:text-slate-300">Address:</span> ${escapeHTML(req.address)}</div>` : ''}
+                                            </div>
+                                        ` : ''}
                                         <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">${req.createdAt?.toDate ? formatDate(req.createdAt.toDate()) : 'Recently'}</p>
                                     </div>
                                     <div class="flex items-center gap-2 w-full sm:w-auto">
@@ -6225,9 +6455,10 @@
                     </div>
                 `;
 
-                if (activities.length === 0 && pendingRequests.length === 0) {
+                if (activities.length === 0 && pendingRequests.length === 0 && pendingCollabRequests.length === 0) {
                     return `
                     <div class="max-w-2xl mx-auto animate-slide-up">
+                        ${pendingCollabHTML}
                         ${pendingRequestsHTML}
                         ${messageInputHTML}
                         <div class="flex flex-col items-center justify-center py-24 text-center">
@@ -6243,6 +6474,7 @@
 
                 return `
                 <div class="max-w-2xl mx-auto space-y-4 animate-slide-up">
+                    ${pendingCollabHTML}
                     ${pendingRequestsHTML}
                     ${messageInputHTML}
                     <div class="mb-8">
@@ -6349,6 +6581,8 @@
                         bookId: bookId,
                         bookTitle: bookTitle,
                         requesterName: userProfile?.displayName || currentUser.displayName || currentUser.email || 'Reader',
+                        phoneNumber: userProfile?.phoneNumber || '',
+                        address: userProfile?.address || '',
                         status: 'pending',
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
