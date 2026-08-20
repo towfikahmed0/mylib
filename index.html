@@ -1716,12 +1716,15 @@
                                 window.queueRenderLibraryOnly();
                             }
                             if (e.key === 'Escape') {
-                                searchQuery = '';
-                                searchInput.value = '';
-                                searchInput.blur();
-                                document.getElementById('clear-search-btn').classList.add('hidden');
-                                if (searchHint) searchHint.classList.remove('opacity-0');
-                                window.queueRenderLibraryOnly();
+                                if (searchQuery) {
+                                    searchQuery = '';
+                                    searchInput.value = '';
+                                    document.getElementById('clear-search-btn')?.classList.add('hidden');
+                                    window.queueRenderLibraryOnly();
+                                } else {
+                                    searchInput.blur();
+                                    if (searchHint) searchHint.classList.remove('opacity-0');
+                                }
                             }
                         });
                         searchInput.addEventListener('focus', () => {
