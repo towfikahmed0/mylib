@@ -1,4 +1,4 @@
-# 📚 MyLib v3.1
+# 📚 MyLib: Library Manager
 
 > **Your personal library, reading life, and literary community — in one place.**
 
