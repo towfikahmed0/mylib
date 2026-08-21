@@ -1,7 +1,0 @@
-## 2026-08-14 - Text-To-Speech (TTS) Toggle and State Cues
-**Learning:** In text-heavy reading applications with integrated AI assistance, the Text-to-Speech button is a key accessibility (a11y) and comfort feature. However, failing to manage the speech synthesis state globally can lead to overlapping voices, repetitive clicks, and confusion for keyboard or screen reader users. Simply toggling classes is insufficient; changing both `aria-label` and `title` to "Stop listening" with corresponding visual icon swaps (Speaker 🔊 to Stop ⏹) makes the interaction immediate, intuitive, and fully controllable.
-**Action:** When integrating SpeechSynthesis, always keep track of active utterances and button DOM elements globally. Toggling clicks should act as play/stop controls, and dynamically re-render icons alongside updating screen reader attributes.
-
-## 2026-08-20 - Search Input Escape Key Two-Stage Dismissal
-**Learning:** For primary search inputs in search-heavy web apps, immediately blurring on `Escape` when search text is present frustrates users who simply want to clear their query and try a new search. Implementing a two-stage Escape interaction—where stage 1 clears input text, refreshes the list, and maintains input focus, and stage 2 blurs the input when empty—creates a much smoother keyboard navigation experience.
-**Action:** When adding or updating search bar key listeners for `Escape`, evaluate if `searchQuery` is present. If non-empty, clear `searchQuery` and `searchInput.value`, trigger live search re-render, and keep focus on the element.
