@@ -8663,6 +8663,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                 let userProgressVal = userProgress;
                 let userHighlightsVal = statusData.highlights || [];
                 let allStatuses = [];
+                let userProfiles = { ...userProfileCache };
 
                 try {
                     if (currentUser) {
@@ -8679,7 +8680,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                     allStatuses = allStatusesSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
 
                     const userIds = [...new Set(allStatuses.map(s => s.uid))];
-                    const userProfiles = { ...userProfileCache };
+                    userProfiles = { ...userProfileCache };
                     const missingUserIds = userIds.filter(id => !userProfiles[id]);
 
                     if (missingUserIds.length > 0) {
@@ -8847,18 +8848,18 @@ If the collection is small or has no finished books, be extra encouraging and su
                                                 <input id="borrower-name" type="text" placeholder="Borrower Name" class="flex-1 px-3 py-2 text-xs bg-slate-100 dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                                                 <button id="borrow-book-btn" class="px-4 py-2 bg-primary text-white text-[10px] font-black uppercase rounded-lg focus-visible:ring-2 focus-visible:ring-primary outline-none">Borrow</button>
                                             </div>
-                                            <p class="text-[9px] text-slate-400">Leave name empty to borrow as yourself (${currentUser.displayName || currentUser.email})</p>
+                                            <p class="text-[9px] text-slate-400">Leave name empty to borrow as yourself (${currentUser?.displayName || currentUser?.email || 'Yourself'})</p>
                                         </div>
                                     `}
                                 </div>
                             </div>
                         </div>
 
-                        ${allStatuses.some(s => s.uid !== currentUser.uid && (s.comment || s.rating > 0)) ? `
+                        ${allStatuses.some(s => s.uid !== currentUser?.uid && (s.comment || s.rating > 0)) ? `
                             <div class="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800">
                                 <p class="text-[10px] font-bold text-slate-400 uppercase mb-4">Collaborator Reviews</p>
                                 <div class="space-y-4">
-                                    ${allStatuses.filter(s => s.uid !== currentUser.uid && (s.comment || s.rating > 0)).sort((a, b) => (b.updatedAt?.toMillis() || 0) - (a.updatedAt?.toMillis() || 0)).map(s => `
+                                    ${allStatuses.filter(s => s.uid !== currentUser?.uid && (s.comment || s.rating > 0)).sort((a, b) => (b.updatedAt?.toMillis() || 0) - (a.updatedAt?.toMillis() || 0)).map(s => `
                                         <div class="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
                                             <div class="flex justify-between items-center mb-2">
                                                 <span class="text-xs font-bold text-primary">${escapeHTML(userProfiles[s.uid]?.displayName || userProfiles[s.uid]?.email || 'Unknown User')}</span>
@@ -8888,7 +8889,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                                                 <button onclick="window.copyQuote('${h.text.replace(/'/g, "\\'")}', '${book.title.replace(/'/g, "\\'")}', '${(book.author || 'Unknown').replace(/'/g, "\\'")}', this)" class="text-blue-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity p-1 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Copy highlight" title="Copy highlight">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
                                                 </button>
-                                                ${h.userId === currentUser.uid ? `
+                                                ${h.userId === currentUser?.uid ? `
                                                 <button onclick="window.deleteHighlight('${book.id}', '${h.id}')" class="text-rose-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="Delete highlight" title="Delete highlight">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                                 </button>
@@ -8930,7 +8931,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                                     <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
                                     Ask AI
                                 </button>
-                                ${book.userId === currentUser.uid ? `
+                                ${book.userId === currentUser?.uid ? `
                                 <button id="transfer-book-btn" class="px-4 py-3 sm:px-8 sm:py-4 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-2xl font-bold hover:bg-amber-200 transition-all text-xs sm:text-base focus-visible:ring-2 focus-visible:ring-amber-500 outline-none flex items-center justify-center gap-2">
                                     <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
                                     Transfer
