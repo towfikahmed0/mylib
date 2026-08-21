@@ -1,0 +1,1483 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>MyLib · User Guide</title>
+
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/2232/2232688.png" type="image/x-icon">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: 'var(--primary-color, #3b82f6)'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=Playfair+Display:ital,wght@0,700;1,700&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #3b82f6;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .font-serif {
+            font-family: 'Playfair Display', serif;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+        }
+
+        .dark .glass {
+            background: rgba(15, 23, 42, 0.7);
+        }
+
+        .guide-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 1.5rem;
+        }
+
+        .chapter-number {
+            font-variant-numeric: tabular-nums;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-300">
+
+    <!-- Theme Initialization -->
+    <script>
+        const savedTheme = localStorage.getItem('mylib_theme');
+
+        if (
+            savedTheme === 'dark' ||
+            (!savedTheme &&
+                window.matchMedia('(prefers-color-scheme: dark)').matches)
+        ) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+
+
+    <!-- ========================================================= -->
+    <!-- HEADER -->
+    <!-- ========================================================= -->
+
+    <header class="border-b border-slate-200/50 dark:border-slate-800/50
+               py-5 sticky top-0 bg-white/80 dark:bg-slate-950/80
+               backdrop-blur-md z-40">
+        <div class="max-w-6xl mx-auto px-6 flex items-center justify-between">
+
+            <div class="flex items-center gap-3">
+
+                <img src="https://cdn-icons-png.flaticon.com/512/2232/2232688.png" class="w-8 h-8 object-contain"
+                    alt="MyLib Logo">
+
+                <span class="font-serif italic text-xl font-bold tracking-tight">
+                    MyLib
+
+                    <span class="text-xs font-sans not-italic
+                               bg-blue-100 dark:bg-slate-800
+                               px-2 py-1 text-blue-600 dark:text-blue-400
+                               rounded-full font-bold ml-2">
+                        User Guide
+                    </span>
+                </span>
+
+            </div>
+
+            <a href="/index.html" class="text-sm font-bold text-primary hover:underline transition">
+                Back to App
+            </a>
+
+        </div>
+    </header>
+
+
+    <!-- ========================================================= -->
+    <!-- MAIN -->
+    <!-- ========================================================= -->
+
+    <main class="flex-1 max-w-6xl mx-auto w-full px-6">
+
+
+        <!-- ===================================================== -->
+        <!-- HERO -->
+        <!-- ===================================================== -->
+
+        <section class="text-center max-w-3xl mx-auto
+                   pt-20 pb-14 space-y-6">
+
+            <div class="inline-flex items-center gap-2
+                       px-3 py-1.5 rounded-full
+                       bg-blue-50 dark:bg-slate-900
+                       border border-blue-100 dark:border-slate-800
+                       text-[10px] font-black uppercase
+                       tracking-widest text-primary">
+                MyLib Documentation
+            </div>
+
+            <h1 class="text-4xl sm:text-6xl
+                       font-black font-serif italic
+                       text-slate-800 dark:text-white
+                       leading-tight">
+                Your library.
+                <br>
+                Your thoughts.
+                <br>
+                Your community.
+            </h1>
+
+            <p class="text-sm sm:text-base
+                       text-slate-500 dark:text-slate-400
+                       leading-relaxed max-w-2xl mx-auto">
+                MyLib brings your personal collection, thoughtful reviews,
+                reading insights, and fellow readers together in one place.
+                This guide will walk you through everything you need to know.
+            </p>
+
+        </section>
+
+
+        <!-- ===================================================== -->
+        <!-- QUICK NAVIGATION -->
+        <!-- ===================================================== -->
+
+        <section class="pb-20">
+
+            <div class="glass rounded-[2rem]
+                       border border-blue-100/60 dark:border-slate-800
+                       shadow-xl p-6 sm:p-8">
+
+                <div class="mb-6">
+
+                    <p class="text-[10px] font-black
+                               uppercase tracking-widest text-primary">
+                        Quick Navigation
+                    </p>
+
+                    <h2 class="text-xl font-bold
+                               font-serif italic
+                               mt-1">
+                        Explore the guide
+                    </h2>
+
+                </div>
+
+
+                <div class="grid grid-cols-2 sm:grid-cols-4
+                           gap-3">
+
+                    <a href="#getting-started" class="guide-link">
+                        01 · Getting Started
+                    </a>
+
+                    <a href="#navigation" class="guide-link">
+                        02 · Navigation
+                    </a>
+
+                    <a href="#my-library" class="guide-link">
+                        03 · My Library
+                    </a>
+
+                    <a href="#collection" class="guide-link">
+                        04 · Your Collection
+                    </a>
+
+                    <a href="#community" class="guide-link">
+                        05 · Reviews & Community
+                    </a>
+
+                    <a href="#collaboration" class="guide-link">
+                        06 · Collaboration
+                    </a>
+
+                    <a href="#insights" class="guide-link">
+                        07 · Insights
+                    </a>
+
+                    <a href="#offline" class="guide-link">
+                        08 · Offline & Sync
+                    </a>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ===================================================== -->
+        <!-- GUIDE -->
+        <!-- ===================================================== -->
+
+        <section class="space-y-24">
+
+
+            <!-- ================================================= -->
+            <!-- CHAPTER 01 -->
+            <!-- ================================================= -->
+
+            <div id="getting-started" class="scroll-mt-32
+                       grid grid-cols-1 md:grid-cols-2
+                       gap-10 items-center
+                       border-b border-slate-100
+                       dark:border-slate-900 pb-20">
+
+                <div class="space-y-5">
+
+                    <span class="text-[10px] font-black
+                               text-primary uppercase
+                               tracking-widest chapter-number">
+                        Chapter 01 · Getting Started
+                    </span>
+
+                    <h2 class="text-3xl font-bold
+                               font-serif italic
+                               text-slate-800 dark:text-white">
+                        Create your MyLib account
+                    </h2>
+
+                    <p class="text-sm text-slate-500
+                               dark:text-slate-400
+                               leading-relaxed">
+                        Getting started with MyLib is simple. Sign in directly
+                        with your Google account and MyLib will automatically
+                        determine whether you already have an account.
+                    </p>
+
+                    <div class="space-y-3 text-sm">
+
+                        <div class="flex gap-3">
+                            <span class="text-primary font-bold">01</span>
+                            <span>
+                                Choose <strong>Sign in with Google</strong>.
+                            </span>
+                        </div>
+
+                        <div class="flex gap-3">
+                            <span class="text-primary font-bold">02</span>
+                            <span>
+                                If an account already exists, you will be
+                                signed in automatically.
+                            </span>
+                        </div>
+
+                        <div class="flex gap-3">
+                            <span class="text-primary font-bold">03</span>
+                            <span>
+                                If you are new to MyLib, your account will
+                                be created automatically.
+                            </span>
+                        </div>
+
+                    </div>
+
+                    <p class="text-xs text-slate-400
+                               dark:text-slate-500
+                               leading-relaxed">
+                        MyLib currently uses Google authentication through
+                        Firebase. Your Google sign-in identity cannot currently
+                        be changed from within MyLib. Account deletion is not
+                        currently available in this version.
+                    </p>
+
+                </div>
+
+
+                <div class="h-80 rounded-[2rem]
+                           bg-slate-100 dark:bg-slate-900
+                           border border-slate-200/50
+                           dark:border-slate-800
+                           p-4 shadow-inner">
+                    <img src="./img/guideimgs/c1.png" class="guide-image" alt="MyLib account sign in">
+                </div>
+
+            </div>
+
+
+            <!-- ================================================= -->
+            <!-- CHAPTER 02 -->
+            <!-- ================================================= -->
+
+            <div id="navigation" class="scroll-mt-32
+                       grid grid-cols-1 md:grid-cols-2
+                       gap-10 items-center
+                       border-b border-slate-100
+                       dark:border-slate-900 pb-20">
+
+                <div class="md:order-2 space-y-5">
+
+                    <span class="text-[10px] font-black
+                               text-primary uppercase
+                               tracking-widest">
+                        Chapter 02 · Navigation
+                    </span>
+
+                    <h2 class="text-3xl font-bold
+                               font-serif italic
+                               text-slate-800 dark:text-white">
+                        Find your way around MyLib
+                    </h2>
+
+                    <p class="text-sm text-slate-500
+                               dark:text-slate-400
+                               leading-relaxed">
+                        The navigation bar gives you quick access to the
+                        major areas of your library and the MyLib experience.
+                    </p>
+
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+                        <div class="feature-mini">
+                            <strong>Home</strong>
+                            <span>Return to your main library.</span>
+                        </div>
+
+                        <div class="feature-mini">
+                            <strong>My Library</strong>
+                            <span>View your finished books and library statistics.</span>
+                        </div>
+
+                        <div class="feature-mini">
+                            <strong>Explore</strong>
+                            <span>Discover books, readers and community posts.</span>
+                        </div>
+
+                        <div class="feature-mini">
+                            <strong>Insight</strong>
+                            <span>Explore statistics and information about your collection.</span>
+                        </div>
+
+                        <div class="feature-mini">
+                            <strong>Notifications</strong>
+                            <span>Keep track of alerts and activity.</span>
+                        </div>
+
+                        <div class="feature-mini">
+                            <strong>Add Books</strong>
+                            <span>Add books to your collection.</span>
+                        </div>
+
+                        <div class="feature-mini sm:col-span-2">
+                            <strong>Settings</strong>
+                            <span>Manage your account, library and collaboration settings.</span>
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="md:order-1 h-80 rounded-[2rem]
+                           bg-slate-100 dark:bg-slate-900
+                           border border-slate-200/50
+                           dark:border-slate-800
+                           p-4 shadow-inner">
+                    <img src="./img/guideimgs/nav.png" class="guide-image" alt="MyLib navigation bar">
+                </div>
+
+            </div>
+
+
+            <!-- ================================================= -->
+            <!-- CHAPTER 03 -->
+            <!-- ================================================= -->
+
+            <div id="my-library" class="scroll-mt-32
+                       grid grid-cols-1 md:grid-cols-2
+                       gap-10 items-center
+                       border-b border-slate-100
+                       dark:border-slate-900 pb-20">
+
+                <div class="space-y-5">
+
+                    <span class="text-[10px] font-black
+                               text-primary uppercase
+                               tracking-widest">
+                        Chapter 03 · My Library
+                    </span>
+
+                    <h2 class="text-3xl font-bold
+                               font-serif italic
+                               text-slate-800 dark:text-white">
+                        Your reading history at a glance
+                    </h2>
+
+                    <p class="text-sm text-slate-500
+                               dark:text-slate-400
+                               leading-relaxed">
+                        The My Library tab is where you keep track of the
+                        books you have finished and manage your personal
+                        reading history.
+                    </p>
+
+
+                    <div class="space-y-4">
+
+                        <div class="numbered-item">
+                            <span>1</span>
+                            <p>
+                                <strong>Your statistics</strong><br>
+                                See an overview of your finished books and
+                                reading activity.
+                            </p>
+                        </div>
+
+                        <div class="numbered-item">
+                            <span>2</span>
+                            <p>
+                                <strong>Collaborator activity</strong><br>
+                                See how many books your collaborators have
+                                finished.
+                            </p>
+                        </div>
+
+                        <div class="numbered-item">
+                            <span>3</span>
+                            <p>
+                                <strong>Wishlist</strong><br>
+                                Keep track of books you want to read.
+                            </p>
+                        </div>
+
+                        <div class="numbered-item">
+                            <span>4</span>
+                            <p>
+                                <strong>Add finished book</strong><br>
+                                Add a book you have already finished, whether
+                                it came from your own collection or another
+                                source.
+                            </p>
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="h-80 rounded-[2rem]
+                           bg-slate-100 dark:bg-slate-900
+                           border border-slate-200/50
+                           dark:border-slate-800
+                           p-4 shadow-inner">
+                    <img src="./img/guideimgs/mylibraryTab.png" class="guide-image" alt="My Library tab">
+                </div>
+
+            </div>
+
+
+            <!-- ================================================= -->
+            <!-- CHAPTER 04 -->
+            <!-- ================================================= -->
+
+            <div id="collection" class="scroll-mt-32
+                       grid grid-cols-1 md:grid-cols-2
+                       gap-10 items-center
+                       border-b border-slate-100
+                       dark:border-slate-900 pb-20">
+
+                <div class="md:order-2 space-y-5">
+
+                    <span class="text-[10px] font-black
+                               text-primary uppercase
+                               tracking-widest">
+                        Chapter 04 · Your Collection
+                    </span>
+
+                    <h2 class="text-3xl font-bold
+                               font-serif italic
+                               text-slate-800 dark:text-white">
+                        Build and organize your collection
+                    </h2>
+
+                    <p class="text-sm text-slate-500
+                               dark:text-slate-400
+                               leading-relaxed">
+                        Your personal library is the heart of MyLib. Add
+                        books, organize them and keep useful information
+                        about your collection in one place.
+                    </p>
+
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+                        <div class="feature-mini">
+                            <strong>Add Books</strong>
+                            <span>Add books manually or through supported lookup tools.</span>
+                        </div>
+
+                        <div class="feature-mini">
+                            <strong>Book Information</strong>
+                            <span>Keep titles, authors, genres, ratings and other details together.</span>
+                        </div>
+
+                        <div class="feature-mini">
+                            <strong>Search</strong>
+                            <span>Quickly find books in your library.</span>
+                        </div>
+
+                        <div class="feature-mini">
+                            <strong>Filtering</strong>
+                            <span>Use library information to narrow down your collection.</span>
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="md:order-1 h-80 rounded-[2rem]
+                           bg-slate-100 dark:bg-slate-900
+                           border border-slate-200/50
+                           dark:border-slate-800
+                           flex items-center justify-center
+                           text-slate-400 text-xs
+                           shadow-inner p-8">
+
+                    <div class="text-center space-y-3">
+                        <img src="./img/guideimgs/books.png" class="guide-image" alt="MyLib Books organise">
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- ================================================= -->
+            <!-- CHAPTER 05 -->
+            <!-- ================================================= -->
+
+            <div id="community" class="scroll-mt-32
+                       grid grid-cols-1 md:grid-cols-2
+                       gap-10 items-center
+                       border-b border-slate-100
+                       dark:border-slate-900 pb-20">
+
+                <div class="space-y-5">
+
+                    <span class="text-[10px] font-black
+                               text-primary uppercase
+                               tracking-widest">
+                        Chapter 05 · Reviews & Community
+                    </span>
+
+                    <h2 class="text-3xl font-bold
+                               font-serif italic
+                               text-slate-800 dark:text-white">
+                        Share ideas. Discover readers.
+                    </h2>
+
+                    <p class="text-sm text-slate-500
+                               dark:text-slate-400
+                               leading-relaxed">
+                        Explore is where the social side of MyLib comes alive.
+                        Discover other readers, explore their libraries and
+                        share your own thoughts about books.
+                    </p>
+
+
+                    <div class="space-y-4">
+
+                        <div class="numbered-item">
+                            <span>1</span>
+                            <p>
+                                <strong>Explore other libraries</strong><br>
+                                Search for another user's library using their
+                                email address.
+                            </p>
+                        </div>
+
+                        <div class="numbered-item">
+                            <span>2</span>
+                            <p>
+                                <strong>Write a post</strong><br>
+                                Use the "Write Review" button to create a post
+                                and select its category.
+                            </p>
+                        </div>
+
+                        <div class="numbered-item">
+                            <span>3</span>
+                            <p>
+                                <strong>Choose a category</strong><br>
+                                Posts can be categorized as Review, Help or
+                                Others.
+                            </p>
+                        </div>
+
+                        <div class="numbered-item">
+                            <span>4</span>
+                            <p>
+                                <strong>Interact</strong><br>
+                                Like and comment on posts from other readers.
+                            </p>
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="h-80 rounded-[2rem]
+                           bg-slate-100 dark:bg-slate-900
+                           border border-slate-200/50
+                           dark:border-slate-800
+                           p-4 shadow-inner">
+                    <img src="./img/guideimgs/exploreTab.png" class="guide-image" alt="MyLib Explore tab">
+                </div>
+
+            </div>
+
+
+            <!-- ================================================= -->
+            <!-- CHAPTER 06 -->
+            <!-- ================================================= -->
+
+            <div id="collaboration" class="scroll-mt-32
+                       grid grid-cols-1 md:grid-cols-2
+                       gap-10 items-center
+                       border-b border-slate-100
+                       dark:border-slate-900 pb-20">
+
+                <div class="md:order-2 space-y-5">
+
+                    <span class="text-[10px] font-black
+                               text-primary uppercase
+                               tracking-widest">
+                        Chapter 06 · Collaboration
+                    </span>
+
+                    <h2 class="text-3xl font-bold
+                               font-serif italic
+                               text-slate-800 dark:text-white">
+                        Read together
+                    </h2>
+
+                    <p class="text-sm text-slate-500
+                               dark:text-slate-400
+                               leading-relaxed">
+                        MyLib lets you connect your library experience with
+                        people you trust. Collaboration can make it easier
+                        to share reading activity and discover what others
+                        are reading.
+                    </p>
+
+
+                    <div class="space-y-4">
+
+                        <div class="flex items-center gap-3">
+                            <span class="step-circle">1</span>
+                            <span>Open <strong>Settings</strong>.</span>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <span class="step-circle">2</span>
+                            <span>Add a collaborator using their email.</span>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <span class="step-circle">3</span>
+                            <span>Wait for the collaboration request to be accepted.</span>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <span class="step-circle">4</span>
+                            <span>Access the shared collaboration features.</span>
+                        </div>
+
+                    </div>
+
+
+                    <div class="p-4 rounded-2xl
+                               bg-blue-50 dark:bg-slate-900
+                               border border-blue-100
+                               dark:border-slate-800">
+                        <p class="text-xs text-slate-500
+                                   dark:text-slate-400
+                                   leading-relaxed">
+                            <strong class="text-slate-700 dark:text-slate-200">
+                                Tip:
+                            </strong>
+                            Only collaborate with people you trust. Your
+                            library is personal, and sharing should always
+                            be intentional.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div class="md:order-1 h-80 rounded-[2rem]
+                           bg-slate-100 dark:bg-slate-900
+                           border border-slate-200/50
+                           dark:border-slate-800
+                           flex items-center justify-center
+                           text-slate-400 text-xs
+                           shadow-inner">
+
+                    <div class="text-center space-y-3">
+                        <img src="./img/guideimgs/col.png" class="guide-image" alt="library sharing and collaboration">
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- ================================================= -->
+            <!-- CHAPTER 07 -->
+            <!-- ================================================= -->
+
+            <div id="insights" class="scroll-mt-32
+                       border-b border-slate-100
+                       dark:border-slate-900 pb-20">
+
+                <div class="text-center max-w-2xl
+                           mx-auto space-y-5 mb-10">
+
+                    <span class="text-[10px] font-black
+                               text-primary uppercase
+                               tracking-widest">
+                        Chapter 07 · Insights
+                    </span>
+
+                    <h2 class="text-3xl sm:text-4xl
+                               font-bold font-serif italic
+                               text-slate-800 dark:text-white">
+                        Understand your library
+                    </h2>
+
+                    <p class="text-sm text-slate-500
+                               dark:text-slate-400
+                               leading-relaxed">
+                        Your library is more than a list of books. Insights
+                        helps you see patterns in your collection and
+                        understand your reading habits.
+                    </p>
+
+                </div>
+
+
+                <div class="grid grid-cols-1 md:grid-cols-3
+                           gap-5">
+
+                    <div class="insight-card">
+
+                        <div class="insight-icon">
+                            📚
+                        </div>
+
+                        <h3>
+                            Reading Composition
+                        </h3>
+
+                        <p>
+                            Visualize the composition of your collection and
+                            see how different genres and reading categories
+                            contribute to your library.
+                        </p>
+
+                    </div>
+
+
+                    <div class="insight-card">
+
+                        <div class="insight-icon">
+                            ⭐
+                        </div>
+
+                        <h3>
+                            Rating Distribution
+                        </h3>
+
+                        <p>
+                            Understand how you rate the books you read and
+                            discover patterns in your reading preferences.
+                        </p>
+
+                    </div>
+
+
+                    <div class="insight-card">
+
+                        <div class="insight-icon">
+                            💰
+                        </div>
+
+                        <h3>
+                            Collection Value
+                        </h3>
+
+                        <p>
+                            Keep track of the financial side of your
+                            collection, including its total and average value.
+                        </p>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- ================================================= -->
+            <!-- CHAPTER 08 -->
+            <!-- ================================================= -->
+
+            <div id="offline" class="scroll-mt-32
+                       grid grid-cols-1 md:grid-cols-2
+                       gap-10 items-center
+                       pb-20">
+
+                <div class="space-y-5">
+
+                    <span class="text-[10px] font-black
+                               text-primary uppercase
+                               tracking-widest">
+                        Chapter 08 · Offline & Sync
+                    </span>
+
+                    <h2 class="text-3xl font-bold
+                               font-serif italic
+                               text-slate-800 dark:text-white">
+                        Your library, wherever you are
+                    </h2>
+
+                    <p class="text-sm text-slate-500
+                               dark:text-slate-400
+                               leading-relaxed">
+                        MyLib is designed as a Progressive Web App. You can
+                        install it on supported devices and continue using
+                        important parts of your library even when your
+                        connection is unavailable.
+                    </p>
+
+
+                    <div class="space-y-4">
+
+                        <div class="feature-row">
+                            <span>✓</span>
+                            <p>
+                                <strong>Installable</strong><br>
+                                Add MyLib to your device for an app-like experience.
+                            </p>
+                        </div>
+
+                        <div class="feature-row">
+                            <span>✓</span>
+                            <p>
+                                <strong>Offline support</strong><br>
+                                Continue working with available local data
+                                when you are offline.
+                            </p>
+                        </div>
+
+                        <div class="feature-row">
+                            <span>✓</span>
+                            <p>
+                                <strong>Cloud synchronization</strong><br>
+                                Changes can synchronize with Firebase when
+                                connectivity is restored.
+                            </p>
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="h-80 rounded-[2rem]
+                           bg-gradient-to-br
+                           from-blue-50 to-slate-100
+                           dark:from-slate-900 dark:to-slate-950
+                           border border-blue-100/60
+                           dark:border-slate-800
+                           flex items-center justify-center
+                           shadow-inner">
+
+                    <div class="text-center">
+
+                        <div class="text-5xl mb-4">
+                            ☁️
+                        </div>
+
+                        <p class="font-bold">
+                            Offline → Work → Sync
+                        </p>
+
+                        <p class="text-xs text-slate-400
+                                   mt-2 max-w-xs">
+                            Your library stays connected to your devices
+                            through MyLib's synchronization system.
+                        </p>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ===================================================== -->
+        <!-- FAQ -->
+        <!-- ===================================================== -->
+
+        <section id="faq" class="scroll-mt-32
+                   glass p-8 sm:p-12
+                   rounded-[2.5rem]
+                   border border-blue-100/50
+                   dark:border-slate-800
+                   shadow-xl space-y-8
+                   mb-24">
+
+            <div class="text-center max-w-xl
+                       mx-auto space-y-2">
+
+                <span class="text-[10px] font-black
+                           text-primary uppercase
+                           tracking-widest">
+                    Need help?
+                </span>
+
+                <h2 class="text-3xl font-bold
+                           font-serif italic
+                           text-slate-800 dark:text-white">
+                    Frequently Asked Questions
+                </h2>
+
+                <p class="text-xs text-slate-500
+                           dark:text-slate-400">
+                    Quick answers to common questions about MyLib.
+                </p>
+
+            </div>
+
+
+            <div class="space-y-4 max-w-3xl mx-auto">
+
+
+                <!-- FAQ 1 -->
+
+                <div class="faq-item">
+
+                    <button onclick="toggleFAQ(1)" class="faq-button">
+                        <span>
+                            How do I create a MyLib account?
+                        </span>
+
+                        <svg id="faq-icon-1" class="w-4 h-4 transform transition-transform" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    <div id="faq-ans-1" class="faq-answer hidden">
+                        MyLib currently uses Google sign-in. If your Google
+                        account has already been registered, you will be
+                        signed in. Otherwise, MyLib will create your account
+                        automatically.
+                    </div>
+
+                </div>
+
+                <!-- FAQ 1 -->
+
+                <div class="faq-item">
+
+                    <button onclick="toggleFAQ(1)" class="faq-button">
+                        <span>
+                            Is MyLib free to use?
+                        </span>
+
+                        <svg id="faq-icon-1" class="w-4 h-4 transform transition-transform" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    <div id="faq-ans-1" class="faq-answer hidden">
+                        Yes. MyLib is free to use. There are no paid
+                        subscriptions or premium features in this version.
+                    </div>
+
+                </div>
+                <!-- FAQ 1 -->
+
+                <div class="faq-item">
+
+                    <button onclick="toggleFAQ(1)" class="faq-button">
+                        <span>
+                            Are my data safe and private?
+                        </span>
+
+                        <svg id="faq-icon-1" class="w-4 h-4 transform transition-transform" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    <div id="faq-ans-1" class="faq-answer hidden">
+                        MyLib uses Firebase for authentication and data
+                        storage. Your data is private and secure, and you
+                        can manage your account settings to control access.
+                    </div>
+
+                </div>
+
+                <!-- FAQ 2 -->
+
+                <div class="faq-item">
+
+                    <button onclick="toggleFAQ(2)" class="faq-button">
+                        <span>
+                            How do I add a book?
+                        </span>
+
+                        <svg id="faq-icon-2" class="w-4 h-4 transform transition-transform" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    <div id="faq-ans-2" class="faq-answer hidden">
+                        Use the Add Books button in the navigation area.
+                        Depending on the available tools, you can enter
+                        information manually or use supported book lookup
+                        and scanning features.
+                    </div>
+
+                </div>
+
+
+                <!-- FAQ 3 -->
+
+                <div class="faq-item">
+
+                    <button onclick="toggleFAQ(3)" class="faq-button">
+                        <span>
+                            How does collaboration work?
+                        </span>
+
+                        <svg id="faq-icon-3" class="w-4 h-4 transform transition-transform" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    <div id="faq-ans-3" class="faq-answer hidden">
+                        Collaboration can be managed from Settings. Add a
+                        collaborator using their email address and, once the
+                        request is accepted, use the available shared-library
+                        features.
+                    </div>
+
+                </div>
+
+
+                <!-- FAQ 4 -->
+
+                <div class="faq-item">
+
+                    <button onclick="toggleFAQ(4)" class="faq-button">
+                        <span>
+                            Can I use MyLib offline?
+                        </span>
+
+                        <svg id="faq-icon-4" class="w-4 h-4 transform transition-transform" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    <div id="faq-ans-4" class="faq-answer hidden">
+                        Yes. MyLib is built as a Progressive Web App with
+                        offline support. Available local data can remain
+                        accessible while you are offline, and synchronization
+                        can occur again when your connection returns.
+                    </div>
+
+                </div>
+
+
+                <!-- FAQ 5 -->
+
+                <div class="faq-item">
+
+                    <button onclick="toggleFAQ(5)" class="faq-button">
+                        <span>
+                            What can I see in Insights?
+                        </span>
+
+                        <svg id="faq-icon-5" class="w-4 h-4 transform transition-transform" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    <div id="faq-ans-5" class="faq-answer hidden">
+                        Insights provides information about your collection,
+                        including reading composition, rating distribution
+                        and financial information such as collection value.
+                    </div>
+
+                </div>
+
+
+                <!-- FAQ 6 -->
+
+                <div class="faq-item">
+
+                    <button onclick="toggleFAQ(6)" class="faq-button">
+                        <span>
+                            Can I delete my account?
+                        </span>
+
+                        <svg id="faq-icon-6" class="w-4 h-4 transform transition-transform" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    <div id="faq-ans-6" class="faq-answer hidden">
+                        Account deletion is not currently available from
+                        within MyLib in this version.
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <!-- ========================================================= -->
+    <!-- FOOTER -->
+    <!-- ========================================================= -->
+
+    <footer class="py-8
+               border-t border-slate-200/50
+               dark:border-slate-800/50">
+
+        <p class="text-center text-[10px]
+                   text-slate-400
+                   font-bold uppercase
+                   tracking-widest">
+            © 2026 MyLib · Preserve every word. Every story matters.
+        </p>
+
+    </footer>
+
+
+    <!-- ========================================================= -->
+    <!-- EXTRA STYLES -->
+    <!-- ========================================================= -->
+
+    <style>
+        .guide-link {
+            display: block;
+            padding: 0.8rem 1rem;
+            border-radius: 1rem;
+            background: rgba(248, 250, 252, 0.8);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            color: #64748b;
+            font-size: 0.7rem;
+            font-weight: 700;
+            transition: all 0.2s ease;
+        }
+
+        .dark .guide-link {
+            background: rgba(15, 23, 42, 0.7);
+            border-color: #1e293b;
+            color: #94a3b8;
+        }
+
+        .guide-link:hover {
+            color: var(--primary-color);
+            transform: translateY(-2px);
+        }
+
+
+        .feature-mini {
+            padding: 0.9rem;
+            border-radius: 1rem;
+            background: rgba(248, 250, 252, 0.7);
+            border: 1px solid rgba(226, 232, 240, 0.7);
+        }
+
+        .dark .feature-mini {
+            background: rgba(15, 23, 42, 0.6);
+            border-color: #1e293b;
+        }
+
+        .feature-mini strong {
+            display: block;
+            font-size: 0.75rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .feature-mini span {
+            display: block;
+            font-size: 0.68rem;
+            line-height: 1.5;
+            color: #64748b;
+        }
+
+        .dark .feature-mini span {
+            color: #94a3b8;
+        }
+
+
+        .numbered-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.8rem;
+        }
+
+        .numbered-item>span {
+            flex-shrink: 0;
+            width: 1.6rem;
+            height: 1.6rem;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #eff6ff;
+            color: var(--primary-color);
+            font-size: 0.65rem;
+            font-weight: 900;
+        }
+
+        .dark .numbered-item>span {
+            background: #172554;
+        }
+
+        .numbered-item p {
+            font-size: 0.75rem;
+            line-height: 1.55;
+            color: #64748b;
+        }
+
+        .dark .numbered-item p {
+            color: #94a3b8;
+        }
+
+
+        .step-circle {
+            width: 1.8rem;
+            height: 1.8rem;
+            border-radius: 999px;
+            background: #eff6ff;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            font-weight: 900;
+            flex-shrink: 0;
+        }
+
+        .dark .step-circle {
+            background: #172554;
+        }
+
+
+        .insight-card {
+            padding: 2rem;
+            border-radius: 2rem;
+            background: rgba(248, 250, 252, 0.8);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+
+        .dark .insight-card {
+            background: rgba(15, 23, 42, 0.7);
+            border-color: #1e293b;
+        }
+
+        .insight-icon {
+            width: 3rem;
+            height: 3rem;
+            border-radius: 1rem;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            margin-bottom: 1.2rem;
+        }
+
+        .dark .insight-icon {
+            background: #1e293b;
+        }
+
+        .insight-card h3 {
+            font-size: 1rem;
+            font-weight: 800;
+            margin-bottom: 0.6rem;
+        }
+
+        .insight-card p {
+            font-size: 0.72rem;
+            line-height: 1.7;
+            color: #64748b;
+        }
+
+        .dark .insight-card p {
+            color: #94a3b8;
+        }
+
+
+        .feature-row {
+            display: flex;
+            gap: 0.8rem;
+            align-items: flex-start;
+        }
+
+        .feature-row>span {
+            color: var(--primary-color);
+            font-weight: 900;
+            font-size: 1rem;
+        }
+
+        .feature-row p {
+            font-size: 0.75rem;
+            line-height: 1.55;
+            color: #64748b;
+        }
+
+        .dark .feature-row p {
+            color: #94a3b8;
+        }
+
+
+        .faq-item {
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 0.8rem;
+        }
+
+        .dark .faq-item {
+            border-color: #1e293b;
+        }
+
+        .faq-button {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            text-align: left;
+            padding: 0.7rem 0;
+            font-size: 0.8rem;
+            font-weight: 800;
+            color: #334155;
+            transition: color 0.2s ease;
+        }
+
+        .dark .faq-button {
+            color: #e2e8f0;
+        }
+
+        .faq-button:hover {
+            color: var(--primary-color);
+        }
+
+        .faq-answer {
+            margin-top: 0.4rem;
+            padding-bottom: 0.5rem;
+            font-size: 0.7rem;
+            line-height: 1.7;
+            color: #64748b;
+        }
+
+        .dark .faq-answer {
+            color: #94a3b8;
+        }
+    </style>
+
+
+    <!-- ========================================================= -->
+    <!-- FAQ LOGIC -->
+    <!-- ========================================================= -->
+
+    <script>
+
+        function toggleFAQ(id) {
+
+            const answer =
+                document.getElementById(`faq-ans-${id}`);
+
+            const icon =
+                document.getElementById(`faq-icon-${id}`);
+
+            if (!answer || !icon) return;
+
+            const isOpen =
+                !answer.classList.contains('hidden');
+
+
+            // Close all FAQs
+            document
+                .querySelectorAll('[id^="faq-ans-"]')
+                .forEach(el => {
+                    el.classList.add('hidden');
+                });
+
+            document
+                .querySelectorAll('[id^="faq-icon-"]')
+                .forEach(el => {
+                    el.classList.remove('rotate-180');
+                });
+
+
+            // Open selected FAQ
+            if (!isOpen) {
+
+                answer.classList.remove('hidden');
+
+                icon.classList.add('rotate-180');
+
+            }
+
+        }
+
+    </script>
+
+</body>
+
+</html>

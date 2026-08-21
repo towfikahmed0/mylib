@@ -32,7 +32,8 @@ service cloud.firestore {
     // ========== PARTNERSHIPS COLLECTION ==========
     match /partnerships/{partnershipId} {
       allow read: if request.auth != null && 
-        (request.auth.uid == resource.data.userId1 || 
+        (resource == null ||
+         request.auth.uid == resource.data.userId1 ||
          request.auth.uid == resource.data.userId2);
          
       allow create: if request.auth != null && 
@@ -40,11 +41,13 @@ service cloud.firestore {
          request.auth.uid == request.resource.data.userId2);
          
       allow update: if request.auth != null && 
-        (request.auth.uid == resource.data.userId1 || 
+        (resource == null ||
+         request.auth.uid == resource.data.userId1 ||
          request.auth.uid == resource.data.userId2);
          
       allow delete: if request.auth != null && 
-        (request.auth.uid == resource.data.userId1 || 
+        (resource == null ||
+         request.auth.uid == resource.data.userId1 ||
          request.auth.uid == resource.data.userId2);
     }
 
@@ -88,6 +91,44 @@ service cloud.firestore {
       );
 
       allow update, delete: if false;
+    }
+
+    // ========== BOOK REQUESTS COLLECTION ==========
+    match /bookRequests/{requestId} {
+      allow read: if request.auth != null && (
+        resource == null ||
+        request.auth.uid == resource.data.fromUserId ||
+        request.auth.uid == resource.data.toUserId
+      );
+      allow create: if request.auth != null &&
+        request.auth.uid == request.resource.data.fromUserId;
+      allow update: if request.auth != null && (
+        request.auth.uid == resource.data.fromUserId ||
+        request.auth.uid == resource.data.toUserId
+      );
+      allow delete: if request.auth != null && (
+        request.auth.uid == resource.data.fromUserId ||
+        request.auth.uid == resource.data.toUserId
+      );
+    }
+
+    // ========== COLLABORATION REQUESTS COLLECTION ==========
+    match /collaborationRequests/{requestId} {
+      allow read: if request.auth != null && (
+        resource == null ||
+        request.auth.uid == resource.data.fromUserId ||
+        request.auth.uid == resource.data.toUserId
+      );
+      allow create: if request.auth != null &&
+        request.auth.uid == request.resource.data.fromUserId;
+      allow update: if request.auth != null && (
+        request.auth.uid == resource.data.fromUserId ||
+        request.auth.uid == resource.data.toUserId
+      );
+      allow delete: if request.auth != null && (
+        request.auth.uid == resource.data.fromUserId ||
+        request.auth.uid == resource.data.toUserId
+      );
     }
 
     // ========== REVIEWS COLLECTION ==========
