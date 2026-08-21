@@ -1844,6 +1844,7 @@
             }
 
             function doRenderLibraryOnly() {
+                books = books.map(b => b._escapedTitle ? b : normalizeBook(b));
                 renderRecentSearches();
                 // ⚡ Bolt: Hoist density class calculation out of the mapping loop
                 const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
@@ -3144,6 +3145,7 @@
              * into a single pass to eliminate redundant processing and memory overhead.
              */
             function updateLibraryStats() {
+                books = books.map(b => b._escapedTitle ? b : normalizeBook(b));
                 const authorsSet = new Set();
                 const genresSet = new Set();
                 const ownersSet = new Set();
@@ -4357,7 +4359,7 @@
                     <div id="select-book-list" class="flex-1 overflow-y-auto space-y-3 pr-2">
                         ${myBooks.length > 0 ? myBooks.map(b => `
                             <button onclick="window.markAsFinished('${b.id}', this)" class="w-full flex items-center gap-4 p-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all text-left group focus-visible:ring-2 focus-visible:ring-primary outline-none">
-                                <img src="${b.coverUrl || b.thumbnail || 'https://via.placeholder.com/40x60?text=No+Cover'}" class="w-12 h-16 object-cover rounded-lg shadow-sm">
+                                <img src="${b.coverUrl || b.thumbnail || 'data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"60\" viewBox=\"0 0 40 60\"><rect width=\"100%\" height=\"100%\" fill=\"%23f1f5f9\"/><text x=\"50%\" y=\"50%\" dominant-baseline=\"middle\" text-anchor=\"middle\" fill=\"%2394a3b8\" font-family=\"sans-serif\" font-size=\"8\" font-weight=\"bold\">No Cover</text></svg>'}" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"60\" viewBox=\"0 0 40 60\"><rect width=\"100%\" height=\"100%\" fill=\"%23f1f5f9\"/><text x=\"50%\" y=\"50%\" dominant-baseline=\"middle\" text-anchor=\"middle\" fill=\"%2394a3b8\" font-family=\"sans-serif\" font-size=\"8\" font-weight=\"bold\">No Cover</text></svg>';" class="w-12 h-16 object-cover rounded-lg shadow-sm" alt="Book cover">
                                 <div class="flex-1 min-w-0">
                                     <h4 class="font-bold text-sm truncate group-hover:text-blue-600 transition-colors">${escapeHTML(b.title)}</h4>
                                     <p class="text-xs text-slate-500 truncate">${escapeHTML(b.author)}</p>
@@ -4382,7 +4384,7 @@
                         const filtered = myBooks.filter(b => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q));
                         listContainer.innerHTML = filtered.length > 0 ? filtered.map(b => `
                             <button onclick="window.markAsFinished('${b.id}', this)" class="w-full flex items-center gap-4 p-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all text-left group focus-visible:ring-2 focus-visible:ring-primary outline-none">
-                                <img src="${b.coverUrl || b.thumbnail || 'https://via.placeholder.com/40x60?text=No+Cover'}" class="w-12 h-16 object-cover rounded-lg shadow-sm">
+                                <img src="${b.coverUrl || b.thumbnail || 'data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"60\" viewBox=\"0 0 40 60\"><rect width=\"100%\" height=\"100%\" fill=\"%23f1f5f9\"/><text x=\"50%\" y=\"50%\" dominant-baseline=\"middle\" text-anchor=\"middle\" fill=\"%2394a3b8\" font-family=\"sans-serif\" font-size=\"8\" font-weight=\"bold\">No Cover</text></svg>'}" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"60\" viewBox=\"0 0 40 60\"><rect width=\"100%\" height=\"100%\" fill=\"%23f1f5f9\"/><text x=\"50%\" y=\"50%\" dominant-baseline=\"middle\" text-anchor=\"middle\" fill=\"%2394a3b8\" font-family=\"sans-serif\" font-size=\"8\" font-weight=\"bold\">No Cover</text></svg>';" class="w-12 h-16 object-cover rounded-lg shadow-sm" alt="Book cover">
                                 <div class="flex-1 min-w-0">
                                     <h4 class="font-bold text-sm truncate group-hover:text-blue-600 transition-colors">${escapeHTML(b.title)}</h4>
                                     <p class="text-xs text-slate-500 truncate">${escapeHTML(b.author)}</p>
@@ -4586,6 +4588,7 @@
             }
 
             function renderMyBooks() {
+                books = books.map(b => b._escapedTitle ? b : normalizeBook(b));
                 renderRecentSearches();
                 // ⚡ Bolt: Hoist density class calculation out of the mapping loop
                 const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
@@ -6393,32 +6396,44 @@ If the collection is small or has no finished books, be extra encouraging and su
                     </div>
                 `);
 
-                // Re-fetch current user's rating and comment for this book to be sure
-                const userStatusDoc = await db.collection('books').doc(book.id).collection('readingStatus').doc(currentUser.uid).get();
-                const userRatingVal = userStatusDoc.exists ? userStatusDoc.data().rating || 0 : userRating;
-                const userCommentVal = userStatusDoc.exists ? userStatusDoc.data().comment || '' : userComment;
-                const userProgressVal = userStatusDoc.exists ? userStatusDoc.data().progress || 0 : userProgress;
-                const userHighlightsVal = userStatusDoc.exists ? userStatusDoc.data().highlights || [] : (statusData.highlights || []);
+                let userRatingVal = userRating;
+                let userCommentVal = userComment;
+                let userProgressVal = userProgress;
+                let userHighlightsVal = statusData.highlights || [];
+                let allStatuses = [];
 
-                // Fetch all ratings and comments for this book
-                const allStatusesSnapshot = await db.collection('books').doc(book.id).collection('readingStatus').get();
-                const allStatuses = allStatusesSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
-
-                // Fetch user profiles for display names with local caching
-                const userIds = [...new Set(allStatuses.map(s => s.uid))];
-                const userProfiles = { ...userProfileCache };
-                const missingUserIds = userIds.filter(id => !userProfiles[id]);
-
-                if (missingUserIds.length > 0) {
-                    // Firestore 'in' query supports up to 10 items
-                    for (let i = 0; i < missingUserIds.length; i += 10) {
-                        const chunk = missingUserIds.slice(i, i + 10);
-                        const usersSnapshot = await db.collection('users').where('uid', 'in', chunk).get();
-                        usersSnapshot.docs.forEach(doc => {
-                            userProfiles[doc.id] = doc.data();
-                            userProfileCache[doc.id] = doc.data(); // Cache globally
-                        });
+                try {
+                    if (currentUser) {
+                        const userStatusDoc = await db.collection('books').doc(book.id).collection('readingStatus').doc(currentUser.uid).get();
+                        if (userStatusDoc.exists) {
+                            userRatingVal = userStatusDoc.data().rating || userRating;
+                            userCommentVal = userStatusDoc.data().comment || userComment;
+                            userProgressVal = userStatusDoc.data().progress || userProgress;
+                            userHighlightsVal = userStatusDoc.data().highlights || userHighlightsVal;
+                        }
                     }
+
+                    const allStatusesSnapshot = await db.collection('books').doc(book.id).collection('readingStatus').get();
+                    allStatuses = allStatusesSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+
+                    const userIds = [...new Set(allStatuses.map(s => s.uid))];
+                    const userProfiles = { ...userProfileCache };
+                    const missingUserIds = userIds.filter(id => !userProfiles[id]);
+
+                    if (missingUserIds.length > 0) {
+                        for (let i = 0; i < missingUserIds.length; i += 10) {
+                            const chunk = missingUserIds.slice(i, i + 10);
+                            const usersSnapshot = await db.collection('users').where('uid', 'in', chunk).get();
+                            usersSnapshot.docs.forEach(doc => {
+                                userProfiles[doc.id] = doc.data();
+                                userProfileCache[doc.id] = doc.data();
+                            });
+                        }
+                    }
+                } catch (err) {
+                    console.warn("Could not fetch remote status/reviews for book details:", err);
+                } finally {
+                    closeLoading();
                 }
 
                 // Calculate average rating
@@ -6437,15 +6452,13 @@ If the collection is small or has no finished books, be extra encouraging and su
                         counter.textContent = `${count} character${count !== 1 ? 's' : ''}${readTimeStr}`;
                     }
                 };
-
-                closeLoading();
                 const close = showModal(`
                 <div class="fixed inset-0 z-50 flex items-center justify-center sm:p-4">
                     <div class="bg-sky-50 dark:bg-gray-800 w-full h-full sm:h-auto sm:rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up overflow-y-auto sm:max-h-[95vh]">
                         <div class="flex flex-col sm:flex-row gap-8">
                             <div class="flex-shrink-0 mx-auto sm:mx-0">
                                 <div class="relative group">
-                                    <img src="${book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover'}" class="w-44 h-64 object-cover rounded-3xl shadow-2xl border border-white/20">
+                                    <img src="${book.coverUrl || book.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAiIGhlaWdodD0iMTgwIiB2aWV3Qm94PSIwIDAgMTIwIDE4MCI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iI2YxZjVmOSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTRhM3I4IiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9ImJvbGQiPk5vIENvdmVyPC90ZXh0Pjwvc3ZnPg=='}" onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAiIGhlaWdodD0iMTgwIiB2aWV3Qm94PSIwIDAgMTIwIDE4MCI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iI2YxZjVmOSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTRhM3I4IiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9ImJvbGQiPk5vIENvdmVyPC90ZXh0Pjwvc3ZnPg==';" class="w-44 h-64 object-cover rounded-3xl shadow-2xl border border-white/20" alt="Book cover">
                                     ${isWishlist ? `
                                         <button id="move-to-lib-btn" title="Move to Library" class="absolute -top-3 -right-3 w-12 h-12 bg-emerald-600 text-white rounded-full flex items-center justify-center shadow-lg border-4 border-white dark:border-slate-900 hover:scale-110 transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none" aria-label="Move to Library">
                                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
