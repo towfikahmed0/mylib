@@ -1427,28 +1427,58 @@
                         <h2 class="text-2xl font-black mb-6 font-serif italic text-blue-600 dark:text-blue-400">AI Librarian Settings</h2>
                         <div class="space-y-4">
                             <div>
-                                <label for="gemini-api-key" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Gemini API Key</label>
-                                <div class="relative">
-                                    <input id="gemini-api-key" type="password" placeholder="Enter your Gemini API Key" value="${localStorage.getItem('mylib_gemini_api_key') || ''}" class="w-full pl-4 pr-12 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
-                                    <button id="toggle-api-key-visibility" class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none rounded-lg" aria-label="Toggle API Key visibility" title="Toggle API Key visibility">
-                                        <svg id="eye-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                                    </button>
-                                </div>
-                                <p class="text-[9px] text-slate-400 mt-1 ml-1 italic">Key is stored only in your browser's localStorage. Get your API key from <a href="https://aistudio.google.com/api-keys">Google AI Studio</a></p>
-                            </div>
-                            <div>
-                                <label for="gemini-model" class="text-[10px] font-bold text-slate-400 uppercase ml-1">AI Model</label>
-                                <select id="gemini-model" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
-                                    <option value="gemma-3-12b-it" ${(localStorage.getItem('mylib_gemini_model') || 'gemma-3-12b-it') === 'gemma-3-12b-it' ? 'selected' : ''}>gemma-3-12b-it (Recommended)</option>
-                                    <option value="gemma-3-4b-it" ${localStorage.getItem('mylib_gemini_model') === 'gemma-3-4b-it' ? 'selected' : ''}>gemma-3-4b-it</option>
-                                    <option value="gemma-3-1b-it" ${localStorage.getItem('mylib_gemini_model') === 'gemma-3-1b-it' ? 'selected' : ''}>gemma-3-1b-it</option>
-                                    <option value="gemma-3-27b-it" ${localStorage.getItem('mylib_gemini_model') === 'gemma-3-27b-it' ? 'selected' : ''}>gemma-3-27b-it</option>
-                                    <option value="gemini-2.5-flash-lite" ${localStorage.getItem('mylib_gemini_model') === 'gemini-2.5-flash-lite' ? 'selected' : ''}>gemini-2.5-flash-lite</option>
-                                    <option value="gemini-2.5-flash" ${localStorage.getItem('mylib_gemini_model') === 'gemini-2.5-flash' ? 'selected' : ''}>gemini-2.5-flash</option>
-                                    <option value="gemini-3-flash-preview" ${localStorage.getItem('mylib_gemini_model') === 'gemini-3-flash-preview' ? 'selected' : ''}>gemini-3-flash-preview</option>
-                                    <option value="gemini-3.1-flash-lite-preview" ${localStorage.getItem('mylib_gemini_model') === 'gemini-3.1-flash-lite-preview' ? 'selected' : ''}>gemini-3.1-flash-lite-preview</option>
+                                <label for="ai-provider-select" class="text-[10px] font-bold text-slate-400 uppercase ml-1">AI Provider</label>
+                                <select id="ai-provider-select" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
+                                    <option value="gemini" ${(localStorage.getItem('mylib_ai_provider') || 'gemini') === 'gemini' ? 'selected' : ''}>Gemini (Google AI)</option>
+                                    <option value="groq" ${localStorage.getItem('mylib_ai_provider') === 'groq' ? 'selected' : ''}>Groq AI</option>
                                 </select>
                             </div>
+
+                            <!-- Gemini Config Section -->
+                            <div id="gemini-config-section" class="${(localStorage.getItem('mylib_ai_provider') || 'gemini') === 'groq' ? 'hidden' : ''} space-y-4">
+                                <div>
+                                    <label for="gemini-api-key" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Gemini API Key</label>
+                                    <div class="relative">
+                                        <input id="gemini-api-key" type="password" placeholder="Enter your Gemini API Key" value="${localStorage.getItem('mylib_gemini_api_key') || ''}" class="w-full pl-4 pr-12 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
+                                        <button id="toggle-api-key-visibility" class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none rounded-lg" aria-label="Toggle API Key visibility" title="Toggle API Key visibility">
+                                            <svg id="eye-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                        </button>
+                                    </div>
+                                    <p class="text-[9px] text-slate-400 mt-1 ml-1 italic">Key is stored only in your browser's localStorage. Get your API key from <a href="https://aistudio.google.com/api-keys" target="_blank" class="text-blue-500 underline">Google AI Studio</a></p>
+                                </div>
+                                <div>
+                                    <label for="gemini-model" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Gemini Model</label>
+                                    <select id="gemini-model" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
+                                        <option value="gemma-3-12b-it" ${(localStorage.getItem('mylib_gemini_model') || 'gemma-3-12b-it') === 'gemma-3-12b-it' ? 'selected' : ''}>gemma-3-12b-it (Recommended)</option>
+                                        <option value="gemma-3-4b-it" ${localStorage.getItem('mylib_gemini_model') === 'gemma-3-4b-it' ? 'selected' : ''}>gemma-3-4b-it</option>
+                                        <option value="gemma-3-1b-it" ${localStorage.getItem('mylib_gemini_model') === 'gemma-3-1b-it' ? 'selected' : ''}>gemma-3-1b-it</option>
+                                        <option value="gemma-3-27b-it" ${localStorage.getItem('mylib_gemini_model') === 'gemma-3-27b-it' ? 'selected' : ''}>gemma-3-27b-it</option>
+                                        <option value="gemini-2.5-flash-lite" ${localStorage.getItem('mylib_gemini_model') === 'gemini-2.5-flash-lite' ? 'selected' : ''}>gemini-2.5-flash-lite</option>
+                                        <option value="gemini-2.5-flash" ${localStorage.getItem('mylib_gemini_model') === 'gemini-2.5-flash' ? 'selected' : ''}>gemini-2.5-flash</option>
+                                        <option value="gemini-3-flash-preview" ${localStorage.getItem('mylib_gemini_model') === 'gemini-3-flash-preview' ? 'selected' : ''}>gemini-3-flash-preview</option>
+                                        <option value="gemini-3.1-flash-lite-preview" ${localStorage.getItem('mylib_gemini_model') === 'gemini-3.1-flash-lite-preview' ? 'selected' : ''}>gemini-3.1-flash-lite-preview</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Groq Config Section -->
+                            <div id="groq-config-section" class="${localStorage.getItem('mylib_ai_provider') === 'groq' ? '' : 'hidden'} space-y-4">
+                                <div>
+                                    <label for="groq-api-key" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Groq API Key</label>
+                                    <div class="relative">
+                                        <input id="groq-api-key" type="password" placeholder="Enter your Groq API Key" value="${localStorage.getItem('mylib_groq_api_key') || ''}" class="w-full pl-4 pr-12 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
+                                        <button id="toggle-groq-api-key-visibility" class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none rounded-lg" aria-label="Toggle Groq API Key visibility" title="Toggle Groq API Key visibility">
+                                            <svg id="groq-eye-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                        </button>
+                                    </div>
+                                    <p class="text-[9px] text-slate-400 mt-1 ml-1 italic">Key is stored only in your browser's localStorage. Get your API key from <a href="https://console.groq.com/keys" target="_blank" class="text-blue-500 underline">Groq Console</a></p>
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Groq Model</label>
+                                    <input type="text" readonly value="openai/gpt-oss-20b" class="w-full px-4 py-3 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl text-slate-500 text-sm font-mono cursor-not-allowed">
+                                </div>
+                            </div>
+
                             <div>
                                 <label for="gemini-language" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Preferred Language</label>
                                 <select id="gemini-language" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
@@ -2732,7 +2762,7 @@
 
             async function runAISearch() {
                 const config = getAIConfig();
-                if (!config.apiKey) { showToast('Please set your Gemini API key in Settings.', 'error'); return; }
+                if (!config.apiKey) { showToast('Please set your AI API key in Settings.', 'error'); return; }
                 const searchInput = document.getElementById('search-input');
                 const btn = document.getElementById('ai-search-btn');
                 if (!searchQuery) return;
@@ -2749,7 +2779,7 @@
                     Library Data: ${JSON.stringify(libraryData)}
                     Return ONLY a valid JSON array of matching book ID strings. If no matches are found, return [].`;
 
-                    const response = await callGeminiAI(prompt, "Respond ONLY with a valid JSON array of strings.");
+                    const response = await callAI(prompt, "Respond ONLY with a valid JSON array of strings.");
                     const cleaned = response.replace(/```json|```/g, '').trim();
                     aiSearchResults = JSON.parse(cleaned);
                     aiSearchResultsSet = new Set(aiSearchResults);
@@ -3289,9 +3319,34 @@
                 document.getElementById('save-sharing-btn')?.addEventListener('click', saveSharingSettings);
                 document.getElementById('ai-cleanup-btn')?.addEventListener('click', runLibraryCleanup);
 
+                document.getElementById('ai-provider-select')?.addEventListener('change', (e) => {
+                    const provider = e.target.value;
+                    const geminiSec = document.getElementById('gemini-config-section');
+                    const groqSec = document.getElementById('groq-config-section');
+                    if (provider === 'groq') {
+                        geminiSec?.classList.add('hidden');
+                        groqSec?.classList.remove('hidden');
+                    } else {
+                        geminiSec?.classList.remove('hidden');
+                        groqSec?.classList.add('hidden');
+                    }
+                });
+
                 document.getElementById('toggle-api-key-visibility')?.addEventListener('click', () => {
                     const input = document.getElementById('gemini-api-key');
                     const icon = document.getElementById('eye-icon');
+                    if (input.type === 'password') {
+                        input.type = 'text';
+                        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/>';
+                    } else {
+                        input.type = 'password';
+                        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>';
+                    }
+                });
+
+                document.getElementById('toggle-groq-api-key-visibility')?.addEventListener('click', () => {
+                    const input = document.getElementById('groq-api-key');
+                    const icon = document.getElementById('groq-eye-icon');
                     if (input.type === 'password') {
                         input.type = 'text';
                         icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/>';
@@ -3316,12 +3371,20 @@
                 document.getElementById('gemini-api-key')?.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter') document.getElementById('save-ai-settings-btn')?.click();
                 });
+                document.getElementById('groq-api-key')?.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') document.getElementById('save-ai-settings-btn')?.click();
+                });
 
                 document.getElementById('save-ai-settings-btn')?.addEventListener('click', (e) => {
-                    const apiKey = document.getElementById('gemini-api-key').value.trim();
-                    const model = document.getElementById('gemini-model').value;
-                    const language = document.getElementById('gemini-language').value;
-                    localStorage.setItem('mylib_gemini_api_key', apiKey);
+                    const provider = document.getElementById('ai-provider-select')?.value || 'gemini';
+                    const geminiApiKey = document.getElementById('gemini-api-key')?.value.trim() || '';
+                    const groqApiKey = document.getElementById('groq-api-key')?.value.trim() || '';
+                    const model = document.getElementById('gemini-model')?.value || 'gemma-3-12b-it';
+                    const language = document.getElementById('gemini-language')?.value || 'English';
+
+                    localStorage.setItem('mylib_ai_provider', provider);
+                    localStorage.setItem('mylib_gemini_api_key', geminiApiKey);
+                    localStorage.setItem('mylib_groq_api_key', groqApiKey);
                     localStorage.setItem('mylib_gemini_model', model);
                     localStorage.setItem('mylib_ai_language', language);
                     showToast('AI Settings saved!', 'success');
@@ -5374,7 +5437,7 @@
                     btn.innerHTML = `<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
                     try {
                         const prompt = `Fetch metadata for the book "${title}"${author ? ` by ${author}` : ''}${isbn ? ` or ISBN ${isbn}` : ''}. Author name, Genre and tags must be in English. Return ONLY a JSON object with: { "title": "string", "author": "string", "genres": ["string"], "tags": ["string"], "price": number, "description": "string", "isbn": "string" }`;
-                        const response = await callGeminiAI(prompt, "You are a book metadata expert. Respond ONLY with valid JSON.");
+                        const response = await callAI(prompt, "You are a book metadata expert. Respond ONLY with valid JSON.");
                         const metadata = JSON.parse(response.replace(/```json|```/g, '').trim());
                         if (metadata.title && !document.getElementById('man-title').value) document.getElementById('man-title').value = metadata.title;
                         if (metadata.author && !document.getElementById('man-author').value) document.getElementById('man-author').value = metadata.author;
@@ -6368,7 +6431,7 @@
             async function runLibraryCleanup() {
                 const btn = document.getElementById('ai-cleanup-btn');
                 const config = getAIConfig();
-                if (!config.apiKey) { showToast('Please set your Gemini API key first.', 'error'); return; }
+                if (!config.apiKey) { showToast('Please set your AI API key first.', 'error'); return; }
                 const myBooks = books.filter(b => b.userId === currentUser.uid);
                 if (myBooks.length === 0) { showToast('Your library is empty.', 'info'); return; }
                 const originalText = btn.innerHTML;
@@ -6388,7 +6451,7 @@
 
                         Data: ${JSON.stringify(chunk)}
                         Return ONLY JSON array: [{ "id": "book_id", "field": "author|genres|tags|description", "old": "value", "new": "fixed_value", "reason": "why" }]`;
-                        const response = await callGeminiAI(prompt, "Respond ONLY with a valid JSON array of objects.");
+                        const response = await callAI(prompt, "Respond ONLY with a valid JSON array of objects.");
                         try {
                             const fixes = JSON.parse(response.replace(/```json|```/g, '').trim());
                             allFixes = allFixes.concat(fixes);
@@ -6518,7 +6581,7 @@
                 if (!btn || !content) return;
 
                 const config = getAIConfig();
-                if (!config.apiKey) { showToast('Please set Gemini API key in Settings', 'error'); return; }
+                if (!config.apiKey) { showToast('Please set AI API key in Settings', 'error'); return; }
 
                 btn.disabled = true;
                 const originalText = btn.innerHTML;
@@ -6538,7 +6601,7 @@
                     Prioritize books already in my 'want_to_read' list, but suggest new ones if needed.`;
                     const systemPrompt = `${getSystemPrompt()}\n\nTask: Reading Roadmap Generation.`;
 
-                    const result = await callGeminiAI(prompt, systemPrompt);
+                    const result = await callAI(prompt, systemPrompt);
 
                     content.innerHTML = `
                         <div class="relative group/copy">
@@ -6564,7 +6627,7 @@
 
                 const config = getAIConfig();
                 if (!config.apiKey) {
-                    showToast('Please set your Gemini API key in Settings.', 'error');
+                    showToast('Please set your AI API key in Settings.', 'error');
                     return;
                 }
 
@@ -6595,7 +6658,7 @@
                     Structure the response with clear headers and bullet points.`;
                     const systemPrompt = `${getSystemPrompt()}\n\nTask: Comprehensive Library Analysis.`;
 
-                    const result = await callGeminiAI(prompt, systemPrompt);
+                    const result = await callAI(prompt, systemPrompt);
 
                     content.innerHTML = `
                         <div class="relative group/copy">
@@ -8052,15 +8115,123 @@
             // ---------- AI Librarian Service ----------
             const AI_CONFIG = {
                 defaultModel: 'gemma-3-12b-it',
-                fallbackModel: 'gemma-3-12b-it'
+                fallbackModel: 'gemma-3-12b-it',
+                groqModel: 'openai/gpt-oss-20b',
+                groqEndpoint: 'https://api.groq.com/openai/v1/chat/completions'
             };
 
+            window.getAIConfig = getAIConfig;
+            window.callAI = callAI;
+
             function getAIConfig() {
+                const provider = localStorage.getItem('mylib_ai_provider') || 'gemini';
                 return {
-                    apiKey: localStorage.getItem('mylib_gemini_api_key'),
-                    model: localStorage.getItem('mylib_gemini_model') || AI_CONFIG.defaultModel,
+                    provider,
+                    apiKey: provider === 'groq' ? (localStorage.getItem('mylib_groq_api_key') || '') : (localStorage.getItem('mylib_gemini_api_key') || ''),
+                    model: provider === 'groq' ? AI_CONFIG.groqModel : (localStorage.getItem('mylib_gemini_model') || AI_CONFIG.defaultModel),
                     language: localStorage.getItem('mylib_ai_language') || 'English'
                 };
+            }
+
+            // Main AI Abstraction Layer
+            async function callAI(userPrompt, systemInstruction, useFallback = false, history = []) {
+                const config = getAIConfig();
+                if (config.provider === 'groq') {
+                    return callGroqAI(userPrompt, systemInstruction, history);
+                } else {
+                    return callGeminiAI(userPrompt, systemInstruction, useFallback, history);
+                }
+            }
+
+            async function callGroqAI(userPrompt, systemInstruction, history = []) {
+                const config = getAIConfig();
+                if (!config.apiKey) throw new Error('API_KEY_MISSING');
+
+                const cacheKey = JSON.stringify({ provider: 'groq', userPrompt, model: config.model });
+                const cached = aiResponseCache.find(c => c.key === cacheKey);
+                if (cached) return cached.response;
+
+                const messages = [];
+                let hasSystemMsg = false;
+
+                if (history && history.length > 0) {
+                    history.forEach(item => {
+                        const role = item.role === 'model' ? 'assistant' : 'user';
+                        const text = item.parts?.[0]?.text || '';
+                        if (text.startsWith('SYSTEM:')) {
+                            hasSystemMsg = true;
+                            const contextMatch = text.match(/SYSTEM:\s*(.*?)\n\nCONTEXT:\s*(.*?)\n\nUSER:\s*(.*)$/s);
+                            if (contextMatch) {
+                                messages.push({ role: 'system', content: `${contextMatch[1]}\n\nCONTEXT: ${contextMatch[2]}` });
+                                messages.push({ role: 'user', content: contextMatch[3] });
+                            } else {
+                                messages.push({ role: 'system', content: systemInstruction });
+                                messages.push({ role: 'user', content: text });
+                            }
+                        } else {
+                            messages.push({ role, content: text });
+                        }
+                    });
+                }
+
+                if (!hasSystemMsg) {
+                    const fullSystemPrompt = `${systemInstruction}\n\nCONTEXT: ${JSON.stringify(getLibraryContext())}`;
+                    messages.unshift({ role: 'system', content: fullSystemPrompt });
+                    if (messages.length === 1) {
+                        messages.push({ role: 'user', content: userPrompt });
+                    }
+                }
+
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+                try {
+                    const response = await fetch(AI_CONFIG.groqEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${config.apiKey}`
+                        },
+                        body: JSON.stringify({
+                            model: config.model,
+                            messages,
+                            temperature: 0.7,
+                            max_tokens: 800
+                        }),
+                        signal: controller.signal
+                    });
+
+                    clearTimeout(timeoutId);
+
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({}));
+                        const msg = errorData.error?.message || '';
+
+                        if (response.status === 401 || msg.includes('invalid_api_key') || msg.includes('API key')) {
+                            throw new Error('Your Groq API key is invalid. Please check your Settings.');
+                        }
+                        if (response.status === 429 || msg.includes('rate_limit')) {
+                            throw new Error('Groq rate limit reached. Please try again in a few minutes.');
+                        }
+                        if (response.status === 404 || msg.includes('model_not_found')) {
+                            throw new Error('Selected Groq model was not found.');
+                        }
+
+                        throw new Error(msg || 'Groq AI call failed.');
+                    }
+
+                    const data = await response.json();
+                    const text = data.choices?.[0]?.message?.content || '';
+
+                    aiResponseCache.unshift({ key: cacheKey, response: text });
+                    if (aiResponseCache.length > 5) aiResponseCache.pop();
+
+                    return text;
+                } catch (err) {
+                    clearTimeout(timeoutId);
+                    if (err.name === 'AbortError') throw new Error('The AI request timed out. Please try again.');
+                    throw err;
+                }
             }
 
             async function callGeminiAI(userPrompt, systemInstruction, useFallback = false, history = []) {
@@ -8068,7 +8239,7 @@
                 if (!config.apiKey) throw new Error('API_KEY_MISSING');
 
                 // Check cache
-                const cacheKey = JSON.stringify({ userPrompt, model: config.model });
+                const cacheKey = JSON.stringify({ provider: 'gemini', userPrompt, model: config.model });
                 const cached = aiResponseCache.find(c => c.key === cacheKey);
                 if (cached) return cached.response;
 
@@ -8315,7 +8486,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                     try {
                         const config = getAIConfig();
                         if (!config.apiKey) {
-                            updateChatMessage(thinkingId, "Please enter your Gemini API key in Settings to use the AI Librarian.");
+                            updateChatMessage(thinkingId, "Please enter your AI API key in Settings to use the AI Librarian.");
                             return;
                         }
 
@@ -8324,11 +8495,9 @@ If the collection is small or has no finished books, be extra encouraging and su
                             return;
                         }
 
-                        // Build history for Gemini
+                        // Build history
                         const systemPrompt = getSystemPrompt();
                         if (chatHistory.length === 0) {
-                            // Combine system instructions and context with the first user message
-                            // to avoid consecutive 'user' role messages which is rejected by Gemini API.
                             let context = getLibraryContext();
                             if (bookContext) context.focusedBook = bookContext;
                             const initialPrompt = `SYSTEM: ${systemPrompt}\n\nCONTEXT: ${JSON.stringify(context)}\n\nUSER: ${message}`;
@@ -8337,7 +8506,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                             chatHistory.push({ role: 'user', parts: [{ text: message }] });
                         }
 
-                        const aiResponse = await callGeminiAI(message, systemPrompt, false, chatHistory);
+                        const aiResponse = await callAI(message, systemPrompt, false, chatHistory);
 
                         if (aiResponse.includes("Using fallback model")) {
                             const status = document.getElementById('ai-status-indicator');
@@ -8801,14 +8970,14 @@ If the collection is small or has no finished books, be extra encouraging and su
 
                     try {
                         const config = getAIConfig();
-                        if (!config.apiKey) { showToast('Please set Gemini API key in Settings', 'error'); return; }
+                        if (!config.apiKey) { showToast('Please set AI API key in Settings', 'error'); return; }
 
                         const prompt = `Provide a professional, concise summary (max 3 sentences) and 5 highly relevant tags for the book "${book.title}" by ${book.author}.
                         Book Context: ${book.description || 'No description available.'}
                         Return ONLY JSON: { "summary": "...", "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"] }
                         Language: ${config.language}`;
 
-                        const response = await callGeminiAI(prompt, "Respond ONLY with a valid JSON object.");
+                        const response = await callAI(prompt, "Respond ONLY with a valid JSON object.");
                         const data = JSON.parse(response.replace(/```json|```/g, '').trim());
 
                         showAISummaryModal(book, data);
