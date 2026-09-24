@@ -2136,26 +2136,77 @@
                     lastActiveTab = activeTab;
                     appEl.innerHTML = `
                     <div class="fixed inset-0 bg-blue-50/30 dark:bg-slate-900 pointer-events-none -z-10"></div>
-                    <header class="sticky top-0 z-40 glass border-b border-slate-200 dark:border-slate-800">
+
+                    <!-- Desktop Left Sidebar (>= 1024px) -->
+                    <aside class="hidden lg:flex flex-col fixed top-0 bottom-0 left-0 w-[240px] bg-card border-r border-border z-40 p-4 justify-between">
+                        <div class="flex flex-col gap-6">
+                            <!-- Top: Logo + MyLib + v3.1 Badge -->
+                            <div class="flex flex-col gap-2">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 dark:shadow-primary/10">
+                                        <img src="https://cdn-icons-png.flaticon.com/512/2232/2232688.png" alt="MyLib Logo" class="w-full h-full object-cover">
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <h1 class="text-lg font-black tracking-tight leading-tight font-serif text-primary">MyLib</h1>
+                                        <span class="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-[8px] font-black uppercase tracking-tighter border border-primary/20">v${APP_VERSION}</span>
+                                    </div>
+                                </div>
+                                <!-- User Email (small, muted) -->
+                                <p class="text-xs text-muted-foreground truncate px-1" title="${currentUser.email}">${currentUser.email}</p>
+                            </div>
+
+                            <!-- Nav items: icon + label, stacked vertically -->
+                            <nav class="flex flex-col gap-1">
+                                <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="relative flex items-center gap-3 px-3 py-2.5 text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'library' ? 'bg-secondary text-foreground rounded-md' : 'text-muted-foreground hover:bg-muted rounded-md'}">
+                                    ${activeTab === 'library' ? '<span class="absolute left-0 top-1.5 bottom-1.5 w-1 bg-primary rounded-r"></span>' : ''}
+                                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></svg>
+                                    <span>Library</span>
+                                </button>
+                                <button onclick="window.setTab('mybooks')" ${activeTab === 'mybooks' ? 'aria-current="page"' : ''} class="relative flex items-center gap-3 px-3 py-2.5 text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'mybooks' ? 'bg-secondary text-foreground rounded-md' : 'text-muted-foreground hover:bg-muted rounded-md'}">
+                                    ${activeTab === 'mybooks' ? '<span class="absolute left-0 top-1.5 bottom-1.5 w-1 bg-primary rounded-r"></span>' : ''}
+                                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                                    <span>My Books</span>
+                                </button>
+                                <button onclick="window.setTab('explore')" ${activeTab === 'explore' ? 'aria-current="page"' : ''} class="relative flex items-center gap-3 px-3 py-2.5 text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'explore' ? 'bg-secondary text-foreground rounded-md' : 'text-muted-foreground hover:bg-muted rounded-md'}">
+                                    ${activeTab === 'explore' ? '<span class="absolute left-0 top-1.5 bottom-1.5 w-1 bg-primary rounded-r"></span>' : ''}
+                                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+                                    <span>Explore</span>
+                                </button>
+                                <button onclick="window.setTab('insight')" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="relative flex items-center gap-3 px-3 py-2.5 text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'insight' ? 'bg-secondary text-foreground rounded-md' : 'text-muted-foreground hover:bg-muted rounded-md'}">
+                                    ${activeTab === 'insight' ? '<span class="absolute left-0 top-1.5 bottom-1.5 w-1 bg-primary rounded-r"></span>' : ''}
+                                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                                    <span>Insights</span>
+                                </button>
+                            </nav>
+                        </div>
+
+                        <!-- Bottom of sidebar: bell icon, + button, gear icon -->
+                        <div class="flex items-center justify-around border-t border-border pt-4">
+                            <button onclick="window.setTab('activity')" class="p-2.5 hover:bg-muted rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'activity' ? 'text-primary bg-secondary' : 'text-muted-foreground'}" title="Activity" aria-label="Activity">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                            </button>
+                            <button class="manual-add-trigger p-2.5 hover:bg-muted rounded-xl transition text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary outline-none" title="Add Book Manually" aria-label="Add Book Manually">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            </button>
+                            <button onclick="window.setTab('settings')" class="p-2.5 hover:bg-muted rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'settings' ? 'text-primary bg-secondary' : 'text-muted-foreground'}" title="Settings" aria-label="Settings">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                            </button>
+                        </div>
+                    </aside>
+
+                    <!-- Mobile Header (< 1024px) -->
+                    <header class="lg:hidden sticky top-0 z-40 glass border-b border-slate-200 dark:border-slate-800">
                         <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
                             <div class="flex items-center gap-3 flex-shrink-0">
                                 <div class="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 dark:shadow-primary/10">
-                                    <img src="https://cdn-icons-png.flaticon.com/512/2232/2232688.png">
+                                    <img src="https://cdn-icons-png.flaticon.com/512/2232/2232688.png" alt="MyLib Logo" class="w-full h-full object-cover">
                                 </div>
-                                <div class="hidden sm:block">
+                                <div>
                                     <div class="flex items-center gap-2">
-                                        <h1 class="text-lg font-black tracking-tight leading-tight font-serif text-primary">My Lib</h1>
+                                        <h1 class="text-lg font-black tracking-tight leading-tight font-serif text-primary">MyLib</h1>
                                         <span class="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-[8px] font-black uppercase tracking-tighter border border-primary/20">v${APP_VERSION}</span>
                                     </div>
-                                    <div class="flex items-center gap-2">
-                                        <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-widest">${currentUser.email}</p>
-                                        <span class="text-[10px] text-slate-300">|</span>
-                                    <span class="text-[10px] font-black text-primary">${statusCounts.finished} Completed</span>
-                                    <span class="text-[10px] text-slate-300">·</span>
-                                    <span class="text-[10px] font-black text-blue-500">${statusCounts.reading} Reading</span>
-                                    <span class="text-[10px] text-slate-300">·</span>
-                                    <span class="text-[10px] font-black text-emerald-500">${libraryStats.wishlistCount} Wishlist</span>
-                                    </div>
+                                    <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-widest truncate max-w-[120px] sm:max-w-none">${currentUser.email}</p>
                                 </div>
                                 <!-- Connectivity Indicator -->
                                 <div id="conn-indicator" class="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 transition-all cursor-help" title="Online: Cloud Sync Active">
@@ -2163,18 +2214,11 @@
                                     <span class="text-[8px] font-black uppercase tracking-tighter text-slate-400">${navigator.onLine ? 'Live' : 'Offline'}</span>
                                 </div>
                             </div>
-                            <div class="flex-1"></div>
-                            <nav class="hidden md:flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                                <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'library' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Library</button>
-                                <button onclick="window.setTab('mybooks')" ${activeTab === 'mybooks' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'mybooks' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">My Books</button>
-                                <button onclick="window.setTab('explore')" ${activeTab === 'explore' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'explore' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Explore</button>
-                                <button onclick="window.setTab('insight')" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="px-4 py-2 rounded-lg text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'insight' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}">Insights</button>
-                            </nav>
                             <div class="flex items-center gap-1">
                                 <button onclick="window.setTab('activity')" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'activity' ? 'text-primary bg-blue-50 dark:bg-blue-900/20' : 'text-slate-500'}" title="Activity" aria-label="Activity">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
                                 </button>
-                                <button id="manual-add-btn" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500 focus-visible:ring-2 focus-visible:ring-primary outline-none" title="Add Book Manually" aria-label="Add Book Manually">
+                                <button class="manual-add-trigger p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500 focus-visible:ring-2 focus-visible:ring-primary outline-none" title="Add Book Manually" aria-label="Add Book Manually">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                 </button>
                                 <button onclick="window.setTab('settings')" class="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'settings' ? 'text-primary bg-blue-50 dark:bg-blue-900/20' : 'text-slate-500'}" title="Settings" aria-label="Settings">
@@ -2183,7 +2227,26 @@
                             </div>
                         </div>
                     </header>
-                    <main id="main-content" class="max-w-6xl mx-auto p-6 pb-32 w-full flex-1"></main>
+
+                    <!-- App Layout Wrapper -->
+                    <div class="lg:pl-[240px] flex flex-col min-h-screen">
+                        <!-- Top Strip in Main Content: LIVE indicator and Pills -->
+                        <div class="px-6 pt-6 flex flex-wrap items-center justify-between gap-3 max-w-6xl w-full mx-auto">
+                            <div class="hidden lg:flex items-center gap-2">
+                                <div id="conn-indicator-desktop" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 transition-all cursor-help" title="Online: Cloud Sync Active">
+                                    <div class="w-1.5 h-1.5 rounded-full ${navigator.onLine ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}"></div>
+                                    <span class="text-[8px] font-black uppercase tracking-tighter text-slate-400">${navigator.onLine ? 'Live' : 'Offline'}</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 text-xs font-bold">
+                                <span class="px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20">${statusCounts.finished} Completed</span>
+                                <span class="px-3 py-1.5 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20">${statusCounts.reading} Reading</span>
+                                <span class="px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">${libraryStats.wishlistCount} Wishlist</span>
+                            </div>
+                        </div>
+
+                        <main id="main-content" class="max-w-6xl mx-auto p-6 pb-32 w-full flex-1"></main>
+                    </div>
 
                     <!-- Scroll to Top Button -->
                     <button id="scroll-top-btn" class="fixed bottom-40 right-6 w-12 h-12 bg-white dark:bg-slate-800 text-primary rounded-full shadow-lg flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-40 focus-visible:ring-2 focus-visible:ring-primary outline-none opacity-0 translate-y-10 pointer-events-none" aria-label="Scroll to top" title="Scroll to top">
@@ -2194,7 +2257,9 @@
                         <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
                         <span id="ai-ping" class="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full border-2 border-white dark:border-slate-900 animate-bounce hidden"></span>
                     </button>
-                    <nav id="mobile-nav" class="md:hidden fixed bottom-0 left-0 right-0 glass border-t border-slate-200 dark:border-slate-800 px-3 py-3 grid grid-cols-4 gap-1 z-40">
+
+                    <!-- Mobile Bottom Nav (< 1024px) -->
+                    <nav id="mobile-nav" class="lg:hidden fixed bottom-0 left-0 right-0 glass border-t border-slate-200 dark:border-slate-800 px-3 py-3 grid grid-cols-4 gap-1 z-40">
                         <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'library' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></svg>
                             <span class="text-[8px] font-bold">Library</span>
@@ -3417,26 +3482,28 @@
             function attachGlobalListeners() {
                 // Online/Offline status listeners
                 const updateConnUI = () => {
-                    const indicator = document.getElementById('conn-indicator');
-                    if (indicator) {
-                        const dot = indicator.querySelector('div');
-                        const label = indicator.querySelector('span');
-                        if (navigator.onLine) {
-                            dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse';
-                            label.textContent = 'Live';
-                            indicator.title = 'Online: Cloud Sync Active';
-                        } else {
-                            dot.className = 'w-1.5 h-1.5 rounded-full bg-amber-500';
-                            label.textContent = 'Offline';
-                            indicator.title = 'Offline: Local changes will sync when reconnected';
+                    ['conn-indicator', 'conn-indicator-desktop'].forEach(id => {
+                        const indicator = document.getElementById(id);
+                        if (indicator) {
+                            const dot = indicator.querySelector('div');
+                            const label = indicator.querySelector('span');
+                            if (navigator.onLine) {
+                                dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse';
+                                label.textContent = 'Live';
+                                indicator.title = 'Online: Cloud Sync Active';
+                            } else {
+                                dot.className = 'w-1.5 h-1.5 rounded-full bg-amber-500';
+                                label.textContent = 'Offline';
+                                indicator.title = 'Offline: Local changes will sync when reconnected';
+                            }
                         }
-                    }
+                    });
                 };
                 window.addEventListener('online', updateConnUI);
                 window.addEventListener('offline', updateConnUI);
 
                 document.getElementById('scan-btn')?.addEventListener('click', openScanner);
-                document.getElementById('manual-add-btn')?.addEventListener('click', () => openManualEntry(''));
+                document.querySelectorAll('.manual-add-trigger').forEach(btn => btn.addEventListener('click', () => openManualEntry('')));
                 document.getElementById('ai-chat-fab')?.addEventListener('click', openAIChat);
 
                 const scrollTopBtn = document.getElementById('scroll-top-btn');
