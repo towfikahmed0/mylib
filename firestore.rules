@@ -19,7 +19,11 @@ function partnershipExists(uid1, uid2) {
 
 function partnershipAllowsAdd(uid1, uid2) {
   let p = get(/databases/$(database)/documents/partnerships/$(getPartnershipId(uid1, uid2)));
-  return p.data.status == 'accepted' && p.data.allowAddBooks == true;
+  return p.data.status == 'accepted'
+    && p.data.allowAddBooks == true
+    // A grant must exist, and only the library owner (uid2) can be the granter.
+    && p.data.grantedBy != ''
+    && p.data.grantedBy == uid2;
 }
     function isLibraryMember(userId, libraryOwnerId) {
       return userId == libraryOwnerId || partnershipExists(userId, libraryOwnerId);
@@ -56,14 +60,20 @@ function partnershipAllowsAdd(uid1, uid2) {
     match /userLookup/{email} {
       allow read: if isSignedIn();
 
+      // Denies email squatting in userLookup — a caller may only claim their own verified email.
       allow create: if isSignedIn()
+        && request.auth.token.email != null
         && request.resource.data.uid == request.auth.uid
+        && email == request.auth.token.email.lower()
         && email == email.lower()
         && email.matches('^[^@]+@[^@]+$');
 
+      // Denies email squatting in userLookup — a caller may only claim their own verified email.
       allow update: if isSignedIn()
+        && request.auth.token.email != null
         && resource.data.uid == request.auth.uid
-        && request.resource.data.uid == request.auth.uid;
+        && request.resource.data.uid == request.auth.uid
+        && email == request.auth.token.email.lower();
 
       allow delete: if false;
     }
@@ -89,17 +99,33 @@ function partnershipAllowsAdd(uid1, uid2) {
         && get(/databases/$(database)/documents/collaborationRequests/$(partnershipId)).data.status == 'accepted'
         // Fresh partnerships start closed.
         && request.resource.data.status == 'accepted'
-        && request.resource.data.allowAddBooks == false;
+        && request.resource.data.allowAddBooks == false
+        // No add-books grant exists until a party explicitly grants it.
+        && request.resource.data.grantedBy == '';
 
-      // Either party may toggle allowAddBooks or their own unsubscribed flag.
+      // Guards allowAddBooks so a partner cannot self-grant write access to the other's library.
       allow update: if isSignedIn()
         && (request.auth.uid == resource.data.userId1
             || request.auth.uid == resource.data.userId2)
         && request.resource.data.userId1 == resource.data.userId1
         && request.resource.data.userId2 == resource.data.userId2
         && request.resource.data.status == resource.data.status
+        && (
+          // Grant on: the library owner turns allowAddBooks on and records themselves as granter.
+          (resource.data.allowAddBooks == false
+           && request.resource.data.allowAddBooks == true
+           && request.resource.data.grantedBy == request.auth.uid)
+          // Revoke: allowAddBooks turns off and the grant is reset.
+          || (resource.data.allowAddBooks == true
+              && request.resource.data.allowAddBooks == false
+              && request.resource.data.grantedBy == '')
+          // Unchanged: the recorded granter must not change.
+          // Uses .get() with a default so legacy docs that predate grantedBy can be migrated.
+          || (request.resource.data.allowAddBooks == resource.data.allowAddBooks
+              && request.resource.data.get('grantedBy', '') == resource.data.get('grantedBy', ''))
+        )
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['allowAddBooks', 'user1Unsubscribed', 'user2Unsubscribed', 'updatedAt']);
+             .hasOnly(['allowAddBooks', 'user1Unsubscribed', 'user2Unsubscribed', 'updatedAt', 'grantedBy']);
 
       allow delete: if false;
     }
@@ -139,13 +165,31 @@ function partnershipAllowsAdd(uid1, uid2) {
   allow read: if isSignedIn()
     && get(/databases/$(database)/documents/partnerships/$(getPartnershipId(request.auth.uid, resource.data.userId))).data.status == 'accepted';
 
+      // Validates book payload sizes and copyType to reject oversized / malformed writes.
       allow create: if isSignedIn()
         && canEditLibrary(request.auth.uid, request.resource.data.userId)
         && request.resource.data.title is string
-        && request.resource.data.author is string;
+        && request.resource.data.author is string
+        && request.resource.data.title.size() <= 500
+        && request.resource.data.author.size() <= 300
+        && (!('description' in request.resource.data) || request.resource.data.description.size() <= 10000)
+        && (!('isbn'        in request.resource.data) || request.resource.data.isbn.size() <= 40)
+        && (!('coverUrl'    in request.resource.data) || request.resource.data.coverUrl.size() <= 2000)
+        && (!('tags'        in request.resource.data) || request.resource.data.tags.size() <= 50)
+        && (!('categories'  in request.resource.data) || request.resource.data.categories.size() <= 20)
+        && (!('copyType' in request.resource.data) || request.resource.data.copyType in ['New Copy','Old Copy','Gifted']);
 
+      // Validates book payload sizes and copyType to reject oversized / malformed writes.
       allow update: if isSignedIn()
         && canEditLibrary(request.auth.uid, resource.data.userId)
+        && request.resource.data.title.size() <= 500
+        && request.resource.data.author.size() <= 300
+        && (!('description' in request.resource.data) || request.resource.data.description.size() <= 10000)
+        && (!('isbn'        in request.resource.data) || request.resource.data.isbn.size() <= 40)
+        && (!('coverUrl'    in request.resource.data) || request.resource.data.coverUrl.size() <= 2000)
+        && (!('tags'        in request.resource.data) || request.resource.data.tags.size() <= 50)
+        && (!('categories'  in request.resource.data) || request.resource.data.categories.size() <= 20)
+        && (!('copyType' in request.resource.data) || request.resource.data.copyType in ['New Copy','Old Copy','Gifted'])
         && (
           // Normal update — ownership unchanged.
           request.resource.data.userId == resource.data.userId
@@ -165,6 +209,7 @@ function partnershipAllowsAdd(uid1, uid2) {
       allow read: if isSignedIn()
         && resource.data.userId == request.auth.uid;
 
+      // Validates reading status, comment, and gifter name to reject malformed writes.
       allow write: if isSignedIn()
         && request.auth.uid == statusId
         && request.resource.data.userId == request.auth.uid
@@ -176,7 +221,10 @@ function partnershipAllowsAdd(uid1, uid2) {
         && (request.resource.data.progress == null
             || (request.resource.data.progress is int
                 && request.resource.data.progress >= 0
-                && request.resource.data.progress <= 100));
+                && request.resource.data.progress <= 100))
+        && request.resource.data.status in ['want_to_read','reading','finished']
+        && (!('comment' in request.resource.data) || request.resource.data.comment.size() <= 2000)
+        && (!('gifterName' in request.resource.data) || request.resource.data.gifterName.size() <= 200);
     }
 
     // ==========================================================
@@ -243,9 +291,18 @@ function partnershipAllowsAdd(uid1, uid2) {
          && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['body', 'rating', 'category', 'updatedAt']))
         ||
-        // Any signed-in user adjusting the counters (likes / comments).
+        // Counters (likesCount/commentsCount) — a signed-in user may change either counter
+        // by exactly +1 or -1 per write. This blocks the "set likesCount to 999999" attack
+        // while keeping the existing like/comment UI functional.
+        // TODO: replace with a Cloud Function that increments on writes to /likes and /comments.
         (request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['likesCount', 'commentsCount']))
+             .hasOnly(['likesCount', 'commentsCount'])
+         && (request.resource.data.likesCount == resource.data.likesCount
+             || request.resource.data.likesCount == resource.data.likesCount + 1
+             || request.resource.data.likesCount == resource.data.likesCount - 1)
+         && (request.resource.data.commentsCount == resource.data.commentsCount
+             || request.resource.data.commentsCount == resource.data.commentsCount + 1
+             || request.resource.data.commentsCount == resource.data.commentsCount - 1))
       );
 
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;

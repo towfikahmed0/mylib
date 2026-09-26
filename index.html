@@ -2,6 +2,8 @@
 <html lang="en">
 
 <head>
+    <!-- CSP: 'unsafe-inline' for script-src is a temporary concession while inline scripts remain. Remove once externalized. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://unpkg.com https://www.gstatic.com https://cdn.jsdelivr.net https://www.googletagmanager.com https://www.google-analytics.com https://generativelanguage.googleapis.com https://api.groq.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://www.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com wss://firestore.googleapis.com https://www.google-analytics.com https://region1.google-analytics.com https://generativelanguage.googleapis.com https://api.groq.com https://openlibrary.org https://covers.openlibrary.org https://firebaselogging.googleapis.com https://firebaselogging-pa.googleapis.com; frame-src 'self' https://*.firebaseapp.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests;">
     <script>
         (function () {
             const t = localStorage.getItem('theme');
@@ -17,7 +19,7 @@
     <meta name="description"
         content="Manage your personal book collection with offline support, QR scanning, and cloud sync.">
     <meta name="theme-color" content="#3b82f6">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"   referrerpolicy="no-referrer">
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json">
     <!-- Google tag (gtag.js) -->
@@ -30,7 +32,7 @@
         gtag('config', 'G-N049QSWR4Y');
     </script>
     <!-- Tailwind + Inter & Playfair Display fonts -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com"   referrerpolicy="no-referrer"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -85,19 +87,19 @@
     </script>
     <link
         href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..900;1,9..144,400..900&family=Inter:opsz,wght@14..32,300..700&family=Raleway:wght@400;600;700&display=swap"
-        rel="stylesheet">
+        rel="stylesheet"   referrerpolicy="no-referrer">
     <!-- html5-qrcode (optimized build) -->
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"   referrerpolicy="no-referrer"></script>
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <!-- PapaParse for CSV -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"   referrerpolicy="no-referrer"></script>
     <!-- Canvas Confetti -->
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"   referrerpolicy="no-referrer"></script>
     <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"   referrerpolicy="no-referrer"></script>
     <style>
         :root {
             --background: #ffffff;
@@ -2568,7 +2570,7 @@
                                     <div>
                                         <label for="gemini-api-key" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Gemini API Key</label>
                                         <div class="relative">
-                                            <input id="gemini-api-key" type="password" placeholder="Enter your Gemini API Key" value="${escapeHTML(localStorage.getItem('mylib_gemini_api_key') || '')}" class="w-full pl-4 pr-12 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
+                                            <input id="gemini-api-key" type="password" placeholder="Enter your Gemini API Key" value="${escapeHTML(sessionStorage.getItem('mylib_gemini_api_key') || '')}" class="w-full pl-4 pr-12 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
                                             <button id="toggle-api-key-visibility" class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none rounded-lg" aria-label="Toggle API Key visibility" title="Toggle API Key visibility">
                                                 <svg id="eye-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                                             </button>
@@ -2595,7 +2597,7 @@
                                     <div>
                                         <label for="groq-api-key" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Groq API Key</label>
                                         <div class="relative">
-                                            <input id="groq-api-key" type="password" placeholder="Enter your Groq API Key" value="${escapeHTML(localStorage.getItem('mylib_groq_api_key') || '')}" class="w-full pl-4 pr-12 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
+                                            <input id="groq-api-key" type="password" placeholder="Enter your Groq API Key" value="${escapeHTML(sessionStorage.getItem('mylib_groq_api_key') || '')}" class="w-full pl-4 pr-12 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
                                             <button id="toggle-groq-api-key-visibility" class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none rounded-lg" aria-label="Toggle Groq API Key visibility" title="Toggle Groq API Key visibility">
                                                 <svg id="groq-eye-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                                             </button>
@@ -3615,7 +3617,7 @@
                                 </div>
 
                                 ${userId !== currentUser.uid ? `
-                                    <button id="visit-library-btn" onclick="window.visitCollaboratorLibrary('${userId}')" class="mt-6 px-8 py-3 bg-slate-900 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-bold hover:scale-105 active:scale-95 transition-all shadow-lg focus-visible:ring-2 focus-visible:ring-primary outline-none whitespace-nowrap text-sm">
+                                    <button id="visit-library-btn" data-action="visit-library" data-value="${escapeHTML(userId)}" class="mt-6 px-8 py-3 bg-slate-900 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-bold hover:scale-105 active:scale-95 transition-all shadow-lg focus-visible:ring-2 focus-visible:ring-primary outline-none whitespace-nowrap text-sm">
                                         Visit Library
                                     </button>
                                 ` : ''}
@@ -4361,7 +4363,7 @@
                             if (maxSim > 0.6 && maxSim < 1) {
                                 suggestionHtml = `
                                 <div class="mb-6 animate-slide-up">
-                                    <p class="text-sm text-slate-500">Did you mean <button onclick="searchQuery='${bestMatch.replace(/'/g, "\\'")}'; document.getElementById('search-input').value='${bestMatch.replace(/'/g, "\\'")}'; window.queueRenderLibraryOnly();" class="text-primary font-bold hover:underline focus-visible:ring-2 focus-visible:ring-primary outline-none rounded px-1">"${escapeHTML(bestMatch)}"</button>?</p>
+                                    <p class="text-sm text-slate-500">Did you mean <button data-action="apply-suggestion" data-value="${escapeHTML(bestMatch)}" class="text-primary font-bold hover:underline focus-visible:ring-2 focus-visible:ring-primary outline-none rounded px-1">"${escapeHTML(bestMatch)}"</button>?</p>
                                 </div>`;
                             }
                         }
@@ -4557,8 +4559,9 @@
                     const language = document.getElementById('gemini-language')?.value || 'English';
 
                     localStorage.setItem('mylib_ai_provider', provider);
-                    localStorage.setItem('mylib_gemini_api_key', geminiApiKey);
-                    localStorage.setItem('mylib_groq_api_key', groqApiKey);
+                    // Stored in sessionStorage: cleared on tab close, not shared across tabs, not readable by other origins.
+                    sessionStorage.setItem('mylib_gemini_api_key', geminiApiKey);
+                    sessionStorage.setItem('mylib_groq_api_key', groqApiKey);
                     localStorage.setItem('mylib_gemini_model', model);
                     localStorage.setItem('mylib_ai_language', language);
                     showToast('AI Settings saved!', 'success');
@@ -7371,7 +7374,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                         <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">${title}</h3>
                         <div class="grid grid-cols-1 gap-x-6 gap-y-2">
                             ${entries.slice(0, 6).map(([label, count], i) => {
-                    const clickHandler = filterType ? `onclick='window.applyInsightFilter("${filterType}", "${label.replace(/"/g, "&quot;")}")'` : '';
+                    const clickHandler = filterType ? `data-action="apply-insight" data-value="${escapeHTML(filterType)}" data-value2="${escapeHTML(label)}"` : '';
                     const pct = total > 0 ? Math.round((count / total) * 100) : 0;
                     const displayCount = showPercentageInLegend ? `${count} <span class="text-[10px] font-normal text-slate-400">(${pct}%)</span>` : count;
                     return `
@@ -7473,9 +7476,8 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                     ${entries.map(([label, count], i) => {
                     const pct = total > 0 ? Math.round((count / total) * 100) : 0;
                     const color = palette[i % palette.length];
-                    const jsLabel = label.replace(/'/g, "\\'").replace(/"/g, "&quot;");
                     return `
-                                        <button onclick="window.applyInsightFilter('genre', '${jsLabel}')" class="flex items-center justify-between gap-3 text-sm py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg px-2 -mx-2 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none group">
+                                        <button data-action="apply-insight" data-value="genre" data-value2="${escapeHTML(label)}" class="flex items-center justify-between gap-3 text-sm py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg px-2 -mx-2 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none group">
                                             <div class="flex items-center gap-2 min-w-0">
                                                 <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: ${color}"></span>
                                                 <span class="font-medium truncate group-hover:text-primary transition-colors">${escapeHTML(label)}</span>
@@ -8294,12 +8296,12 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                 return `
                 <div class="glass rounded-[2.5rem] p-8 border border-slate-200/50 dark:border-slate-800 hover:shadow-2xl transition-all animate-slide-up group relative">
                     ${isOwner ? `
-                        <button onclick="window.deleteReview('${rev.id}')" class="absolute top-6 right-6 p-2 text-slate-400 hover:text-rose-500 transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 outline-none rounded-lg z-10" aria-label="Delete review">
+                        <button data-action="delete-review" data-value="${escapeHTML(rev.id)}" class="absolute top-6 right-6 p-2 text-slate-400 hover:text-rose-500 transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 outline-none rounded-lg z-10" aria-label="Delete review">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                         </button>
                     ` : ''}
                     <div class="flex items-center justify-between mb-6">
-                        <button onclick="window.openUserProfile('${rev.userId}')" class="flex items-center gap-3 text-left focus-visible:ring-2 focus-visible:ring-primary outline-none rounded-xl p-1 -ml-1">
+                        <button data-action="open-user-profile" data-value="${escapeHTML(rev.userId)}" class="flex items-center gap-3 text-left focus-visible:ring-2 focus-visible:ring-primary outline-none rounded-xl p-1 -ml-1">
                             <div class="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-sm uppercase shadow-md">${escapeHTML(rev.userName?.substring(0, 2) || '??')}</div>
                             <div>
                                 <h4 class="text-sm font-black text-slate-900 dark:text-white">${escapeHTML(rev.userName)}</h4>
@@ -8323,11 +8325,11 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     </div>
 
                     <div class="flex items-center gap-6 pt-6 border-t border-slate-100 dark:border-slate-800">
-                        <button onclick="window.toggleLike('${rev.id}', this)" class="flex items-center gap-2 ${rev.isLiked ? 'text-rose-500' : 'text-slate-400'} hover:text-rose-500 transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 outline-none rounded-lg p-1" aria-label="Like review by ${escapeHTML(rev.userName)}">
+                        <button data-action="toggle-like" data-value="${escapeHTML(rev.id)}" class="flex items-center gap-2 ${rev.isLiked ? 'text-rose-500' : 'text-slate-400'} hover:text-rose-500 transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 outline-none rounded-lg p-1" aria-label="Like review by ${escapeHTML(rev.userName)}">
                             <svg class="w-6 h-6 ${rev.isLiked ? 'fill-rose-500' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                             <span class="text-xs font-black">${rev.likesCount || 0}</span>
                         </button>
-                        <button onclick="window.toggleComments('${rev.id}')" class="flex items-center gap-2 text-slate-400 hover:text-sky-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none rounded-lg p-1" aria-label="View comments">
+                        <button data-action="toggle-comments" data-value="${escapeHTML(rev.id)}" class="flex items-center gap-2 text-slate-400 hover:text-sky-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none rounded-lg p-1" aria-label="View comments">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
                             <span class="text-xs font-black">${rev.commentsCount || 0}</span>
                         </button>
@@ -9642,7 +9644,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                 const provider = localStorage.getItem('mylib_ai_provider') || 'gemini';
                 return {
                     provider,
-                    apiKey: provider === 'groq' ? (localStorage.getItem('mylib_groq_api_key') || '') : (localStorage.getItem('mylib_gemini_api_key') || ''),
+                    apiKey: provider === 'groq' ? (sessionStorage.getItem('mylib_groq_api_key') || '') : (sessionStorage.getItem('mylib_gemini_api_key') || ''),
                     model: provider === 'groq' ? AI_CONFIG.groqModel : (localStorage.getItem('mylib_gemini_model') || AI_CONFIG.defaultModel),
                     language: localStorage.getItem('mylib_ai_language') || 'English'
                 };
@@ -10582,11 +10584,11 @@ If the collection is small or has no finished books, be extra encouraging and su
                                                 <span class="text-[9px] font-bold text-sky-500 block">Added by ${escapeHTML(h.userName || 'Anonymous')}</span>
                                             </div>
                                             <div class="flex items-center gap-2">
-                                                <button onclick="window.copyQuote('${h.text.replace(/'/g, "\\'")}', '${book.title.replace(/'/g, "\\'")}', '${(book.author || 'Unknown').replace(/'/g, "\\'")}', this)" class="text-sky-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity p-1 hover:bg-slate-50 dark:hover:bg-blue-900/20 rounded-lg focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Copy highlight" title="Copy highlight">
+                                                <button data-action="copy-quote" data-value="${escapeHTML(h.text)}" data-value2="${escapeHTML(book.title)}" data-value3="${escapeHTML(book.author || 'Unknown')}" class="text-sky-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity p-1 hover:bg-slate-50 dark:hover:bg-blue-900/20 rounded-lg focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Copy highlight" title="Copy highlight">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
                                                 </button>
                                                 ${h.userId === currentUser?.uid ? `
-                                                <button onclick="window.deleteHighlight('${book.id}', '${h.id}')" class="text-rose-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="Delete highlight" title="Delete highlight">
+                                                <button data-action="delete-highlight" data-value="${escapeHTML(book.id)}" data-value2="${escapeHTML(h.id)}" class="text-rose-500 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="Delete highlight" title="Delete highlight">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                                 </button>
                                                 ` : ''}
@@ -11314,6 +11316,14 @@ If the collection is small or has no finished books, be extra encouraging and su
                     case 'set-copy-type': window.setCopyTypeFilter(value); break;
                     case 'toggle-fav-filter': window.toggleFavoritesFilter(false); break;
                     case 'apply-insight': window.applyInsightFilter(value, value2); break;
+                    case 'apply-suggestion': {
+                        const v = el.dataset.value;
+                        searchQuery = v;
+                        const input = document.getElementById('search-input');
+                        if (input) input.value = v;
+                        window.queueRenderLibraryOnly();
+                        break;
+                    }
 
                     // ---- Book actions ----
                     case 'toggle-fav': window.toggleFavorite(value); break;

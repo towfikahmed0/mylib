@@ -4,6 +4,8 @@
   "version": "3.1.0",
   "start_url": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "prefer_related_applications": false,
   "background_color": "#ffffff",
   "theme_color": "#4F46E5",
   "icons": [
