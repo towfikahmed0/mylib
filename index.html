@@ -1387,7 +1387,7 @@
                         window.refreshApp = () => {
                             worker.postMessage('SKIP_WAITING');
                         };
-                        showToast('New version available! <button onclick="window.refreshApp()" class="ml-4 underline font-bold uppercase text-xs">Refresh</button>', 'info', 10000);
+                        showToast('New version available!', 'info', 10000, '<button onclick="window.refreshApp()" class="ml-4 underline font-bold uppercase text-xs">Refresh</button>');
                     };
 
                     if (reg.waiting && navigator.serviceWorker.controller) {
@@ -1430,11 +1430,11 @@
         (function () {
             // SRE: Global Error Boundary
             window.onerror = function (msg, url, lineNo, columnNo, error) {
-                showToast('Something went wrong, but your data is safe. <button onclick="window.location.reload()" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Reload</button>', 'error', 10000);
+                showToast('Something went wrong, but your data is safe.', 'error', 10000, '<button onclick="window.location.reload()" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Reload</button>');
                 return false;
             };
             window.onunhandledrejection = function (event) {
-                showToast('A background task failed. Your work is saved. <button onclick="window.location.reload()" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Reload</button>', 'error', 10000);
+                showToast('A background task failed. Your work is saved.', 'error', 10000, '<button onclick="window.location.reload()" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Reload</button>');
             };
 
 
@@ -1881,14 +1881,15 @@
             };
 
             // ---------- Utility: Toast ----------
-            function showToast(message, type = 'info', duration = 4000) {
+            function showToast(message, type = 'info', duration = 4000, actionHtml = '') {
                 if (navigator.vibrate) {
                     if (type === 'error') navigator.vibrate([50, 50, 50]);
                     else if (type === 'success') navigator.vibrate(10);
                 }
                 toastEl.innerHTML = `
                 <div class="w-2 h-2 rounded-full ${type === 'success' ? 'bg-emerald-400' : type === 'error' ? 'bg-rose-400' : 'bg-blue-400'}"></div>
-                <span>${message}</span>
+                <span>${escapeHTML(message)}</span>
+                ${actionHtml || ''}
             `;
                 toastEl.classList.remove('opacity-0', 'translate-y-10', 'pointer-events-none');
                 toastEl.classList.add('opacity-100', 'translate-y-0');
@@ -2567,7 +2568,7 @@
                                     <div>
                                         <label for="gemini-api-key" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Gemini API Key</label>
                                         <div class="relative">
-                                            <input id="gemini-api-key" type="password" placeholder="Enter your Gemini API Key" value="${localStorage.getItem('mylib_gemini_api_key') || ''}" class="w-full pl-4 pr-12 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
+                                            <input id="gemini-api-key" type="password" placeholder="Enter your Gemini API Key" value="${escapeHTML(localStorage.getItem('mylib_gemini_api_key') || '')}" class="w-full pl-4 pr-12 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
                                             <button id="toggle-api-key-visibility" class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none rounded-lg" aria-label="Toggle API Key visibility" title="Toggle API Key visibility">
                                                 <svg id="eye-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                                             </button>
@@ -2594,7 +2595,7 @@
                                     <div>
                                         <label for="groq-api-key" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Groq API Key</label>
                                         <div class="relative">
-                                            <input id="groq-api-key" type="password" placeholder="Enter your Groq API Key" value="${localStorage.getItem('mylib_groq_api_key') || ''}" class="w-full pl-4 pr-12 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
+                                            <input id="groq-api-key" type="password" placeholder="Enter your Groq API Key" value="${escapeHTML(localStorage.getItem('mylib_groq_api_key') || '')}" class="w-full pl-4 pr-12 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all">
                                             <button id="toggle-groq-api-key-visibility" class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none rounded-lg" aria-label="Toggle Groq API Key visibility" title="Toggle Groq API Key visibility">
                                                 <svg id="groq-eye-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                                             </button>
@@ -2669,10 +2670,10 @@
                                     <div class="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
                                         ${metadataCache.authors.length > 0 ? metadataCache.authors.map(author => `
                                             <div class="group flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs transition-all hover:bg-slate-50 dark:hover:bg-blue-900/20">
-                                                <span class="font-medium">${author}</span>
+                                                <span class="font-medium">${escapeHTML(author)}</span>
                                                 <div class="flex gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
-                                                    <button onclick="window.editMetadata('Author', '${author.replace(/'/g, "\\'")}')" class="text-sky-500 hover:text-sky-600 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded" aria-label="Edit author"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
-                                                    <button onclick="window.deleteMetadata('Author', '${author.replace(/'/g, "\\'")}')" class="text-rose-500 hover:text-rose-600 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded" aria-label="Delete author"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                                                    <button data-action="edit-metadata" data-value="Author" data-value2="${escapeHTML(author)}" class="text-sky-500 hover:text-sky-600 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded" aria-label="Edit author"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
+                                                    <button data-action="delete-metadata" data-value="Author" data-value2="${escapeHTML(author)}" class="text-rose-500 hover:text-rose-600 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded" aria-label="Delete author"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
                                                 </div>
                                             </div>
                                         `).join('') : '<p class="text-xs text-slate-400 italic">No authors yet.</p>'}
@@ -2683,10 +2684,10 @@
                                     <div class="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
                                         ${metadataCache.genres.length > 0 ? metadataCache.genres.map(genre => `
                                             <div class="group flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs transition-all hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
-                                                <span class="font-medium">${genre}</span>
+                                                <span class="font-medium">${escapeHTML(genre)}</span>
                                                 <div class="flex gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
-                                                    <button onclick="window.editMetadata('Genre', '${genre.replace(/'/g, "\\'")}')" class="text-emerald-500 hover:text-emerald-600 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded" aria-label="Edit genre"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
-                                                    <button onclick="window.deleteMetadata('Genre', '${genre.replace(/'/g, "\\'")}')" class="text-rose-500 hover:text-rose-600 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded" aria-label="Delete genre"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                                                    <button data-action="edit-metadata" data-value="Genre" data-value2="${escapeHTML(genre)}" class="text-emerald-500 hover:text-emerald-600 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded" aria-label="Edit genre"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg></button>
+                                                    <button data-action="delete-metadata" data-value="Genre" data-value2="${escapeHTML(genre)}" class="text-rose-500 hover:text-rose-600 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded" aria-label="Delete genre"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
                                                 </div>
                                             </div>
                                         `).join('') : '<p class="text-xs text-slate-400 italic">No genres yet.</p>'}
@@ -3062,7 +3063,7 @@
                                     </div>
                                 </div>
                                 <!-- User Email (small, muted) -->
-                                <p class="text-xs text-muted-foreground truncate px-1" title="${currentUser.email}">${currentUser.email}</p>
+                                <p class="text-xs text-muted-foreground truncate px-1" title="${escapeHTML(currentUser.email || '')}">${escapeHTML(currentUser.email || '')}</p>
                             </div>
 
                                                         <!-- Nav items: icon + label, stacked vertically -->
@@ -3131,7 +3132,7 @@
                                         <span class="hidden sm:inline-block px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-[8px] font-black uppercase tracking-tighter border border-primary/20">v${APP_VERSION}</span>
                                     </div>
                                     <!-- Email max-width restricted on mobile -->
-                                    <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-widest truncate max-w-[100px] sm:max-w-none">${currentUser.email}</p>
+                                    <p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-widest truncate max-w-[100px] sm:max-w-none">${escapeHTML(currentUser.email || '')}</p>
                                 </div>
                                 <!-- Connectivity Indicator hidden on very small screens to save space -->
                                 <div id="conn-indicator" class="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 transition-all cursor-help" title="Online: Cloud Sync Active">
@@ -3524,7 +3525,7 @@
                         }
 
                         selectedBookIds.clear();
-                        showToast(`Deleted ${ids.length} books successfully. <button onclick="window.undoDelete()" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Undo</button>`, 'success', 10000);
+                        showToast(`Deleted ${ids.length} books successfully.`, 'success', 10000, '<button onclick="window.undoDelete()" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Undo</button>');
                     } catch (err) {
                         console.error('Bulk delete error:', err);
                         showToast('Failed to delete books: ' + err.message, 'error');
@@ -5253,10 +5254,10 @@
 
                     let html = items.map((item, i) => `
                     <div class="dropdown-item ${i === selectedIndex ? 'bg-slate-100 dark:bg-slate-700 text-sky-600' : ''} ${item.type === 'add' ? 'font-bold text-sky-600 dark:text-blue-400 border-t border-slate-100 dark:border-slate-800' : ''}"
-                         data-value="${item.value}"
+                         data-value="${escapeHTML(item.value)}"
                          data-action="${item.type}"
                          data-index="${i}">
-                        ${item.type === 'add' ? `+ Add "${item.value}"` : item.value}
+                        ${item.type === 'add' ? `+ Add "${escapeHTML(item.value)}"` : escapeHTML(item.value)}
                     </div>
                 `).join('');
 
@@ -5809,7 +5810,7 @@
                                 <h3 class="font-black text-sm truncate font-serif">${book._escapedTitle}</h3>
                                 ${book.borrowedBy ? `<span class="px-2 py-0.5 rounded-full text-[8px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed</span>` : ''}
                             </div>
-                            <button class="text-xs text-slate-500 truncate hover:text-sky-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-left" onclick="event.stopPropagation(); window.setAuthorFilter('${book._jsAuthor}')" aria-label="Filter by author: ${book._escapedAuthor}">${book._escapedAuthor}</button>
+                            <button class="text-xs text-slate-500 truncate hover:text-sky-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-left" data-action="filter-author" data-value="${book._escapedAuthor}" aria-label="Filter by author: ${book._escapedAuthor}">${book._escapedAuthor}</button>
                             <div class="flex flex-wrap gap-1 mt-1 items-center max-h-[22px] overflow-hidden sm:max-h-none sm:overflow-visible">
                                 ${book._genresHTML}
                                 ${book._tagsHTML_list}
@@ -5817,7 +5818,7 @@
                         </div>
                         <div class="text-right flex-shrink-0 flex flex-col items-end">
                             <div class="text-amber-400 text-[10px]">${stars}</div>
-${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-sky-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${book._jsOwner}')" aria-label="Filter by owner: ${book._escapedOwner}">Owner: ${book._escapedOwner}</button>` : ''}
+${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-sky-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-right" data-action="filter-owner" data-value="${book._escapedOwner}" aria-label="Filter by owner: ${book._escapedOwner}">Owner: ${book._escapedOwner}</button>` : ''}
                             <div class="flex items-center gap-2 mt-1">
                                 <button data-action="toggle-fav" data-value="${book.id}" class="p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 outline-none ${isFavorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'}" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                                     <svg class="w-3.5 h-3.5 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'text-slate-300'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
@@ -5900,14 +5901,14 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                 ${bookStatus === 'reading' ? `
                                     <button data-action="mark-finished" data-value="${book.id}" class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none" aria-label="Mark as finished">Mark as Finished</button>
                                 ` : ''}
-                                ${book.borrowedBy ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed by ${book.borrowedBy}</div>` : ''}
+                                ${book.borrowedBy ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed by ${escapeHTML(book.borrowedBy)}</div>` : ''}
                                 ${addedByBadge}
                             </div>
                         </div>
                         <div class="flex items-center justify-between">
                             <span class="text-[10px] font-bold text-slate-400">${book._formattedDate}</span>
                             <div class="flex items-center gap-2">
-                                <span class="text-slate-900 dark:text-white font-black text-sm">${book.price ? getCurrencySymbol() + book.price : ''}</span>
+                                <span class="text-slate-900 dark:text-white font-black text-sm">${book.price ? getCurrencySymbol() + escapeHTML(book.price) : ''}</span>
                                 <button class="p-2 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Edit book details"data-action="edit-book" data-value="${book.id}">
                                     <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
@@ -6348,9 +6349,9 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                         <h2 class="text-2xl font-black mb-2">Approve Details</h2>
                         <p class="text-slate-500 text-sm mb-6">We extracted this info from the code. Confirm or edit.</p>
                         <div class="space-y-4">
-                            <div><label class="text-xs font-bold text-slate-400">Title</label><input id="modal-title" value="${parsed.title || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
-                            <div><label class="text-xs font-bold text-slate-400">Author</label><input id="modal-author" value="${parsed.author || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
-                            <div><label class="text-xs font-bold text-slate-400">ISBN</label><input id="modal-isbn" value="${parsed.isbn || ''}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
+                            <div><label class="text-xs font-bold text-slate-400">Title</label><input id="modal-title" value="${escapeHTML(parsed.title || '')}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
+                            <div><label class="text-xs font-bold text-slate-400">Author</label><input id="modal-author" value="${escapeHTML(parsed.author || '')}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
+                            <div><label class="text-xs font-bold text-slate-400">ISBN</label><input id="modal-isbn" value="${escapeHTML(parsed.isbn || '')}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
                         </div>
                         <div class="flex gap-4 mt-8">
                             <button data-close class="flex-1 px-4 py-4 bg-slate-200 dark:bg-slate-700 rounded-2xl font-bold focus-visible:ring-2 focus-visible:ring-slate-400 outline-none">Cancel</button>
@@ -7822,10 +7823,10 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                             <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Top Tags</h3>
                             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                 ${Object.entries(tagsCount).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([name, count]) => `
-                                    <button class="w-full flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/30 hover:bg-slate-100 dark:hover:bg-slate-800/60 rounded-xl group cursor-pointer focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all text-left" onclick='window.applyInsightFilter("tag", "${name.replace(/"/g, "&quot;")}")' aria-label="Filter by tag: ${name}">
+                                    <button class="w-full flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/30 hover:bg-slate-100 dark:hover:bg-slate-800/60 rounded-xl group cursor-pointer focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all text-left" data-action="apply-insight" data-value="tag" data-value2="${escapeHTML(name)}" aria-label="Filter by tag: ${escapeHTML(name)}">
                                         <div class="flex items-center gap-3">
                                             <div class="w-1.5 h-1.5 rounded-full bg-amber-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                            <span class="text-sm font-medium text-slate-600 dark:text-slate-300 group-hover:text-amber-600 transition-colors">${name}</span>
+                                            <span class="text-sm font-medium text-slate-600 dark:text-slate-300 group-hover:text-amber-600 transition-colors">${escapeHTML(name)}</span>
                                         </div>
                                         <span class="text-xs font-black text-slate-400 bg-white dark:bg-slate-700 px-2 py-1 rounded-md border border-slate-100 dark:border-slate-600">${count}</span>
                                     </button>
@@ -7956,7 +7957,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                         <div>
                             <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Professional Summary</h3>
                             <div class="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-sm leading-relaxed text-slate-700 dark:text-slate-300 italic border border-slate-100 dark:border-slate-800">
-                                "${data.summary}"
+                                "${escapeHTML(data.summary || '')}"
                             </div>
                         </div>
 
@@ -7965,7 +7966,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                             <div class="flex flex-wrap gap-2">
                                 ${data.tags.map(tag => `
                                     <span class="px-3 py-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 rounded-full text-xs font-bold border border-emerald-100/50 dark:border-emerald-900/30">
-                                        ${tag}
+                                        ${escapeHTML(tag)}
                                     </span>
                                 `).join('')}
                             </div>
@@ -8020,9 +8021,9 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                         const book = books.find(b => b.id === f.id);
                         return '<div class="glass p-5 rounded-2xl border border-emerald-100 dark:border-emerald-900/30 flex items-start gap-4">' +
                             '<div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600 flex-shrink-0 font-bold">' + (i + 1) + '</div>' +
-                            '<div class="flex-1 min-w-0"><div class="text-xs font-black text-slate-400 uppercase mb-1">' + (book?.title || 'Unknown') + '</div>' +
-                            '<div class="flex flex-wrap items-center gap-2 text-sm"><span class="line-through text-slate-500">' + f.old + '</span><svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg><span class="text-emerald-700 font-bold">' + f.new + '</span></div>' +
-                            '<p class="text-[10px] text-slate-400 mt-2">' + f.reason + '</p></div>' +
+                            '<div class="flex-1 min-w-0"><div class="text-xs font-black text-slate-400 uppercase mb-1">' + escapeHTML(book?.title || 'Unknown') + '</div>' +
+                            '<div class="flex flex-wrap items-center gap-2 text-sm"><span class="line-through text-slate-500">' + escapeHTML(String(f.old || '')) + '</span><svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg><span class="text-emerald-700 font-bold">' + escapeHTML(String(f.new || '')) + '</span></div>' +
+                            '<p class="text-[10px] text-slate-400 mt-2">' + escapeHTML(f.reason || '') + '</p></div>' +
                             '<input type="checkbox" checked data-fix-index="' + i + '" class="w-6 h-6 rounded text-emerald-600"></div>';
                     }).join('') +
                     '</div><div class="flex gap-4 sticky bottom-0 bg-slate-50/80 backdrop-blur-md py-6 border-t border-slate-200">' +
@@ -8299,7 +8300,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     ` : ''}
                     <div class="flex items-center justify-between mb-6">
                         <button onclick="window.openUserProfile('${rev.userId}')" class="flex items-center gap-3 text-left focus-visible:ring-2 focus-visible:ring-primary outline-none rounded-xl p-1 -ml-1">
-                            <div class="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-sm uppercase shadow-md">${rev.userName?.substring(0, 2) || '??'}</div>
+                            <div class="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-sm uppercase shadow-md">${escapeHTML(rev.userName?.substring(0, 2) || '??')}</div>
                             <div>
                                 <h4 class="text-sm font-black text-slate-900 dark:text-white">${escapeHTML(rev.userName)}</h4>
                                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${formatDate(date)} · ${readTime} min read</p>
@@ -8946,7 +8947,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                 <span class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-slate-400">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 100-8 4 4 0 000 8zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
                                 </span>
-                                <input id="user-search-input" type="email" placeholder="Search user by email address..." value="${window.lastUserSearchQuery || ''}" class="w-full pl-11 pr-4 py-3.5 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-primary outline-none text-sm transition-all text-slate-800 dark:text-white font-medium" />
+                                <input id="user-search-input" type="email" placeholder="Search user by email address..." value="${escapeHTML(window.lastUserSearchQuery || '')}" class="w-full pl-11 pr-4 py-3.5 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-primary outline-none text-sm transition-all text-slate-800 dark:text-white font-medium" />
                             </div>
                             <button onclick="window.searchUserByEmail()" class="px-6 py-3.5 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-md shadow-primary/20 flex items-center gap-2 text-sm">
                                 Search
@@ -9372,8 +9373,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
 
                             lastImportState = { addedIds, previousStates };
 
-                            const toastMsg = `Imported ${importedCount} new, updated ${updatedCount} existing. <button onclick="window.undoImport()" class="ml-4 underline font-bold uppercase text-xs focus-visible:ring-2 focus-visible:ring-white outline-none rounded" aria-label="Undo last import">Undo</button>`;
-                            showToast(toastMsg, 'success', 10000);
+                            showToast(`Imported ${importedCount} new, updated ${updatedCount} existing.`, 'success', 10000, '<button onclick="window.undoImport()" class="ml-4 underline font-bold uppercase text-xs focus-visible:ring-2 focus-visible:ring-white outline-none rounded" aria-label="Undo last import">Undo</button>');
                             window.undoImport = undoImport;
                         }
                     });
@@ -10436,8 +10436,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                                     <div class="flex flex-wrap gap-2">
                                         ${bookGenres.map(g => {
                     const escapedG = escapeHTML(g);
-                    const jsEscapedG = g.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-                    return `<button onclick="window.setCategoryFilter('${jsEscapedG}'); close();" class="px-3 py-1 bg-blue-100/80 hover:bg-blue-200 dark:bg-blue-900/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>`;
+                    return `<button data-action="filter-genre" data-value="${escapedG}" class="px-3 py-1 bg-blue-100/80 hover:bg-blue-200 dark:bg-blue-900/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>`;
                 }).join('')}
                                     </div>
                                     ${book.owner ? `<span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-auto">Owner: ${escapeHTML(book.owner)}</span>` : ''}
@@ -10456,7 +10455,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                                 </div>
 
                                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-8 mt-8">
-                                    <div class="bg-slate-50/50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200/50 dark:border-slate-700"><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Price</p><p class="text-xl font-black text-sky-600 dark:text-blue-400 font-sans">${book.price ? getCurrencySymbol() + book.price : '—'}</p></div>
+                                    <div class="bg-slate-50/50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200/50 dark:border-slate-700"><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Price</p><p class="text-xl font-black text-sky-600 dark:text-blue-400 font-sans">${book.price ? getCurrencySymbol() + escapeHTML(book.price) : '—'}</p></div>
                                     <div class="bg-slate-50/50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200/50 dark:border-slate-700"><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Purchased</p><p class="text-xl font-black font-mono">${book.purchaseDate ? new Date(book.purchaseDate).toLocaleDateString() : '—'}</p></div>
                                     ${book.copyType ? `
                                     <div class="col-span-2 sm:col-span-1 bg-slate-50/50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200/50 dark:border-slate-700">
@@ -10472,8 +10471,8 @@ If the collection is small or has no finished books, be extra encouraging and su
                                 ${book.isbn ? `
                                     <div class="mt-6 px-4">
                                         <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">ISBN</p>
-                                        <button onclick="window.copyISBN('${book.isbn.replace(/'/g, "\\'")}', this)" class="flex items-center gap-2 group/isbn hover:text-sky-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary/50 outline-none rounded-lg px-2 -ml-2" title="Copy ISBN" aria-label="Copy ISBN">
-                                            <span class="text-sm font-mono tracking-wider">${book.isbn}</span>
+                                        <button data-action="copy-isbn" data-value="${escapeHTML(book.isbn)}" class="flex items-center gap-2 group/isbn hover:text-sky-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary/50 outline-none rounded-lg px-2 -ml-2" title="Copy ISBN" aria-label="Copy ISBN">
+                                            <span class="text-sm font-mono tracking-wider">${escapeHTML(book.isbn)}</span>
                                             <svg class="w-3.5 h-3.5 opacity-0 group-hover/isbn:opacity-100 transition-opacity" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
                                         </button>
                                     </div>` : ''}
@@ -10508,7 +10507,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                                 <div class="mt-4 px-4">
                                     <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Tags</p>
                                     <div class="flex flex-wrap gap-2">
-                                        ${(book.tags || []).map(tag => `<button onclick="window.setTagFilter('${tag}'); document.querySelector('[data-close]').click();" class="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-bold cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by tag: ${tag}">${tag}</button>`).join('')}
+                                        ${(book.tags || []).map(tag => `<button data-action="filter-tag" data-value="${escapeHTML(tag)}" class="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-bold cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by tag: ${escapeHTML(tag)}">${escapeHTML(tag)}</button>`).join('')}
                                     </div>
                                 </div>
                                 <div class="mt-4 px-4">
@@ -10534,7 +10533,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                                     ${book.borrowedBy ? `
                                         <div class="flex items-center justify-between bg-amber-50 dark:bg-amber-900/20 p-3 rounded-xl border border-amber-100 dark:border-amber-900/30">
                                             <div class="text-sm">
-                                                <span class="font-bold text-amber-900 dark:text-amber-200">${book.borrowedBy}</span>
+                                                <span class="font-bold text-amber-900 dark:text-amber-200">${escapeHTML(book.borrowedBy)}</span>
                                                 <span class="text-amber-700 dark:text-amber-400 text-xs">on ${new Date(book.borrowDate).toLocaleDateString()}</span>
                                             </div>
                                             <button id="return-book-btn" class="text-[10px] font-black uppercase text-amber-600 hover:text-amber-700 focus-visible:ring-2 focus-visible:ring-amber-500 outline-none rounded px-1">Return</button>
@@ -10600,7 +10599,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                             <div class="flex gap-2 items-center">
                                 <input id="new-highlight-input" type="text" aria-label="Add a quote or highlight" placeholder="Add a quote or highlight..." class="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all font-medium">
                                 <input id="new-highlight-page-input" type="text" aria-label="Page number" placeholder="Page #" class="w-20 px-3 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all text-center font-semibold">
-                                <button onclick="window.addHighlight('${book.id}', document.getElementById('new-highlight-input').value, document.getElementById('new-highlight-page-input').value)" class="p-3.5 bg-slate-900 text-white rounded-xl shadow-md hover:bg-slate-800 transition active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none flex items-center justify-center" aria-label="Add highlight">
+                                <button data-action="add-highlight" data-value="${book.id}" class="p-3.5 bg-slate-900 text-white rounded-xl shadow-md hover:bg-slate-800 transition active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none flex items-center justify-center" aria-label="Add highlight">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                 </button>
                             </div>
@@ -10614,7 +10613,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                         ` : ''}
 
                         <div class="flex flex-col sm:flex-row items-center justify-between mt-10 gap-6">
-                            <button id="delete-book-btn" class="w-full sm:w-auto px-6 py-3 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-2xl font-bold transition-all order-2 sm:order-1 focus-visible:ring-2 focus-visible:ring-rose-500 outline-none">Delete</button>
+                            ${book.userId === currentUser?.uid ? `<button id="delete-book-btn" class="w-full sm:w-auto px-6 py-3 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-2xl font-bold transition-all order-2 sm:order-1 focus-visible:ring-2 focus-visible:ring-rose-500 outline-none">Delete</button>` : `<div class="order-2 sm:order-1"></div>`}
                             <div class="grid grid-cols-2 sm:flex w-full sm:w-auto gap-3 order-1 sm:order-2">
                                 <button id="ai-summary-btn" class="px-4 py-3 sm:px-8 sm:py-4 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-2xl font-bold hover:bg-emerald-200 transition-all flex items-center justify-center gap-2 text-xs sm:text-base focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none" title="Generate AI Summary & Tags" aria-label="Generate AI Summary & Tags">
                                     <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
@@ -10633,8 +10632,8 @@ If the collection is small or has no finished books, be extra encouraging and su
                                     <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
                                     Transfer
                                 </button>
-                                ` : ''}
                                 <button id="edit-book-btn" class="px-4 py-3 sm:px-8 sm:py-4 bg-slate-100 dark:bg-slate-800 rounded-2xl font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all text-xs sm:text-base focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">Edit Details</button>
+                                ` : ''}
                                 <button data-close class="px-4 py-3 sm:px-10 sm:py-4 bg-primary dark:bg-white text-white dark:text-primary rounded-2xl font-bold shadow-xl shadow-primary/20 dark:shadow-none hover:scale-105 active:scale-95 transition-all text-xs sm:text-base focus-visible:ring-2 focus-visible:ring-primary outline-none">Close</button>
                             </div>
                         </div>
@@ -10687,7 +10686,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                     }
                 });
 
-                document.getElementById('edit-book-btn').addEventListener('click', () => {
+                document.getElementById('edit-book-btn')?.addEventListener('click', () => {
                     close();
                     openManualEntry(null, book);
                 });
@@ -11026,7 +11025,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                     }
                 });
 
-                document.getElementById('delete-book-btn').addEventListener('click', async (e) => {
+                document.getElementById('delete-book-btn')?.addEventListener('click', async (e) => {
                     if (confirm('Are you sure you want to delete this book?')) {
                         const btn = e.currentTarget;
                         const originalText = btn.innerText;
@@ -11045,7 +11044,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                             batch.delete(db.collection('books').doc(book.id).collection('readingStatus').doc(currentUser.uid));
                             await batch.commit();
 
-                            showToast(`Book deleted. <button onclick="window.undoDelete()" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Undo</button>`, 'info', 10000);
+                            showToast('Book deleted.', 'info', 10000, '<button onclick="window.undoDelete()" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Undo</button>');
                             close();
                         } catch (err) {
                             showToast('Error deleting: ' + err.message, 'error');
@@ -11271,19 +11270,21 @@ If the collection is small or has no finished books, be extra encouraging and su
             window.runLibraryCleanup = runLibraryCleanup;
             window.getLibraryContext = getLibraryContext;
             window.generateReadingRoadmap = generateReadingRoadmap;
-            window.__test_data = {
-                get books() { return books; },
-                set books(v) { books = v; },
-                get readingStatuses() { return readingStatuses; },
-                set readingStatuses(v) { readingStatuses = v; },
-                get currentUser() { return currentUser; },
-                set currentUser(v) { currentUser = v; },
-                get userProfile() { return userProfile; },
-                set userProfile(v) { userProfile = v; },
-                get activities() { return activities; },
-                set activities(v) { activities = v; },
-                get libraryStats() { return libraryStats; }
-            };
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.__DEBUG__) {
+                window.__test_data = {
+                    get books() { return books; },
+                    set books(v) { books = v; },
+                    get readingStatuses() { return readingStatuses; },
+                    set readingStatuses(v) { readingStatuses = v; },
+                    get currentUser() { return currentUser; },
+                    set currentUser(v) { currentUser = v; },
+                    get userProfile() { return userProfile; },
+                    set userProfile(v) { userProfile = v; },
+                    get activities() { return activities; },
+                    set activities(v) { activities = v; },
+                    get libraryStats() { return libraryStats; }
+                };
+            }
             // ============================================================
             // DELEGATED ACTION LISTENER
             // Replaces all inline onclick handlers that interpolate user data.
