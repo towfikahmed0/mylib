@@ -158,49 +158,66 @@ function partnershipAllowsAdd(uid1, uid2) {
     // ==========================================================
     // BOOKS
     // ==========================================================
-    match /books/{bookId} {
-      // Own books — provable from `where('userId','==',uid)`.
-      allow read: if isSignedIn() && request.auth.uid == resource.data.userId;
-      // Partner books — path is deterministic given `resource.data.userId`.
+match /books/{bookId} {
+  // Own books — provable from `where('userId','==',uid)`.
+  allow read: if isSignedIn() && request.auth.uid == resource.data.userId;
+
+  // Partner books — path is deterministic given `resource.data.userId`.
+  // Now respects unsubscribe flags.
   allow read: if isSignedIn()
-    && get(/databases/$(database)/documents/partnerships/$(getPartnershipId(request.auth.uid, resource.data.userId))).data.status == 'accepted';
+    && get(/databases/$(database)/documents/partnerships/$(getPartnershipId(request.auth.uid, resource.data.userId))).data.status == 'accepted'
+    && (
+      (get(/databases/$(database)/documents/partnerships/$(getPartnershipId(request.auth.uid, resource.data.userId))).data.userId1 == request.auth.uid
+        && get(/databases/$(database)/documents/partnerships/$(getPartnershipId(request.auth.uid, resource.data.userId))).data.get('user1Unsubscribed', false) != true)
+      ||
+      (get(/databases/$(database)/documents/partnerships/$(getPartnershipId(request.auth.uid, resource.data.userId))).data.userId2 == request.auth.uid
+        && get(/databases/$(database)/documents/partnerships/$(getPartnershipId(request.auth.uid, resource.data.userId))).data.get('user2Unsubscribed', false) != true)
+    );
 
-      // Validates book payload sizes and copyType to reject oversized / malformed writes.
-      allow create: if isSignedIn()
-        && canEditLibrary(request.auth.uid, request.resource.data.userId)
-        && request.resource.data.title is string
-        && request.resource.data.author is string
-        && request.resource.data.title.size() <= 500
-        && request.resource.data.author.size() <= 300
-        && (!('description' in request.resource.data) || request.resource.data.description.size() <= 10000)
-        && (!('isbn'        in request.resource.data) || request.resource.data.isbn.size() <= 40)
-        && (!('coverUrl'    in request.resource.data) || request.resource.data.coverUrl.size() <= 2000)
-        && (!('tags'        in request.resource.data) || request.resource.data.tags.size() <= 50)
-        && (!('categories'  in request.resource.data) || request.resource.data.categories.size() <= 20)
-        && (!('copyType' in request.resource.data) || request.resource.data.copyType in ['New Copy','Old Copy','Gifted']);
+  // Validates book payload sizes, copyType, and coverUrl scheme.
+  allow create: if isSignedIn()
+    && canEditLibrary(request.auth.uid, request.resource.data.userId)
+    && request.resource.data.title is string
+    && request.resource.data.author is string
+    && request.resource.data.title.size() <= 500
+    && request.resource.data.author.size() <= 300
+    && (!('description' in request.resource.data) || request.resource.data.description.size() <= 10000)
+    && (!('isbn'        in request.resource.data) || request.resource.data.isbn.size() <= 40)
+    && (!('coverUrl'    in request.resource.data) || (
+         request.resource.data.coverUrl.size() <= 2000
+         && request.resource.data.coverUrl.matches('^https?://')
+       ))
+    && (!('tags'        in request.resource.data) || request.resource.data.tags.size() <= 50)
+    && (!('categories'  in request.resource.data) || request.resource.data.categories.size() <= 20)
+    && (!('copyType' in request.resource.data) || request.resource.data.copyType in ['New Copy','Old Copy','Gifted']);
 
-      // Validates book payload sizes and copyType to reject oversized / malformed writes.
-      allow update: if isSignedIn()
-        && canEditLibrary(request.auth.uid, resource.data.userId)
-        && request.resource.data.title.size() <= 500
-        && request.resource.data.author.size() <= 300
-        && (!('description' in request.resource.data) || request.resource.data.description.size() <= 10000)
-        && (!('isbn'        in request.resource.data) || request.resource.data.isbn.size() <= 40)
-        && (!('coverUrl'    in request.resource.data) || request.resource.data.coverUrl.size() <= 2000)
-        && (!('tags'        in request.resource.data) || request.resource.data.tags.size() <= 50)
-        && (!('categories'  in request.resource.data) || request.resource.data.categories.size() <= 20)
-        && (!('copyType' in request.resource.data) || request.resource.data.copyType in ['New Copy','Old Copy','Gifted'])
-        && (
-          // Normal update — ownership unchanged.
-          request.resource.data.userId == resource.data.userId
-          // Owner transferring the book to someone with edit permission on them.
-          || (resource.data.userId == request.auth.uid
-              && canEditLibrary(request.auth.uid, request.resource.data.userId))
-        );
+  // Same validations for updates, plus ownership transfer logic.
+  allow update: if isSignedIn()
+    && canEditLibrary(request.auth.uid, resource.data.userId)
+    && request.resource.data.title is string
+    && request.resource.data.author is string
+    && request.resource.data.title.size() <= 500
+    && request.resource.data.author.size() <= 300
+    && (!('description' in request.resource.data) || request.resource.data.description.size() <= 10000)
+    && (!('isbn'        in request.resource.data) || request.resource.data.isbn.size() <= 40)
+    && (!('coverUrl'    in request.resource.data) || (
+         request.resource.data.coverUrl.size() <= 2000
+         && request.resource.data.coverUrl.matches('^https?://')
+       ))
+    && (!('tags'        in request.resource.data) || request.resource.data.tags.size() <= 50)
+    && (!('categories'  in request.resource.data) || request.resource.data.categories.size() <= 20)
+    && (!('copyType' in request.resource.data) || request.resource.data.copyType in ['New Copy','Old Copy','Gifted'])
+    && (
+      // Normal update — ownership unchanged.
+      request.resource.data.userId == resource.data.userId
+      // Owner transferring the book to someone with edit permission on them.
+      || (resource.data.userId == request.auth.uid
+          && canEditLibrary(request.auth.uid, request.resource.data.userId))
+    );
 
-      allow delete: if isSignedIn()
-        && canEditLibrary(request.auth.uid, resource.data.userId);
-    }
+  allow delete: if isSignedIn()
+    && canEditLibrary(request.auth.uid, resource.data.userId);
+}
 
     // ==========================================================
     // READING STATUS (collection group)
