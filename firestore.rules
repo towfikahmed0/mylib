@@ -1,157 +1,267 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to get partnership ID (sorted)
+
+    // ==========================================================
+    // HELPERS
+    // ==========================================================
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
     function getPartnershipId(uid1, uid2) {
       return uid1 < uid2 ? uid1 + '_' + uid2 : uid2 + '_' + uid1;
     }
 
-    // Check if user is a member of the library (owner or partner)
+function partnershipExists(uid1, uid2) {
+  return get(/databases/$(database)/documents/partnerships/$(getPartnershipId(uid1, uid2))).data.status == 'accepted';
+}
+
+function partnershipAllowsAdd(uid1, uid2) {
+  let p = get(/databases/$(database)/documents/partnerships/$(getPartnershipId(uid1, uid2)));
+  return p.data.status == 'accepted' && p.data.allowAddBooks == true;
+}
     function isLibraryMember(userId, libraryOwnerId) {
-      return userId == libraryOwnerId ||
-             exists(path('/databases/' + database + '/documents/partnerships/' + getPartnershipId(userId, libraryOwnerId)));
+      return userId == libraryOwnerId || partnershipExists(userId, libraryOwnerId);
     }
 
-    // Check if user has edit permissions in the library
     function canEditLibrary(userId, libraryOwnerId) {
-      return userId == libraryOwnerId || (
-        exists(path('/databases/' + database + '/documents/partnerships/' + getPartnershipId(userId, libraryOwnerId))) &&
-        get(path('/databases/' + database + '/documents/partnerships/' + getPartnershipId(userId, libraryOwnerId))).data.get('allowAddBooks', false) == true
-      );
+      return userId == libraryOwnerId || partnershipAllowsAdd(userId, libraryOwnerId);
     }
 
-    // ========== USERS COLLECTION ==========
+    // ==========================================================
+    // USERS — public parent + private subcollection
+    // ==========================================================
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth.uid == userId;
-      allow update: if request.auth.uid == userId;
+      // Anyone signed-in can see the public profile.
+      allow read: if isSignedIn();
+
+      // Only the owner can create/update their own doc.
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.uid == resource.data.uid;
+
+      allow delete: if false;
+
+      // Private data — owner only.
+      match /private/{docId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+    }
+
+    // ==========================================================
+    // USER LOOKUP (email → uid) for collaborator search
+    // ==========================================================
+    match /userLookup/{email} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && email == email.lower()
+        && email.matches('^[^@]+@[^@]+$');
+
+      allow update: if isSignedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid;
+
       allow delete: if false;
     }
 
-    // ========== PARTNERSHIPS COLLECTION ==========
+    // ==========================================================
+    // PARTNERSHIPS — created only after an accepted request exists
+    // ==========================================================
     match /partnerships/{partnershipId} {
-      allow read: if request.auth != null && 
-        (resource == null ||
-         request.auth.uid == resource.data.userId1 ||
-         request.auth.uid == resource.data.userId2);
-         
-      allow create: if request.auth != null && 
-        (request.auth.uid == request.resource.data.userId1 ||
-         request.auth.uid == request.resource.data.userId2);
-         
-      allow update: if request.auth != null && 
-        (resource == null ||
-         request.auth.uid == resource.data.userId1 ||
-         request.auth.uid == resource.data.userId2);
-         
-      allow delete: if request.auth != null && 
-        (resource == null ||
-         request.auth.uid == resource.data.userId1 ||
-         request.auth.uid == resource.data.userId2);
+      // Split reads for list-query provability.
+      allow read: if isSignedIn() && request.auth.uid == resource.data.userId1;
+      allow read: if isSignedIn() && request.auth.uid == resource.data.userId2;
+
+      allow create: if isSignedIn()
+        && (request.auth.uid == request.resource.data.userId1
+            || request.auth.uid == request.resource.data.userId2)
+        // Must use the canonical sorted-UID pair as the ID.
+        && partnershipId == getPartnershipId(
+              request.resource.data.userId1,
+              request.resource.data.userId2
+           )
+        // An accepted collaboration request must already exist.
+        && exists(/databases/$(database)/documents/collaborationRequests/$(partnershipId))
+        && get(/databases/$(database)/documents/collaborationRequests/$(partnershipId)).data.status == 'accepted'
+        // Fresh partnerships start closed.
+        && request.resource.data.status == 'accepted'
+        && request.resource.data.allowAddBooks == false;
+
+      // Either party may toggle allowAddBooks or their own unsubscribed flag.
+      allow update: if isSignedIn()
+        && (request.auth.uid == resource.data.userId1
+            || request.auth.uid == resource.data.userId2)
+        && request.resource.data.userId1 == resource.data.userId1
+        && request.resource.data.userId2 == resource.data.userId2
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['allowAddBooks', 'user1Unsubscribed', 'user2Unsubscribed', 'updatedAt']);
+
+      allow delete: if false;
     }
 
-    // ========== BOOKS COLLECTION ==========
+    // ==========================================================
+    // COLLABORATION REQUESTS — deterministic ID = sorted UID pair
+    // ==========================================================
+    match /collaborationRequests/{requestId} {
+      allow read: if isSignedIn() && request.auth.uid == resource.data.fromUserId;
+      allow read: if isSignedIn() && request.auth.uid == resource.data.toUserId;
+
+      allow create: if isSignedIn()
+        && request.auth.uid == request.resource.data.fromUserId
+        && request.resource.data.fromUserId != request.resource.data.toUserId
+        && request.resource.data.status == 'pending'
+        && requestId == getPartnershipId(
+              request.resource.data.fromUserId,
+              request.resource.data.toUserId
+           );
+
+      allow update: if isSignedIn()
+        && (request.auth.uid == resource.data.toUserId
+            || request.auth.uid == resource.data.fromUserId)
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'updatedAt']);
+
+      allow delete: if false;
+    }
+
+    // ==========================================================
+    // BOOKS
+    // ==========================================================
     match /books/{bookId} {
-      // Allow read if user is the owner or a partner
-      allow read: if request.auth != null &&
-        isLibraryMember(request.auth.uid, resource.data.userId);
-      
-      allow create: if request.auth != null &&
-        canEditLibrary(request.auth.uid, request.resource.data.userId);
+      // Own books — provable from `where('userId','==',uid)`.
+      allow read: if isSignedIn() && request.auth.uid == resource.data.userId;
+      // Partner books — path is deterministic given `resource.data.userId`.
+  allow read: if isSignedIn()
+    && get(/databases/$(database)/documents/partnerships/$(getPartnershipId(request.auth.uid, resource.data.userId))).data.status == 'accepted';
 
-      allow update: if request.auth != null &&
-        canEditLibrary(request.auth.uid, resource.data.userId) &&
-        (request.resource.data.userId == resource.data.userId || isLibraryMember(request.resource.data.userId, resource.data.userId));
+      allow create: if isSignedIn()
+        && canEditLibrary(request.auth.uid, request.resource.data.userId)
+        && request.resource.data.title is string
+        && request.resource.data.author is string;
 
-      allow delete: if request.auth != null &&
-        canEditLibrary(request.auth.uid, resource.data.userId);
+      allow update: if isSignedIn()
+        && canEditLibrary(request.auth.uid, resource.data.userId)
+        && (
+          // Normal update — ownership unchanged.
+          request.resource.data.userId == resource.data.userId
+          // Owner transferring the book to someone with edit permission on them.
+          || (resource.data.userId == request.auth.uid
+              && canEditLibrary(request.auth.uid, request.resource.data.userId))
+        );
+
+      allow delete: if isSignedIn()
+        && canEditLibrary(request.auth.uid, resource.data.userId);
     }
 
-    // ========== READING STATUS SUBCOLLECTION (supports Collection Group) ==========
+    // ==========================================================
+    // READING STATUS (collection group)
+    // ==========================================================
     match /{path=**}/readingStatus/{statusId} {
-      allow read: if request.auth != null && (
-        request.auth.uid == statusId ||
-        (resource != null && request.auth.uid == resource.data.userId) ||
-        isLibraryMember(request.auth.uid, get(/databases/$(database)/documents/$(path)).data.userId)
-      );
-      allow write: if request.auth != null && request.auth.uid == statusId;
+      allow read: if isSignedIn()
+        && resource.data.userId == request.auth.uid;
+
+      allow write: if isSignedIn()
+        && request.auth.uid == statusId
+        && request.resource.data.userId == request.auth.uid
+        // Optional range validation — only applies if the field is present.
+        && (request.resource.data.rating == null
+            || (request.resource.data.rating is int
+                && request.resource.data.rating >= 0
+                && request.resource.data.rating <= 5))
+        && (request.resource.data.progress == null
+            || (request.resource.data.progress is int
+                && request.resource.data.progress >= 0
+                && request.resource.data.progress <= 100));
     }
 
-    // ========== ACTIVITY FEED COLLECTION ==========
+    // ==========================================================
+    // ACTIVITY FEED
+    // ==========================================================
     match /activityFeed/{activityId} {
-      allow read: if request.auth != null &&
-        isLibraryMember(request.auth.uid, resource.data.libraryId);
-      
-      allow create: if request.auth != null && (
-        // User creating for themselves
-        (request.auth.uid == request.resource.data.userId && isLibraryMember(request.auth.uid, request.resource.data.libraryId)) ||
-        // User creating for a collaborator (e.g. transfer notification)
-        (isLibraryMember(request.auth.uid, request.resource.data.userId) && request.resource.data.libraryId == request.resource.data.userId)
-      );
+      allow read: if isSignedIn() && request.auth.uid == resource.data.libraryId;
+  allow read: if isSignedIn()
+    && get(/databases/$(database)/documents/partnerships/$(getPartnershipId(request.auth.uid, resource.data.libraryId))).data.status == 'accepted';
+
+      allow create: if isSignedIn()
+        && request.auth.uid == request.resource.data.userId
+        && canEditLibrary(request.auth.uid, request.resource.data.libraryId);
 
       allow update, delete: if false;
     }
 
-    // ========== BOOK REQUESTS COLLECTION ==========
+    // ==========================================================
+    // BOOK REQUESTS (borrowing)
+    // ==========================================================
     match /bookRequests/{requestId} {
-      allow read: if request.auth != null && (
-        resource == null ||
-        request.auth.uid == resource.data.fromUserId ||
-        request.auth.uid == resource.data.toUserId
-      );
-      allow create: if request.auth != null &&
-        request.auth.uid == request.resource.data.fromUserId;
-      allow update: if request.auth != null && (
-        request.auth.uid == resource.data.fromUserId ||
-        request.auth.uid == resource.data.toUserId
-      );
-      allow delete: if request.auth != null && (
-        request.auth.uid == resource.data.fromUserId ||
-        request.auth.uid == resource.data.toUserId
-      );
+      allow read: if isSignedIn() && request.auth.uid == resource.data.fromUserId;
+      allow read: if isSignedIn() && request.auth.uid == resource.data.toUserId;
+
+      allow create: if isSignedIn()
+        && request.auth.uid == request.resource.data.fromUserId
+        && request.resource.data.fromUserId != request.resource.data.toUserId
+        && request.resource.data.status == 'pending';
+
+      allow update: if isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'updatedAt'])
+        && (
+          // Recipient accepts or rejects.
+          (request.auth.uid == resource.data.toUserId
+           && request.resource.data.status in ['accepted', 'rejected'])
+          ||
+          // Sender cancels.
+          (request.auth.uid == resource.data.fromUserId
+           && request.resource.data.status == 'cancelled')
+        );
+
+      allow delete: if false;
     }
 
-    // ========== COLLABORATION REQUESTS COLLECTION ==========
-    match /collaborationRequests/{requestId} {
-      allow read: if request.auth != null && (
-        resource == null ||
-        request.auth.uid == resource.data.fromUserId ||
-        request.auth.uid == resource.data.toUserId
-      );
-      allow create: if request.auth != null &&
-        request.auth.uid == request.resource.data.fromUserId;
-      allow update: if request.auth != null && (
-        request.auth.uid == resource.data.fromUserId ||
-        request.auth.uid == resource.data.toUserId
-      );
-      allow delete: if request.auth != null && (
-        request.auth.uid == resource.data.fromUserId ||
-        request.auth.uid == resource.data.toUserId
-      );
-    }
-
-    // ========== REVIEWS COLLECTION ==========
+    // ==========================================================
+    // REVIEWS
+    // ==========================================================
     match /reviews/{reviewId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null &&
-                    request.resource.data.userId == request.auth.uid &&
-                    request.resource.data.category in ['Help', 'Review', 'Others'];
-      allow update: if request.auth != null && (
-        resource.data.userId == request.auth.uid ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'commentsCount'])
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.category in ['Help', 'Review', 'Others']
+        && request.resource.data.body is string
+        && request.resource.data.body.size() >= 10
+        && request.resource.data.body.size() <= 2000
+        && request.resource.data.likesCount == 0
+        && request.resource.data.commentsCount == 0;
+
+      allow update: if isSignedIn() && (
+        // Owner editing review content.
+        (resource.data.userId == request.auth.uid
+         && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['body', 'rating', 'category', 'updatedAt']))
+        ||
+        // Any signed-in user adjusting the counters (likes / comments).
+        (request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['likesCount', 'commentsCount']))
       );
-      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
 
       match /likes/{userId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null && request.auth.uid == userId;
+        allow read: if isSignedIn();
+        allow write: if isSignedIn() && request.auth.uid == userId;
       }
 
       match /comments/{commentId} {
-        allow read: if request.auth != null;
-        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-        allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+        allow read: if isSignedIn();
+        allow create: if isSignedIn()
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.body is string
+          && request.resource.data.body.size() <= 500;
+        allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
       }
     }
   }

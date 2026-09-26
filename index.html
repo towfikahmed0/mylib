@@ -7,7 +7,7 @@
             const t = localStorage.getItem('theme');
             const d = window.matchMedia('(prefers-color-scheme: dark)').matches;
             if (t === 'dark' || (!t && d)) document.documentElement.classList.add('dark');
-        })(); F
+        })();
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -2786,40 +2786,32 @@
                         return;
                     }
 
-                    // Find the user by email
-                    const userSnapshot = await db.collection('users').where('email', '==', email).limit(1).get();
-                    if (userSnapshot.empty) {
-                        showToast('User not found. They must log in first.', 'error');
+                    // Look up via the userLookup index (email → uid)
+                    const lookupDoc = await db.collection('userLookup').doc(email).get();
+                    if (!lookupDoc.exists) {
+                        showToast('User not found. They must log in at least once.', 'error');
                         return;
                     }
+                    const partnerId = lookupDoc.data().uid;
 
-                    const partnerId = userSnapshot.docs[0].id;
                     if (partnerId === currentUser.uid) {
                         showToast('You cannot share with yourself.', 'error');
                         return;
                     }
 
-                    // Check if already accepted collaborators
+                    // Deterministic ID — required by the new rules
                     const ids = [currentUser.uid, partnerId].sort();
-                    const partnershipId = `${ids[0]}_${ids[1]}`;
-                    const existingPartnership = allPartnerships.find(p => p.id === partnershipId);
-                    if (existingPartnership && (existingPartnership.status === 'accepted' || existingPartnership.status === undefined)) {
-                        showToast('You are already collaborating with this user.', 'info');
-                        return;
+                    const requestId = `${ids[0]}_${ids[1]}`;
+
+                    const reqRef = db.collection('collaborationRequests').doc(requestId);
+                    const existing = await reqRef.get();
+                    if (existing.exists) {
+                        const d = existing.data();
+                        if (d.status === 'accepted') { showToast('Already collaborating.', 'info'); return; }
+                        if (d.status === 'pending') { showToast('Request already pending.', 'info'); return; }
                     }
 
-                    // Check if duplicate pending collaboration request exists
-                    const existingPending = collaborationRequests.find(r =>
-                        ((r.fromUserId === currentUser.uid && r.toUserId === partnerId) ||
-                            (r.fromUserId === partnerId && r.toUserId === currentUser.uid)) &&
-                        r.status === 'pending'
-                    );
-                    if (existingPending) {
-                        showToast('A collaboration request is already pending for this user.', 'info');
-                        return;
-                    }
-
-                    await db.collection('collaborationRequests').add({
+                    await reqRef.set({
                         fromUserId: currentUser.uid,
                         fromEmail: currentUser.email || '',
                         fromName: userProfile?.displayName || currentUser.displayName || currentUser.email || 'A user',
@@ -2832,7 +2824,7 @@
                     showToast(`Collaboration request sent to ${email}!`, 'success');
                     document.getElementById('share-email').value = '';
                 } catch (err) {
-                    showToast('Error sending collaboration request: ' + err.message, 'error');
+                    showToast('Error sending request: ' + err.message, 'error');
                 } finally {
                     btn.disabled = false;
                     btn.innerText = originalText;
@@ -2841,22 +2833,24 @@
 
             window.acceptCollaborationRequest = async (requestId) => {
                 try {
-                    const reqDoc = await db.collection('collaborationRequests').doc(requestId).get();
-                    if (!reqDoc.exists) {
-                        showToast('Collaboration request no longer exists.', 'error');
-                        return;
-                    }
-                    const req = { id: reqDoc.id, ...reqDoc.data() };
-                    if (req.status !== 'pending') {
-                        showToast('This request is no longer pending.', 'info');
-                        return;
+                    const reqRef = db.collection('collaborationRequests').doc(requestId);
+                    const reqDoc = await reqRef.get();
+                    if (!reqDoc.exists) { showToast('Request no longer exists.', 'error'); return; }
+
+                    const req = reqDoc.data();
+                    if (req.status !== 'pending') { showToast('Request is no longer pending.', 'info'); return; }
+                    if (req.toUserId !== currentUser.uid) {
+                        showToast('You cannot accept this request.', 'error'); return;
                     }
 
-                    await db.collection('collaborationRequests').doc(requestId).update({
+                    // 1. Flip the request to accepted
+                    await reqRef.update({
                         status: 'accepted',
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
 
+                    // 2. Now create the partnership document.
+                    //    The rules will verify that the request above exists and is accepted.
                     const ids = [req.fromUserId, req.toUserId].sort();
                     const partnershipId = `${ids[0]}_${ids[1]}`;
 
@@ -2867,14 +2861,15 @@
                         status: 'accepted',
                         user1Unsubscribed: false,
                         user2Unsubscribed: false,
-                        allowAddBooks: false,
+                        allowAddBooks: false,   // rules require this to start false
                         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    }, { merge: true });
+                    });
 
-                    showToast('Collaboration request accepted!', 'success');
+                    showToast('Collaboration accepted!', 'success');
                     window.queueRenderMainApp();
                 } catch (err) {
+                    console.error('Accept error:', err);
                     showToast('Failed to accept request: ' + err.message, 'error');
                 }
             };
@@ -2918,7 +2913,8 @@
             window.updatePartnershipPermission = async (partnershipId, allowAddBooks) => {
                 try {
                     await db.collection('partnerships').doc(partnershipId).update({
-                        allowAddBooks: allowAddBooks
+                        allowAddBooks: allowAddBooks,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
                     showToast(allowAddBooks ? 'Permission granted!' : 'Permission revoked', 'success');
                     renderPartners();
@@ -2926,7 +2922,6 @@
                     showToast('Error updating permission: ' + err.message, 'error');
                 }
             };
-
 
             async function renderPartners() {
                 const listEl = document.getElementById('collaborators-list');
@@ -2978,7 +2973,7 @@
                     const isUser1 = partnership.userId1 === currentUser.uid;
                     const isUnsubscribed = isUser1 ? partnership.user1Unsubscribed : partnership.user2Unsubscribed;
                     const partnerUnsubscribed = isUser1 ? partnership.user2Unsubscribed : partnership.user1Unsubscribed;
-                    const partnerName = userDocs[idx].data()?.displayName || userDocs[idx].data()?.email || 'Unknown';
+                    const partnerName = userDocs[idx].data()?.displayName || 'Unknown User';
                     const allowAddBooks = partnership.allowAddBooks || false;
 
                     return `
@@ -3683,7 +3678,7 @@
 
                     // Fetch profile user's name
                     const profileDoc = await db.collection('users').doc(profileUserId).get();
-                    const profileName = profileDoc.data()?.displayName || profileDoc.data()?.email || 'User';
+                    const profileName = profileDoc.data()?.displayName || 'User';
 
                     // Restrict visited library query to books owned directly by this collaborator to respect Firestore security rules
                     const collaboratorIds = [profileUserId];
@@ -3877,7 +3872,7 @@
 
                     const userNames = {};
                     partnerIds.forEach((id, idx) => {
-                        userNames[id] = userDocs[idx].data()?.displayName || userDocs[idx].data()?.email || 'Unknown';
+                        userNames[id] = userDocs[idx].data()?.displayName || 'Unknown';
                     });
 
                     closeLoading();
@@ -4575,32 +4570,36 @@
                     const phoneNumber = document.getElementById('profile-phone-number').value.trim();
                     const address = document.getElementById('profile-address').value.trim();
 
-                    // Client-side phone number validation
-                    if (phoneNumber) {
-                        const phoneRegex = /^\+?[0-9\s\-]{7,20}$/;
-                        if (!phoneRegex.test(phoneNumber)) {
-                            showToast('Please enter a valid phone number (e.g. +1 234 567 8900).', 'error');
-                            return;
-                        }
+                    if (phoneNumber && !/^\+?[0-9\s\-]{7,20}$/.test(phoneNumber)) {
+                        showToast('Please enter a valid phone number.', 'error');
+                        return;
                     }
 
                     btn.disabled = true;
                     btn.innerText = 'Saving...';
                     try {
+                        // Public fields → parent doc
                         await db.collection('users').doc(currentUser.uid).update({
                             displayName,
-                            phoneNumber,
-                            address,
                             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                         });
+
+                        // Private fields → subcollection
+                        await db.collection('users').doc(currentUser.uid)
+                            .collection('private').doc('data')
+                            .set({
+                                phoneNumber,
+                                address,
+                                email: currentUser.email || '',
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            }, { merge: true });
+
                         if (displayName !== currentUser.displayName) {
                             await currentUser.updateProfile({ displayName });
                         }
-                        if (!userProfile) userProfile = {};
-                        userProfile.displayName = displayName;
-                        userProfile.phoneNumber = phoneNumber;
-                        userProfile.address = address;
-                        userProfileCache[currentUser.uid] = userProfile;
+
+                        userProfile = { ...userProfile, displayName, phoneNumber, address };
+                        userProfileCache[currentUser.uid] = { ...userProfileCache[currentUser.uid], displayName };
 
                         showToast('Profile updated!', 'success');
                         window.queueRenderMainApp();
@@ -5385,16 +5384,15 @@
                     _formattedDate: book.purchaseDate ? new Date(book.purchaseDate).toLocaleDateString() : '',
                     _genresHTML: genres.map(g => {
                         const escapedG = escapeHTML(g);
-                        const jsEscapedG = g.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-                        return `<button onclick="event.stopPropagation(); window.setCategoryFilter('${jsEscapedG}')" class="inline-block bg-slate-50 hover:bg-blue-100 text-sky-600 dark:bg-blue-950/30 dark:hover:bg-blue-900/50 dark:text-blue-400 px-2 py-0.5 rounded-full text-[9px] font-bold transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none whitespace-nowrap" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>`;
+                        return `<button data-action="filter-genre" data-value="${escapedG}" class="inline-block bg-slate-50 hover:bg-blue-100 text-sky-600 dark:bg-blue-950/30 dark:hover:bg-blue-900/50 dark:text-blue-400 px-2 py-0.5 rounded-full text-[9px] font-bold transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none whitespace-nowrap" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>`;
                     }).join(' '),
                     _tagsHTML_grid: tags.map(tag => {
                         const escapedTag = escapeHTML(tag);
-                        return `<button onclick="event.stopPropagation(); window.setTagFilter('${escapedTag.replace(/'/g, "\\'")}')" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-sky-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by tag: ${escapedTag}">${escapedTag}</button>`;
+                        return `<button data-action="filter-tag" data-value="${escapedTag}" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-sky-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by tag: ${escapedTag}">${escapedTag}</button>`;
                     }).join(''),
                     _tagsHTML_list: tags.map(tag => {
                         const escapedTag = escapeHTML(tag);
-                        return `<button onclick="event.stopPropagation(); window.setTagFilter('${escapedTag.replace(/'/g, "\\'")}')" class="text-[8px] bg-slate-100 dark:bg-slate-700 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by tag: ${escapedTag}">${escapedTag}</button>`;
+                        return `<button data-action="filter-tag" data-value="${escapedTag}" class="text-[8px] bg-slate-100 dark:bg-slate-700 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by tag: ${escapedTag}">${escapedTag}</button>`;
                     }).join('')
                 };
             }
@@ -5780,11 +5778,11 @@
                                 </div>
                             </div>
                             <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex flex-col gap-2">
-                                <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-5 h-5 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-sky-600 focus:ring-blue-500 shadow-lg cursor-pointer" aria-label="Select '${book._escapedTitle}' for bulk actions">
-                                <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="w-5 h-5 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                                <input type="checkbox" ${isSelected ? 'checked' : ''} data-action="select-book" data-value="${book.id}" class="w-5 h-5 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-sky-600 focus:ring-blue-500 shadow-lg cursor-pointer" aria-label="Select '${book._escapedTitle}' for bulk actions">
+                                <button data-action="toggle-fav" data-value="${book.id}" class="w-5 h-5 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                                     <svg class="w-3.5 h-3.5 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'stroke-white'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                                 </button>
-                                <button onclick="event.stopPropagation(); window.copyToClipboard('${(book.isbn || book.title).replace(/'/g, "\\'")}', 'Copied book info!', this)" class="w-5 h-5 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Copy ISBN/Title" title="Copy ISBN/Title">
+                                <button data-action="copy-book" data-value="${escapeHTML(book.isbn || book.title)}" class="w-5 h-5 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Copy ISBN/Title" title="Copy ISBN/Title">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
                                 </button>
                             </div>
@@ -5801,7 +5799,7 @@
                     return `
                     <div class="book-card glass px-3 py-3 sm:px-6 sm:py-4 rounded-2xl flex items-center gap-3 sm:gap-4 cursor-pointer hover:bg-white dark:hover:bg-slate-800 transition-all border ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-lg' : 'border-slate-200/50 dark:border-slate-800'} group relative focus-visible:ring-4 focus-visible:ring-primary/30 outline-none" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}">
                         <div class="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
-                            <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-blue-500" aria-label="Select '${book._escapedTitle}' for bulk actions">
+                            <input type="checkbox" ${isSelected ? 'checked' : ''} data-action="select-book" data-value="${book.id}" class="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-blue-500" aria-label="Select '${book._escapedTitle}' for bulk actions">
                         </div>
                        <div class="w-10 h-14 sm:w-12 sm:h-16 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700">
     ${book.coverUrl || book.thumbnail ? `<img src="${book.coverUrl || book.thumbnail}" class="w-full h-full object-cover" loading="lazy">` : '<div class="w-full h-full flex items-center justify-center bg-slate-50 dark:bg-slate-700 text-[8px] text-blue-300 dark:text-slate-500 font-bold uppercase p-1 text-center">No Cover</div>'}
@@ -5821,23 +5819,23 @@
                             <div class="text-amber-400 text-[10px]">${stars}</div>
 ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-sky-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${book._jsOwner}')" aria-label="Filter by owner: ${book._escapedOwner}">Owner: ${book._escapedOwner}</button>` : ''}
                             <div class="flex items-center gap-2 mt-1">
-                                <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 outline-none ${isFavorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'}" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                                <button data-action="toggle-fav" data-value="${book.id}" class="p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 outline-none ${isFavorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'}" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                                     <svg class="w-3.5 h-3.5 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'text-slate-300'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                                 </button>
                                 <button class="p-1 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Edit book details" title="Edit book details">
                                     <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
-                                <button onclick="event.stopPropagation(); window.copyToClipboard('${(book.isbn || book.title).replace(/'/g, "\\'")}', 'Copied book info!', this)" class="p-1 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Copy ISBN/Title" title="Copy ISBN/Title">
+                                <button data-action="copy-book" data-value="${escapeHTML(book.isbn || book.title)}" class="p-1 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Copy ISBN/Title" title="Copy ISBN/Title">
                                     <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
                                 </button>
                                 <div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${READING_STATUSES[bookStatus].badge} ${bookStatus === 'reading' ? 'animate-pulse-subtle' : ''}">
                                     ${statusData.isWishlist ? 'Wishlist' : (bookStatus === 'reading' ? `Reading (${userProgress || book.progress || 0}%)` : READING_STATUSES[bookStatus].label)}
                                 </div>
                                 ${bookStatus === 'want_to_read' ? `
-                                    <button onclick="event.stopPropagation(); window.quickUpdateStatus('${book.id}', 'reading', this)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-900 text-white hover:bg-slate-800 transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Start reading">Start Reading</button>
+                                    <button data-action="start-reading" data-value="${book.id}" class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-900 text-white hover:bg-slate-800 transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Start reading">Start Reading</button>
                                 ` : ''}
                                 ${bookStatus === 'reading' ? `
-                                    <button onclick="event.stopPropagation(); window.quickUpdateStatus('${book.id}', 'finished', this)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none" aria-label="Mark as finished">Mark as Finished</button>
+                                    <button data-action="mark-finished" data-value="${book.id}" class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none" aria-label="Mark as finished">Mark as Finished</button>
                                 ` : ''}
                             </div>
                         </div>
@@ -5852,11 +5850,11 @@ ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 trunca
                 return `
                 <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-slate-200/50 dark:border-slate-800'} relative ${activeDensityClass} focus-visible:ring-4 focus-visible:ring-primary/30 outline-none animate-slide-up" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}" style="animation-delay: ${staggerDelay}">
                     <div class="absolute top-4 left-4 z-20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex flex-col gap-3">
-                        <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); window.toggleSelection('${book.id}')" class="w-6 h-6 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-sky-600 focus:ring-blue-500 shadow-lg cursor-pointer" aria-label="Select '${book._escapedTitle}' for bulk actions">
-                                <button onclick="event.stopPropagation(); window.toggleFavorite('${book.id}')" class="w-6 h-6 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} data-action="select-book" data-value="${book.id}" class="w-6 h-6 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-sky-600 focus:ring-blue-500 shadow-lg cursor-pointer" aria-label="Select '${book._escapedTitle}' for bulk actions">
+                                <button data-action="toggle-fav" data-value="${book.id}" class="w-6 h-6 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                             <svg class="w-4 h-4 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'stroke-white'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                         </button>
-                        <button onclick="event.stopPropagation(); window.copyToClipboard('${(book.isbn || book.title).replace(/'/g, "\\'")}', 'Copied book info!', this)" class="w-6 h-6 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Copy ISBN/Title" title="Copy ISBN/Title">
+                        <button data-action="copy-book" data-value="${escapeHTML(book.isbn || book.title)}" class="w-6 h-6 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Copy ISBN/Title" title="Copy ISBN/Title">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
                         </button>
                     </div>
@@ -5865,7 +5863,7 @@ ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 trunca
                             <div class="absolute bottom-0 left-0 right-0 h-3.5 bg-slate-900/40 backdrop-blur-sm z-10 flex items-center" role="progressbar" aria-valuenow="${userProgress || book.progress || 0}" aria-valuemin="0" aria-valuemax="100" aria-label="Reading progress: ${userProgress || book.progress || 0}%">
                                 <div class="h-full bg-gradient-to-r from-blue-500 to-indigo-400 transition-all duration-500" style="width: ${userProgress || book.progress || 0}%"></div>
                                 <span class="absolute inset-0 flex items-center justify-center text-[8px] font-black text-white drop-shadow-md pointer-events-none">${userProgress || book.progress || 0}%</span>
-                                <button onclick="event.stopPropagation(); window.quickUpdateProgress('${book.id}', this)" class="absolute right-0 bottom-full mb-1 mr-1 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 active:scale-90 transition-all opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary outline-none" title="Quickly increment progress by 5%" aria-label="Quickly increment progress by 5%">
+                                <button data-action="quick-progress" data-value="${book.id}" class="absolute right-0 bottom-full mb-1 mr-1 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 active:scale-90 transition-all opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary outline-none" title="Quickly increment progress by 5%" aria-label="Quickly increment progress by 5%">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 6v12m6-6H6"/></svg>
                                 </button>
                             </div>
@@ -5886,8 +5884,8 @@ ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 trunca
                             </div>
                             <h3 class="font-black text-lg leading-tight line-clamp-2 mt-1 group-hover:text-primary transition-colors font-serif italic">${book._escapedTitle}</h3>
                             <div class="flex justify-between items-center gap-2">
-                                <button class="text-sm text-slate-500 dark:text-slate-400 mt-1 truncate font-medium hover:text-sky-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-left" onclick="event.stopPropagation(); window.setAuthorFilter('${book._jsAuthor}')" aria-label="Filter by author: ${book._escapedAuthor}">${book._escapedAuthor}</button>
-                                ${book.owner ? `<button class="text-[10px] text-slate-400 font-medium truncate hover:text-sky-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-right" onclick="event.stopPropagation(); window.setOwnerFilter('${book._jsOwner}')" aria-label="Filter by owner: ${book._escapedOwner}">Owner: ${book._escapedOwner}</button>` : ''}
+<button data-action="filter-author" data-value="${book._escapedAuthor}" class="text-sm text-slate-500 dark:text-slate-400 mt-1 truncate font-medium hover:text-sky-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-left" aria-label="Filter by author: ${book._escapedAuthor}">${book._escapedAuthor}</button>
+${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOwner}" class="text-[10px] text-slate-400 font-medium truncate hover:text-sky-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-right" aria-label="Filter by owner: ${book._escapedOwner}">Owner: ${book._escapedOwner}</button>` : ''}
                             </div>
                             <div class="flex flex-wrap gap-1 mt-2 max-h-[20px] overflow-hidden">
                                 ${book._tagsHTML_grid}
@@ -5897,10 +5895,10 @@ ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 trunca
                                     ${statusData.isWishlist ? 'Wishlist' : (bookStatus === 'reading' ? `Reading (${userProgress || book.progress || 0}%)` : READING_STATUSES[bookStatus].label)}
                                 </div>
                                 ${bookStatus === 'want_to_read' ? `
-                                    <button onclick="event.stopPropagation(); window.quickUpdateStatus('${book.id}', 'reading', this)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-900 text-white hover:bg-slate-800 transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Start reading">Start Reading</button>
+                                    <button data-action="start-reading" data-value="${book.id}" class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-900 text-white hover:bg-slate-800 transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Start reading">Start Reading</button>
                                 ` : ''}
                                 ${bookStatus === 'reading' ? `
-                                    <button onclick="event.stopPropagation(); window.quickUpdateStatus('${book.id}', 'finished', this)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none" aria-label="Mark as finished">Mark as Finished</button>
+                                    <button data-action="mark-finished" data-value="${book.id}" class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none" aria-label="Mark as finished">Mark as Finished</button>
                                 ` : ''}
                                 ${book.borrowedBy ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed by ${book.borrowedBy}</div>` : ''}
                                 ${addedByBadge}
@@ -5910,7 +5908,7 @@ ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 trunca
                             <span class="text-[10px] font-bold text-slate-400">${book._formattedDate}</span>
                             <div class="flex items-center gap-2">
                                 <span class="text-slate-900 dark:text-white font-black text-sm">${book.price ? getCurrencySymbol() + book.price : ''}</span>
-                                <button class="p-2 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Edit book details">
+                                <button class="p-2 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Edit book details"data-action="edit-book" data-value="${book.id}">
                                     <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
                             </div>
@@ -5993,112 +5991,95 @@ ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 trunca
                     });
 
                 function fetchBooksFromPartnerships() {
-                    // Build list of user IDs to fetch books from
+                    // 1. Build the list of userIds whose libraries we need to watch
                     let userIdsToFetch = [currentUser.uid];
-
                     allPartnerships.forEach(partnership => {
                         const isAccepted = partnership.status === 'accepted' || partnership.status === undefined;
                         if (!isAccepted) return;
-
                         const isUser1 = partnership.userId1 === currentUser.uid;
-                        // Only include partner if current user hasn't unsubscribed
                         const currentUserUnsubscribed = isUser1 ? partnership.user1Unsubscribed : partnership.user2Unsubscribed;
                         if (!currentUserUnsubscribed) {
                             const partnerId = isUser1 ? partnership.userId2 : partnership.userId1;
-                            if (!userIdsToFetch.includes(partnerId)) {
-                                userIdsToFetch.push(partnerId);
-                            }
+                            if (!userIdsToFetch.includes(partnerId)) userIdsToFetch.push(partnerId);
                         }
                     });
 
-                    // Firestore 'in' query supports max 10-30 items
+                    // 2. Tear down old subscriptions
                     if (unsubscribeOwnBooks) {
-                        if (Array.isArray(unsubscribeOwnBooks)) unsubscribeOwnBooks.forEach(unsub => unsub());
+                        if (Array.isArray(unsubscribeOwnBooks)) unsubscribeOwnBooks.forEach(u => u());
                         else unsubscribeOwnBooks();
                     }
+                    if (unsubscribeActivity) {
+                        if (Array.isArray(unsubscribeActivity)) unsubscribeActivity.forEach(u => u());
+                        else unsubscribeActivity();
+                    }
 
+                    // 3. BOOKS — one equality query per userId (NOT `in`)
                     const bookUnsubs = [];
-                    const chunkedBooksMap = new Map(); // Using Map for O(1) chunk updates
-
-                    for (let i = 0; i < userIdsToFetch.length; i += 10) {
-                        const chunk = userIdsToFetch.slice(i, i + 10);
-                        const chunkMap = new Map(); // Persistent map for this chunk's documents
-                        chunkedBooksMap.set(i, chunkMap);
+                    const chunkedBooksMap = new Map();
+                    userIdsToFetch.forEach((uid, idx) => {
+                        const map = new Map();
+                        chunkedBooksMap.set(idx, map);
 
                         const unsub = db.collection('books')
-                            .where('userId', 'in', chunk)
+                            .where('userId', '==', uid)
                             .onSnapshot(snapshot => {
-                                // ⚡ Bolt: Use incremental updates with docChanges() to avoid O(N) re-processing
                                 snapshot.docChanges().forEach(change => {
                                     if (change.type === 'removed') {
-                                        chunkMap.delete(change.doc.id);
+                                        map.delete(change.doc.id);
                                     } else {
-                                        chunkMap.set(change.doc.id, normalizeBook({ id: change.doc.id, ...change.doc.data() }));
+                                        map.set(change.doc.id, normalizeBook({ id: change.doc.id, ...change.doc.data() }));
                                     }
                                 });
-
-                                // Merge and sort all chunked books
                                 const allBooks = [];
                                 for (const m of chunkedBooksMap.values()) {
                                     for (const b of m.values()) allBooks.push(b);
                                 }
                                 books = allBooks.sort((a, b) => b._createdTime - a._createdTime);
-
                                 updateLibraryStats();
                                 if (isInitialSync) isInitialSync = false;
                                 window.queueRenderMainApp();
                             }, err => {
-                                console.error("Firestore Error for chunk:", chunk, err);
+                                console.error("Firestore Error for user:", uid, err);
                             });
                         bookUnsubs.push(unsub);
-                    }
+                    });
                     unsubscribeOwnBooks = bookUnsubs;
 
-                    // Subscribe to activity feed for these libraries
-                    if (unsubscribeActivity) {
-                        if (Array.isArray(unsubscribeActivity)) unsubscribeActivity.forEach(unsub => unsub());
-                        else unsubscribeActivity();
-                    }
-
+                    // 4. ACTIVITY FEED — same pattern
                     const activityUnsubs = [];
                     const chunkedActivitiesMap = new Map();
-
-                    for (let i = 0; i < userIdsToFetch.length; i += 10) {
-                        const chunk = userIdsToFetch.slice(i, i + 10);
-                        const chunkMap = new Map();
-                        chunkedActivitiesMap.set(i, chunkMap);
+                    userIdsToFetch.forEach((uid, idx) => {
+                        const map = new Map();
+                        chunkedActivitiesMap.set(idx, map);
 
                         const unsub = db.collection('activityFeed')
-                            .where('libraryId', 'in', chunk)
+                            .where('libraryId', '==', uid)
                             .orderBy('timestamp', 'desc')
                             .limit(30)
                             .onSnapshot(snapshot => {
-                                // ⚡ Bolt: Incremental activity updates
                                 snapshot.docChanges().forEach(change => {
                                     if (change.type === 'removed') {
-                                        chunkMap.delete(change.doc.id);
+                                        map.delete(change.doc.id);
                                     } else {
-                                        chunkMap.set(change.doc.id, {
+                                        map.set(change.doc.id, {
                                             id: change.doc.id,
                                             ...change.doc.data(),
                                             timestamp: change.doc.data().timestamp?.toDate() || new Date()
                                         });
                                     }
                                 });
-
-                                // Merge and sort all chunked activities
                                 const allActivities = [];
                                 for (const m of chunkedActivitiesMap.values()) {
                                     for (const a of m.values()) allActivities.push(a);
                                 }
                                 activities = allActivities.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
-
                                 if (activeTab === 'explore' || activeTab === 'activity') window.queueRenderMainApp();
                             }, err => {
-                                console.error("Activity Listener Error for chunk:", chunk, err);
+                                console.error("Activity Listener Error for user:", uid, err);
                             });
                         activityUnsubs.push(unsub);
-                    }
+                    });
                     unsubscribeActivity = activityUnsubs;
                 }
 
@@ -7547,7 +7528,7 @@ ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 trunca
                         const data = doc.data();
                         return {
                             uid: partnerIds[idx],
-                            name: data.displayName || data.email || 'Partner',
+                            name: data.displayName || 'Partner',
                             count: data.completedBooksCount || 0
                         };
                     }).filter(Boolean).sort((a, b) => b.count - a.count);
@@ -7710,7 +7691,7 @@ ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 trunca
                             </div>
                             <div class="bg-white dark:bg-slate-800 p-3 sm:p-6 rounded-3xl border border-slate-100 dark:border-slate-700 relative overflow-hidden group shadow-sm">
                                 <div class="absolute -right-2 -bottom-2 opacity-10 group-hover:scale-110 transition-transform duration-500">
-                                    <svg class="w-16 h-16 sm:w-20 sm:h-20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.16-1.46-3.27-3.4h1.96c.1 1.05.82 1.87 2.21 1.87 1.32 0 2.14-.65 2.14-1.51 0-.9-.61-1.57-2.33-1.99-2.12-.52-3.83-1.26-3.83-3.48 0-1.9 1.43-3.09 3.12-3.44V5h2.67v1.9c1.47.3 2.72 1.１4 2.9１ ２．９４h-１．８９c-.１１-.８８-.７２-１．４６-１．８８-１．４６-１．１２ ０-１．８７ .５３-１．８７ １．４５ ０ .８４ .７１ １．３４ ２．５１ １．８ ２．２２ .５６ ３．８ １．４７ ３．８ ３．５３-.０１ ２．１２-１．５１ ３．２３-３．３９ ３．４６z"/></svg>
+                                   <svg class="w-16 h-16 sm:w-20 sm:h-20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.16-1.46-3.27-3.4h1.96c.1 1.05.82 1.87 2.21 1.87 1.32 0 2.14-.65 2.14-1.51 0-.9-.61-1.57-2.33-1.99-2.12-.52-3.83-1.26-3.83-3.48 0-1.9 1.43-3.09 3.12-3.44V5h2.67v1.9c1.47.3 2.72 1.14 2.91 2.94h-1.89c-.11-.88-.72-1.46-1.88-1.46-1.12 0-1.87.53-1.87 1.45 0 .84.71 1.34 2.51 1.8 2.22.56 3.8 1.47 3.8 3.53-.01 2.12-1.51 3.23-3.39 3.46z"/></svg>
                                 </div>
                                 <div class="text-[10px] font-bold uppercase opacity-80 mb-1">Collection Value</div>
                                 <div class="text-xl sm:text-3xl font-black font-sans relative z-10 font-mono">${getCurrencySymbol()}${Math.round(totalValue)}</div>
@@ -8178,10 +8159,12 @@ ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 trunca
                     `;
 
                     // Save to Firestore
-                    await db.collection('users').doc(currentUser.uid).set({
-                        lastAIAnalysis: result,
-                        lastAIAnalysisDate: firebase.firestore.FieldValue.serverTimestamp()
-                    }, { merge: true });
+                    await db.collection('users').doc(currentUser.uid)
+                        .collection('private').doc('data')
+                        .set({
+                            lastAIAnalysis: result,
+                            lastAIAnalysisDate: firebase.firestore.FieldValue.serverTimestamp()
+                        }, { merge: true });
 
                     if (userProfile) {
                         userProfile.lastAIAnalysis = result;
@@ -8738,11 +8721,8 @@ ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 trunca
                 container.className = "fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4";
                 container.classList.remove('hidden');
 
-                // Escape key listener to close modal
                 const handleEscape = (e) => {
-                    if (e.key === 'Escape') {
-                        window.closeUserSearchModal();
-                    }
+                    if (e.key === 'Escape') window.closeUserSearchModal();
                 };
 
                 window.closeUserSearchModal = () => {
@@ -8755,60 +8735,60 @@ ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 trunca
 
                 document.addEventListener('keydown', handleEscape);
 
-                // Backdrop click to close
                 container.onclick = (e) => {
-                    if (e.target === container) {
-                        window.closeUserSearchModal();
-                    }
+                    if (e.target === container) window.closeUserSearchModal();
                 };
 
                 container.innerHTML = `
-                    <div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up relative flex flex-col items-center justify-center py-20 text-center">
-                        <button onclick="window.closeUserSearchModal()" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close search results">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                        </button>
-                        <div class="w-10 h-10 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin mb-4"></div>
-                        <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">Searching user...</p>
-                    </div>
-                `;
+        <div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up relative flex flex-col items-center justify-center py-20 text-center">
+            <button onclick="window.closeUserSearchModal()" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close search results">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+            <div class="w-10 h-10 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin mb-4"></div>
+            <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">Searching user...</p>
+        </div>
+    `;
 
                 try {
-                    const userSnapshot = await db.collection('users').where('email', '==', email).limit(1).get();
-                    if (userSnapshot.empty) {
+                    // 1. Look up uid via the public lookup index
+                    const lookupDoc = await db.collection('userLookup').doc(email).get();
+                    if (!lookupDoc.exists) {
                         container.innerHTML = `
-                            <div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up relative text-center py-20">
-                                <button onclick="window.closeUserSearchModal()" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close search results">
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                                </button>
-                                <div class="p-8">
-                                    <p class="text-sm text-slate-500 italic">No user found with email "${escapeHTML(email)}"</p>
-                                </div>
-                            </div>
-                        `;
+                <div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up relative text-center py-20">
+                    <button onclick="window.closeUserSearchModal()" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close search results">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                    <div class="p-8">
+                        <p class="text-sm text-slate-500 italic">No user found with email "${escapeHTML(email)}"</p>
+                    </div>
+                </div>
+            `;
                         return;
                     }
 
-                    const userDoc = userSnapshot.docs[0];
-                    const foundUserId = userDoc.id;
+                    const foundUserId = lookupDoc.data().uid;
+
+                    // 2. Read the PUBLIC profile only
+                    const userDoc = await db.collection('users').doc(foundUserId).get();
+                    if (!userDoc.exists) {
+                        container.innerHTML = `<div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-10 text-center"><p class="text-sm text-slate-500 italic">User profile missing.</p></div>`;
+                        return;
+                    }
+
                     const profile = userDoc.data();
-                    const profileName = profile.displayName || profile.email || 'User';
+                    const profileName = profile.displayName || 'User';
 
-                    // Fetch books owned by this user
-                    let foundBooks = [];
-                    let isCollaborator = false;
-
+                    // 3. Determine collaborator status
                     const ids = [currentUser.uid, foundUserId].sort();
                     const partnershipId = `${ids[0]}_${ids[1]}`;
                     const localPartnership = allPartnerships.find(p => p.id === partnershipId);
-                    if (localPartnership && (localPartnership.status === 'accepted' || localPartnership.status === undefined)) {
-                        isCollaborator = true;
-                    }
+                    const isCollaborator = foundUserId === currentUser.uid
+                        || (localPartnership && (localPartnership.status === 'accepted' || localPartnership.status === undefined));
 
-                    if (foundUserId === currentUser.uid) {
-                        isCollaborator = true;
-                    }
-
+                    // 4. Fetch books only if collaborator
+                    let foundBooks = [];
                     let errorMsg = "";
+
                     if (isCollaborator) {
                         try {
                             const booksSnapshot = await db.collection('books').where('userId', '==', foundUserId).get();
@@ -8833,119 +8813,118 @@ ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 trunca
                     }
 
                     container.innerHTML = `
-                        <div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up relative space-y-6 text-left overflow-y-auto max-h-[90vh]">
-                            <button onclick="window.closeUserSearchModal()" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none animate-pulse-subtle" aria-label="Close search results">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                            </button>
-                            <div class="flex flex-col sm:flex-row items-center gap-6 justify-between border-b border-slate-200 dark:border-slate-700 pb-6 pt-4">
-                                <div class="flex items-center gap-4 text-left">
-                                    <div class="w-14 h-14 rounded-full bg-primary text-white flex items-center justify-center font-black text-xl uppercase shadow-md">${profileName.substring(0, 2)}</div>
-                                    <div>
-                                        <h4 class="text-lg font-black text-slate-900 dark:text-white">${escapeHTML(profileName)}</h4>
-                                        <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">${escapeHTML(profile.email)}</p>
-                                        ${profile.bio ? `<p class="text-sm text-slate-500 dark:text-slate-400 italic mt-2">"${escapeHTML(profile.bio)}"</p>` : ''}
-                                    </div>
-                                </div>
-                                <div class="flex gap-4">
-                                    <div class="bg-slate-50 dark:bg-slate-800 px-4 py-3 rounded-xl border border-slate-100 dark:border-slate-800 text-center min-w-[100px]">
-                                        <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Books</span>
-                                        <span class="text-base font-black text-primary">${profile.totalBooksCount || 0}</span>
-                                    </div>
-                                    <div class="bg-slate-50 dark:bg-slate-800 px-4 py-3 rounded-xl border border-slate-100 dark:border-slate-800 text-center min-w-[100px]">
-                                        <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Finished</span>
-                                        <span class="text-base font-black text-emerald-500">${profile.completedBooksCount || 0}</span>
-                                    </div>
-                                </div>
-                            </div>
+            <div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up relative space-y-6 text-left overflow-y-auto max-h-[90vh]">
+                <button onclick="window.closeUserSearchModal()" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close search results">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+                <div class="flex flex-col sm:flex-row items-center gap-6 justify-between border-b border-slate-200 dark:border-slate-700 pb-6 pt-4">
+                    <div class="flex items-center gap-4 text-left">
+                        <div class="w-14 h-14 rounded-full bg-primary text-white flex items-center justify-center font-black text-xl uppercase shadow-md">${escapeHTML(profileName.substring(0, 2))}</div>
+                        <div>
+                            <h4 class="text-lg font-black text-slate-900 dark:text-white">${escapeHTML(profileName)}</h4>
+                            <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">${escapeHTML(email)}</p>
+                            ${profile.bio ? `<p class="text-sm text-slate-500 dark:text-slate-400 italic mt-2">"${escapeHTML(profile.bio)}"</p>` : ''}
+                        </div>
+                    </div>
+                    <div class="flex gap-4">
+                        <div class="bg-slate-50 dark:bg-slate-800 px-4 py-3 rounded-xl border border-slate-100 dark:border-slate-800 text-center min-w-[100px]">
+                            <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Books</span>
+                            <span class="text-base font-black text-primary">${profile.totalBooksCount || 0}</span>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-800 px-4 py-3 rounded-xl border border-slate-100 dark:border-slate-800 text-center min-w-[100px]">
+                            <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Finished</span>
+                            <span class="text-base font-black text-emerald-500">${profile.completedBooksCount || 0}</span>
+                        </div>
+                    </div>
+                </div>
 
-                            <div>
-                                <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Books Owned</h4>
-                                ${foundBooks.length > 0 ? `
-                                    <div class="space-y-4">
-                                        ${foundBooks.map(book => {
+                <div>
+                    <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Books Owned</h4>
+                    ${foundBooks.length > 0 ? `
+                        <div class="space-y-4">
+                            ${foundBooks.map(book => {
                         const title = book.title || 'Untitled';
                         const author = book.author || 'Unknown Author';
                         const coverUrl = book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover';
                         const bookGenres = getBookGenres(book);
                         const copyType = book.copyType || 'New Copy';
-
-                        const isCurrentlyBorrowed = !!book.borrowedBy && (!Array.isArray(book.borrowHistory) || book.borrowHistory.length === 0 || !book.borrowHistory[book.borrowHistory.length - 1].returnDate);
+                        const isCurrentlyBorrowed = !!book.borrowedBy;
                         const isSelf = currentUser && foundUserId === currentUser.uid;
 
                         return `
-                                                <div class="bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden transition-all shadow-sm hover:shadow-md">
-                                                    <div onclick="window.toggleSearchBookDropdown('${book.id}')" class="p-4 flex items-center justify-between gap-4 cursor-pointer" role="button" aria-expanded="false" id="book-header-${book.id}">
-                                                        <div class="flex items-center gap-4 min-w-0">
-                                                            <img src="${coverUrl}" class="w-12 h-16 object-cover rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex-shrink-0">
-                                                            <div class="min-w-0">
-                                                                <h5 class="font-bold text-slate-800 dark:text-white truncate text-sm leading-snug">${escapeHTML(title)}</h5>
-                                                                <p class="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5 italic font-medium">${escapeHTML(author)}</p>
-                                                                <div class="flex items-center gap-2 mt-1 flex-wrap">
-                                                                    ${book.rating ? `<span class="text-amber-400 text-xs">${'★'.repeat(book.rating)}${'☆'.repeat(5 - book.rating)}</span>` : ''}
-                                                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100/80 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">${escapeHTML(copyType)}</span>
-                                                                    ${isCurrentlyBorrowed ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">Currently borrowed</span>` : ''}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <svg id="arrow-${book.id}" class="w-5 h-5 text-slate-400 transition-transform duration-200 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                                    </div>
-                                                    <div id="dropdown-${book.id}" class="hidden border-t border-slate-200 dark:border-slate-700/60 p-5 bg-white/50 dark:bg-slate-800/50 space-y-4 animate-slide-up">
-                                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                                                            <div>
-                                                                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Genres</span>
-                                                                <div class="flex flex-wrap gap-1">
-                                                                    ${bookGenres.map(g => `<span class="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded text-[10px] font-medium">${escapeHTML(g)}</span>`).join('')}
-                                                                </div>
-                                                            </div>
-                                                            <div>
-                                                                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Copy Details</span>
-                                                                <p class="font-medium text-slate-700 dark:text-slate-300">${escapeHTML(copyType)}${book.copyType === 'Gifted' && book.gifterName ? ` (Gifted by ${escapeHTML(book.gifterName)})` : ''}</p>
-                                                            </div>
-                                                        </div>
-                                                        ${book.description ? `
-                                                            <div>
-                                                                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Description</span>
-                                                                <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">${escapeHTML(book.description)}</p>
-                                                            </div>
-                                                        ` : ''}
-                                                        <div class="pt-2 flex items-center justify-between border-t border-slate-200/60 dark:border-slate-700/60">
-                                                            <div>
-                                                                ${isCurrentlyBorrowed ? `<span class="text-xs font-bold text-amber-600 dark:text-amber-400">Currently borrowed by ${escapeHTML(book.borrowedBy || 'someone')}</span>` : `<span class="text-xs font-bold text-emerald-600 dark:text-emerald-400">Available</span>`}
-                                                            </div>
-                                                            <div id="request-btn-container-${book.id}">
-                                                                ${isSelf ? `
-                                                                    <span class="text-xs font-bold text-slate-400 italic">Your Book</span>
-                                                                ` : isCurrentlyBorrowed ? `
-                                                                    <button disabled class="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-400 font-bold rounded-xl text-xs cursor-not-allowed">Currently borrowed</button>
-                                                                ` : `
-                                                                    <button id="req-btn-${book.id}" onclick="window.sendBookRequest('${book.id}', '${foundUserId}', '${escapeHTML(title.replace(/'/g, "\\'"))}', this)" class="px-4 py-2 bg-primary text-white font-bold rounded-xl text-xs hover:bg-slate-800 transition active:scale-95 shadow-md shadow-primary/20 focus-visible:ring-2 focus-visible:ring-primary outline-none">Request Book</button>
-                                                                `}
-                                                            </div>
-                                                        </div>
+                                    <div class="bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden transition-all shadow-sm hover:shadow-md">
+                                        <div onclick="window.toggleSearchBookDropdown('${book.id}')" class="p-4 flex items-center justify-between gap-4 cursor-pointer" role="button" aria-expanded="false" id="book-header-${book.id}">
+                                            <div class="flex items-center gap-4 min-w-0">
+                                                <img src="${coverUrl}" class="w-12 h-16 object-cover rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex-shrink-0" alt="Book cover">
+                                                <div class="min-w-0">
+                                                    <h5 class="font-bold text-slate-800 dark:text-white truncate text-sm leading-snug">${escapeHTML(title)}</h5>
+                                                    <p class="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5 italic font-medium">${escapeHTML(author)}</p>
+                                                    <div class="flex items-center gap-2 mt-1 flex-wrap">
+                                                        ${book.rating ? `<span class="text-amber-400 text-xs">${'★'.repeat(book.rating)}${'☆'.repeat(5 - book.rating)}</span>` : ''}
+                                                        <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100/80 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">${escapeHTML(copyType)}</span>
+                                                        ${isCurrentlyBorrowed ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">Currently borrowed</span>` : ''}
                                                     </div>
                                                 </div>
-                                            `;
+                                            </div>
+                                            <svg id="arrow-${book.id}" class="w-5 h-5 text-slate-400 transition-transform duration-200 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                        </div>
+                                        <div id="dropdown-${book.id}" class="hidden border-t border-slate-200 dark:border-slate-700/60 p-5 bg-white/50 dark:bg-slate-800/50 space-y-4 animate-slide-up">
+                                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                                                <div>
+                                                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Genres</span>
+                                                    <div class="flex flex-wrap gap-1">
+                                                        ${bookGenres.map(g => `<span class="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded text-[10px] font-medium">${escapeHTML(g)}</span>`).join('')}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Copy Details</span>
+                                                    <p class="font-medium text-slate-700 dark:text-slate-300">${escapeHTML(copyType)}${book.copyType === 'Gifted' && book.gifterName ? ` (Gifted by ${escapeHTML(book.gifterName)})` : ''}</p>
+                                                </div>
+                                            </div>
+                                            ${book.description ? `
+                                                <div>
+                                                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Description</span>
+                                                    <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">${escapeHTML(book.description)}</p>
+                                                </div>
+                                            ` : ''}
+                                            <div class="pt-2 flex items-center justify-between border-t border-slate-200/60 dark:border-slate-700/60">
+                                                <div>
+                                                    ${isCurrentlyBorrowed ? `<span class="text-xs font-bold text-amber-600 dark:text-amber-400">Currently borrowed by ${escapeHTML(book.borrowedBy || 'someone')}</span>` : `<span class="text-xs font-bold text-emerald-600 dark:text-emerald-400">Available</span>`}
+                                                </div>
+                                                <div id="request-btn-container-${book.id}">
+                                                    ${isSelf ? `
+                                                        <span class="text-xs font-bold text-slate-400 italic">Your Book</span>
+                                                    ` : isCurrentlyBorrowed ? `
+                                                        <button disabled class="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-400 font-bold rounded-xl text-xs cursor-not-allowed">Currently borrowed</button>
+                                                    ` : `
+                                                        <button id="req-btn-${book.id}" onclick="window.sendBookRequest('${book.id}', '${foundUserId}', '${escapeHTML(title.replace(/'/g, "\\'"))}', this)" class="px-4 py-2 bg-primary text-white font-bold rounded-xl text-xs hover:bg-slate-800 transition active:scale-95 shadow-md shadow-primary/20 focus-visible:ring-2 focus-visible:ring-primary outline-none">Request Book</button>
+                                                    `}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
                     }).join('')}
-                                    </div>
-                                ` : `
-                                    <div class="p-8 text-center bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
-                                        <p class="text-xs text-slate-400 italic">${errorMsg || "No books in this library yet."}</p>
-                                    </div>
-                                `}
-                            </div>
                         </div>
-                    `;
+                    ` : `
+                        <div class="p-8 text-center bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                            <p class="text-xs text-slate-400 italic">${errorMsg || "No books in this library yet."}</p>
+                        </div>
+                    `}
+                </div>
+            </div>
+        `;
                 } catch (err) {
                     container.innerHTML = `
-                        <div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up relative text-center py-20">
-                            <button onclick="window.closeUserSearchModal()" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close search results">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                            </button>
-                            <div class="p-8">
-                                <p class="text-sm text-rose-500 italic">Search failed: ${escapeHTML(err.message)}</p>
-                            </div>
-                        </div>
-                    `;
+            <div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-6 sm:p-10 shadow-2xl relative text-center py-20">
+                <button onclick="window.closeUserSearchModal()" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+                <div class="p-8">
+                    <p class="text-sm text-rose-500 italic">Search failed: ${escapeHTML(err.message)}</p>
+                </div>
+            </div>
+        `;
                 }
             };
 
@@ -10147,7 +10126,6 @@ If the collection is small or has no finished books, be extra encouraging and su
                 window.__appReady = true;
 
                 auth.onAuthStateChanged(async (user) => {
-                    // Hide initial loader on first auth resolution
                     const loader = document.getElementById('initial-loader');
                     if (loader) {
                         loader.classList.add('opacity-0');
@@ -10156,22 +10134,88 @@ If the collection is small or has no finished books, be extra encouraging and su
 
                     currentUser = user;
                     if (user) {
-                        // Ensure user profile exists in Firestore
-                        const userDoc = await db.collection('users').doc(user.uid).get();
-                        if (!userDoc.exists) {
-                            await db.collection('users').doc(user.uid).set({
-                                uid: user.uid,
-                                email: user.email,
-                                displayName: user.displayName || '',
-                                bio: '',
-                                joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                                totalBooksCount: 0,
-                                completedBooksCount: 0,
-                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                            });
-                            userProfile = { uid: user.uid, email: user.email, displayName: user.displayName || '', bio: '', joinedAt: new Date(), totalBooksCount: 0, completedBooksCount: 0 };
-                        } else {
-                            userProfile = userDoc.data();
+                        try {
+                            const userDoc = await db.collection('users').doc(user.uid).get();
+                            const privDoc = await db.collection('users').doc(user.uid)
+                                .collection('private').doc('data').get();
+
+                            if (!userDoc.exists) {
+                                // ---- First-time sign-in: create both docs ----
+                                await db.collection('users').doc(user.uid).set({
+                                    uid: user.uid,
+                                    displayName: user.displayName || '',
+                                    photoURL: user.photoURL || null,
+                                    bio: '',
+                                    joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                    totalBooksCount: 0,
+                                    completedBooksCount: 0
+                                });
+
+                                await db.collection('users').doc(user.uid)
+                                    .collection('private').doc('data').set({
+                                        email: user.email || '',
+                                        phoneNumber: '',
+                                        address: '',
+                                        lastAIAnalysis: null
+                                    });
+
+                                userProfile = {
+                                    uid: user.uid,
+                                    displayName: user.displayName || '',
+                                    photoURL: user.photoURL || null,
+                                    bio: '',
+                                    joinedAt: new Date(),
+                                    totalBooksCount: 0,
+                                    completedBooksCount: 0,
+                                    email: user.email || '',
+                                    phoneNumber: '',
+                                    address: '',
+                                    lastAIAnalysis: null
+                                };
+                            } else {
+                                // ---- Existing user: merge public + private ----
+                                // If private doc doesn't exist yet (edge case), create it.
+                                if (!privDoc.exists) {
+                                    await db.collection('users').doc(user.uid)
+                                        .collection('private').doc('data').set({
+                                            email: user.email || '',
+                                            phoneNumber: '',
+                                            address: '',
+                                            lastAIAnalysis: null
+                                        }, { merge: true });
+                                }
+
+                                userProfile = {
+                                    ...userDoc.data(),
+                                    ...(privDoc.exists ? privDoc.data() : {
+                                        email: user.email || '',
+                                        phoneNumber: '',
+                                        address: '',
+                                        lastAIAnalysis: null
+                                    })
+                                };
+                            }
+
+                            // Cache for other lookups in the app
+                            userProfileCache[user.uid] = {
+                                ...userDoc.data(),
+                                // Include only safe/public fields for cross-user caching
+                            };
+
+                            // Always keep the lookup index fresh
+                            if (user.email) {
+                                try {
+                                    await db.collection('userLookup').doc(user.email.toLowerCase()).set({
+                                        uid: user.uid
+                                    }, { merge: true });
+                                } catch (e) {
+                                    console.warn('userLookup write failed:', e);
+                                }
+                            }
+                        } catch (err) {
+                            console.error('Failed to load user profile:', err);
+                            showToast('Could not load your profile. Please reload.', 'error', 8000);
+                            return;
                         }
 
                         subscribeToBooks();
@@ -10181,6 +10225,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                         if (unsubscribeStatus) unsubscribeStatus();
                         books = [];
                         readingStatuses = {};
+                        userProfile = null;
                         appEl.innerHTML = '';
                         renderAuth();
                     }
@@ -11239,7 +11284,85 @@ If the collection is small or has no finished books, be extra encouraging and su
                 set activities(v) { activities = v; },
                 get libraryStats() { return libraryStats; }
             };
+            // ============================================================
+            // DELEGATED ACTION LISTENER
+            // Replaces all inline onclick handlers that interpolate user data.
+            // User data never enters JS source — it's read from data-* attributes.
+            // ============================================================
+            document.addEventListener('click', (e) => {
+                const el = e.target.closest('[data-action]');
+                if (!el) return;
 
+                const action = el.dataset.action;
+                const value = el.dataset.value;
+                const value2 = el.dataset.value2;
+                const value3 = el.dataset.value3;
+
+                // Stop the click from bubbling to card handlers (which open details/edit modal).
+                if (el.dataset.stop !== 'false') e.stopPropagation();
+
+                switch (action) {
+                    // ---- Filters ----
+                    case 'filter-genre': window.setCategoryFilter(value); break;
+                    case 'filter-tag': window.setTagFilter(value === '' ? null : value); break;
+                    case 'filter-author': window.setAuthorFilter(value); break;
+                    case 'filter-owner': window.setOwnerFilter(value); break;
+                    case 'clear-tag': window.setTagFilter(null); break;
+                    case 'clear-adv-filter': window.clearAdvancedFilter(value); break;
+                    case 'clear-sort': window.clearSortFilter(value); break;
+                    case 'set-copy-type': window.setCopyTypeFilter(value); break;
+                    case 'toggle-fav-filter': window.toggleFavoritesFilter(false); break;
+                    case 'apply-insight': window.applyInsightFilter(value, value2); break;
+
+                    // ---- Book actions ----
+                    case 'toggle-fav': window.toggleFavorite(value); break;
+                    case 'select-book': window.toggleSelection(value); break;
+                    case 'copy-isbn': window.copyISBN(value, el); break;
+                    case 'copy-book': window.copyToClipboard(value, 'Copied book info!', el); break;
+                    case 'copy-quote': window.copyQuote(value, value2, value3, el); break;
+                    case 'start-reading': window.quickUpdateStatus(value, 'reading', el); break;
+                    case 'mark-finished': window.quickUpdateStatus(value, 'finished', el); break;
+                    case 'quick-progress': window.quickUpdateProgress(value, el); break;
+                    case 'open-book': { const b = books.find(x => x.id === value); if (b) window.openBookDetails(b); break; }
+                    case 'edit-book': { const b = books.find(x => x.id === value); if (b) window.openManualEntry(null, b); break; }
+
+                    // ---- Highlight actions ----
+                    case 'delete-highlight': window.deleteHighlight(value, value2); break;
+                    case 'add-highlight': {
+                        const t = document.getElementById('new-highlight-input')?.value || '';
+                        const p = document.getElementById('new-highlight-page-input')?.value || '';
+                        window.addHighlight(value, t, p);
+                        break;
+                    }
+
+                    // ---- Collab ----
+                    case 'accept-collab': window.acceptCollaborationRequest(value); break;
+                    case 'reject-collab': window.rejectCollaborationRequest(value); break;
+                    case 'cancel-collab': window.cancelInvitation(value); break;
+                    case 'leave-partnership': window.leavePartnership(value); break;
+                    case 'open-user-profile': window.openUserProfile(value); break;
+                    case 'visit-library': window.visitCollaboratorLibrary(value); break;
+                    case 'open-visited-book': window.openVisitedBookDetails(value, JSON.parse(value2 || '[]')); break;
+
+                    // ---- Book requests ----
+                    case 'send-book-request': window.sendBookRequest(value, value2, value3, el); break;
+                    case 'accept-book-req': window.acceptBookRequest(value); break;
+                    case 'reject-book-req': window.rejectBookRequest(value); break;
+
+                    // ---- Reviews ----
+                    case 'delete-review': window.deleteReview(value); break;
+                    case 'toggle-like': window.toggleLike(value, el); break;
+                    case 'toggle-comments': window.toggleComments(value); break;
+                    case 'add-comment': window.addComment(value); break;
+
+                    // ---- Metadata ----
+                    case 'edit-metadata': window.editMetadata(value, value2); break;
+                    case 'delete-metadata': window.deleteMetadata(value, value2); break;
+
+                    // ---- Activity ----
+                    case 'jump-to-book': window.jumpToBook(value); break;
+                }
+            }, true);  // <-- capture phase: runs BEFORE card-level handlers
             // ---------- Global click listener for book cards and AI copy buttons ----------
             document.addEventListener('click', e => {
                 const recentSearchBtn = e.target.closest('.recent-search-chip');
