@@ -68,7 +68,73 @@ function partnershipData(uid1, uid2) {
                 && d.coverUrl.matches('^https?://')))
         && (!('tags' in d) || (d.tags is list && d.tags.size() <= 50))
         && (!('categories' in d) || (d.categories is list && d.categories.size() <= 20))
-        && (!('copyType' in d) || d.copyType in ['New Copy', 'Old Copy', 'Gifted']);
+        && (!('genres' in d) || (d.genres is list && d.genres.size() <= 50))
+        && (!('highlights' in d) || d.highlights is list)
+        && (!('borrowHistory' in d) || d.borrowHistory is list)
+        && (!('copyType' in d) || d.copyType in ['New Copy', 'Old Copy', 'Gifted'])
+        // Numeric fields must really be numbers (and within sane bounds).
+        && (!('rating' in d) || d.rating == null
+            || ((d.rating is int || d.rating is float) && d.rating >= 0 && d.rating <= 5))
+        && (!('averageRating' in d) || d.averageRating == null
+            || ((d.averageRating is int || d.averageRating is float)
+                && d.averageRating >= 0 && d.averageRating <= 5))
+        && (!('ratingCount' in d) || d.ratingCount == null
+            || (d.ratingCount is int && d.ratingCount >= 0))
+        // Booleans / strings.
+        && (!('isWishlist' in d) || d.isWishlist is bool)
+        && (!('excludeFromLibrary' in d) || d.excludeFromLibrary is bool)
+        && (!('gifterName' in d) || d.gifterName == null
+            || (d.gifterName is string && d.gifterName.size() <= 200))
+        && (!('thumbnail' in d) || d.thumbnail == null
+            || (d.thumbnail is string && d.thumbnail.size() <= 2000))
+        && (!('source' in d) || d.source == null
+            || (d.source is string && d.source.size() <= 50))
+        && (!('status' in d) || d.status == null
+            || (d.status is string && d.status.size() <= 50))
+        && (!('comments' in d) || d.comments == null
+            || (d.comments is string && d.comments.size() <= 10000))
+        && (!('category' in d) || d.category == null || d.category is string)
+        && (!('libraryId' in d) || d.libraryId == null || d.libraryId is string)
+        && (!('borrowedBy' in d) || d.borrowedBy == null
+            || (d.borrowedBy is string && d.borrowedBy.size() <= 200))
+        && (!('borrowDate' in d) || d.borrowDate == null || d.borrowDate is string)
+        && (!('purchaseDate' in d) || d.purchaseDate == null || d.purchaseDate is string);
+    }
+
+    // Strict field allowlists for book documents — blocks arbitrary field injection.
+    // Content fields either an owner or a granted partner may change.
+    function bookContentFields() {
+      return ['title', 'author', 'genres', 'categories', 'category',
+              'description', 'tags', 'coverUrl', 'isbn', 'isWishlist',
+              'price', 'purchaseDate', 'thumbnail', 'source', 'copyType',
+              'gifterName', 'status', 'excludeFromLibrary',
+              'rating', 'averageRating', 'ratingCount', 'comments',
+              'highlights', 'borrowHistory', 'borrowedBy', 'borrowDate',
+              'libraryId', 'updatedAt'];
+    }
+
+    // Owner-only additions: an ownership transfer may move `userId` (further gated
+    // by the active-partnership check in the update rule).
+    function bookOwnerFields() {
+      return ['title', 'author', 'genres', 'categories', 'category',
+              'description', 'tags', 'coverUrl', 'isbn', 'isWishlist',
+              'price', 'purchaseDate', 'thumbnail', 'source', 'copyType',
+              'gifterName', 'status', 'excludeFromLibrary',
+              'rating', 'averageRating', 'ratingCount', 'comments',
+              'highlights', 'borrowHistory', 'borrowedBy', 'borrowDate',
+              'libraryId', 'updatedAt', 'userId'];
+    }
+
+    // Fields permitted on creation. `addedBy` and `createdAt` are set once here and
+    // pinned immutable by the update rule.
+    function bookCreateFields() {
+      return ['title', 'author', 'genres', 'categories', 'category',
+              'description', 'tags', 'coverUrl', 'isbn', 'isWishlist',
+              'price', 'purchaseDate', 'thumbnail', 'source', 'copyType',
+              'gifterName', 'status', 'excludeFromLibrary',
+              'rating', 'averageRating', 'ratingCount', 'comments',
+              'highlights', 'borrowHistory', 'borrowedBy', 'borrowDate',
+              'libraryId', 'updatedAt', 'userId', 'addedBy', 'createdAt'];
     }
 
     // Shared payload validation for per-user reading status.
@@ -105,11 +171,24 @@ function partnershipData(uid1, uid2) {
       // Anyone signed-in can see the public profile.
       allow read: if isSignedIn();
 
-      // Only the owner can create/update their own doc.
-      allow create: if isSignedIn() && request.auth.uid == userId;
+      // Only the owner can create/update their own doc. The public profile is
+      // restricted to the exact shape the app uses, so no arbitrary fields can be
+      // injected. `uid` is write-once and can never be re-pointed at another account.
+      allow create: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.uid == userId
+        && request.resource.data.keys().hasOnly([
+             'uid', 'displayName', 'photoURL', 'bio', 'joinedAt',
+             'totalBooksCount', 'completedBooksCount'
+           ]);
+
       allow update: if isSignedIn()
         && request.auth.uid == userId
-        && request.resource.data.uid == resource.data.uid;
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+             'displayName', 'photoURL', 'bio', 'updatedAt',
+             'totalBooksCount', 'completedBooksCount'
+           ]);
 
       allow delete: if false;
 
@@ -267,9 +346,11 @@ match /books/{bookId} {
     && activePartnership(request.auth.uid, resource.data.userId);
 
   // Owner creates in their own library. A partner with an active add grant may create a
-  // book for the owner's library, and must be recorded as `addedBy`.
+  // book for the owner's library, and must be recorded as `addedBy`. Only allowlisted
+  // fields may be written — no arbitrary field injection.
   allow create: if isSignedIn()
     && validBookData(request.resource.data)
+    && request.resource.data.keys().hasOnly(bookCreateFields())
     && (
       request.resource.data.userId == request.auth.uid
       || partnershipAllowsAdd(request.auth.uid, request.resource.data.userId)
@@ -279,7 +360,8 @@ match /books/{bookId} {
 
   // Owner has full control of their own books. A partner may edit only books they
   // personally added, while their add grant is active. Ownership may only change via an
-  // explicit transfer by the current owner to an active partner.
+  // explicit transfer by the current owner to an active partner. Each role is limited
+  // to its own strict field allowlist, so no arbitrary field can be injected.
   allow update: if isSignedIn()
     && validBookData(request.resource.data)
     && (
@@ -291,9 +373,18 @@ match /books/{bookId} {
     && request.resource.data.get('addedBy', '') == resource.data.get('addedBy', '')
     && request.resource.data.get('createdAt', null) == resource.data.get('createdAt', null)
     && (
-      resource.data.userId == request.auth.uid
+      // Owner: may edit any content field. `userId` is only in the owner list, and any
+      // change to it is already constrained to an active-partner transfer by the check
+      // above — so ownership can never be hijacked.
+      (resource.data.userId == request.auth.uid
+       && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(bookOwnerFields()))
+      // Partner: may edit only a book they personally added, only while their add grant
+      // is active, and may never touch `userId`.
       || (resource.data.get('addedBy', '') == request.auth.uid
-          && partnershipAllowsAdd(request.auth.uid, resource.data.userId))
+          && partnershipAllowsAdd(request.auth.uid, resource.data.userId)
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(bookContentFields()))
     )
     // Borrowing: a book can only be claimed while previously unborrowed, and a return can
     // only clear an existing borrow. This blocks two users claiming the same book.

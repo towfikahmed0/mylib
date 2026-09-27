@@ -3625,13 +3625,8 @@
                             const bookData = { ...item.book };
                             const bookId = bookData.id;
                             delete bookData.id;
-                            // Pre-calculated fields should be removed to avoid duplication of data structure
-                            delete bookData._searchStr;
-                            delete bookData._sortTitle;
-                            delete bookData._sortAuthor;
-                            delete bookData._createdTime;
-                            delete bookData._purchaseTime;
-                            delete bookData._genres;
+                            // Strip every client-side pre-computed field so none are persisted.
+                            Object.keys(bookData).forEach(key => { if (key.startsWith('_')) delete bookData[key]; });
 
                             batch.set(db.collection('books').doc(bookId), bookData);
                             batch.set(db.collection('books').doc(bookId).collection('readingStatus').doc(currentUser.uid), item.status);
@@ -9387,7 +9382,11 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
 
                 // Revert updated books
                 for (const [id, prevState] of Object.entries(previousStates)) {
-                    batch.set(db.collection('books').doc(id), prevState);
+                    const cleanState = { ...prevState };
+                    delete cleanState.id;
+                    // Strip every client-side pre-computed field so none are persisted.
+                    Object.keys(cleanState).forEach(key => { if (key.startsWith('_')) delete cleanState[key]; });
+                    batch.set(db.collection('books').doc(id), cleanState);
                 }
 
                 try {
