@@ -3797,7 +3797,7 @@
                         const coverUrl = book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover';
                         return `
                                         <div data-action="open-visited-book" data-value="${escapeHTML(book.id)}" data-value2="${escapeHTML(JSON.stringify(collaboratorIds))}"class="bg-white dark:bg-slate-800 p-4 rounded-3xl flex gap-4 cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all border border-slate-100 dark:border-slate-800" role="button" aria-label="${escapeHTML(title)} by ${escapeHTML(author)}">
-                                            <img src="${coverUrl}" class="w-16 h-24 object-cover rounded-2xl shadow-md border border-slate-200 dark:border-slate-700 flex-shrink-0">
+                                            <img src="${escapeHTML(coverUrl)}" class="w-16 h-24 object-cover rounded-2xl shadow-md border border-slate-200 dark:border-slate-700 flex-shrink-0">
                                             <div class="flex-1 flex flex-col justify-center min-w-0">
                                                 <h4 class="font-bold text-slate-800 dark:text-white truncate text-sm leading-snug">${escapeHTML(title)}</h4>
                                                 <p class="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5 italic font-medium">${escapeHTML(author)}</p>
@@ -4403,7 +4403,7 @@
 
                             html += `
                             <div ${html ? 'class="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800"' : ''}>
-                                <h3 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200" data-owner-id="${ownerId}">
+                                <h3 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200" data-owner-id="${escapeHTML(ownerId)}">
                                     From <span data-name="${escapeHTML(name)}">${escapeHTML(name)}</span>'s Library (${books.length})
                                 </h3>
                                 <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3'}">
@@ -5046,7 +5046,7 @@
 
                         html += `
                             <div class="flex gap-2 mt-4">
-                                <input id="comment-input-${reviewId}" type="text" placeholder="Add a comment..." class="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-primary outline-none text-xs transition-all">
+                                <input id="comment-input-${escapeHTML(reviewId)}" type="text" placeholder="Add a comment..." class="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-primary outline-none text-xs transition-all">
                                 <button data-action="add-comment" data-value="${escapeHTML(reviewId)}"  class="p-2 bg-primary text-white rounded-xl hover:bg-slate-800 transition active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Post comment">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                                 </button>
@@ -5859,7 +5859,7 @@
 
                 if (viewMode === 'compact') {
                     return `
-                    <div class="book-card relative group cursor-pointer focus-visible:ring-4 focus-visible:ring-primary/30 outline-none rounded-2xl" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}">
+                    <div class="book-card relative group cursor-pointer focus-visible:ring-4 focus-visible:ring-primary/30 outline-none rounded-2xl" data-book-id="${escapeHTML(book.id)}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}">
                         <div class="absolute inset-0 bg-slate-900/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity rounded-2xl"></div>
                         <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm relative">
                             ${book.coverUrl || book.thumbnail ?
@@ -5875,8 +5875,8 @@
                                 </div>
                             </div>
                             <div class="absolute top-2 left-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex flex-col gap-2">
-                                <input type="checkbox" ${isSelected ? 'checked' : ''} data-action="select-book" data-value="${book.id}" class="w-5 h-5 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-sky-600 focus:ring-blue-500 shadow-lg cursor-pointer" aria-label="Select '${book._escapedTitle}' for bulk actions">
-                                <button data-action="toggle-fav" data-value="${book.id}" class="w-5 h-5 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                                <input type="checkbox" ${isSelected ? 'checked' : ''} data-action="select-book" data-value="${escapeHTML(book.id)}" class="w-5 h-5 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-sky-600 focus:ring-blue-500 shadow-lg cursor-pointer" aria-label="Select '${book._escapedTitle}' for bulk actions">
+                                <button data-action="toggle-fav" data-value="${escapeHTML(book.id)}" class="w-5 h-5 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                                     <svg class="w-3.5 h-3.5 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'stroke-white'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                                 </button>
                                 <button data-action="copy-book" data-value="${escapeHTML(book.isbn || book.title)}" class="w-5 h-5 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Copy ISBN/Title" title="Copy ISBN/Title">
@@ -5894,9 +5894,9 @@
 
                 if (viewMode === 'list') {
                     return `
-                    <div class="book-card glass px-3 py-3 sm:px-6 sm:py-4 rounded-2xl flex items-center gap-3 sm:gap-4 cursor-pointer hover:bg-white dark:hover:bg-slate-800 transition-all border ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-lg' : 'border-slate-200/50 dark:border-slate-800'} group relative focus-visible:ring-4 focus-visible:ring-primary/30 outline-none" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}">
+                    <div class="book-card glass px-3 py-3 sm:px-6 sm:py-4 rounded-2xl flex items-center gap-3 sm:gap-4 cursor-pointer hover:bg-white dark:hover:bg-slate-800 transition-all border ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-lg' : 'border-slate-200/50 dark:border-slate-800'} group relative focus-visible:ring-4 focus-visible:ring-primary/30 outline-none" data-book-id="${escapeHTML(book.id)}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}">
                         <div class="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
-                            <input type="checkbox" ${isSelected ? 'checked' : ''} data-action="select-book" data-value="${book.id}" class="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-blue-500" aria-label="Select '${book._escapedTitle}' for bulk actions">
+                            <input type="checkbox" ${isSelected ? 'checked' : ''} data-action="select-book" data-value="${escapeHTML(book.id)}" class="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-blue-500" aria-label="Select '${book._escapedTitle}' for bulk actions">
                         </div>
                        <div class="w-10 h-14 sm:w-12 sm:h-16 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700">
     ${book.coverUrl || book.thumbnail ? `<img src="${escapeHTML(book.coverUrl || book.thumbnail || '')}" class="w-full h-full object-cover" loading="lazy">` : '<div class="w-full h-full flex items-center justify-center bg-slate-50 dark:bg-slate-700 text-[8px] text-blue-300 dark:text-slate-500 font-bold uppercase p-1 text-center">No Cover</div>'}
@@ -5916,10 +5916,10 @@
                             <div class="text-amber-400 text-[10px]">${stars}</div>
 ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 truncate max-w-[80px] hover:text-sky-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none text-right" data-action="filter-owner" data-value="${book._escapedOwner}" aria-label="Filter by owner: ${book._escapedOwner}">Owner: ${book._escapedOwner}</button>` : ''}
                             <div class="flex items-center gap-2 mt-1">
-                                <button data-action="toggle-fav" data-value="${book.id}" class="p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 outline-none ${isFavorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'}" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                                <button data-action="toggle-fav" data-value="${escapeHTML(book.id)}" class="p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 outline-none ${isFavorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'}" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                                     <svg class="w-3.5 h-3.5 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'text-slate-300'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                                 </button>
-                                <button data-action="edit-book" data-value="${book.id}" class="p-1 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Edit book details" title="Edit book details">
+                                <button data-action="edit-book" data-value="${escapeHTML(book.id)}" class="p-1 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Edit book details" title="Edit book details">
                                     <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
                                 <button data-action="copy-book" data-value="${escapeHTML(book.isbn || book.title)}" class="p-1 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Copy ISBN/Title" title="Copy ISBN/Title">
@@ -5929,10 +5929,10 @@ ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 trunca
                                     ${statusData.isWishlist ? 'Wishlist' : (bookStatus === 'reading' ? `Reading (${userProgress || book.progress || 0}%)` : READING_STATUSES[bookStatus].label)}
                                 </div>
                                 ${bookStatus === 'want_to_read' ? `
-                                    <button data-action="start-reading" data-value="${book.id}" class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-900 text-white hover:bg-slate-800 transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Start reading">Start Reading</button>
+                                    <button data-action="start-reading" data-value="${escapeHTML(book.id)}" class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-900 text-white hover:bg-slate-800 transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Start reading">Start Reading</button>
                                 ` : ''}
                                 ${bookStatus === 'reading' ? `
-                                    <button data-action="mark-finished" data-value="${book.id}" class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none" aria-label="Mark as finished">Mark as Finished</button>
+                                    <button data-action="mark-finished" data-value="${escapeHTML(book.id)}" class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none" aria-label="Mark as finished">Mark as Finished</button>
                                 ` : ''}
                             </div>
                         </div>
@@ -5945,10 +5945,10 @@ ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 trunca
                 const staggerDelay = `${(index % 10) * 50}ms`;
 
                 return `
-                <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-slate-200/50 dark:border-slate-800'} relative ${activeDensityClass} focus-visible:ring-4 focus-visible:ring-primary/30 outline-none animate-slide-up" data-book-id="${book.id}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}" style="animation-delay: ${staggerDelay}">
+                <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-slate-200/50 dark:border-slate-800'} relative ${activeDensityClass} focus-visible:ring-4 focus-visible:ring-primary/30 outline-none animate-slide-up" data-book-id="${escapeHTML(book.id)}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}" style="animation-delay: ${staggerDelay}">
                     <div class="absolute top-4 left-4 z-20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex flex-col gap-3">
-                        <input type="checkbox" ${isSelected ? 'checked' : ''} data-action="select-book" data-value="${book.id}" class="w-6 h-6 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-sky-600 focus:ring-blue-500 shadow-lg cursor-pointer" aria-label="Select '${book._escapedTitle}' for bulk actions">
-                                <button data-action="toggle-fav" data-value="${book.id}" class="w-6 h-6 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} data-action="select-book" data-value="${escapeHTML(book.id)}" class="w-6 h-6 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-sky-600 focus:ring-blue-500 shadow-lg cursor-pointer" aria-label="Select '${book._escapedTitle}' for bulk actions">
+                                <button data-action="toggle-fav" data-value="${escapeHTML(book.id)}" class="w-6 h-6 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                             <svg class="w-4 h-4 ${isFavorite ? 'fill-rose-500 stroke-rose-500' : 'stroke-white'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                         </button>
                         <button data-action="copy-book" data-value="${escapeHTML(book.isbn || book.title)}" class="w-6 h-6 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Copy ISBN/Title" title="Copy ISBN/Title">
@@ -5960,7 +5960,7 @@ ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 trunca
                             <div class="absolute bottom-0 left-0 right-0 h-3.5 bg-slate-900/40 backdrop-blur-sm z-10 flex items-center" role="progressbar" aria-valuenow="${userProgress || book.progress || 0}" aria-valuemin="0" aria-valuemax="100" aria-label="Reading progress: ${userProgress || book.progress || 0}%">
                                 <div class="h-full bg-gradient-to-r from-blue-500 to-indigo-400 transition-all duration-500" style="width: ${userProgress || book.progress || 0}%"></div>
                                 <span class="absolute inset-0 flex items-center justify-center text-[8px] font-black text-white drop-shadow-md pointer-events-none">${userProgress || book.progress || 0}%</span>
-                                <button data-action="quick-progress" data-value="${book.id}" class="absolute right-0 bottom-full mb-1 mr-1 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 active:scale-90 transition-all opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary outline-none" title="Quickly increment progress by 5%" aria-label="Quickly increment progress by 5%">
+                                <button data-action="quick-progress" data-value="${escapeHTML(book.id)}" class="absolute right-0 bottom-full mb-1 mr-1 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 active:scale-90 transition-all opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary outline-none" title="Quickly increment progress by 5%" aria-label="Quickly increment progress by 5%">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 6v12m6-6H6"/></svg>
                                 </button>
                             </div>
@@ -5992,10 +5992,10 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                     ${statusData.isWishlist ? 'Wishlist' : (bookStatus === 'reading' ? `Reading (${userProgress || book.progress || 0}%)` : READING_STATUSES[bookStatus].label)}
                                 </div>
                                 ${bookStatus === 'want_to_read' ? `
-                                    <button data-action="start-reading" data-value="${book.id}" class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-900 text-white hover:bg-slate-800 transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Start reading">Start Reading</button>
+                                    <button data-action="start-reading" data-value="${escapeHTML(book.id)}" class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-900 text-white hover:bg-slate-800 transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Start reading">Start Reading</button>
                                 ` : ''}
                                 ${bookStatus === 'reading' ? `
-                                    <button data-action="mark-finished" data-value="${book.id}" class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none" aria-label="Mark as finished">Mark as Finished</button>
+                                    <button data-action="mark-finished" data-value="${escapeHTML(book.id)}" class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none" aria-label="Mark as finished">Mark as Finished</button>
                                 ` : ''}
                                 ${book.borrowedBy ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">Borrowed by ${escapeHTML(book.borrowedBy)}</div>` : ''}
                                 ${addedByBadge}
@@ -6005,7 +6005,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                             <span class="text-[10px] font-bold text-slate-400">${book._formattedDate}</span>
                             <div class="flex items-center gap-2">
                                 <span class="text-slate-900 dark:text-white font-black text-sm">${book.price ? getCurrencySymbol() + escapeHTML(book.price) : ''}</span>
-                                <button class="p-2 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Edit book details"data-action="edit-book" data-value="${book.id}">
+                                <button class="p-2 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" aria-label="Edit book details"data-action="edit-book" data-value="${escapeHTML(book.id)}">
                                     <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
                             </div>
@@ -6245,16 +6245,16 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up">
                         <h2 class="text-2xl font-black mb-4">Add To Which Library?</h2>
                         <div class="space-y-3">
-                            <label class="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer border-2 border-transparent" data-dest="${currentUser.uid}">
-                                <input type="radio" name="scan-library-dest" value="${currentUser.uid}" checked class="w-5 h-5 text-sky-600">
+                            <label class="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer border-2 border-transparent" data-dest="${escapeHTML(currentUser.uid)}">
+                                <input type="radio" name="scan-library-dest" value="${escapeHTML(currentUser.uid)}" checked class="w-5 h-5 text-sky-600">
                                 <span class="font-medium">My Library</span>
                             </label>
                     `;
 
                     partnersWhoAllowAdding.forEach(p => {
                         destHtml += `
-                            <label class="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer border-2 border-transparent" data-dest="${p.userId}" data-partner-id="${p.userId}">
-                                <input type="radio" name="scan-library-dest" value="${p.userId}" class="w-5 h-5 text-sky-600">
+                            <label class="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer border-2 border-transparent" data-dest="${escapeHTML(p.userId)}" data-partner-id="${escapeHTML(p.userId)}">
+                                <input type="radio" name="scan-library-dest" value="${escapeHTML(p.userId)}" class="w-5 h-5 text-sky-600">
                                 <span class="font-medium" data-name="">Loading...</span>
                             </label>
                         `;
@@ -6771,7 +6771,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
 
                         // Create radio buttons for destinations
                         let html = `<label class="flex items-center gap-2 cursor-pointer">
-                            <input type="radio" name="library-dest" value="${currentUser.uid}" checked class="w-4 h-4 text-sky-600">
+                            <input type="radio" name="library-dest" value="${escapeHTML(currentUser.uid)}" checked class="w-4 h-4 text-sky-600">
                             <span class="text-xs font-medium">My Library</span>
                         </label>`;
 
@@ -6779,8 +6779,8 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                         if (partnersWhoAllowAdding.length > 0) {
                             html += partnersWhoAllowAdding.map(p => `
                                 <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" name="library-dest" value="${p.userId}" class="w-4 h-4 text-sky-600">
-                                    <span class="text-xs font-medium" data-partner-id="${p.userId}">Loading...</span>
+                                    <input type="radio" name="library-dest" value="${escapeHTML(p.userId)}" class="w-4 h-4 text-sky-600">
+                                    <span class="text-xs font-medium" data-partner-id="${escapeHTML(p.userId)}">Loading...</span>
                                 </label>
                             `).join('');
 
@@ -8446,7 +8446,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                             <span class="text-xs font-black">${rev.commentsCount || 0}</span>
                         </button>
                     </div>
-                    <div id="comments-${rev.id}" class="hidden mt-6 space-y-4 animate-slide-up"></div>
+                    <div id="comments-${escapeHTML(rev.id)}" class="hidden mt-6 space-y-4 animate-slide-up"></div>
                 </div>
                 `;
             }
@@ -8972,7 +8972,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
 
                         return `
                                     <div class="bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden transition-all shadow-sm hover:shadow-md">
-                                        <div data-action="toggle-search-book" data-value="${escapeHTML(book.id)}" data-stop="false" class="p-4 flex items-center justify-between gap-4 cursor-pointer"  role="button" aria-expanded="false" id="book-header-${book.id}">
+                                        <div data-action="toggle-search-book" data-value="${escapeHTML(book.id)}" data-stop="false" class="p-4 flex items-center justify-between gap-4 cursor-pointer"  role="button" aria-expanded="false" id="book-header-${escapeHTML(book.id)}">
                                             <div class="flex items-center gap-4 min-w-0">
                                                 <img src="${escapeHTML(coverUrl)}" class="w-12 h-16 object-cover rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex-shrink-0" alt="Book cover">
                                                 <div class="min-w-0">
@@ -8985,9 +8985,9 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                                     </div>
                                                 </div>
                                             </div>
-                                            <svg id="arrow-${book.id}" class="w-5 h-5 text-slate-400 transition-transform duration-200 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                            <svg id="arrow-${escapeHTML(book.id)}" class="w-5 h-5 text-slate-400 transition-transform duration-200 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                         </div>
-                                        <div id="dropdown-${book.id}" class="hidden border-t border-slate-200 dark:border-slate-700/60 p-5 bg-white/50 dark:bg-slate-800/50 space-y-4 animate-slide-up">
+                                        <div id="dropdown-${escapeHTML(book.id)}" class="hidden border-t border-slate-200 dark:border-slate-700/60 p-5 bg-white/50 dark:bg-slate-800/50 space-y-4 animate-slide-up">
                                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                                                 <div>
                                                     <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Genres</span>
@@ -9010,13 +9010,13 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                                 <div>
                                                     ${isCurrentlyBorrowed ? `<span class="text-xs font-bold text-amber-600 dark:text-amber-400">Currently borrowed by ${escapeHTML(book.borrowedBy || 'someone')}</span>` : `<span class="text-xs font-bold text-emerald-600 dark:text-emerald-400">Available</span>`}
                                                 </div>
-                                                <div id="request-btn-container-${book.id}">
+                                                <div id="request-btn-container-${escapeHTML(book.id)}">
                                                     ${isSelf ? `
                                                         <span class="text-xs font-bold text-slate-400 italic">Your Book</span>
                                                     ` : isCurrentlyBorrowed ? `
                                                         <button disabled class="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-400 font-bold rounded-xl text-xs cursor-not-allowed">Currently borrowed</button>
                                                     ` : `
-                                                        <button id="req-btn-${book.id}" data-action="send-book-request" data-value="${escapeHTML(book.id)}" data-value2="${escapeHTML(foundUserId)}" data-value3="${escapeHTML(title)}" class="px-4 py-2 bg-primary text-white font-bold rounded-xl text-xs hover:bg-slate-800 transition active:scale-95 shadow-md shadow-primary/20 focus-visible:ring-2 focus-visible:ring-primary outline-none">Request Book</button>
+                                                        <button id="req-btn-${escapeHTML(book.id)}" data-action="send-book-request" data-value="${escapeHTML(book.id)}" data-value2="${escapeHTML(foundUserId)}" data-value3="${escapeHTML(title)}" class="px-4 py-2 bg-primary text-white font-bold rounded-xl text-xs hover:bg-slate-800 transition active:scale-95 shadow-md shadow-primary/20 focus-visible:ring-2 focus-visible:ring-primary outline-none">Request Book</button>
                                                     `}
                                                 </div>
                                             </div>
