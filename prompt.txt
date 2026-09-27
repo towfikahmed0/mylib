@@ -1,0 +1,297 @@
+You are fixing the CURRENT MyLib files after a second independent security review.
+
+Files:
+
+* `firestore.rules`
+* `index.html`
+
+The previous patch is NOT trusted. Fix only the verified issues below. Inspect the current code before editing. Do not rewrite unrelated code or change product behavior.
+
+### P0 — MUST FIX
+
+#### 1. Fix readingStatus query regression
+
+Current frontend uses:
+`db.collectionGroup('readingStatus').where('userId','==',uid)`
+
+The current rule additionally requires `statusId == request.auth.uid`, which the query cannot prove and causes PERMISSION_DENIED.
+
+Fix the rules so the existing collectionGroup query succeeds while preserving security:
+
+* read only when `resource.data.userId == request.auth.uid`
+* create/update require `request.resource.data.userId == request.auth.uid`
+* ensure the authenticated user cannot write another user's status
+* preserve delete behavior correctly without `request.resource`
+* do NOT add a statusId query requirement unless the frontend query is also safely changed.
+
+Then verify all reading-status consumers still work.
+
+#### 2. Fix review likes counter bypass
+
+Current `existsAfter()` check is insufficient.
+
+A user must only be allowed:
+
+* `likesCount + 1` when their like document is CREATED in the same atomic batch
+* `likesCount - 1` when their like document is DELETED in the same atomic batch
+* no counter-only increment/decrement
+* no repeated +1 after the like already exists
+* no decrement when their like does not exist
+
+Use Firestore atomic-write semantics (`getAfter`, `exists`, etc.) correctly.
+
+Do not weaken like-document ownership rules.
+
+Frontend already batches the like document + counter; preserve that behavior.
+
+#### 3. Fix ALL attacker-controlled Firestore document-ID HTML sinks
+
+Search the entire `index.html`.
+
+Every Firestore-controlled:
+
+* `book.id`
+* `review.id`
+* `rev.id`
+* comment ID
+* request ID
+* any other document ID
+
+must be safely escaped before insertion into HTML attributes/text.
+
+Specifically inspect the sinks reported around:
+
+* 5862
+* 5948
+* 5878
+* 5899
+* 5950
+* 5963
+* 8975
+* 8988
+* 8990
+* 9013
+* 9019
+* 8449
+* 5012
+* 5019
+* 5042
+
+Do NOT assume document IDs are safe just because they normally come from Firestore.
+
+Use the existing `escapeHTML()` function consistently.
+
+Prefer DOM APIs/textContent where practical.
+
+Do not remove functionality.
+
+#### 4. Fix `coverUrl` HTML injection
+
+At every HTML sink, especially the visited-library modal around the reported `index.html:3800`, escape `coverUrl` before interpolation.
+
+Do not rely on:
+
+* Firestore `https?://` validation
+* `new URL()`
+* CSP
+
+Those are not substitutes for HTML-context escaping.
+
+Also search the entire file for every other raw `coverUrl`/image URL HTML sink.
+
+### P1 — FIX
+
+#### 5. Books: implement a real field allowlist
+
+Do NOT blindly choose fields.
+
+First inspect the entire `index.html` and current Firestore usage to enumerate every legitimate book field.
+
+Then enforce role-specific affectedKeys():
+
+Owner may modify legitimate mutable book fields.
+
+Partner with active `allowAddBooks` may:
+
+* create books for the owner
+* modify/delete only books where `addedBy == request.auth.uid`
+
+Partner must NOT modify protected fields or owner-created books.
+
+Protected fields include at minimum:
+
+* userId
+* addedBy
+* createdAt
+* ownership/system fields
+
+Explicitly validate numeric fields such as:
+
+* rating
+* progress
+* averageRating
+* counts
+
+Prevent malformed values from reaching rendering code.
+
+Preserve every legitimate existing book feature discovered during inspection, including highlights/notes/etc. Do not accidentally remove valid fields.
+
+#### 6. Users: field allowlist
+
+Inspect all profile fields actually used by the app.
+
+Allow only legitimate profile fields to be created/updated.
+
+Keep `uid` immutable.
+
+Prevent arbitrary attacker-controlled fields and unbounded junk data.
+
+Do not break existing profile functionality.
+
+#### 7. Fix commentsCount integrity
+
+Prefer a deterministic comment-document ID that lets Firestore rules prove a comment was created/deleted by the same atomic batch.
+
+Before changing the ID scheme:
+
+* inspect how comments are currently read/rendered
+* preserve existing comments
+* avoid breaking existing comment documents
+
+If a fully backward-compatible secure implementation is impossible without migration, implement the safest compatible solution and clearly report the residual risk instead of pretending it is fixed.
+
+### P1 — CSP / XSS architecture
+
+#### 8. Do NOT weaken CSP
+
+Do NOT:
+
+* add `unsafe-inline`
+* remove CSP
+* replace the nonce with another static nonce
+* add broad wildcard sources just to make the app work
+
+The current static nonce is not a real nonce and the CSP conflicts with the existing inline event-handler attributes.
+
+Inspect all inline:
+
+* `onclick`
+* `onchange`
+* `onsubmit`
+* `oninput`
+* etc.
+
+The app already has `data-action` event delegation. Migrate inline handlers to that pattern.
+
+Only after ALL inline handlers are migrated should you remove the fake static nonce and use a strict production CSP.
+
+Because this is a single static HTML app, prefer:
+
+* local/external JS with `script-src 'self'`
+* no inline handlers
+* no `unsafe-inline`
+
+Do not perform a partial CSP migration that breaks controls.
+
+### P2 — Supply chain
+
+#### 9. Audit third-party assets
+
+Do not make a broad dependency upgrade.
+
+For every external JS/CSS dependency:
+
+* exact version
+* whether it can be self-hosted/bundled
+* whether SRI is practical
+* whether it is actually required
+
+At minimum address:
+
+* unversioned Tailwind Play CDN
+* unversioned Google/gtag script
+* CDN dependencies without SRI
+
+Do NOT add `unsafe-inline` or wildcard CSP sources as a workaround.
+
+If production Tailwind requires a build step, implement only if the project already has a compatible build path. Otherwise report the exact required production migration rather than introducing a large build-system rewrite in this pass.
+
+### P2 — Existing feature regression
+
+Fix the existing activity-feed bulk-transfer incompatibility identified around:
+`index.html:3546-3555`
+and the activity-feed rule around:
+`firestore.rules:356-358`.
+
+Inspect the intended behavior first.
+
+The rule currently requires:
+`request.auth.uid == request.resource.data.userId`
+
+while the transfer flow writes the target user as `userId`.
+
+Make the smallest change that preserves the intended security model and bulk-transfer feature. Do NOT simply loosen the rule for everyone.
+
+### Compatibility requirements
+
+Before finishing:
+
+* preserve signup/login
+* library CRUD
+* collaboration requests
+* collaboration grants
+* unsubscribe/resubscribe
+* book requests
+* borrowing/returning
+* reading status
+* reviews
+* likes
+* comments
+* activity feed
+* profile
+* AI BYOK
+* QR/import/export
+* existing UI behavior
+
+Do not change Firebase pricing tier.
+Do not introduce Cloud Functions.
+Do not add paid infrastructure.
+Do not rewrite the application.
+
+### Required verification
+
+Search the complete files again after editing.
+
+Confirm:
+
+* no unescaped Firestore IDs reach HTML sinks
+* no raw coverUrl reaches HTML attributes
+* no `javascript:`/HTML injection sinks
+* no inline event handlers remain before enforcing strict CSP
+* no new `unsafe-inline`
+* readingStatus collectionGroup query is provably allowed
+* like +1 requires same-batch like creation
+* like -1 requires same-batch like deletion
+* repeated counter-only updates are denied
+* book/profile field writes are allowlisted
+* ownership/addedBy protections remain intact
+* activity transfer works
+* existing UI flows remain intact
+
+Do NOT claim emulator tests passed unless they actually ran.
+
+If Java/Firestore emulator is unavailable, perform all static verification possible and clearly state that emulator verification remains outstanding.
+
+### Final response
+
+Report:
+
+1. files changed
+2. exact fixes made
+3. compatibility changes
+4. tests actually executed
+5. tests NOT executed
+6. remaining security risks
+7. whether the result is `BLOCK DEPLOYMENT` or `READY FOR EMULATOR TESTING`
+
+Do not make further changes outside this scope.
