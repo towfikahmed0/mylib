@@ -1405,7 +1405,7 @@
                         window.refreshApp = () => {
                             worker.postMessage('SKIP_WAITING');
                         };
-                        showToast('New version available!', 'info', 10000, '<button onclick="window.refreshApp()" class="ml-4 underline font-bold uppercase text-xs">Refresh</button>');
+                        showToast('New version available!', 'info', 10000, '<button data-action="refresh-app" class="ml-4 underline font-bold uppercase text-xs">Refresh</button>');
                     };
 
                     if (reg.waiting && navigator.serviceWorker.controller) {
@@ -1448,11 +1448,11 @@
         (function () {
             // SRE: Global Error Boundary
             window.onerror = function (msg, url, lineNo, columnNo, error) {
-                showToast('Something went wrong, but your data is safe.', 'error', 10000, '<button onclick="window.location.reload()" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Reload</button>');
+                showToast('Something went wrong, but your data is safe.', 'error', 10000, '<button data-action="reload-app" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Reload</button>');
                 return false;
             };
             window.onunhandledrejection = function (event) {
-                showToast('A background task failed. Your work is saved.', 'error', 10000, '<button onclick="window.location.reload()" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Reload</button>');
+                showToast('A background task failed. Your work is saved.', 'error', 10000, '<button data-action="reload-app" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Reload</button>');
             };
 
 
@@ -2064,7 +2064,7 @@
         </nav>
 
         <div class="flex items-center gap-3">
-            <button id="theme-toggle-btn" onclick="window.toggleLandingTheme()" aria-label="Toggle dark mode" class="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-card text-foreground hover:bg-muted transition-all duration-300 hover:rotate-180 focus-visible:ring-2 focus-visible:ring-ring outline-none">
+            <button id="theme-toggle-btn" data-action="toggle-landing-theme" aria-label="Toggle dark mode" class="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-card text-foreground hover:bg-muted transition-all duration-300 hover:rotate-180 focus-visible:ring-2 focus-visible:ring-ring outline-none">
                 <svg id="theme-toggle-sun" class="w-5 h-5 ${isDark ? '' : 'hidden'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
                 </svg>
@@ -2105,7 +2105,7 @@
                         </svg>
                         Continue with Google
                     </button>
-                    <button onclick="document.getElementById('features').scrollIntoView({behavior: 'smooth'})" class="w-full sm:w-auto px-8 py-4 rounded-xl font-bold border-2 border-slate-200 dark:border-slate-700 text-foreground hover:bg-muted transition-all duration-300 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring outline-none">
+                    <button data-action="scroll-to" data-value="features" class="w-full sm:w-auto px-8 py-4 rounded-xl font-bold border-2 border-slate-200 dark:border-slate-700 text-foreground hover:bg-muted transition-all duration-300 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring outline-none">
                         See Features
                     </button>
                 </div>
@@ -2353,13 +2353,13 @@
             <p class="text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-10">A librarian who already knows your shelves. Ask questions about your collection, find books naturally, and discover connections you might have missed.</p>
             <!-- Interactive AI Chips -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto text-left">
-                <button onclick="window.openAIChat('Which books haven\\'t I read yet?')" class="ai-chip bg-card text-card-foreground rounded-full px-6 py-4 border border-slate-200 dark:border-slate-700 shadow-terra-sm text-center cursor-pointer hover:bg-primary hover:border-primary hover:text-primary-foreground transition-all duration-300 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring outline-none group">
+                <button data-action="open-ai-chat" data-value="Which books haven\'t I read yet?" class="ai-chip bg-card text-card-foreground rounded-full px-6 py-4 border border-slate-200 dark:border-slate-700 shadow-terra-sm text-center cursor-pointer hover:bg-primary hover:border-primary hover:text-primary-foreground transition-all duration-300 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring outline-none group">
                     <p class="text-sm font-medium italic group-hover:text-primary-foreground">"Which books haven't I read yet?"</p>
                 </button>
-                <button onclick="window.openAIChat('What are my highest-rated books?')" class="ai-chip bg-card text-card-foreground rounded-full px-6 py-4 border border-slate-200 dark:border-slate-700 shadow-terra-sm text-center cursor-pointer hover:bg-primary hover:border-primary hover:text-primary-foreground transition-all duration-300 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring outline-none group">
+                <button data-action="open-ai-chat" data-value="What are my highest-rated books?" class="ai-chip bg-card text-card-foreground rounded-full px-6 py-4 border border-slate-200 dark:border-slate-700 shadow-terra-sm text-center cursor-pointer hover:bg-primary hover:border-primary hover:text-primary-foreground transition-all duration-300 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring outline-none group">
                     <p class="text-sm font-medium italic group-hover:text-primary-foreground">"What are my highest-rated books?"</p>
                 </button>
-                <button onclick="window.openAIChat('Recommend something new based on my reading history.')" class="ai-chip bg-card text-card-foreground rounded-full px-6 py-4 border border-slate-200 dark:border-slate-700 shadow-terra-sm text-center cursor-pointer hover:bg-primary hover:border-primary hover:text-primary-foreground transition-all duration-300 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring outline-none group">
+                <button data-action="open-ai-chat" data-value="Recommend something new based on my reading history." class="ai-chip bg-card text-card-foreground rounded-full px-6 py-4 border border-slate-200 dark:border-slate-700 shadow-terra-sm text-center cursor-pointer hover:bg-primary hover:border-primary hover:text-primary-foreground transition-all duration-300 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring outline-none group">
                     <p class="text-sm font-medium italic group-hover:text-primary-foreground">"Recommend something new."</p>
                 </button>
             </div>
@@ -2525,15 +2525,15 @@
                                 <div>
                                     <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Theme</label>
                                     <div class="grid grid-cols-3 gap-2 mt-1.5">
-                                        <button onclick="window.setTheme('light')" aria-pressed="${localStorage.getItem('mylib_theme') !== 'dark' && localStorage.getItem('mylib_theme') !== 'sepia'}" class="px-3 py-3 rounded-xl border-2 ${localStorage.getItem('mylib_theme') !== 'dark' && localStorage.getItem('mylib_theme') !== 'sepia' ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'} bg-white text-slate-900 text-xs font-bold focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all flex flex-col items-center gap-1.5">
+                                        <button data-action="set-theme" data-value="light" aria-pressed="${localStorage.getItem('mylib_theme') !== 'dark' && localStorage.getItem('mylib_theme') !== 'sepia'}" class="px-3 py-3 rounded-xl border-2 ${localStorage.getItem('mylib_theme') !== 'dark' && localStorage.getItem('mylib_theme') !== 'sepia' ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'} bg-white text-slate-900 text-xs font-bold focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all flex flex-col items-center gap-1.5">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                                             Light
                                         </button>
-                                        <button onclick="window.setTheme('dark')" aria-pressed="${localStorage.getItem('mylib_theme') === 'dark'}" class="px-3 py-3 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'dark' ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'} bg-slate-900 text-white text-xs font-bold focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all flex flex-col items-center gap-1.5">
+                                        <button data-action="set-theme" data-value="dark" aria-pressed="${localStorage.getItem('mylib_theme') === 'dark'}" class="px-3 py-3 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'dark' ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'} bg-slate-900 text-white text-xs font-bold focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all flex flex-col items-center gap-1.5">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
                                             Dark
                                         </button>
-                                        <button onclick="window.setTheme('sepia')" aria-pressed="${localStorage.getItem('mylib_theme') === 'sepia'}" class="px-3 py-3 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'sepia' ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'} bg-sepia-100 text-sepia-900 text-xs font-bold focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all flex flex-col items-center gap-1.5">
+                                        <button data-action="set-theme" data-value="sepia" aria-pressed="${localStorage.getItem('mylib_theme') === 'sepia'}" class="px-3 py-3 rounded-xl border-2 ${localStorage.getItem('mylib_theme') === 'sepia' ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'} bg-sepia-100 text-sepia-900 text-xs font-bold focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all flex flex-col items-center gap-1.5">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
                                             Sepia
                                         </button>
@@ -2545,7 +2545,7 @@
                                         ${['blue', 'rose', 'emerald', 'amber', 'violet'].map(color => {
                     const bgClass = color === 'blue' ? 'bg-slate-500' : color === 'rose' ? 'bg-rose-500' : color === 'emerald' ? 'bg-emerald-500' : color === 'amber' ? 'bg-amber-500' : 'bg-violet-500';
                     const isSelected = (localStorage.getItem('mylib_accent') || 'blue') === color;
-                    return `<button onclick="window.setAccent('${color}')" aria-pressed="${isSelected}" class="w-10 h-10 rounded-full ${bgClass} ${isSelected ? 'ring-4 ring-offset-2 ring-slate-300 dark:ring-slate-600 scale-110' : 'hover:scale-105'} focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all" title="${color.charAt(0).toUpperCase() + color.slice(1)}" aria-label="Set ${color} accent color"></button>`;
+                    return `<button data-action="set-accent" data-value="${color}" aria-pressed="${isSelected}" class="w-10 h-10 rounded-full ${bgClass} ${isSelected ? 'ring-4 ring-offset-2 ring-slate-300 dark:ring-slate-600 scale-110' : 'hover:scale-105'} focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all" title="${color.charAt(0).toUpperCase() + color.slice(1)}" aria-label="Set ${color} accent color"></button>`;
                 }).join('')}
                                     </div>
                                 </div>
@@ -2836,8 +2836,8 @@
                                 <span class="h-px flex-1 bg-slate-100 dark:bg-slate-800"></span>
                             </div>
                             <div class="flex flex-col sm:flex-row gap-2">
-                                <button onclick="window.runWishlistMigration()" class="text-xs font-bold text-slate-500 hover:text-primary transition-colors px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg">Migrate Wishlist</button>
-                                <button onclick="window.runDataMigration()" class="text-xs font-bold text-slate-500 hover:text-primary transition-colors px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg">Migrate Library</button>
+                                <button data-action="run-wishlist-migration" class="text-xs font-bold text-slate-500 hover:text-primary transition-colors px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg">Migrate Wishlist</button>
+                                <button data-action="run-data-migration" class="text-xs font-bold text-slate-500 hover:text-primary transition-colors px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg">Migrate Library</button>
                             </div>
                         </div>
                         <p class="text-center text-[10px] text-slate-400 uppercase font-sans tracking-widest mt-8">Made with care by <a href="https://towfikahmed0.github.io/" class="text-primary hover:underline">Towfik Ahmed</a></p>
@@ -3155,22 +3155,22 @@
                                 <!-- Divider between Add Book and nav tabs -->
                                 <div class="border-t border-border my-1"></div>
 
-                                <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="relative flex items-center gap-3 px-3 py-2.5 text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'library' ? 'bg-secondary text-foreground rounded-md' : 'text-muted-foreground hover:bg-muted rounded-md'}">
+                                <button data-action="set-tab" data-value="library" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="relative flex items-center gap-3 px-3 py-2.5 text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'library' ? 'bg-secondary text-foreground rounded-md' : 'text-muted-foreground hover:bg-muted rounded-md'}">
                                     ${activeTab === 'library' ? '<span class="absolute left-0 top-1.5 bottom-1.5 w-1 bg-primary rounded-r"></span>' : ''}
                                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></svg>
                                     <span class="font-raleway">Library</span>
                                 </button>
-                                <button onclick="window.setTab('mybooks')" ${activeTab === 'mybooks' ? 'aria-current="page"' : ''} class="relative flex items-center gap-3 px-3 py-2.5 text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'mybooks' ? 'bg-secondary text-foreground rounded-md' : 'text-muted-foreground hover:bg-muted rounded-md'}">
+                                <button data-action="set-tab" data-value="mybooks" ${activeTab === 'mybooks' ? 'aria-current="page"' : ''} class="relative flex items-center gap-3 px-3 py-2.5 text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'mybooks' ? 'bg-secondary text-foreground rounded-md' : 'text-muted-foreground hover:bg-muted rounded-md'}">
                                     ${activeTab === 'mybooks' ? '<span class="absolute left-0 top-1.5 bottom-1.5 w-1 bg-primary rounded-r"></span>' : ''}
                                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
                                     <span class="font-raleway">My Books</span>
                                 </button>
-                                <button onclick="window.setTab('explore')" ${activeTab === 'explore' ? 'aria-current="page"' : ''} class="relative flex items-center gap-3 px-3 py-2.5 text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'explore' ? 'bg-secondary text-foreground rounded-md' : 'text-muted-foreground hover:bg-muted rounded-md'}">
+                                <button data-action="set-tab" data-value="explore" ${activeTab === 'explore' ? 'aria-current="page"' : ''} class="relative flex items-center gap-3 px-3 py-2.5 text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'explore' ? 'bg-secondary text-foreground rounded-md' : 'text-muted-foreground hover:bg-muted rounded-md'}">
                                     ${activeTab === 'explore' ? '<span class="absolute left-0 top-1.5 bottom-1.5 w-1 bg-primary rounded-r"></span>' : ''}
                                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
                                     <span class="font-raleway">Explore</span>
                                 </button>
-                                <button onclick="window.setTab('insight')" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="relative flex items-center gap-3 px-3 py-2.5 text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'insight' ? 'bg-secondary text-foreground rounded-md' : 'text-muted-foreground hover:bg-muted rounded-md'}">
+                                <button data-action="set-tab" data-value="insight" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="relative flex items-center gap-3 px-3 py-2.5 text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'insight' ? 'bg-secondary text-foreground rounded-md' : 'text-muted-foreground hover:bg-muted rounded-md'}">
                                     ${activeTab === 'insight' ? '<span class="absolute left-0 top-1.5 bottom-1.5 w-1 bg-primary rounded-r"></span>' : ''}
                                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                                     <span class="font-raleway">Insights</span>
@@ -3180,14 +3180,14 @@
 
                         <!-- Bottom of sidebar: bell icon, theme toggle, gear icon -->
                         <div class="flex items-center justify-around border-t border-border pt-4">
-                            <button onclick="window.setTab('settings')" class="p-2.5 hover:bg-muted rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'settings' ? 'text-primary bg-secondary' : 'text-muted-foreground'}" title="Settings" aria-label="Settings">
+                            <button data-action="set-tab" data-value="settings" class="p-2.5 hover:bg-muted rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'settings' ? 'text-primary bg-secondary' : 'text-muted-foreground'}" title="Settings" aria-label="Settings">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                             </button>
-                            <button onclick="window.setTab('activity')" class="p-2.5 hover:bg-muted rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'activity' ? 'text-primary bg-secondary' : 'text-muted-foreground'}" title="Activity" aria-label="Activity">
+                            <button data-action="set-tab" data-value="activity" class="p-2.5 hover:bg-muted rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'activity' ? 'text-primary bg-secondary' : 'text-muted-foreground'}" title="Activity" aria-label="Activity">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
                             </button>
                             <!-- ⚡ Theme toggle replacing the + button -->
-                            <button onclick="window.toggleSidebarTheme()" class="p-2.5 hover:bg-muted rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none text-muted-foreground" title="${isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}" aria-label="${isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}">
+                            <button data-action="toggle-sidebar-theme" class="p-2.5 hover:bg-muted rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none text-muted-foreground" title="${isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}" aria-label="${isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}">
                                 ${isDark
                             ? '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>'
                             : '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>'}
@@ -3220,13 +3220,13 @@
                             </div>
                             <!-- Action buttons: Reduced padding and icon size on mobile -->
                             <div class="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
-                                <button onclick="window.setTab('activity')" class="p-2 sm:p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'activity' ? 'text-primary bg-slate-50 dark:bg-blue-900/20' : 'text-slate-500'}" title="Activity" aria-label="Activity">
+                                <button data-action="set-tab" data-value="activity" class="p-2 sm:p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'activity' ? 'text-primary bg-slate-50 dark:bg-blue-900/20' : 'text-slate-500'}" title="Activity" aria-label="Activity">
                                     <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
                                 </button>
                                 <button class="manual-add-trigger p-2 sm:p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition text-slate-500 focus-visible:ring-2 focus-visible:ring-primary outline-none" title="Add Book Manually" aria-label="Add Book Manually">
                                     <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                 </button>
-                                <button onclick="window.setTab('settings')" class="p-2 sm:p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'settings' ? 'text-primary bg-slate-50 dark:bg-blue-900/20' : 'text-slate-500'}" title="Settings" aria-label="Settings">
+                                <button data-action="set-tab" data-value="settings" class="p-2 sm:p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'settings' ? 'text-primary bg-slate-50 dark:bg-blue-900/20' : 'text-slate-500'}" title="Settings" aria-label="Settings">
                                     <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                 </button>
                             </div>
@@ -3265,19 +3265,19 @@
 
                     <!-- Mobile Bottom Nav (< 1024px) -->
                     <nav id="mobile-nav" class="lg:hidden fixed bottom-0 left-0 right-0 glass border-t border-slate-200 dark:border-slate-800 px-3 py-3 grid grid-cols-4 gap-1 z-40">
-                        <button onclick="window.setTab('library')" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'library' ? 'text-primary' : 'text-slate-400'}">
+                        <button data-action="set-tab" data-value="library" ${activeTab === 'library' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'library' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></svg>
                             <span class="text-[8px] font-bold">Library</span>
                         </button>
-                        <button onclick="window.setTab('mybooks')" ${activeTab === 'mybooks' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'mybooks' ? 'text-primary' : 'text-slate-400'}">
+                        <button data-action="set-tab" data-value="mybooks" ${activeTab === 'mybooks' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'mybooks' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
                             <span class="text-[8px] font-bold">My Books</span>
                         </button>
-                        <button onclick="window.setTab('explore')" ${activeTab === 'explore' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'explore' ? 'text-primary' : 'text-slate-400'}">
+                        <button data-action="set-tab" data-value="explore" ${activeTab === 'explore' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'explore' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
                             <span class="text-[8px] font-bold">Explore</span>
                         </button>
-                        <button onclick="window.setTab('insight')" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'insight' ? 'text-primary' : 'text-slate-400'}">
+                        <button data-action="set-tab" data-value="insight" ${activeTab === 'insight' ? 'aria-current="page"' : ''} class="flex flex-col items-center gap-1 rounded-xl focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeTab === 'insight' ? 'text-primary' : 'text-slate-400'}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                             <span class="text-[8px] font-bold text-center">Insights</span>
                         </button>
@@ -3326,17 +3326,17 @@
                             <div class="glass p-4 rounded-2xl border border-blue-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-4">
                                 <div class="flex items-center gap-3">
                                     <span id="selected-count" class="text-sm font-black text-sky-600 px-3 py-1 bg-blue-100 dark:bg-blue-900/50 rounded-lg">0 Selected</span>
-                                    <button onclick="window.clearSelection()" class="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase focus-visible:ring-2 focus-visible:ring-primary outline-none rounded px-1">Clear</button>
+                                    <button data-action="clear-selection" class="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase focus-visible:ring-2 focus-visible:ring-primary outline-none rounded px-1">Clear</button>
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <select id="bulk-genre" class="bg-slate-100 dark:bg-slate-800 rounded-lg text-[10px] font-bold px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-primary">
                                         <option value="">Change Genre...</option>
                                         ${metadataCache.genres.map(cat => `<option value="${escapeHTML(cat)}">${escapeHTML(cat)}</option>`).join('')}
                                     </select>
-                                    <button onclick="window.bulkTransfer()" class="p-2 text-sky-500 hover:bg-slate-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" title="Transfer Selected" aria-label="Transfer selected books">
+                                    <button data-action="bulk-transfer" class="p-2 text-sky-500 hover:bg-slate-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none" title="Transfer Selected" aria-label="Transfer selected books">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
                                     </button>
-                                    <button onclick="window.bulkDelete()" class="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" title="Delete Selected" aria-label="Delete selected books">
+                                    <button data-action="bulk-delete" class="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" title="Delete Selected" aria-label="Delete selected books">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                     </button>
                                 </div>
@@ -3603,7 +3603,7 @@
                         }
 
                         selectedBookIds.clear();
-                        showToast(`Deleted ${ids.length} books successfully.`, 'success', 10000, '<button onclick="window.undoDelete()" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Undo</button>');
+                        showToast(`Deleted ${ids.length} books successfully.`, 'success', 10000, '<button data-action="undo-delete" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Undo</button>');
                     } catch (err) {
                         console.error('Bulk delete error:', err);
                         showToast('Failed to delete books: ' + err.message, 'error');
@@ -4166,32 +4166,32 @@
                     let html = '';
                     let activeCount = 0;
                     if (advancedFilters.rating !== 'all') {
-                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">${advancedFilters.rating} Stars <button onclick="window.clearAdvancedFilter('rating')" aria-label="Remove rating filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-amber-500 outline-none">×</button></span>`;
+                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">${advancedFilters.rating} Stars <button data-action="clear-adv-filter" data-value="rating" aria-label="Remove rating filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-amber-500 outline-none">×</button></span>`;
                         activeCount++;
                     }
                     if (advancedFilters.minPrice || advancedFilters.maxPrice) {
-                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">${getCurrencySymbol()}${advancedFilters.minPrice || 0} - ${getCurrencySymbol()}${advancedFilters.maxPrice || '∞'} <button onclick="window.clearAdvancedFilter('price')" aria-label="Remove price filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none">×</button></span>`;
+                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">${getCurrencySymbol()}${advancedFilters.minPrice || 0} - ${getCurrencySymbol()}${advancedFilters.maxPrice || '∞'} <button data-action="clear-adv-filter" data-value="price" aria-label="Remove price filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none">×</button></span>`;
                         activeCount++;
                     }
                     if (advancedFilters.startDate || advancedFilters.endDate) {
-                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Date Range <button onclick="window.clearAdvancedFilter('date')" aria-label="Remove date filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">×</button></span>`;
+                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Date Range <button data-action="clear-adv-filter" data-value="date" aria-label="Remove date filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">×</button></span>`;
                         activeCount++;
                     }
                     if (favoritesOnly) {
-                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Favorites <button onclick="window.toggleFavoritesFilter(false)" aria-label="Remove favorites filter" class="hover:bg-white/20 rounded px-1 transition-colors">×</button></span>`;
+                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Favorites <button data-action="clear-fav-filter" data-value="false" aria-label="Remove favorites filter" class="hover:bg-white/20 rounded px-1 transition-colors">×</button></span>`;
                         activeCount++;
                     }
                     if (sortBy === 'borrowed_to_others') {
-                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Borrowed to Others <button onclick="window.clearSortFilter('borrowed_to_others')" aria-label="Remove borrowed filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-amber-500 outline-none">×</button></span>`;
+                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Borrowed to Others <button data-action="clear-sort" data-value="borrowed_to_others" aria-label="Remove borrowed filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-amber-500 outline-none">×</button></span>`;
                         activeCount++;
                     }
                     if (copyTypeFilter !== 'all') {
-                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Copy Type: ${escapeHTML(copyTypeFilter)} <button onclick="window.setCopyTypeFilter('all')" aria-label="Remove copy type filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">×</button></span>`;
+                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Copy Type: ${escapeHTML(copyTypeFilter)} <button data-action="set-copy-type" data-value="all" aria-label="Remove copy type filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">×</button></span>`;
                         activeCount++;
                     }
 
                     if (activeCount > 1) {
-                        html += `<button onclick="window.clearAllFilters()" class="text-[10px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest ml-2 px-2 py-1 focus-visible:ring-2 focus-visible:ring-primary outline-none rounded transition-all">Clear All</button>`;
+                        html += `<button data-action="clear-all-filters" class="text-[10px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest ml-2 px-2 py-1 focus-visible:ring-2 focus-visible:ring-primary outline-none rounded transition-all">Clear All</button>`;
                     }
 
                     if (window.innerWidth < 768) {
@@ -4204,7 +4204,7 @@
                     }
 
                     if (aiSearchResults) {
-                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">AI Search: "${searchQuery}" <button onclick="window.clearAISearch()" aria-label="Clear AI search" class="hover:bg-white/20 rounded px-1 transition-colors">×</button></span>`;
+                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">AI Search: "${searchQuery}" <button data-action="clear-ai-search" aria-label="Clear AI search" class="hover:bg-white/20 rounded px-1 transition-colors">×</button></span>`;
                         activeCount++;
                     }
 
@@ -4257,7 +4257,7 @@
                         <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Tag:</span>
                         <span class="px-3 py-1 active-filter-chip rounded-full text-xs font-bold flex items-center gap-2">
                             ${tagFilter}
-                            <button onclick="window.setTagFilter(null)" class="hover:bg-white/20 rounded px-1 transition-colors" aria-label="Clear tag filter">
+                            <button data-action="filter-tag" data-value="null" class="hover:bg-white/20 rounded px-1 transition-colors" aria-label="Clear tag filter">
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
                         </span>
@@ -4270,10 +4270,10 @@
                     copyTypeContainer.innerHTML = `
                     <div class="flex items-center gap-2 flex-wrap mb-4">
                         <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-1">Copy Type:</span>
-                        <button onclick="window.setCopyTypeFilter('all')" class="px-3 py-1.5 rounded-full text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${copyTypeFilter === 'all' ? 'active-filter-chip shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}" aria-pressed="${copyTypeFilter === 'all'}" aria-label="Show all copy types">All</button>
-                        <button onclick="window.setCopyTypeFilter('New Copy')" class="px-3 py-1.5 rounded-full text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${copyTypeFilter === 'New Copy' ? 'active-filter-chip text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}" aria-pressed="${copyTypeFilter === 'New Copy'}" aria-label="Filter by New copies">New copies</button>
-                        <button onclick="window.setCopyTypeFilter('Old Copy')" class="px-3 py-1.5 rounded-full text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${copyTypeFilter === 'Old Copy' ? 'active-filter-chip text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}" aria-pressed="${copyTypeFilter === 'Old Copy'}" aria-label="Filter by Old copies">Old copies</button>
-                        <button onclick="window.setCopyTypeFilter('Gifted')" class="px-3 py-1.5 rounded-full text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${copyTypeFilter === 'Gifted' ? 'active-filter-chip text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}" aria-pressed="${copyTypeFilter === 'Gifted'}" aria-label="Filter by Gifted copies">Gifted copies</button>
+                        <button data-action="set-copy-type" data-value="all" class="px-3 py-1.5 rounded-full text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${copyTypeFilter === 'all' ? 'active-filter-chip shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}" aria-pressed="${copyTypeFilter === 'all'}" aria-label="Show all copy types">All</button>
+                        <button data-action="set-copy-type" data-value="New Copy" class="px-3 py-1.5 rounded-full text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${copyTypeFilter === 'New Copy' ? 'active-filter-chip text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}" aria-pressed="${copyTypeFilter === 'New Copy'}" aria-label="Filter by New copies">New copies</button>
+                        <button data-action="set-copy-type" data-value="Old Copy" class="px-3 py-1.5 rounded-full text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${copyTypeFilter === 'Old Copy' ? 'active-filter-chip text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}" aria-pressed="${copyTypeFilter === 'Old Copy'}" aria-label="Filter by Old copies">Old copies</button>
+                        <button data-action="set-copy-type" data-value="Gifted" class="px-3 py-1.5 rounded-full text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${copyTypeFilter === 'Gifted' ? 'active-filter-chip text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}" aria-pressed="${copyTypeFilter === 'Gifted'}" aria-label="Filter by Gifted copies">Gifted copies</button>
                     </div>
                     `;
                 }
@@ -4331,7 +4331,7 @@
                                 ${filteredBooks.length} ${filteredBooks.length === 1 ? 'book' : 'books'} shown
                             </div>
                             <div class="flex items-center gap-3">
-                                <button onclick="window.toggleFavoritesFilter()" class="flex items-center gap-2 px-3 py-2 rounded-xl transition-all focus-visible:ring-2 focus-visible:ring-rose-500 outline-none ${favoritesOnly ? 'bg-rose-500 text-white shadow-lg' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-rose-500'}" aria-pressed="${favoritesOnly}" aria-label="Toggle favorites filter">
+                                <button data-action="toggle-fav-filter" class="flex items-center gap-2 px-3 py-2 rounded-xl transition-all focus-visible:ring-2 focus-visible:ring-rose-500 outline-none ${favoritesOnly ? 'bg-rose-500 text-white shadow-lg' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-rose-500'}" aria-pressed="${favoritesOnly}" aria-label="Toggle favorites filter">
                                     <svg class="w-4 h-4 ${favoritesOnly ? 'fill-current' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                                     <span class="text-[10px] font-black uppercase tracking-tight">${favoritesOnly ? 'Favorites' : 'All'}</span>
                                 </button>
@@ -4453,12 +4453,12 @@
                             <div class="mt-8 flex flex-col items-center justify-center gap-6">
                                 ${isAnyFilterActive ? `
                                     <div class="flex flex-col sm:flex-row gap-4">
-                                        <button onclick="window.clearAllFilters()" class="px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-full font-bold text-sm shadow-md hover:bg-slate-50 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">Clear All Filters</button>
-                                        <button onclick="window.openAIChat('I cannot find the books I am looking for. Can you help me search my library?')" class="px-6 py-3 bg-slate-900 text-white rounded-full font-bold text-sm shadow-lg shadow-slate-200 dark:shadow-none hover:bg-slate-800 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none flex items-center gap-2">
+                                        <button data-action="clear-all-filters" class="px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-full font-bold text-sm shadow-md hover:bg-slate-50 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">Clear All Filters</button>
+                                        <button data-action="open-ai-chat" data-value="I cannot find the books I am looking for. Can you help me search my library?" class="px-6 py-3 bg-slate-900 text-white rounded-full font-bold text-sm shadow-lg shadow-slate-200 dark:shadow-none hover:bg-slate-800 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none flex items-center gap-2">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
                                             Ask AI Librarian
                                         </button>
-                                        ${(searchQuery && !aiSearchResults) ? `<button id="ai-search-btn" onclick="runAISearch()" class="px-6 py-3 bg-emerald-600 text-white rounded-full font-bold text-sm shadow-lg shadow-emerald-200 dark:shadow-none hover:bg-emerald-700 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>AI Smart Search</button>` : ''}
+                                        ${(searchQuery && !aiSearchResults) ? `<button id="ai-search-btn" data-action="run-ai-search" class="px-6 py-3 bg-emerald-600 text-white rounded-full font-bold text-sm shadow-lg shadow-emerald-200 dark:shadow-none hover:bg-emerald-700 transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>AI Smart Search</button>` : ''}
                                     </div>
                                     <div class="max-w-md p-4 bg-slate-50/50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/50 dark:border-slate-800 text-center animate-slide-up">
                                         <p class="text-[10px] font-bold text-sky-600 dark:text-blue-400 uppercase tracking-widest mb-2">Search Tips</p>
@@ -4471,8 +4471,8 @@
                                     </div>
                                 ` : `
                                     <div class="flex gap-4">
-                                         <button onclick="window.openScanner()" class="px-6 py-2 bg-primary text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">Scan Book</button>
-                                        <button onclick="document.querySelector('.manual-add-trigger')?.click()" class="px-6 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-full font-bold text-sm shadow-md transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">Add Manually</button>
+                                         <button data-action="open-scanner" class="px-6 py-2 bg-primary text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">Scan Book</button>
+                                        <button data-action="open-manual-add" class="px-6 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-full font-bold text-sm shadow-md transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">Add Manually</button>
                                     </div>
                                 `}
                             </div>
@@ -7275,11 +7275,11 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     <!-- Sub-tab Navigation -->
                     <div class="flex items-center justify-center">
                         <div class="bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl flex gap-1 shadow-inner">
-                            <button onclick="window.setMyBooksSubTab('finished')" class="px-8 py-3 rounded-xl text-sm font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${myBooksSubTab === 'finished' ? 'bg-white dark:bg-slate-700 shadow-md text-primary' : 'text-slate-500 hover:text-slate-700'}">
+                            <button data-action="set-my-books-sub-tab" data-value="finished" class="px-8 py-3 rounded-xl text-sm font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${myBooksSubTab === 'finished' ? 'bg-white dark:bg-slate-700 shadow-md text-primary' : 'text-slate-500 hover:text-slate-700'}">
                                 Finished Books
                                 <span class="ml-2 px-2 py-0.5 bg-slate-200 dark:bg-slate-600 rounded-lg text-[10px]">${finishedBooks.length}</span>
                             </button>
-                            <button onclick="window.setMyBooksSubTab('wishlist')" class="px-8 py-3 rounded-xl text-sm font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${myBooksSubTab === 'wishlist' ? 'bg-white dark:bg-slate-700 shadow-md text-primary' : 'text-slate-500 hover:text-slate-700'}">
+                            <button data-action="set-my-books-sub-tab" data-value="wishlist" class="px-8 py-3 rounded-xl text-sm font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${myBooksSubTab === 'wishlist' ? 'bg-white dark:bg-slate-700 shadow-md text-primary' : 'text-slate-500 hover:text-slate-700'}">
                                 Wishlist
                                 <span class="ml-2 px-2 py-0.5 bg-slate-200 dark:bg-slate-600 rounded-lg text-[10px]">${wishlistBooks.length}</span>
                             </button>
@@ -7288,7 +7288,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
 
                     ${myBooksSubTab === 'finished' ? `
                     <div class="flex justify-center">
-                        <button onclick="window.openAddFinishedBookModal()" class="px-6 py-3 bg-primary text-white rounded-2xl font-bold flex items-center gap-2 hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 focus-visible:ring-2 focus-visible:ring-primary outline-none">
+                        <button data-action="open-add-finished-book-modal" class="px-6 py-3 bg-primary text-white rounded-2xl font-bold flex items-center gap-2 hover:opacity-90 transition active:scale-95 shadow-lg shadow-primary/20 focus-visible:ring-2 focus-visible:ring-primary outline-none">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                             Add a finished book
                         </button>
@@ -7304,7 +7304,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                 </div>
                                 <h3 class="text-lg font-black font-serif italic">No books in this section</h3>
                                 <p class="text-slate-400 text-sm mt-1">Start by marking some books as ${myBooksSubTab === 'finished' ? 'finished' : 'wishlist item'}.</p>
-                                <button onclick="window.setTab('library')" class="mt-6 px-6 py-2 bg-primary text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">Browse Library</button>
+                                <button data-action="set-tab" data-value="library" class="mt-6 px-6 py-2 bg-primary text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">Browse Library</button>
                             </div>
                         `}
                     </div>
@@ -7758,7 +7758,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                         </div>
                         <h3 class="text-xl font-black font-serif italic">No insights yet</h3>
                         <p class="text-slate-400 text-sm mt-2 max-w-xs mx-auto">Add books to your library to unlock reading analysis.</p>
-                        <button onclick="window.setTab('library')" class="mt-8 px-6 py-3 bg-primary text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">Go to Library</button>
+                        <button data-action="set-tab" data-value="library" class="mt-8 px-6 py-3 bg-primary text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">Go to Library</button>
                     </div>
                     `;
                 }
@@ -8510,7 +8510,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                         <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Post a Message</h3>
                         <div class="flex gap-2">
                             <input id="activity-message-input" type="text" placeholder="Share a reading update or note..." class="flex-1 px-4 py-3 bg-slate-50 dark:bg-slate-900 rounded-2xl focus:ring-2 focus:ring-primary outline-none text-sm transition-all border border-transparent focus:bg-white dark:focus:bg-slate-800 focus:border-slate-200 dark:focus:border-slate-700">
-                            <button id="post-activity-msg-btn" onclick="window.postActivityMessage()" class="p-4 bg-primary text-white rounded-2xl hover:bg-slate-800 transition active:scale-95 shadow-lg shadow-slate-200 dark:shadow-none focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Post message">
+                            <button id="post-activity-msg-btn" data-action="post-activity-message" class="p-4 bg-primary text-white rounded-2xl hover:bg-slate-800 transition active:scale-95 shadow-lg shadow-slate-200 dark:shadow-none focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Post message">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
                             </button>
                         </div>
@@ -8855,7 +8855,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
 
                 container.innerHTML = `
         <div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up relative flex flex-col items-center justify-center py-20 text-center">
-            <button onclick="window.closeUserSearchModal()" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close search results">
+            <button data-action="close-user-search-modal" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close search results">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
             <div class="w-10 h-10 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin mb-4"></div>
@@ -8869,7 +8869,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     if (!lookupDoc.exists) {
                         container.innerHTML = `
                 <div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up relative text-center py-20">
-                    <button onclick="window.closeUserSearchModal()" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close search results">
+                    <button data-action="close-user-search-modal" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close search results">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                     <div class="p-8">
@@ -8928,7 +8928,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
 
                     container.innerHTML = `
             <div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up relative space-y-6 text-left overflow-y-auto max-h-[90vh]">
-                <button onclick="window.closeUserSearchModal()" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close search results">
+                <button data-action="close-user-search-modal" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close search results">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
                 <div class="flex flex-col sm:flex-row items-center gap-6 justify-between border-b border-slate-200 dark:border-slate-700 pb-6 pt-4">
@@ -9031,7 +9031,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                 } catch (err) {
                     container.innerHTML = `
             <div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-6 sm:p-10 shadow-2xl relative text-center py-20">
-                <button onclick="window.closeUserSearchModal()" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close">
+                <button data-action="close-user-search-modal" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
                 <div class="p-8">
@@ -9047,7 +9047,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                 const categorySelector = `
                     <div class="flex flex-wrap gap-2 mb-8">
                         ${categories.map(cat => `
-                            <button onclick="window.setFeedCategory('${cat}')" class="px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeFeedCategory === cat ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-105' : 'bg-white dark:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 border border-slate-100 dark:border-slate-800'}">${cat}</button>
+                            <button data-action="set-feed-category" data-value="${cat}" class="px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeFeedCategory === cat ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-105' : 'bg-white dark:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 border border-slate-100 dark:border-slate-800'}">${cat}</button>
                         `).join('')}
                     </div>
                 `;
@@ -9062,7 +9062,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                 </span>
                                 <input id="user-search-input" type="email" placeholder="Search user by email address..." value="${escapeHTML(window.lastUserSearchQuery || '')}" class="w-full pl-11 pr-4 py-3.5 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-primary outline-none text-sm transition-all text-slate-800 dark:text-white font-medium" />
                             </div>
-                            <button onclick="window.searchUserByEmail()" class="px-6 py-3.5 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-md shadow-primary/20 flex items-center gap-2 text-sm">
+                            <button data-action="search-user-by-email" class="px-6 py-3.5 bg-primary text-white rounded-xl font-bold hover:opacity-90 transition active:scale-95 shadow-md shadow-primary/20 flex items-center gap-2 text-sm">
                                 Search
                             </button>
                         </div>
@@ -9104,7 +9104,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                     <h2 class="text-3xl font-black font-serif italic text-slate-900 dark:text-white">Community Feed</h2>
                                     <p class="text-slate-500 text-sm mt-1">Discover what others are reading and share your thoughts.</p>
                                 </div>
-                                <button onclick="window.openPostReviewModal()" class="w-full sm:w-auto px-8 py-4 bg-primary text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none">
+                                <button data-action="open-post-review-modal" class="w-full sm:w-auto px-8 py-4 bg-primary text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none">
                                     Write Review
                                 </button>
                             </div>
@@ -9116,7 +9116,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                             </div>
                             <h2 class="text-2xl font-black font-serif italic text-slate-700 dark:text-slate-300">Quiet in the Library</h2>
                             <p class="text-slate-500 dark:text-slate-400 text-sm max-w-xs mt-3">Be the first to share your thoughts on a book that moved you.</p>
-                            <button onclick="window.openPostReviewModal()" class="mt-8 px-8 py-3 bg-primary text-white rounded-full font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">Write a Review</button>
+                            <button data-action="open-post-review-modal" class="mt-8 px-8 py-3 bg-primary text-white rounded-full font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">Write a Review</button>
                         </div>
                     </div>
                     `;
@@ -9131,7 +9131,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                 <h2 class="text-3xl font-black font-serif italic text-slate-900 dark:text-white">Community Feed</h2>
                                 <p class="text-slate-500 text-sm mt-1">Discover what others are reading and share your thoughts.</p>
                             </div>
-                            <button onclick="window.openPostReviewModal()" class="w-full sm:w-auto px-8 py-4 bg-primary text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none">
+                            <button data-action="open-post-review-modal" class="w-full sm:w-auto px-8 py-4 bg-primary text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none">
                                 Write Review
                             </button>
                         </div>
@@ -9142,7 +9142,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     </div>
                     ${hasMoreReviews ? `
                         <div class="flex justify-center pt-8">
-                            <button onclick="window.loadMoreReviews(this)" class="px-8 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-md hover:scale-105 active:scale-95 transition-all">Load More Reviews</button>
+                            <button data-action="load-more-reviews" class="px-8 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-md hover:scale-105 active:scale-95 transition-all">Load More Reviews</button>
                         </div>
                     ` : '<p class="text-center text-slate-400 text-xs font-bold uppercase tracking-widest pt-12 italic">— You\'ve reached the end of the shelf —</p>'}
                 </div>
@@ -9493,7 +9493,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
 
                             lastImportState = { addedIds, previousStates };
 
-                            showToast(`Imported ${importedCount} new, updated ${updatedCount} existing.`, 'success', 10000, '<button onclick="window.undoImport()" class="ml-4 underline font-bold uppercase text-xs focus-visible:ring-2 focus-visible:ring-white outline-none rounded" aria-label="Undo last import">Undo</button>');
+                            showToast(`Imported ${importedCount} new, updated ${updatedCount} existing.`, 'success', 10000, '<button data-action="undo-import" class="ml-4 underline font-bold uppercase text-xs focus-visible:ring-2 focus-visible:ring-white outline-none rounded" aria-label="Undo last import">Undo</button>');
                             window.undoImport = undoImport;
                         }
                     });
@@ -10048,10 +10048,10 @@ If the collection is small or has no finished books, be extra encouraging and su
                         <div class="p-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
                             <!-- Quick Action Buttons -->
                             <div class="flex flex-wrap gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                                <button onclick="window.sendAIChatMessage('📚 Recommend next book')" class="whitespace-nowrap px-4 py-2 sm:px-6 sm:py-3 bg-slate-50 dark:bg-blue-900/20 text-sky-600 dark:text-blue-400 rounded-full text-xs sm:text-sm font-bold hover:bg-blue-100 transition-colors border border-slate-200/50 dark:border-blue-900/30 active:scale-95">📚 Recommend next book</button>
-                                <button onclick="window.sendAIChatMessage('📊 Analyze my library')" class="whitespace-nowrap px-4 py-2 sm:px-6 sm:py-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-full text-xs sm:text-sm font-bold hover:bg-emerald-100 transition-colors border border-emerald-100/50 dark:border-emerald-900/30 active:scale-95">📊 Analyze my library</button>
-                                <button onclick="window.sendAIChatMessage('🧠 Improve my collection')" class="whitespace-nowrap px-4 py-2 sm:px-6 sm:py-3 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 rounded-full text-xs sm:text-sm font-bold hover:bg-amber-100 transition-colors border border-amber-100/50 dark:border-amber-900/30 active:scale-95">🧠 Improve my collection</button>
-                                <button onclick="window.sendAIChatMessage('📝 Summarize my library')" class="whitespace-nowrap px-4 py-2 sm:px-6 sm:py-3 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-full text-xs sm:text-sm font-bold hover:bg-indigo-100 transition-colors border border-indigo-100/50 dark:border-indigo-900/30 active:scale-95">📝 Summarize my library</button>
+                                <button data-action="send-ai-chat-message" data-value="📚 Recommend next book" class="whitespace-nowrap px-4 py-2 sm:px-6 sm:py-3 bg-slate-50 dark:bg-blue-900/20 text-sky-600 dark:text-blue-400 rounded-full text-xs sm:text-sm font-bold hover:bg-blue-100 transition-colors border border-slate-200/50 dark:border-blue-900/30 active:scale-95">📚 Recommend next book</button>
+                                <button data-action="send-ai-chat-message" data-value="📊 Analyze my library" class="whitespace-nowrap px-4 py-2 sm:px-6 sm:py-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-full text-xs sm:text-sm font-bold hover:bg-emerald-100 transition-colors border border-emerald-100/50 dark:border-emerald-900/30 active:scale-95">📊 Analyze my library</button>
+                                <button data-action="send-ai-chat-message" data-value="🧠 Improve my collection" class="whitespace-nowrap px-4 py-2 sm:px-6 sm:py-3 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 rounded-full text-xs sm:text-sm font-bold hover:bg-amber-100 transition-colors border border-amber-100/50 dark:border-amber-900/30 active:scale-95">🧠 Improve my collection</button>
+                                <button data-action="send-ai-chat-message" data-value="📝 Summarize my library" class="whitespace-nowrap px-4 py-2 sm:px-6 sm:py-3 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-full text-xs sm:text-sm font-bold hover:bg-indigo-100 transition-colors border border-indigo-100/50 dark:border-indigo-900/30 active:scale-95">📝 Summarize my library</button>
                             </div>
 
                             <div class="flex gap-2">
@@ -10205,7 +10205,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                         <div class="relative group/msg p-4 ${bg} rounded-2xl text-sm leading-relaxed">
                             ${role === 'ai' ? formatAIText(text) : `<p class="whitespace-pre-line">${escapeHTML(text)}</p>`}
                             ${role === 'ai' ? `
-                                <button onclick="window.speakText(this.parentElement.innerText, this)" class="absolute -right-2 -bottom-2 p-1.5 bg-white dark:bg-slate-700 rounded-lg shadow-md border border-slate-100 dark:border-slate-600 opacity-0 group-hover/msg:opacity-100 transition-opacity hover:text-primary focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-primary outline-none" title="Listen to response" aria-label="Listen to response">
+                                <button data-action="speak-text" class="absolute -right-2 -bottom-2 p-1.5 bg-white dark:bg-slate-700 rounded-lg shadow-md border border-slate-100 dark:border-slate-600 opacity-0 group-hover/msg:opacity-100 transition-opacity hover:text-primary focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-primary outline-none" title="Listen to response" aria-label="Listen to response">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
                                 </button>
                             ` : ''}
@@ -11229,7 +11229,7 @@ If the collection is small or has no finished books, be extra encouraging and su
                             batch.delete(db.collection('books').doc(book.id).collection('readingStatus').doc(currentUser.uid));
                             await batch.commit();
 
-                            showToast('Book deleted.', 'info', 10000, '<button onclick="window.undoDelete()" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Undo</button>');
+                            showToast('Book deleted.', 'info', 10000, '<button data-action="undo-delete" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Undo</button>');
                             close();
                         } catch (err) {
                             showToast('Error deleting: ' + err.message, 'error');
@@ -11490,6 +11490,38 @@ If the collection is small or has no finished books, be extra encouraging and su
                 if (el.dataset.stop !== 'false') e.stopPropagation();
 
                 switch (action) {
+                    case 'refresh-app': window.refreshApp(); break;
+                    case 'toggle-landing-theme': window.toggleLandingTheme(); break;
+                    case 'open-ai-chat': window.openAIChat(value); break;
+                    case 'set-theme': window.setTheme(value); break;
+                    case 'set-accent': window.setAccent(value); break;
+                    case 'run-wishlist-migration': window.runWishlistMigration(); break;
+                    case 'run-data-migration': window.runDataMigration(); break;
+                    case 'set-tab': window.setTab(value); break;
+                    case 'toggle-sidebar-theme': window.toggleSidebarTheme(); break;
+                    case 'clear-selection': window.clearSelection(); break;
+                    case 'bulk-transfer': window.bulkTransfer(); break;
+                    case 'bulk-delete': window.bulkDelete(); break;
+                    case 'undo-delete': window.undoDelete(); break;
+                    case 'clear-fav-filter': window.toggleFavoritesFilter(false); break;
+                    case 'clear-all-filters': window.clearAllFilters(); break;
+                    case 'clear-ai-search': window.clearAISearch(); break;
+                    case 'run-ai-search': window.runAISearch(); break;
+                    case 'open-scanner': window.openScanner(); break;
+                    case 'open-manual-add': document.querySelector('.manual-add-trigger')?.click(); break;
+                    case 'set-my-books-sub-tab': window.setMyBooksSubTab(value); break;
+                    case 'open-add-finished-book-modal': window.openAddFinishedBookModal(); break;
+                    case 'post-activity-message': window.postActivityMessage(); break;
+                    case 'close-user-search-modal': window.closeUserSearchModal(); break;
+                    case 'set-feed-category': window.setFeedCategory(value); break;
+                    case 'search-user-by-email': window.searchUserByEmail(); break;
+                    case 'open-post-review-modal': window.openPostReviewModal(); break;
+                    case 'load-more-reviews': window.loadMoreReviews(el); break;
+                    case 'undo-import': window.undoImport(); break;
+                    case 'send-ai-chat-message': window.sendAIChatMessage(value); break;
+                    case 'reload-app': window.location.reload(); break;
+                    case 'scroll-to': document.getElementById(value)?.scrollIntoView({ behavior: 'smooth' }); break;
+                    case 'speak-text': window.speakText(el.parentElement.innerText, el); break;
                     // ---- Filters ----
                     case 'filter-genre': window.setCategoryFilter(value); break;
                     case 'filter-tag': window.setTagFilter(value === '' ? null : value); break;
