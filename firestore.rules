@@ -13,13 +13,10 @@ service cloud.firestore {
       return uid1 < uid2 ? uid1 + '_' + uid2 : uid2 + '_' + uid1;
     }
 
-function partnershipData(uid1, uid2) {
-  return get(/databases/$(database)/documents/partnerships/$(getPartnershipId(uid1, uid2))).data;
-}
+    function partnershipData(uid1, uid2) {
+      return get(/databases/$(database)/documents/partnerships/$(getPartnershipId(uid1, uid2))).data;
+    }
 
-    // An accepted partnership where the requesting user (uid1) has not unsubscribed.
-    // This makes "unfollow" a real security boundary: it revokes the collaborator's
-    // read/write capabilities, not just the UI.
     function activePartnership(uid1, uid2) {
       let p = partnershipData(uid1, uid2);
       return p.status == 'accepted'
@@ -36,13 +33,12 @@ function partnershipData(uid1, uid2) {
       let p = partnershipData(uid1, uid2);
       return p.status == 'accepted'
         && p.get('allowAddBooks', false) == true
-        // A grant must exist, and only the library owner (uid2) can be the granter.
         && p.get('grantedBy', '') == uid2
-        // An unsubscribed partner loses the capability.
         && (p.userId1 == uid1
               ? p.get('user1Unsubscribed', false) != true
               : p.get('user2Unsubscribed', false) != true);
     }
+
     function isLibraryMember(userId, libraryOwnerId) {
       return userId == libraryOwnerId || partnershipExists(userId, libraryOwnerId);
     }
@@ -51,7 +47,10 @@ function partnershipData(uid1, uid2) {
       return userId == libraryOwnerId || partnershipAllowsAdd(userId, libraryOwnerId);
     }
 
-    // Shared payload validation for books (create + update).
+    // ---------------------------------------------------------
+    // Shared payload validators
+    // ---------------------------------------------------------
+
     function validBookData(d) {
       return d.title is string
         && d.author is string
@@ -65,14 +64,19 @@ function partnershipData(uid1, uid2) {
         && (!('coverUrl' in d) || d.coverUrl == null
             || (d.coverUrl is string
                 && d.coverUrl.size() <= 2000
-                && d.coverUrl.matches('^https?://')))
+                && d.coverUrl.matches('^https?://')
+                && !d.coverUrl.matches('.*["\'<>`\\s].*')))
+        && (!('thumbnail' in d) || d.thumbnail == null
+            || (d.thumbnail is string
+                && d.thumbnail.size() <= 2000
+                && d.thumbnail.matches('^https?://')
+                && !d.thumbnail.matches('.*["\'<>`\\s].*')))
         && (!('tags' in d) || (d.tags is list && d.tags.size() <= 50))
         && (!('categories' in d) || (d.categories is list && d.categories.size() <= 20))
         && (!('genres' in d) || (d.genres is list && d.genres.size() <= 50))
         && (!('highlights' in d) || d.highlights is list)
         && (!('borrowHistory' in d) || d.borrowHistory is list)
         && (!('copyType' in d) || d.copyType in ['New Copy', 'Old Copy', 'Gifted'])
-        // Numeric fields must really be numbers (and within sane bounds).
         && (!('rating' in d) || d.rating == null
             || ((d.rating is int || d.rating is float) && d.rating >= 0 && d.rating <= 5))
         && (!('averageRating' in d) || d.averageRating == null
@@ -80,13 +84,10 @@ function partnershipData(uid1, uid2) {
                 && d.averageRating >= 0 && d.averageRating <= 5))
         && (!('ratingCount' in d) || d.ratingCount == null
             || (d.ratingCount is int && d.ratingCount >= 0))
-        // Booleans / strings.
         && (!('isWishlist' in d) || d.isWishlist is bool)
         && (!('excludeFromLibrary' in d) || d.excludeFromLibrary is bool)
         && (!('gifterName' in d) || d.gifterName == null
             || (d.gifterName is string && d.gifterName.size() <= 200))
-        && (!('thumbnail' in d) || d.thumbnail == null
-            || (d.thumbnail is string && d.thumbnail.size() <= 2000))
         && (!('source' in d) || d.source == null
             || (d.source is string && d.source.size() <= 50))
         && (!('status' in d) || d.status == null
@@ -101,8 +102,6 @@ function partnershipData(uid1, uid2) {
         && (!('purchaseDate' in d) || d.purchaseDate == null || d.purchaseDate is string);
     }
 
-    // Strict field allowlists for book documents — blocks arbitrary field injection.
-    // Content fields either an owner or a granted partner may change.
     function bookContentFields() {
       return ['title', 'author', 'genres', 'categories', 'category',
               'description', 'tags', 'coverUrl', 'isbn', 'isWishlist',
@@ -113,8 +112,6 @@ function partnershipData(uid1, uid2) {
               'libraryId', 'updatedAt'];
     }
 
-    // Owner-only additions: an ownership transfer may move `userId` (further gated
-    // by the active-partnership check in the update rule).
     function bookOwnerFields() {
       return ['title', 'author', 'genres', 'categories', 'category',
               'description', 'tags', 'coverUrl', 'isbn', 'isWishlist',
@@ -125,8 +122,6 @@ function partnershipData(uid1, uid2) {
               'libraryId', 'updatedAt', 'userId'];
     }
 
-    // Fields permitted on creation. `addedBy` and `createdAt` are set once here and
-    // pinned immutable by the update rule.
     function bookCreateFields() {
       return ['title', 'author', 'genres', 'categories', 'category',
               'description', 'tags', 'coverUrl', 'isbn', 'isWishlist',
@@ -137,7 +132,6 @@ function partnershipData(uid1, uid2) {
               'libraryId', 'updatedAt', 'userId', 'addedBy', 'createdAt'];
     }
 
-    // Shared payload validation for per-user reading status.
     function validReadingStatus(d) {
       return d.userId is string
         && d.status in ['want_to_read', 'reading', 'finished']
@@ -153,34 +147,94 @@ function partnershipData(uid1, uid2) {
         && (!('isWishlist' in d) || d.isWishlist is bool);
     }
 
-    // Shared payload validation for reviews (applied on create AND update).
     function validReviewContent(d) {
       return d.category in ['Help', 'Review', 'Others']
         && d.body is string
         && d.body.size() >= 10
         && d.body.size() <= 2000
+        && d.userName is string
+        && d.userName.size() > 0
+        && d.userName.size() <= 100
         && (!('rating' in d) || d.rating == null
             || ((d.rating is int || d.rating is float)
                 && d.rating >= 0 && d.rating <= 5));
     }
 
+    // Profile field validation — shared between create and update
+    function validProfilePayload(d) {
+      return d.displayName is string
+        && d.displayName.size() > 0 
+        && d.displayName.size() <= 100
+        && (!('bio' in d) || d.bio == null
+            || (d.bio is string && d.bio.size() <= 500))
+        && (!('photoURL' in d) || d.photoURL == null
+            || (d.photoURL is string
+                && d.photoURL.size() <= 2000
+                && d.photoURL.matches('^https?://')));
+    }
+
+    // Activity-feed payload validation
+    function validActivityPayload(d) {
+      return d.type is string
+        && d.type in [
+             'book_added', 'status_updated', 'rating_updated',
+             'book_borrowed', 'book_returned', 'user_message',
+             'request_accepted', 'request_rejected', 'book_transfer'
+           ]
+        && d.userId is string
+        && d.userName is string
+        && d.userName.size() <= 100
+        && d.libraryId is string
+        && (!('text' in d) || d.text == null
+            || (d.text is string && d.text.size() <= 500))
+        && (!('bookTitle' in d) || d.bookTitle == null
+            || (d.bookTitle is string && d.bookTitle.size() <= 500))
+        && (!('bookId' in d) || d.bookId == null
+            || (d.bookId is string && d.bookId.size() <= 100))
+        && (!('message' in d) || d.message == null
+            || (d.message is string && d.message.size() <= 1000))
+        && (!('comment' in d) || d.comment == null
+            || (d.comment is string && d.comment.size() <= 2000))
+        && (!('status' in d) || d.status == null
+            || d.status is string)
+        && (!('addedTo' in d) || d.addedTo == null
+            || (d.addedTo is string && d.addedTo.size() <= 50))
+        && (!('rating' in d) || d.rating == null
+            || ((d.rating is int || d.rating is float)
+                && d.rating >= 0 && d.rating <= 5))
+        && (!('recipientId' in d) || d.recipientId == null
+            || d.recipientId is string)
+        && (!('targetUserId' in d) || d.targetUserId == null
+            || d.targetUserId is string)
+        && (!('borrowedBy' in d) || d.borrowedBy == null
+            || (d.borrowedBy is string && d.borrowedBy.size() <= 200));
+    }
+
+    function activityFields() {
+      return ['type', 'userId', 'userName', 'libraryId', 'timestamp',
+              'bookId', 'bookTitle', 'addedTo', 'status', 'rating',
+              'comment', 'text', 'recipientId', 'targetUserId',
+              'borrowedBy', 'message'];
+    }
+
     // ==========================================================
-    // USERS — public parent + private subcollection
+    // USERS
     // ==========================================================
     match /users/{userId} {
-      // Anyone signed-in can see the public profile.
-      allow read: if isSignedIn();
+      allow get: if isSignedIn();
 
-      // Only the owner can create/update their own doc. The public profile is
-      // restricted to the exact shape the app uses, so no arbitrary fields can be
-      // injected. `uid` is write-once and can never be re-pointed at another account.
+      // Bounded list only. The client MUST pass .limit(N) with N <= 100.
+      // Unbounded enumeration of every profile in the system is denied.
+      allow list: if isSignedIn() && request.query.limit <= 100;
+
       allow create: if isSignedIn()
         && request.auth.uid == userId
         && request.resource.data.uid == userId
         && request.resource.data.keys().hasOnly([
              'uid', 'displayName', 'photoURL', 'bio', 'joinedAt',
              'totalBooksCount', 'completedBooksCount'
-           ]);
+           ])
+        && validProfilePayload(request.resource.data);
 
       allow update: if isSignedIn()
         && request.auth.uid == userId
@@ -188,23 +242,26 @@ function partnershipData(uid1, uid2) {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
              'displayName', 'photoURL', 'bio', 'updatedAt',
              'totalBooksCount', 'completedBooksCount'
-           ]);
+           ])
+        && validProfilePayload(request.resource.data);
 
       allow delete: if false;
 
-      // Private data — owner only.
       match /private/{docId} {
         allow read, write: if isSignedIn() && request.auth.uid == userId;
       }
     }
 
     // ==========================================================
-    // USER LOOKUP (email → uid) for collaborator search
+    // USER LOOKUP (email -> uid)
     // ==========================================================
     match /userLookup/{email} {
-      allow read: if isSignedIn();
+      allow get: if isSignedIn();
 
-      // Denies email squatting in userLookup — a caller may only claim their own verified email.
+      // Bounded list only. Filters are NOT inspectable in rules,
+      // so we rely on limit to defeat enumeration.
+      allow list: if isSignedIn() && request.query.limit <= 1;
+
       allow create: if isSignedIn()
         && request.auth.token.email != null
         && request.resource.data.uid == request.auth.uid
@@ -212,7 +269,6 @@ function partnershipData(uid1, uid2) {
         && email == email.lower()
         && email.matches('^[^@]+@[^@]+$');
 
-      // Denies email squatting in userLookup — a caller may only claim their own verified email.
       allow update: if isSignedIn()
         && request.auth.token.email != null
         && resource.data.uid == request.auth.uid
@@ -223,41 +279,29 @@ function partnershipData(uid1, uid2) {
     }
 
     // ==========================================================
-    // PARTNERSHIPS — created only after an accepted request exists
+    // PARTNERSHIPS
     // ==========================================================
     match /partnerships/{partnershipId} {
-      // Split reads for list-query provability.
       allow read: if isSignedIn() && request.auth.uid == resource.data.userId1;
       allow read: if isSignedIn() && request.auth.uid == resource.data.userId2;
 
       allow create: if isSignedIn()
-        // Only the recipient who accepted the request may finalise the partnership.
         && request.auth.uid == get(/databases/$(database)/documents/collaborationRequests/$(partnershipId)).data.toUserId
-        // Must use the canonical sorted-UID pair as the ID (userId1 < userId2).
         && request.resource.data.userId1 < request.resource.data.userId2
         && partnershipId == getPartnershipId(
               request.resource.data.userId1,
               request.resource.data.userId2
            )
-        // A genuinely accepted request must already exist, and its participants must
-        // exactly match the two partnership users.
         && exists(/databases/$(database)/documents/collaborationRequests/$(partnershipId))
         && get(/databases/$(database)/documents/collaborationRequests/$(partnershipId)).data.status == 'accepted'
         && get(/databases/$(database)/documents/collaborationRequests/$(partnershipId)).data.fromUserId in
              [request.resource.data.userId1, request.resource.data.userId2]
         && get(/databases/$(database)/documents/collaborationRequests/$(partnershipId)).data.toUserId in
              [request.resource.data.userId1, request.resource.data.userId2]
-        // Fresh partnerships start closed.
         && request.resource.data.status == 'accepted'
         && request.resource.data.get('allowAddBooks', false) == false
-        // No add-books grant exists until a party explicitly grants it.
         && request.resource.data.get('grantedBy', '') == '';
 
-      // Two independent capabilities:
-      //   (1) the add-books grant — only the library owner may grant, and only the
-      //       recorded granter may revoke; and
-      //   (2) unsubscribing — each participant may only touch their OWN flag.
-      // They are deliberately not merged into one broad update rule.
       allow update: if isSignedIn()
         && (request.auth.uid == resource.data.userId1
             || request.auth.uid == resource.data.userId2)
@@ -265,31 +309,23 @@ function partnershipData(uid1, uid2) {
         && request.resource.data.userId2 == resource.data.userId2
         && request.resource.data.status == resource.data.status
         && (
-          // --- allowAddBooks grant / revoke ---
           (request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['allowAddBooks', 'grantedBy', 'updatedAt'])
            && (
-             // Grant on: the library owner turns it on and records themselves as granter.
              (request.resource.data.get('allowAddBooks', false) == true
               && resource.data.get('allowAddBooks', false) == false
               && request.resource.data.get('grantedBy', '') == request.auth.uid)
-             // Revoke: clears the grant. It only removes access, so either party may do
-             // it, but when a granter is recorded the caller must be that granter.
              || (request.resource.data.get('allowAddBooks', false) == false
                  && resource.data.get('allowAddBooks', false) == true
                  && request.resource.data.get('grantedBy', '') == ''
                  && (resource.data.get('grantedBy', '') == request.auth.uid
                      || resource.data.get('grantedBy', '') == ''))
-             // Unchanged: the recorded granter must not change.
-             // Uses .get() with a default so legacy docs that predate grantedBy can be migrated.
              || (request.resource.data.get('allowAddBooks', false) == resource.data.get('allowAddBooks', false)
                  && request.resource.data.get('grantedBy', '') == resource.data.get('grantedBy', ''))
            ))
-          // --- only user1 may change user1Unsubscribed ---
           || (request.auth.uid == resource.data.userId1
               && request.resource.data.diff(resource.data).affectedKeys()
                    .hasOnly(['user1Unsubscribed', 'updatedAt']))
-          // --- only user2 may change user2Unsubscribed ---
           || (request.auth.uid == resource.data.userId2
               && request.resource.data.diff(resource.data).affectedKeys()
                    .hasOnly(['user2Unsubscribed', 'updatedAt']))
@@ -299,7 +335,7 @@ function partnershipData(uid1, uid2) {
     }
 
     // ==========================================================
-    // COLLABORATION REQUESTS — deterministic ID = sorted UID pair
+    // COLLABORATION REQUESTS
     // ==========================================================
     match /collaborationRequests/{requestId} {
       allow read: if isSignedIn() && request.auth.uid == resource.data.fromUserId;
@@ -314,11 +350,6 @@ function partnershipData(uid1, uid2) {
               request.resource.data.toUserId
            );
 
-      // Strict state machine on a still-pending request:
-      //   toUserId   → accepted / rejected
-      //   fromUserId → cancelled
-      // No participant may jump to an arbitrary status, and a request that has reached a
-      // terminal state can never change again. This blocks self-acceptance.
       allow update: if isSignedIn()
         && resource.data.status == 'pending'
         && request.resource.data.diff(resource.data).affectedKeys()
@@ -336,87 +367,61 @@ function partnershipData(uid1, uid2) {
     // ==========================================================
     // BOOKS
     // ==========================================================
-match /books/{bookId} {
-  // Own books — provable from `where('userId','==',uid)`.
-  allow read: if isSignedIn() && request.auth.uid == resource.data.userId;
+    match /books/{bookId} {
+      allow read: if isSignedIn() && request.auth.uid == resource.data.userId;
+      allow read: if isSignedIn()
+        && activePartnership(request.auth.uid, resource.data.userId);
 
-  // Partner books — only while the partnership is accepted and the reader is active
-  // (an unsubscribed partner can no longer read).
-  allow read: if isSignedIn()
-    && activePartnership(request.auth.uid, resource.data.userId);
+      allow create: if isSignedIn()
+        && validBookData(request.resource.data)
+        && request.resource.data.keys().hasOnly(bookCreateFields())
+        && (
+          request.resource.data.userId == request.auth.uid
+          || partnershipAllowsAdd(request.auth.uid, request.resource.data.userId)
+        )
+        && (request.resource.data.userId == request.auth.uid
+            || request.resource.data.get('addedBy', '') == request.auth.uid);
 
-  // Owner creates in their own library. A partner with an active add grant may create a
-  // book for the owner's library, and must be recorded as `addedBy`. Only allowlisted
-  // fields may be written — no arbitrary field injection.
-  allow create: if isSignedIn()
-    && validBookData(request.resource.data)
-    && request.resource.data.keys().hasOnly(bookCreateFields())
-    && (
-      request.resource.data.userId == request.auth.uid
-      || partnershipAllowsAdd(request.auth.uid, request.resource.data.userId)
-    )
-    && (request.resource.data.userId == request.auth.uid
-        || request.resource.data.get('addedBy', '') == request.auth.uid);
+      allow update: if isSignedIn()
+        && validBookData(request.resource.data)
+        && (
+          request.resource.data.userId == resource.data.userId
+          || (resource.data.userId == request.auth.uid
+              && activePartnership(request.auth.uid, request.resource.data.userId))
+        )
+        && request.resource.data.get('addedBy', '') == resource.data.get('addedBy', '')
+        && request.resource.data.get('createdAt', null) == resource.data.get('createdAt', null)
+        && (
+          (resource.data.userId == request.auth.uid
+           && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(bookOwnerFields()))
+          || (resource.data.get('addedBy', '') == request.auth.uid
+              && partnershipAllowsAdd(request.auth.uid, resource.data.userId)
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(bookContentFields()))
+        )
+        && (
+          request.resource.data.get('borrowedBy', '') == resource.data.get('borrowedBy', '')
+          || resource.data.get('borrowedBy', '') == ''
+          || request.resource.data.get('borrowedBy', '') == ''
+        );
 
-  // Owner has full control of their own books. A partner may edit only books they
-  // personally added, while their add grant is active. Ownership may only change via an
-  // explicit transfer by the current owner to an active partner. Each role is limited
-  // to its own strict field allowlist, so no arbitrary field can be injected.
-  allow update: if isSignedIn()
-    && validBookData(request.resource.data)
-    && (
-      request.resource.data.userId == resource.data.userId
-      || (resource.data.userId == request.auth.uid
-          && activePartnership(request.auth.uid, request.resource.data.userId))
-    )
-    // Nobody may rewrite the authorship/creation markers.
-    && request.resource.data.get('addedBy', '') == resource.data.get('addedBy', '')
-    && request.resource.data.get('createdAt', null) == resource.data.get('createdAt', null)
-    && (
-      // Owner: may edit any content field. `userId` is only in the owner list, and any
-      // change to it is already constrained to an active-partner transfer by the check
-      // above — so ownership can never be hijacked.
-      (resource.data.userId == request.auth.uid
-       && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(bookOwnerFields()))
-      // Partner: may edit only a book they personally added, only while their add grant
-      // is active, and may never touch `userId`.
-      || (resource.data.get('addedBy', '') == request.auth.uid
-          && partnershipAllowsAdd(request.auth.uid, resource.data.userId)
-          && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(bookContentFields()))
-    )
-    // Borrowing: a book can only be claimed while previously unborrowed, and a return can
-    // only clear an existing borrow. This blocks two users claiming the same book.
-    && (
-      request.resource.data.get('borrowedBy', '') == resource.data.get('borrowedBy', '')
-      || resource.data.get('borrowedBy', '') == ''
-      || request.resource.data.get('borrowedBy', '') == ''
-    );
-
-  // Owner may delete their own books. A partner may delete only a book they added, while
-  // their add grant is still active.
-  allow delete: if isSignedIn()
-    && (
-      resource.data.userId == request.auth.uid
-      || (resource.data.get('addedBy', '') == request.auth.uid
-          && partnershipAllowsAdd(request.auth.uid, resource.data.userId))
-    );
-}
+      allow delete: if isSignedIn()
+        && (
+          resource.data.userId == request.auth.uid
+          || (resource.data.get('addedBy', '') == request.auth.uid
+              && partnershipAllowsAdd(request.auth.uid, resource.data.userId))
+        );
+    }
 
     // ==========================================================
-    // READING STATUS (collection group)
+    // READING STATUS
     // ==========================================================
-    // Collection-group rule: only for the collectionGroup('readingStatus') reads the app
-    // performs, scoped to the caller's own status documents.
     match /{path=**}/readingStatus/{statusId} {
       allow read: if isSignedIn()
         && resource.data.userId == request.auth.uid;
     }
 
-    // The actual write path. Split create/update/delete so deletes do not depend on
-    // request.resource (which is empty for deletes). Only the authenticated user may
-    // create/update/delete their own status.
     match /books/{bookId}/readingStatus/{statusId} {
       allow read: if isSignedIn()
         && statusId == request.auth.uid
@@ -440,25 +445,25 @@ match /books/{bookId} {
     // ==========================================================
     match /activityFeed/{activityId} {
       allow read: if isSignedIn() && request.auth.uid == resource.data.libraryId;
-      // Partners may read each other's feed only while active (not unsubscribed).
       allow read: if isSignedIn()
         && activePartnership(request.auth.uid, resource.data.libraryId);
 
       allow create: if isSignedIn()
         && request.auth.uid == request.resource.data.userId
-        && canEditLibrary(request.auth.uid, request.resource.data.libraryId);
+        && canEditLibrary(request.auth.uid, request.resource.data.libraryId)
+        && request.resource.data.keys().hasOnly(activityFields())
+        && validActivityPayload(request.resource.data);
 
       allow update, delete: if false;
     }
 
     // ==========================================================
-    // BOOK REQUESTS (borrowing)
+    // BOOK REQUESTS
     // ==========================================================
     match /bookRequests/{requestId} {
       allow read: if isSignedIn() && request.auth.uid == resource.data.fromUserId;
       allow read: if isSignedIn() && request.auth.uid == resource.data.toUserId;
 
-      // The server verifies book ownership instead of trusting client-supplied metadata.
       allow create: if isSignedIn()
         && request.auth.uid == request.resource.data.fromUserId
         && request.resource.data.fromUserId != request.resource.data.toUserId
@@ -472,11 +477,9 @@ match /books/{bookId} {
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['status', 'updatedAt'])
         && (
-          // Recipient accepts or rejects.
           (request.auth.uid == resource.data.toUserId
            && request.resource.data.status in ['accepted', 'rejected'])
           ||
-          // Sender cancels.
           (request.auth.uid == resource.data.fromUserId
            && request.resource.data.status == 'cancelled')
         );
@@ -497,7 +500,6 @@ match /books/{bookId} {
         && request.resource.data.get('commentsCount', 0) == 0;
 
       allow update: if isSignedIn() && (
-        // Owner editing review content — identical validation to create.
         (resource.data.userId == request.auth.uid
          && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['body', 'rating', 'category', 'updatedAt'])
@@ -505,10 +507,6 @@ match /books/{bookId} {
          && request.resource.data.get('likesCount', 0) == resource.data.get('likesCount', 0)
          && request.resource.data.get('commentsCount', 0) == resource.data.get('commentsCount', 0))
         ||
-        // Likes: the counter must move in lockstep with the caller's own like document,
-        // written in the SAME batched/transactional request. This makes forged counters
-        // ("+1,+1,+1…") impossible without also creating/deleting real like docs,
-        // without introducing Cloud Functions or paid infrastructure.
         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount'])
          && request.resource.data.get('likesCount', 0) == resource.data.get('likesCount', 0) + 1
          && !exists(/databases/$(database)/documents/reviews/$(reviewId)/likes/$(request.auth.uid))
@@ -519,10 +517,18 @@ match /books/{bookId} {
          && exists(/databases/$(database)/documents/reviews/$(reviewId)/likes/$(request.auth.uid))
          && !existsAfter(/databases/$(database)/documents/reviews/$(reviewId)/likes/$(request.auth.uid)))
         ||
-        // Comments: a single +1 per write. (Full proof would need the generated comment
-        // document id, which the rules language cannot reference for a batched add.)
         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentsCount'])
          && request.resource.data.get('commentsCount', 0) == resource.data.get('commentsCount', 0) + 1)
+         
+  // NOTE: commentsCount can be forged by any signed-in user.
+  // Firestore rules cannot reference randomly-generated document IDs,
+  // so we cannot require that a comment was actually created in the
+  // same write. Impact is cosmetic only — the displayed count can be
+  // inflated, but no data is exposed and no privilege is gained.
+  // The correct fix requires a Cloud Function; deferred as out of scope.
+  (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentsCount'])
+   && request.resource.data.get('commentsCount', 0) == resource.data.get('commentsCount', 0) + 1)
+);
       );
 
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;

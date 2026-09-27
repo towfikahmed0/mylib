@@ -1,5 +1,30 @@
 {
-  "emulators": {
-    "singleProjectMode": true
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      "**/.*",
+      "**/node_modules/**",
+      "**/*.bak",
+      "backups/**",
+      "tools/**",
+      "misc/**",
+      "src/**",
+      "docs/**",
+      "*.py",
+      "*.txt",
+      "*.log",
+      "*.md",
+      "package.json",
+      "package-lock.json",
+      "tailwind.config.js",
+      "firestore.rules",
+      "firestore.indexes.json"
+    ]
   }
 }

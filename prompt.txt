@@ -1,7 +1,0 @@
-Read index.html. We need to fix XSS vulnerabilities where Firestore document IDs and URLs are injected into HTML attributes without escaping.
-
-Search the entire file for every instance of book.id, rev.id, review.id, and comment IDs being inserted into HTML attributes (like data-book-id="${book.id}", id="comments-${rev.id}"). Wrap all of them in escapeHTML().
-
-Search for every instance of coverUrl being inserted into an <img src="..."> or any HTML attribute. Wrap them in escapeHTML().
-
-Do not change any other logic, CSS, or CSP. Do not touch Firestore rules. Show me the diff when done.
