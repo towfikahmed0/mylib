@@ -1,5 +1,34 @@
+# Dependencies — restored with `npm install`
 node_modules/
-".agents/" 
-".claude/" 
-".commandcode/" 
-"skills-lock.json" 
+
+# Python tooling — personal scripts
+tools/
+*.py
+__pycache__/
+*.pyc
+
+# Local backups and migration snapshots
+backups/
+*.bak
+*.bak2
+*.pre-final
+
+# Firebase CLI local state
+.firebase/
+.firebaserc.local
+
+# Local scratch
+misc/
+prompt.txt
+server.log
+skills-lock.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
