@@ -320,7 +320,6 @@ match /books/{bookId} {
     // performs, scoped to the caller's own status documents.
     match /{path=**}/readingStatus/{statusId} {
       allow read: if isSignedIn()
-        && statusId == request.auth.uid
         && resource.data.userId == request.auth.uid;
     }
 
@@ -333,12 +332,13 @@ match /books/{bookId} {
         && resource.data.userId == request.auth.uid;
 
       allow create: if isSignedIn()
-        && statusId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.userId == statusId
         && validReadingStatus(request.resource.data);
 
       allow update: if isSignedIn()
-        && statusId == request.auth.uid
         && request.resource.data.userId == request.auth.uid
+        && request.resource.data.userId == statusId
         && validReadingStatus(request.resource.data);
 
       allow delete: if isSignedIn() && statusId == request.auth.uid;
@@ -420,10 +420,12 @@ match /books/{bookId} {
         // without introducing Cloud Functions or paid infrastructure.
         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount'])
          && request.resource.data.get('likesCount', 0) == resource.data.get('likesCount', 0) + 1
+         && !exists(/databases/$(database)/documents/reviews/$(reviewId)/likes/$(request.auth.uid))
          && existsAfter(/databases/$(database)/documents/reviews/$(reviewId)/likes/$(request.auth.uid)))
         ||
         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount'])
          && request.resource.data.get('likesCount', 0) == resource.data.get('likesCount', 0) - 1
+         && exists(/databases/$(database)/documents/reviews/$(reviewId)/likes/$(request.auth.uid))
          && !existsAfter(/databases/$(database)/documents/reviews/$(reviewId)/likes/$(request.auth.uid)))
         ||
         // Comments: a single +1 per write. (Full proof would need the generated comment
