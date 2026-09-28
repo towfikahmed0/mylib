@@ -2,7 +2,6 @@
 <html lang="en">
 
 <head>
-
 <meta http-equiv="Content-Security-Policy" content="
   default-src 'self';
   script-src 'self'
@@ -16,18 +15,7 @@
     https://www.recaptcha.net;
   style-src 'self' https://fonts.googleapis.com;
   font-src 'self' https://fonts.gstatic.com data:;
-  img-src 'self' data: blob:
-    https://covers.openlibrary.org
-    https://books.google.com
-    https://via.placeholder.com
-    https://cdn-icons-png.flaticon.com
-    https://www.gstatic.com
-    https://*.gstatic.com
-    https://lh3.googleusercontent.com
-    https://*.googleusercontent.com
-    https://www.gravatar.com
-    https://secure.gravatar.com
-    https://*.openlibrary.org;
+  img-src 'self' data: blob: https:;
   connect-src 'self'
     https://www.googleapis.com
     https://identitytoolkit.googleapis.com
@@ -64,6 +52,8 @@
   form-action 'self';
   upgrade-insecure-requests;
 ">
+
+
     <script src="/js/theme-init.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
