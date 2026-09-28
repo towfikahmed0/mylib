@@ -1,615 +1,664 @@
 // Initialize theme immediately to prevent flash
-        const savedTheme = localStorage.getItem('mylib_theme');
-        if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-            document.documentElement.classList.add('dark');
-        } else if (savedTheme === 'sepia') {
-            document.documentElement.classList.add('sepia');
-        } else {
-            document.documentElement.classList.remove('dark', 'sepia');
+const savedTheme = localStorage.getItem('mylib_theme');
+if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.classList.add('dark');
+} else if (savedTheme === 'sepia') {
+    document.documentElement.classList.add('sepia');
+} else {
+    document.documentElement.classList.remove('dark', 'sepia');
+}
+
+(function () {
+    // Delegated image-error fallback (CSP-safe replacement for inline onerror=)
+    document.addEventListener('error', (e) => {
+        const img = e.target;
+        if (img.tagName !== 'IMG') return;
+        const fallback = img.dataset.fallbackSrc;
+        if (!fallback || img.src === fallback) return;
+        img.src = fallback;
+        img.removeAttribute('data-fallback-src');
+    }, true); // capture phase — img error events don't bubble
+
+    // SRE: Global Error Boundary
+    window.onerror = function (msg, url, lineNo, columnNo, error) {
+        showToast('Something went wrong, but your data is safe.', 'error', 10000, '<button data-action="reload-app" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Reload</button>');
+        return false;
+    };
+    window.onunhandledrejection = function (event) {
+        showToast('A background task failed. Your work is saved.', 'error', 10000, '<button data-action="reload-app" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Reload</button>');
+    };
+
+
+    window.toggleLandingTheme = function () {
+        const isDark = document.documentElement.classList.toggle('dark');
+        const newTheme = isDark ? 'dark' : 'light';
+        localStorage.setItem('theme', newTheme);
+        localStorage.setItem('mylib_theme', newTheme);
+        const sunIcon = document.getElementById('theme-toggle-sun');
+        const moonIcon = document.getElementById('theme-toggle-moon');
+        if (sunIcon && moonIcon) {
+            if (isDark) {
+                sunIcon.classList.remove('hidden');
+                moonIcon.classList.add('hidden');
+            } else {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+            }
+        }
+    };
+
+    // ---------- State ----------
+    const APP_VERSION = '3.1';
+    const DRAFT_KEY = 'mylib_manual_draft';
+    window.DRAFT_KEY = DRAFT_KEY; // Expose for testing
+    let deferredPrompt = null;
+    let currentUser = null;
+    window.__setCurrentUser = (u) => currentUser = u;
+    let userProfile = null;
+    window.__setUserProfile = (p) => userProfile = p;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        if (activeTab === 'settings') window.queueRenderMainApp();
+    });
+
+    window.addEventListener('appinstalled', () => {
+        deferredPrompt = null;
+        if (activeTab === 'settings') window.queueRenderMainApp();
+    });
+    let books = [];                // local copy for UI, synced with Firestore
+    let chatHistory = [];          // AI chat session history
+    let bookRequests = [];         // book borrowing requests
+    let collaborationRequests = [];// collaboration requests
+    window.__setBooks = (b) => books = b;
+    window.lastDeleted = [];       // Safety net for undo
+    let readingStatuses = {};      // local copy for per-user statuses {bookId: status}
+    window.__setReadingStatuses = (s) => readingStatuses = s;
+    let unsubscribeBooks = null;
+    let unsubscribeStatus = null;
+    let unsubscribeBookRequests = null;
+    let unsubscribeCollabReq1 = null;
+    let unsubscribeCollabReq2 = null;
+    let activeTab = 'library';     // 'library', 'wishlist', 'activity', 'settings'
+    let allPartnerships = [];
+    let aiResponseCache = [];      // Cache last 5 responses [{prompt, response}]
+    let lastActiveTab = null;
+    let socialReviews = [];
+    let lastReviewDoc = null;
+    let hasMoreReviews = true;
+    let activeFeedCategory = 'All';
+    let myBooksSubTab = 'finished';
+    let currentModalCloseHandler = null;
+    let aiSearchResults = null; // List of book IDs
+    let aiSearchResultsSet = null; // Set of book IDs for O(1) lookup
+    let isInitialSync = true;
+    window.__isInitialSync = () => isInitialSync; // Expose for testing
+    window.__setInitialSync = (v) => isInitialSync = v;
+
+    // ⚡ Bolt: Debounce UI renders to prevent lag during rapid state updates (e.g., Firestore sync)
+    let renderPending = false;
+    let libraryRenderPending = false;
+
+    window.queueRenderMainApp = () => renderMainApp();
+    window.queueRenderLibraryOnly = () => renderLibraryOnly();
+
+    // Global keyboard shortcuts (attached once)
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && currentModalCloseHandler) {
+            currentModalCloseHandler();
+            return;
+        }
+        if ((e.key === 'Enter' || e.key === ' ') && document.activeElement && (document.activeElement.classList.contains('book-card') || document.activeElement.classList.contains('activity-card') || document.activeElement.classList.contains('pie-slice') || document.activeElement.getAttribute('role') === 'button')) {
+            e.preventDefault();
+            document.activeElement.click();
+            return;
+        }
+        if (!currentModalCloseHandler && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+            if (e.key === '?') {
+                e.preventDefault();
+                window.showShortcutsHelp();
+                return;
+            }
+            if (e.key === '/') {
+                e.preventDefault();
+                if (activeTab !== 'library') window.setTab('library');
+                setTimeout(() => {
+                    const input = document.getElementById('search-input');
+                    if (input) { input.focus(); input.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+                }, activeTab === 'library' ? 0 : 50);
+                return;
+            }
+            if (e.key.toLowerCase() === 'n') {
+                e.preventDefault();
+                document.getElementById('manual-add-btn')?.click();
+                return;
+            }
+            if (e.key.toLowerCase() === 'l') { e.preventDefault(); window.setTab('library'); return; }
+            if (e.key.toLowerCase() === 'm') { e.preventDefault(); window.setTab('mybooks'); return; }
+            if (e.key.toLowerCase() === 'a') { e.preventDefault(); window.setTab('activity'); return; }
+            if (e.key.toLowerCase() === 'i') { e.preventDefault(); window.setTab('insight'); return; }
+            if (e.key.toLowerCase() === 's') { e.preventDefault(); window.setTab('settings'); return; }
+        }
+    });
+    let viewMode = localStorage.getItem('mylib_viewMode') || 'grid';
+    let defaultSort = localStorage.getItem('mylib_defaultSort') || 'newest';
+    let cardDensity = localStorage.getItem('mylib_density') || 'normal';
+    let readingGoal = parseInt(localStorage.getItem('mylib_readingGoal')) || 50;
+    let sharedWithMe = [];         // UIDs of users who shared their library with me
+    let activities = [];           // activity log for book additions
+    let metadataCache = { authors: [], genres: [] }; // Performance optimization: single-pass cache
+    let userProfileCache = {}; // Cache for user profiles (names/emails)
+    let libraryStats = {
+        libBooksCount: 0,
+        wishlistCount: 0,
+        totalValue: 0,
+        totalTags: 0,
+        statusCounts: { finished: 0, reading: 0, want_to_read: 0 },
+        ratingDist: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
+        genresCount: {},
+        authorsCount: {},
+        tagsCount: {},
+        firstBookTime: Date.now(),
+        recentMomentum: 0,
+        aiContext: {
+            finished: [],
+            notYetFinished: [],
+            topGenres: []
+        }
+    };
+
+    let searchQuery = '';
+    let searchTimeout = null;
+    let sortBy = localStorage.getItem('mylib_sortBy') || defaultSort;
+    let statusFilter = localStorage.getItem('mylib_statusFilter') || 'all';
+    let categoryFilter = 'all';
+    let copyTypeFilter = 'all';
+    let authorFilter = 'all';
+    let ownerFilter = 'all';
+    let tagFilter = null;
+    let favoritesOnly = false;
+    let selectedBookIds = new Set();
+    let advancedFilters = {
+        rating: 'all',
+        minPrice: null,
+        maxPrice: null,
+        startDate: null,
+        endDate: null
+    };
+
+    // ⚡ Bolt: Cache currency symbol to avoid redundant localStorage hits in render loops
+    const CURRENCIES = Object.freeze({
+        'USD': '$',
+        'EUR': '€',
+        'GBP': '£',
+        'BDT': '৳',
+        'INR': '₹',
+        'JPY': '¥'
+    });
+    let cachedCurrencySymbol = CURRENCIES[localStorage.getItem('mylib_currency')] || '$';
+
+    const READING_STATUSES = {
+        want_to_read: { label: '', badge: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200', solid: 'bg-slate-500' },
+        reading: { label: 'Reading', badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300', solid: 'bg-slate-500' },
+        finished: { label: 'Finished', badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300', solid: 'bg-emerald-500' },
+        unread: { label: 'Want to Read', badge: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200', solid: 'bg-slate-500' } // fallback for legacy data
+    };
+
+    // DOM elements
+    const appEl = document.getElementById('app');
+    const toastEl = document.getElementById('toast');
+    const modalContainer = document.getElementById('modal-container');
+
+    // ---------- Utilities ----------
+    const DEFAULT_STATUS = Object.freeze({ status: 'want_to_read', rating: 0, progress: 0, comment: '', isFavorite: false, isWishlist: false, updatedAt: null });
+
+    // ================================================================
+    // CSP-SAFE DYNAMIC STYLES
+    // Central place for all runtime-generated CSS. Using adoptedStyleSheets
+    // avoids 'unsafe-inline' and works with strict style-src CSP.
+    // ================================================================
+
+    // (1) Global accent color sheet — used by setAccent()
+    window.__accentSheet = new CSSStyleSheet();
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, window.__accentSheet];
+
+    // (2) Dynamic per-element style sheet — used by setDynamicStyle()
+    window.__dynamicStyles = new CSSStyleSheet();
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, window.__dynamicStyles];
+
+    // Map of elementId -> { width, color, delay }
+    const __dynamicRules = new Map();
+
+    /**
+     * Apply CSP-safe dynamic styles to an element.
+     *   window.setDynamicStyle(el, { width: 75 });            // sets width:75%
+     *   window.setDynamicStyle(el, { color: '#3b82f6' });     // sets background-color
+     *   window.setDynamicStyle(el, { delay: 100 });           // sets animation-delay:100ms
+     */
+    window.setDynamicStyle = (el, { width, color, delay } = {}) => {
+        if (!el) return;
+
+        // Give the element a stable id on first use
+        if (!el.__dynId) {
+            el.__dynId = 'dyn-' + Math.random().toString(36).slice(2, 9);
+            el.setAttribute('data-dyn-id', el.__dynId);
         }
 
-        (function () {
-            // Delegated image-error fallback (CSP-safe replacement for inline onerror=)
-            document.addEventListener('error', (e) => {
-                const img = e.target;
-                if (img.tagName !== 'IMG') return;
-                const fallback = img.dataset.fallbackSrc;
-                if (!fallback || img.src === fallback) return;
-                img.src = fallback;
-                img.removeAttribute('data-fallback-src');
-            }, true); // capture phase — img error events don't bubble
+        const cur = __dynamicRules.get(el.__dynId) || {};
+        if (width !== undefined) cur.width = width;
+        if (color !== undefined) cur.color = color;
+        if (delay !== undefined) cur.delay = delay;
+        __dynamicRules.set(el.__dynId, cur);
 
-            // SRE: Global Error Boundary
-            window.onerror = function (msg, url, lineNo, columnNo, error) {
-                showToast('Something went wrong, but your data is safe.', 'error', 10000, '<button data-action="reload-app" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Reload</button>');
-                return false;
-            };
-            window.onunhandledrejection = function (event) {
-                showToast('A background task failed. Your work is saved.', 'error', 10000, '<button data-action="reload-app" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Reload</button>');
-            };
+        // Rebuild the sheet from the current rule map
+        let css = '';
+        for (const [id, r] of __dynamicRules) {
+            let body = '';
+            if (r.width !== undefined) body += `width:${r.width}%;`;
+            if (r.color !== undefined) body += `background-color:${r.color};`;
+            if (r.delay !== undefined) body += `animation-delay:${r.delay}ms;`;
+            if (body) css += `[data-dyn-id="${id}"]{${body}}\n`;
+        }
+        window.__dynamicStyles.replaceSync(css);
+    };
+    function getCurrencySymbol() {
+        return cachedCurrencySymbol;
+    }
 
+    function formatPrice(amount) {
+        if (amount === null || amount === undefined || isNaN(amount)) return '—';
+        return getCurrencySymbol() + Number(amount).toFixed(2);
+    }
 
-            window.toggleLandingTheme = function () {
-                const isDark = document.documentElement.classList.toggle('dark');
-                const newTheme = isDark ? 'dark' : 'light';
-                localStorage.setItem('theme', newTheme);
-                localStorage.setItem('mylib_theme', newTheme);
-                const sunIcon = document.getElementById('theme-toggle-sun');
-                const moonIcon = document.getElementById('theme-toggle-moon');
-                if (sunIcon && moonIcon) {
-                    if (isDark) {
-                        sunIcon.classList.remove('hidden');
-                        moonIcon.classList.add('hidden');
-                    } else {
-                        sunIcon.classList.add('hidden');
-                        moonIcon.classList.remove('hidden');
-                    }
-                }
-            };
+    function getStatusData(bookId) {
+        // Performance: Data is pre-normalized in the listener for O(1) lookup
+        return readingStatuses[bookId] || DEFAULT_STATUS;
+    }
 
-            // ---------- State ----------
-            const APP_VERSION = '3.1';
-            const DRAFT_KEY = 'mylib_manual_draft';
-            window.DRAFT_KEY = DRAFT_KEY; // Expose for testing
-            let deferredPrompt = null;
-            let currentUser = null;
-            window.__setCurrentUser = (u) => currentUser = u;
-            let userProfile = null;
-            window.__setUserProfile = (p) => userProfile = p;
+    let syncTimeout = null;
+    async function syncLibraryStats() {
+        if (!currentUser) return;
 
-            window.addEventListener('beforeinstallprompt', (e) => {
-                e.preventDefault();
-                deferredPrompt = e;
-                if (activeTab === 'settings') window.queueRenderMainApp();
-            });
+        if (syncTimeout) clearTimeout(syncTimeout);
+        syncTimeout = setTimeout(async () => {
+            const totalBooks = books.filter(b => b.userId === currentUser.uid).length;
+            const finishedBooks = Object.values(readingStatuses).filter(data => {
+                const status = typeof data === 'string' ? data : data.status;
+                return status === 'finished';
+            }).length;
 
-            window.addEventListener('appinstalled', () => {
-                deferredPrompt = null;
-                if (activeTab === 'settings') window.queueRenderMainApp();
-            });
-            let books = [];                // local copy for UI, synced with Firestore
-            let chatHistory = [];          // AI chat session history
-            let bookRequests = [];         // book borrowing requests
-            let collaborationRequests = [];// collaboration requests
-            window.__setBooks = (b) => books = b;
-            window.lastDeleted = [];       // Safety net for undo
-            let readingStatuses = {};      // local copy for per-user statuses {bookId: status}
-            window.__setReadingStatuses = (s) => readingStatuses = s;
-            let unsubscribeBooks = null;
-            let unsubscribeStatus = null;
-            let unsubscribeBookRequests = null;
-            let unsubscribeCollabReq1 = null;
-            let unsubscribeCollabReq2 = null;
-            let activeTab = 'library';     // 'library', 'wishlist', 'activity', 'settings'
-            let allPartnerships = [];
-            let aiResponseCache = [];      // Cache last 5 responses [{prompt, response}]
-            let lastActiveTab = null;
-            let socialReviews = [];
-            let lastReviewDoc = null;
-            let hasMoreReviews = true;
-            let activeFeedCategory = 'All';
-            let myBooksSubTab = 'finished';
-            let currentModalCloseHandler = null;
-            let aiSearchResults = null; // List of book IDs
-            let aiSearchResultsSet = null; // Set of book IDs for O(1) lookup
-            let isInitialSync = true;
-            window.__isInitialSync = () => isInitialSync; // Expose for testing
-            window.__setInitialSync = (v) => isInitialSync = v;
+            if (userProfile && userProfile.totalBooksCount === totalBooks && userProfile.completedBooksCount === finishedBooks) return;
 
-            // ⚡ Bolt: Debounce UI renders to prevent lag during rapid state updates (e.g., Firestore sync)
-            let renderPending = false;
-            let libraryRenderPending = false;
-
-            window.queueRenderMainApp = () => renderMainApp();
-            window.queueRenderLibraryOnly = () => renderLibraryOnly();
-
-            // Global keyboard shortcuts (attached once)
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && currentModalCloseHandler) {
-                    currentModalCloseHandler();
-                    return;
-                }
-                if ((e.key === 'Enter' || e.key === ' ') && document.activeElement && (document.activeElement.classList.contains('book-card') || document.activeElement.classList.contains('activity-card') || document.activeElement.classList.contains('pie-slice') || document.activeElement.getAttribute('role') === 'button')) {
-                    e.preventDefault();
-                    document.activeElement.click();
-                    return;
-                }
-                if (!currentModalCloseHandler && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
-                    if (e.key === '?') {
-                        e.preventDefault();
-                        window.showShortcutsHelp();
-                        return;
-                    }
-                    if (e.key === '/') {
-                        e.preventDefault();
-                        if (activeTab !== 'library') window.setTab('library');
-                        setTimeout(() => {
-                            const input = document.getElementById('search-input');
-                            if (input) { input.focus(); input.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-                        }, activeTab === 'library' ? 0 : 50);
-                        return;
-                    }
-                    if (e.key.toLowerCase() === 'n') {
-                        e.preventDefault();
-                        document.getElementById('manual-add-btn')?.click();
-                        return;
-                    }
-                    if (e.key.toLowerCase() === 'l') { e.preventDefault(); window.setTab('library'); return; }
-                    if (e.key.toLowerCase() === 'm') { e.preventDefault(); window.setTab('mybooks'); return; }
-                    if (e.key.toLowerCase() === 'a') { e.preventDefault(); window.setTab('activity'); return; }
-                    if (e.key.toLowerCase() === 'i') { e.preventDefault(); window.setTab('insight'); return; }
-                    if (e.key.toLowerCase() === 's') { e.preventDefault(); window.setTab('settings'); return; }
-                }
-            });
-            let viewMode = localStorage.getItem('mylib_viewMode') || 'grid';
-            let defaultSort = localStorage.getItem('mylib_defaultSort') || 'newest';
-            let cardDensity = localStorage.getItem('mylib_density') || 'normal';
-            let readingGoal = parseInt(localStorage.getItem('mylib_readingGoal')) || 50;
-            let sharedWithMe = [];         // UIDs of users who shared their library with me
-            let activities = [];           // activity log for book additions
-            let metadataCache = { authors: [], genres: [] }; // Performance optimization: single-pass cache
-            let userProfileCache = {}; // Cache for user profiles (names/emails)
-            let libraryStats = {
-                libBooksCount: 0,
-                wishlistCount: 0,
-                totalValue: 0,
-                totalTags: 0,
-                statusCounts: { finished: 0, reading: 0, want_to_read: 0 },
-                ratingDist: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
-                genresCount: {},
-                authorsCount: {},
-                tagsCount: {},
-                firstBookTime: Date.now(),
-                recentMomentum: 0,
-                aiContext: {
-                    finished: [],
-                    notYetFinished: [],
-                    topGenres: []
-                }
-            };
-
-            let searchQuery = '';
-            let searchTimeout = null;
-            let sortBy = localStorage.getItem('mylib_sortBy') || defaultSort;
-            let statusFilter = localStorage.getItem('mylib_statusFilter') || 'all';
-            let categoryFilter = 'all';
-            let copyTypeFilter = 'all';
-            let authorFilter = 'all';
-            let ownerFilter = 'all';
-            let tagFilter = null;
-            let favoritesOnly = false;
-            let selectedBookIds = new Set();
-            let advancedFilters = {
-                rating: 'all',
-                minPrice: null,
-                maxPrice: null,
-                startDate: null,
-                endDate: null
-            };
-
-            // ⚡ Bolt: Cache currency symbol to avoid redundant localStorage hits in render loops
-            const CURRENCIES = Object.freeze({
-                'USD': '$',
-                'EUR': '€',
-                'GBP': '£',
-                'BDT': '৳',
-                'INR': '₹',
-                'JPY': '¥'
-            });
-            let cachedCurrencySymbol = CURRENCIES[localStorage.getItem('mylib_currency')] || '$';
-
-            const READING_STATUSES = {
-                want_to_read: { label: '', badge: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200', solid: 'bg-slate-500' },
-                reading: { label: 'Reading', badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300', solid: 'bg-slate-500' },
-                finished: { label: 'Finished', badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300', solid: 'bg-emerald-500' },
-                unread: { label: 'Want to Read', badge: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200', solid: 'bg-slate-500' } // fallback for legacy data
-            };
-
-            // DOM elements
-            const appEl = document.getElementById('app');
-            const toastEl = document.getElementById('toast');
-            const modalContainer = document.getElementById('modal-container');
-
-            // ---------- Utilities ----------
-            const DEFAULT_STATUS = Object.freeze({ status: 'want_to_read', rating: 0, progress: 0, comment: '', isFavorite: false, isWishlist: false, updatedAt: null });
-
-            function getCurrencySymbol() {
-                return cachedCurrencySymbol;
-            }
-
-            function formatPrice(amount) {
-                if (amount === null || amount === undefined || isNaN(amount)) return '—';
-                return getCurrencySymbol() + Number(amount).toFixed(2);
-            }
-
-            function getStatusData(bookId) {
-                // Performance: Data is pre-normalized in the listener for O(1) lookup
-                return readingStatuses[bookId] || DEFAULT_STATUS;
-            }
-
-            let syncTimeout = null;
-            async function syncLibraryStats() {
-                if (!currentUser) return;
-
-                if (syncTimeout) clearTimeout(syncTimeout);
-                syncTimeout = setTimeout(async () => {
-                    const totalBooks = books.filter(b => b.userId === currentUser.uid).length;
-                    const finishedBooks = Object.values(readingStatuses).filter(data => {
-                        const status = typeof data === 'string' ? data : data.status;
-                        return status === 'finished';
-                    }).length;
-
-                    if (userProfile && userProfile.totalBooksCount === totalBooks && userProfile.completedBooksCount === finishedBooks) return;
-
-                    try {
-                        await db.collection('users').doc(currentUser.uid).update({
-                            totalBooksCount: totalBooks,
-                            completedBooksCount: finishedBooks,
-                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                        if (userProfile) {
-                            userProfile.totalBooksCount = totalBooks;
-                            userProfile.completedBooksCount = finishedBooks;
-                        }
-                    } catch (err) {
-                        console.error("Error syncing library stats:", err);
-                    }
-                }, 1000);
-            }
-
-            // ---------- Utility: Escape HTML ----------
-            /**
-             * ⚡ Bolt: Pure JS implementation of escapeHTML to avoid slow DOM operations.
-             * This eliminates O(N) DOM manipulations during list rendering.
-             */
-            function escapeHTML(str) {
-                if (!str && str !== 0) return '';
-                return String(str)
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;')
-                    .replace(/"/g, '&quot;')
-                    .replace(/'/g, '&#039;');
-            }
-
-            // ---------- Utility: Validate Image URL ----------
-            /**
-             * Validates that a URL is a safe http/https URL before storing.
-             * Blocks javascript:, data:text/html, and other dangerous schemes.
-             */
-            function isValidImageUrl(url) {
-                if (!url || typeof url !== 'string') return false;
-                const trimmed = url.trim();
-                if (trimmed === '') return false;
-                try {
-                    const parsed = new URL(trimmed);
-                    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-                } catch {
-                    return false;
-                }
-            }
-
-            // ---------- Utility: Safe Array ----------
-            /**
-             * Returns the input if it's an array; otherwise an empty array.
-             * Prevents "undefined.map is not a function" runtime crashes.
-             */
-            function safeArray(val) {
-                return Array.isArray(val) ? val : [];
-            }
-
-            // ---------- Utility: Format Date ----------
-            /**
-             * Formats a Firestore timestamp, JS Date, ISO string, or null into a locale string.
-             * Returns '' for invalid input (so it renders nothing rather than "Invalid Date").
-             */
-            function fmtDate(val) {
-                if (!val) return '';
-                try {
-                    let d;
-                    if (typeof val.toDate === 'function') d = val.toDate();       // Firestore Timestamp
-                    else if (typeof val.toMillis === 'function') d = new Date(val.toMillis());
-                    else if (val instanceof Date) d = val;
-                    else d = new Date(val);
-                    if (isNaN(d.getTime())) return '';
-                    return d.toLocaleDateString();
-                } catch {
-                    return '';
-                }
-            }
-
-            // Performance optimization: Lowercase inputs once in getSimilarity to avoid redundant string operations in editDistance
-            function getSimilarity(s1, s2) {
-                let longer = s1 ? s1.toLowerCase() : '';
-                let shorter = s2 ? s2.toLowerCase() : '';
-                if (longer.length < shorter.length) {
-                    const temp = longer;
-                    longer = shorter;
-                    shorter = temp;
-                }
-                const longerLength = longer.length;
-                if (longerLength === 0) return 1.0;
-                return (longerLength - editDistance(longer, shorter)) / longerLength;
-            }
-
-            // Bolt Optimization: 1D typed array (Int32Array) for Levenshtein distance calculation.
-            // Eliminates dynamic array allocations, reduces memory overhead, and uses charCodeAt for ~40%+ faster comparison loops.
-            function editDistance(s1, s2) {
-                if (s1 === s2) return 0;
-                const l1 = s1.length;
-                const l2 = s2.length;
-                if (l1 === 0) return l2;
-                if (l2 === 0) return l1;
-
-                const row = new Int32Array(l2 + 1);
-                for (let j = 0; j <= l2; j++) row[j] = j;
-
-                for (let i = 1; i <= l1; i++) {
-                    let prev = i;
-                    const code1 = s1.charCodeAt(i - 1);
-                    for (let j = 1; j <= l2; j++) {
-                        const currentCostsJ = row[j];
-                        let val = row[j - 1];
-                        if (code1 !== s2.charCodeAt(j - 1)) {
-                            val = (val < prev ? (val < currentCostsJ ? val : currentCostsJ) : (prev < currentCostsJ ? prev : currentCostsJ)) + 1;
-                        }
-                        row[j - 1] = prev;
-                        prev = val;
-                    }
-                    row[l2] = prev;
-                }
-                return row[l2];
-            }
-
-            function formatAIText(text) {
-                if (!text) return '';
-
-                // First sanitize the input to prevent XSS
-                let formatted = escapeHTML(text);
-
-                // Apply markdown-like replacements on the sanitized text
-                formatted = formatted
-                    .replace(/^### (.*$)/gim, '<h4 class="text-base font-bold mt-4 mb-1 text-primary">$1</h4>')
-                    .replace(/^## (.*$)/gim, '<h3 class="text-lg font-bold mt-6 mb-2 text-primary">$1</h3>')
-                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                    .replace(/^\s*[\-\*]\s*(.*)/gm, '<li class="ml-4 my-1">$1</li>');
-
-                // Wrap <li> groups in <ul>
-                formatted = formatted.replace(/(<li.*<\/li>)+/g, '<ul class="list-disc my-2">$1</ul>');
-
-                formatted = formatted.replace(/\n/g, '<br>');
-
-                // ---- FINAL SAFETY NET: DOMPurify ----
-                return DOMPurify.sanitize(formatted, {
-                    ALLOWED_TAGS: ['h3', 'h4', 'strong', 'em', 'ul', 'li', 'br', 'p', 'span'],
-                    ALLOWED_ATTR: ['class'],
-                    // Disallow any attribute that could execute code
-                    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'style'],
-                    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input']
+            try {
+                await db.collection('users').doc(currentUser.uid).update({
+                    totalBooksCount: totalBooks,
+                    completedBooksCount: finishedBooks,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-
-
+                if (userProfile) {
+                    userProfile.totalBooksCount = totalBooks;
+                    userProfile.completedBooksCount = finishedBooks;
+                }
+            } catch (err) {
+                console.error("Error syncing library stats:", err);
             }
+        }, 1000);
+    }
 
-            window.activeTTSState = null;
+    // ---------- Utility: Escape HTML ----------
+    /**
+     * ⚡ Bolt: Pure JS implementation of escapeHTML to avoid slow DOM operations.
+     * This eliminates O(N) DOM manipulations during list rendering.
+     */
+    function escapeHTML(str) {
+        if (!str && str !== 0) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
 
-            window.speakText = (text, element) => {
-                if (!('speechSynthesis' in window)) {
-                    showToast('TTS not supported', 'error');
-                    return;
+    // ---------- Utility: Validate Image URL ----------
+    /**
+     * Validates that a URL is a safe http/https URL before storing.
+     * Blocks javascript:, data:text/html, and other dangerous schemes.
+     */
+    function isValidImageUrl(url) {
+        if (!url || typeof url !== 'string') return false;
+        const trimmed = url.trim();
+        if (trimmed === '') return false;
+        try {
+            const parsed = new URL(trimmed);
+            return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+        } catch {
+            return false;
+        }
+    }
+
+    // ---------- Utility: Safe Array ----------
+    /**
+     * Returns the input if it's an array; otherwise an empty array.
+     * Prevents "undefined.map is not a function" runtime crashes.
+     */
+    function safeArray(val) {
+        return Array.isArray(val) ? val : [];
+    }
+
+    // ---------- Utility: Format Date ----------
+    /**
+     * Formats a Firestore timestamp, JS Date, ISO string, or null into a locale string.
+     * Returns '' for invalid input (so it renders nothing rather than "Invalid Date").
+     */
+    function fmtDate(val) {
+        if (!val) return '';
+        try {
+            let d;
+            if (typeof val.toDate === 'function') d = val.toDate();       // Firestore Timestamp
+            else if (typeof val.toMillis === 'function') d = new Date(val.toMillis());
+            else if (val instanceof Date) d = val;
+            else d = new Date(val);
+            if (isNaN(d.getTime())) return '';
+            return d.toLocaleDateString();
+        } catch {
+            return '';
+        }
+    }
+
+    // Performance optimization: Lowercase inputs once in getSimilarity to avoid redundant string operations in editDistance
+    function getSimilarity(s1, s2) {
+        let longer = s1 ? s1.toLowerCase() : '';
+        let shorter = s2 ? s2.toLowerCase() : '';
+        if (longer.length < shorter.length) {
+            const temp = longer;
+            longer = shorter;
+            shorter = temp;
+        }
+        const longerLength = longer.length;
+        if (longerLength === 0) return 1.0;
+        return (longerLength - editDistance(longer, shorter)) / longerLength;
+    }
+
+    // Bolt Optimization: 1D typed array (Int32Array) for Levenshtein distance calculation.
+    // Eliminates dynamic array allocations, reduces memory overhead, and uses charCodeAt for ~40%+ faster comparison loops.
+    function editDistance(s1, s2) {
+        if (s1 === s2) return 0;
+        const l1 = s1.length;
+        const l2 = s2.length;
+        if (l1 === 0) return l2;
+        if (l2 === 0) return l1;
+
+        const row = new Int32Array(l2 + 1);
+        for (let j = 0; j <= l2; j++) row[j] = j;
+
+        for (let i = 1; i <= l1; i++) {
+            let prev = i;
+            const code1 = s1.charCodeAt(i - 1);
+            for (let j = 1; j <= l2; j++) {
+                const currentCostsJ = row[j];
+                let val = row[j - 1];
+                if (code1 !== s2.charCodeAt(j - 1)) {
+                    val = (val < prev ? (val < currentCostsJ ? val : currentCostsJ) : (prev < currentCostsJ ? prev : currentCostsJ)) + 1;
                 }
+                row[j - 1] = prev;
+                prev = val;
+            }
+            row[l2] = prev;
+        }
+        return row[l2];
+    }
 
-                const speakerSvg = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>';
-                const stopSvg = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9h6v6H9V9z" /></svg>';
+    function formatAIText(text) {
+        if (!text) return '';
 
-                const resetBtn = (btn) => {
-                    if (!btn) return;
-                    btn.classList.remove('text-emerald-500', 'animate-pulse');
-                    btn.title = "Listen to response";
-                    btn.setAttribute('aria-label', "Listen to response");
-                    btn.innerHTML = speakerSvg;
-                };
+        // First sanitize the input to prevent XSS
+        let formatted = escapeHTML(text);
 
-                if (window.speechSynthesis.speaking && window.activeTTSState) {
-                    const prevState = window.activeTTSState;
-                    window.speechSynthesis.cancel();
+        // Apply markdown-like replacements on the sanitized text
+        formatted = formatted
+            .replace(/^### (.*$)/gim, '<h4 class="text-base font-bold mt-4 mb-1 text-primary">$1</h4>')
+            .replace(/^## (.*$)/gim, '<h3 class="text-lg font-bold mt-6 mb-2 text-primary">$1</h3>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/^\s*[\-\*]\s*(.*)/gm, '<li class="ml-4 my-1">$1</li>');
 
-                    if (prevState.element === element) {
-                        resetBtn(prevState.element);
-                        window.activeTTSState = null;
-                        return;
-                    } else {
-                        resetBtn(prevState.element);
-                    }
+        // Wrap <li> groups in <ul>
+        formatted = formatted.replace(/(<li.*<\/li>)+/g, '<ul class="list-disc my-2">$1</ul>');
+
+        formatted = formatted.replace(/\n/g, '<br>');
+
+        // ---- FINAL SAFETY NET: DOMPurify ----
+        return DOMPurify.sanitize(formatted, {
+            ALLOWED_TAGS: ['h3', 'h4', 'strong', 'em', 'ul', 'li', 'br', 'p', 'span'],
+            ALLOWED_ATTR: ['class'],
+            // Disallow any attribute that could execute code
+            FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'style'],
+            FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input']
+        });
+
+
+    }
+
+    window.activeTTSState = null;
+
+    window.speakText = (text, element) => {
+        if (!('speechSynthesis' in window)) {
+            showToast('TTS not supported', 'error');
+            return;
+        }
+
+        const speakerSvg = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>';
+        const stopSvg = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9h6v6H9V9z" /></svg>';
+
+        const resetBtn = (btn) => {
+            if (!btn) return;
+            btn.classList.remove('text-emerald-500', 'animate-pulse');
+            btn.title = "Listen to response";
+            btn.setAttribute('aria-label', "Listen to response");
+            btn.innerHTML = speakerSvg;
+        };
+
+        if (window.speechSynthesis.speaking && window.activeTTSState) {
+            const prevState = window.activeTTSState;
+            window.speechSynthesis.cancel();
+
+            if (prevState.element === element) {
+                resetBtn(prevState.element);
+                window.activeTTSState = null;
+                return;
+            } else {
+                resetBtn(prevState.element);
+            }
+        }
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        const language = localStorage.getItem('mylib_ai_language') || 'English';
+        if (language === 'Bengali') utterance.lang = 'bn-BD';
+        else if (language === 'Spanish') utterance.lang = 'es-ES';
+        else if (language === 'French') utterance.lang = 'fr-FR';
+        else if (language === 'German') utterance.lang = 'de-DE';
+        else utterance.lang = 'en-US';
+
+        utterance.onstart = () => {
+            if (element) {
+                element.classList.add('text-emerald-500', 'animate-pulse');
+                element.title = "Stop listening";
+                element.setAttribute('aria-label', "Stop listening");
+                element.innerHTML = stopSvg;
+            }
+        };
+
+        const cleanup = () => {
+            if (element) {
+                resetBtn(element);
+            }
+            if (window.activeTTSState && window.activeTTSState.element === element) {
+                window.activeTTSState = null;
+            }
+        };
+
+        utterance.onend = cleanup;
+        utterance.onerror = cleanup;
+
+        window.activeTTSState = { element, text };
+        window.speechSynthesis.speak(utterance);
+    };
+
+    window.copyBookInfo = (title, author, isbn, element) => {
+        if (!navigator.clipboard) {
+            showToast('Clipboard not available', 'error');
+            return;
+        }
+        const info = `Title: ${title}\nAuthor: ${author}${isbn ? `\nISBN: ${isbn}` : ''}`;
+        navigator.clipboard.writeText(info).then(() => {
+            showToast('Book info copied!', 'success');
+            if (element) {
+                const svg = element.querySelector('svg');
+                if (svg) {
+                    const originalHTML = svg.outerHTML;
+                    svg.outerHTML = '<svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+                    setTimeout(() => {
+                        const newSvg = element.querySelector('svg.text-emerald-500');
+                        if (newSvg) newSvg.outerHTML = originalHTML;
+                    }, 2000);
                 }
+            }
+        }).catch(err => {
+            showToast('Failed to copy info', 'error');
+        });
+    };
 
-                const utterance = new SpeechSynthesisUtterance(text);
-                const language = localStorage.getItem('mylib_ai_language') || 'English';
-                if (language === 'Bengali') utterance.lang = 'bn-BD';
-                else if (language === 'Spanish') utterance.lang = 'es-ES';
-                else if (language === 'French') utterance.lang = 'fr-FR';
-                else if (language === 'German') utterance.lang = 'de-DE';
-                else utterance.lang = 'en-US';
-
-                utterance.onstart = () => {
-                    if (element) {
-                        element.classList.add('text-emerald-500', 'animate-pulse');
-                        element.title = "Stop listening";
-                        element.setAttribute('aria-label', "Stop listening");
-                        element.innerHTML = stopSvg;
-                    }
-                };
-
-                const cleanup = () => {
-                    if (element) {
-                        resetBtn(element);
-                    }
-                    if (window.activeTTSState && window.activeTTSState.element === element) {
-                        window.activeTTSState = null;
-                    }
-                };
-
-                utterance.onend = cleanup;
-                utterance.onerror = cleanup;
-
-                window.activeTTSState = { element, text };
-                window.speechSynthesis.speak(utterance);
-            };
-
-            window.copyBookInfo = (title, author, isbn, element) => {
-                if (!navigator.clipboard) {
-                    showToast('Clipboard not available', 'error');
-                    return;
+    window.copyISBN = (isbn, element) => {
+        if (!navigator.clipboard) {
+            showToast('Clipboard not available', 'error');
+            return;
+        }
+        navigator.clipboard.writeText(isbn).then(() => {
+            showToast('ISBN copied to clipboard!', 'success');
+            if (element) {
+                const svg = element.querySelector('svg');
+                if (svg) {
+                    const originalHTML = svg.outerHTML;
+                    svg.outerHTML = '<svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+                    setTimeout(() => {
+                        const newSvg = element.querySelector('svg.text-emerald-500');
+                        if (newSvg) newSvg.outerHTML = originalHTML;
+                    }, 2000);
                 }
-                const info = `Title: ${title}\nAuthor: ${author}${isbn ? `\nISBN: ${isbn}` : ''}`;
-                navigator.clipboard.writeText(info).then(() => {
-                    showToast('Book info copied!', 'success');
-                    if (element) {
-                        const svg = element.querySelector('svg');
-                        if (svg) {
-                            const originalHTML = svg.outerHTML;
-                            svg.outerHTML = '<svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
-                            setTimeout(() => {
-                                const newSvg = element.querySelector('svg.text-emerald-500');
-                                if (newSvg) newSvg.outerHTML = originalHTML;
-                            }, 2000);
-                        }
-                    }
-                }).catch(err => {
-                    showToast('Failed to copy info', 'error');
-                });
-            };
+            }
+        }).catch(err => {
+            showToast('Failed to copy ISBN', 'error');
+        });
+    };
 
-            window.copyISBN = (isbn, element) => {
-                if (!navigator.clipboard) {
-                    showToast('Clipboard not available', 'error');
-                    return;
+    window.copyQuote = (text, title, author, element) => {
+        if (!navigator.clipboard) {
+            showToast('Clipboard not available', 'error');
+            return;
+        }
+        const formattedQuote = `"${text}" — ${title}, ${author}`;
+        navigator.clipboard.writeText(formattedQuote).then(() => {
+            showToast('Quote copied to clipboard!', 'success');
+            if (element) {
+                const svg = element.querySelector('svg');
+                if (svg) {
+                    const originalHTML = svg.outerHTML;
+                    svg.outerHTML = '<svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+                    setTimeout(() => {
+                        const newSvg = element.querySelector('svg.text-emerald-500');
+                        if (newSvg) newSvg.outerHTML = originalHTML;
+                    }, 2000);
                 }
-                navigator.clipboard.writeText(isbn).then(() => {
-                    showToast('ISBN copied to clipboard!', 'success');
-                    if (element) {
-                        const svg = element.querySelector('svg');
-                        if (svg) {
-                            const originalHTML = svg.outerHTML;
-                            svg.outerHTML = '<svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
-                            setTimeout(() => {
-                                const newSvg = element.querySelector('svg.text-emerald-500');
-                                if (newSvg) newSvg.outerHTML = originalHTML;
-                            }, 2000);
-                        }
-                    }
-                }).catch(err => {
-                    showToast('Failed to copy ISBN', 'error');
-                });
-            };
+            }
+        }).catch(err => {
+            showToast('Failed to copy quote', 'error');
+        });
+    };
 
-            window.copyQuote = (text, title, author, element) => {
-                if (!navigator.clipboard) {
-                    showToast('Clipboard not available', 'error');
-                    return;
-                }
-                const formattedQuote = `"${text}" — ${title}, ${author}`;
-                navigator.clipboard.writeText(formattedQuote).then(() => {
-                    showToast('Quote copied to clipboard!', 'success');
-                    if (element) {
-                        const svg = element.querySelector('svg');
-                        if (svg) {
-                            const originalHTML = svg.outerHTML;
-                            svg.outerHTML = '<svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
-                            setTimeout(() => {
-                                const newSvg = element.querySelector('svg.text-emerald-500');
-                                if (newSvg) newSvg.outerHTML = originalHTML;
-                            }, 2000);
-                        }
-                    }
-                }).catch(err => {
-                    showToast('Failed to copy quote', 'error');
-                });
-            };
-
-            // ---------- Utility: Toast ----------
-            function showToast(message, type = 'info', duration = 4000, actionHtml = '') {
-                if (navigator.vibrate) {
-                    if (type === 'error') navigator.vibrate([50, 50, 50]);
-                    else if (type === 'success') navigator.vibrate(10);
-                }
-                toastEl.innerHTML = `
+    // ---------- Utility: Toast ----------
+    function showToast(message, type = 'info', duration = 4000, actionHtml = '') {
+        if (navigator.vibrate) {
+            if (type === 'error') navigator.vibrate([50, 50, 50]);
+            else if (type === 'success') navigator.vibrate(10);
+        }
+        toastEl.innerHTML = `
                 <div class="w-2 h-2 rounded-full ${type === 'success' ? 'bg-emerald-400' : type === 'error' ? 'bg-rose-400' : 'bg-blue-400'}"></div>
                 <span>${escapeHTML(message)}</span>
                 ${actionHtml || ''}
             `;
-                toastEl.classList.remove('opacity-0', 'translate-y-10', 'pointer-events-none');
-                toastEl.classList.add('opacity-100', 'translate-y-0');
-                setTimeout(() => {
-                    toastEl.classList.add('opacity-0', 'translate-y-10', 'pointer-events-none');
-                    toastEl.classList.remove('opacity-100', 'translate-y-0');
-                }, duration);
-            }
+        toastEl.classList.remove('opacity-0', 'translate-y-10', 'pointer-events-none');
+        toastEl.classList.add('opacity-100', 'translate-y-0');
+        setTimeout(() => {
+            toastEl.classList.add('opacity-0', 'translate-y-10', 'pointer-events-none');
+            toastEl.classList.remove('opacity-100', 'translate-y-0');
+        }, duration);
+    }
 
-            // ---------- Modal helper ----------
-            function trapFocus(element) {
-                const focusableEls = element.querySelectorAll('a[href], button, textarea, input:not([type="hidden"]), select, [tabindex]:not([tabindex="-1"])');
-                const firstFocusableEl = focusableEls[0];
-                const lastFocusableEl = focusableEls[focusableEls.length - 1];
+    // ---------- Modal helper ----------
+    function trapFocus(element) {
+        const focusableEls = element.querySelectorAll('a[href], button, textarea, input:not([type="hidden"]), select, [tabindex]:not([tabindex="-1"])');
+        const firstFocusableEl = focusableEls[0];
+        const lastFocusableEl = focusableEls[focusableEls.length - 1];
 
-                element.addEventListener('keydown', function (e) {
-                    const isTabPressed = (e.key === 'Tab');
-                    if (!isTabPressed) return;
+        element.addEventListener('keydown', function (e) {
+            const isTabPressed = (e.key === 'Tab');
+            if (!isTabPressed) return;
 
-                    if (e.shiftKey) { /* shift + tab */
-                        if (document.activeElement === firstFocusableEl) {
-                            lastFocusableEl.focus();
-                            e.preventDefault();
-                        }
-                    } else { /* tab */
-                        if (document.activeElement === lastFocusableEl) {
-                            firstFocusableEl.focus();
-                            e.preventDefault();
-                        }
-                    }
-                });
-
-                // Focus the first element initially
-                if (firstFocusableEl) {
-                    setTimeout(() => firstFocusableEl.focus(), 100);
+            if (e.shiftKey) { /* shift + tab */
+                if (document.activeElement === firstFocusableEl) {
+                    lastFocusableEl.focus();
+                    e.preventDefault();
+                }
+            } else { /* tab */
+                if (document.activeElement === lastFocusableEl) {
+                    firstFocusableEl.focus();
+                    e.preventDefault();
                 }
             }
+        });
 
-            function showModal(html, onClose, isFullscreen = false) {
-                const triggerEl = document.activeElement;
-                const modal = document.createElement('div');
-                modal.className = isFullscreen
-                    ? 'fixed inset-0 z-50 flex items-center justify-center bg-slate-50 dark:bg-slate-900 transition-all'
-                    : 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm transition-all';
-                modal.innerHTML = html;
-                modalContainer.innerHTML = '';
-                modalContainer.appendChild(modal);
-                modalContainer.classList.add('pointer-events-auto');
+        // Focus the first element initially
+        if (firstFocusableEl) {
+            setTimeout(() => firstFocusableEl.focus(), 100);
+        }
+    }
 
-                trapFocus(modal);
+    function showModal(html, onClose, isFullscreen = false) {
+        const triggerEl = document.activeElement;
+        const modal = document.createElement('div');
+        modal.className = isFullscreen
+            ? 'fixed inset-0 z-50 flex items-center justify-center bg-slate-50 dark:bg-slate-900 transition-all'
+            : 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-slate-900/80 backdrop-blur-sm transition-all';
+        modal.innerHTML = html;
+        modalContainer.innerHTML = '';
+        modalContainer.appendChild(modal);
+        modalContainer.classList.add('pointer-events-auto');
 
-                const closeHandler = () => {
-                    modal.remove();
-                    modalContainer.classList.remove('pointer-events-auto');
-                    currentModalCloseHandler = null;
-                    if (onClose) onClose();
-                    if (triggerEl && triggerEl.focus) triggerEl.focus();
-                };
-                currentModalCloseHandler = closeHandler;
-                modal.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', closeHandler));
-                if (!isFullscreen) {
-                    modal.addEventListener('click', (e) => {
-                        if (e.target === modal) closeHandler();
-                    });
-                }
-                return closeHandler;
-            }
+        trapFocus(modal);
 
-            // ---------- Firebase Auth UI ----------
-            function renderAuth() {
-                const isDark = document.documentElement.classList.contains('dark');
-                appEl.innerHTML = `
+        const closeHandler = () => {
+            modal.remove();
+            modalContainer.classList.remove('pointer-events-auto');
+            currentModalCloseHandler = null;
+            if (onClose) onClose();
+            if (triggerEl && triggerEl.focus) triggerEl.focus();
+        };
+        currentModalCloseHandler = closeHandler;
+        modal.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', closeHandler));
+        if (!isFullscreen) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeHandler();
+            });
+        }
+        return closeHandler;
+    }
+
+    // ---------- Firebase Auth UI ----------
+    function renderAuth() {
+        const isDark = document.documentElement.classList.contains('dark');
+        appEl.innerHTML = `
        <div class="terra-landing min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-200 relative overflow-x-hidden">
 
     <!-- ==================== AMBIENT FLOATING ORBS ==================== -->
@@ -655,7 +704,7 @@
     <main class="flex-1 flex flex-col lg:flex-row relative animate-gradient bg-gradient-to-br from-secondary/60 via-background to-secondary/40">
         <div class="flex-1 flex flex-col justify-center px-6 lg:px-24 py-16 lg:py-24 z-10">
             <div class="max-w-xl">
-                <div style="BORDER: NONE;" class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold mb-8 motion-safe:animate-slide-up">
+                <div style="BORDER: NONE;" class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold mb-8 motion-safe:animate-slide-up" style="animation-delay: 0ms">
                     <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
                     New: AI-Powered Library Analysis
                 </div>
@@ -706,7 +755,7 @@
             <div class="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent z-10"></div>
             <div class="relative z-20 w-full max-w-xl">
                 <div class="animate-pulse-glow absolute -inset-4 bg-gradient-to-r from-primary/40 to-accent/40 blur-4xl rounded-[2rem]"></div>
-                <div style="BACKGROUND: NONE;BORDER: NONE;" class="animate-float-image relative rounded-2xl overflow-hidden shadow-terra-lg border border-slate-200 dark:border-slate-700 bg-card">
+                <div style="BACKGROUND: NONE;BORDER: NONE;" class="relative rounded-2xl overflow-hidden shadow-terra-lg dark:border-slate-700">
                     <img src="/img/hero.png" class="w-full h-auto object-cover rounded-2xl" alt="MyLib Interface Preview">
                     <div class="absolute inset-0 bg-accent/10 pointer-events-none mix-blend-overlay"></div>
                 </div>
@@ -715,7 +764,7 @@
     </main>
 
     <!-- ==================== FEATURES SECTION (BENTO GRID) ==================== -->
-    <section id="features" class="bg-background py-24 px-6 lg:px-24 border-t border-slate-200 dark:border-slate-700 scroll-mt-20">
+    <section style="background-color: #dddddd2e;" id="features" class="bg-background py-24 px-6 lg:px-24 border-t border-slate-200 dark:border-slate-700 scroll-mt-20">
         <div class="max-w-6xl mx-auto">
             <div class="text-center mb-16 scroll-reveal">
                 <h2 class="text-4xl lg:text-5xl font-serif font-black text-foreground mb-4">A Better Way to Live With Your Books</h2>
@@ -882,7 +931,7 @@
     </section>
 
     <!-- ==================== COMMUNITY SECTION ==================== -->
-    <section id="community" class="bg-muted/30 dark:bg-muted/10 py-24 px-6 lg:px-24 border-t border-slate-200 dark:border-slate-700 scroll-mt-20">
+    <section id="community" style="background-color: #dddddd2e;" class="bg-muted/30 dark:bg-muted/10 py-24 px-6 lg:px-24 border-t border-slate-200 dark:border-slate-700 scroll-mt-20">
         <div class="max-w-6xl mx-auto text-center">
             <div class="scroll-reveal">
                 <p class="text-accent text-xs font-bold uppercase tracking-[0.2em] mb-4">THE READING COMMUNITY</p>
@@ -940,7 +989,7 @@
     </section>
 
     <!-- ==================== FINAL CTA SECTION ==================== -->
-    <section class="bg-primary/5 dark:bg-primary/10 py-24 px-6 lg:px-24 border-t border-slate-200 dark:border-slate-700">
+    <section style="background-color: #dddddd2e;" class="bg-primary/5 dark:bg-primary/10 py-24 px-6 lg:px-24 border-t border-slate-200 dark:border-slate-700">
         <div class="scroll-reveal max-w-3xl mx-auto text-center">
             <h2 class="text-4xl lg:text-5xl font-serif font-black text-foreground mb-6">Ready to build your sanctuary?</h2>
             <p class="text-lg text-muted-foreground mb-10 max-w-xl mx-auto">Join thousands of readers who have transformed their reading lives with MyLib.</p>
@@ -969,48 +1018,48 @@
 </div>
     `;
 
-                // Attach event listeners to all Google Sign-In buttons
-                const signInButtons = ['google-signin', 'google-signin-nav', 'google-signin-bottom'];
-                signInButtons.forEach(id => {
-                    const btn = document.getElementById(id);
-                    if (btn) {
-                        btn.addEventListener('click', () => {
-                            const provider = new firebase.auth.GoogleAuthProvider();
-                            auth.signInWithPopup(provider).catch(err => showToast(err.message, 'error'));
-                        });
-                    }
-                });
-
-                // ==================== SCROLL REVEAL OBSERVER ====================
-                // Trigger scroll-reveal animations as user scrolls
-                const revealObserver = new IntersectionObserver((entries) => {
-                    entries.forEach((entry, idx) => {
-                        if (entry.isIntersecting) {
-                            // Stagger sibling reveals slightly for a cascading effect
-                            const siblings = entry.target.parentElement
-                                ? Array.from(entry.target.parentElement.querySelectorAll('.scroll-reveal, .scroll-reveal-scale, .mockup-slide-right'))
-                                : [];
-                            const siblingIdx = siblings.indexOf(entry.target);
-                            const delay = siblingIdx > 0 ? siblingIdx * 80 : 0;
-
-                            setTimeout(() => {
-                                entry.target.classList.add('revealed');
-                            }, delay);
-                            revealObserver.unobserve(entry.target);
-                        }
-                    });
-                }, {
-                    threshold: 0.12,
-                    rootMargin: '0px 0px -50px 0px'
-                });
-
-                document.querySelectorAll('.scroll-reveal, .scroll-reveal-scale, .mockup-slide-right').forEach(el => {
-                    revealObserver.observe(el);
+        // Attach event listeners to all Google Sign-In buttons
+        const signInButtons = ['google-signin', 'google-signin-nav', 'google-signin-bottom'];
+        signInButtons.forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    const provider = new firebase.auth.GoogleAuthProvider();
+                    auth.signInWithPopup(provider).catch(err => showToast(err.message, 'error'));
                 });
             }
+        });
 
-            function renderSettings() {
-                return `
+        // ==================== SCROLL REVEAL OBSERVER ====================
+        // Trigger scroll-reveal animations as user scrolls
+        const revealObserver = new IntersectionObserver((entries) => {
+            entries.forEach((entry, idx) => {
+                if (entry.isIntersecting) {
+                    // Stagger sibling reveals slightly for a cascading effect
+                    const siblings = entry.target.parentElement
+                        ? Array.from(entry.target.parentElement.querySelectorAll('.scroll-reveal, .scroll-reveal-scale, .mockup-slide-right'))
+                        : [];
+                    const siblingIdx = siblings.indexOf(entry.target);
+                    const delay = siblingIdx > 0 ? siblingIdx * 80 : 0;
+
+                    setTimeout(() => {
+                        entry.target.classList.add('revealed');
+                    }, delay);
+                    revealObserver.unobserve(entry.target);
+                }
+            });
+        }, {
+            threshold: 0.12,
+            rootMargin: '0px 0px -50px 0px'
+        });
+
+        document.querySelectorAll('.scroll-reveal, .scroll-reveal-scale, .mockup-slide-right').forEach(el => {
+            revealObserver.observe(el);
+        });
+    }
+
+    function renderSettings() {
+        return `
                 <div class="max-w-6xl mx-auto animate-slide-up space-y-10">
 
                     <!-- ============ PAGE HEADER ============ -->
@@ -1116,10 +1165,10 @@
                                     <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Accent Color</label>
                                     <div class="flex flex-wrap gap-3 mt-2">
                                         ${['blue', 'rose', 'emerald', 'amber', 'violet'].map(color => {
-                    const bgClass = color === 'blue' ? 'bg-slate-500' : color === 'rose' ? 'bg-rose-500' : color === 'emerald' ? 'bg-emerald-500' : color === 'amber' ? 'bg-amber-500' : 'bg-violet-500';
-                    const isSelected = (localStorage.getItem('mylib_accent') || 'blue') === color;
-                    return `<button data-action="set-accent" data-value="${color}" aria-pressed="${isSelected}" class="w-10 h-10 rounded-full ${bgClass} ${isSelected ? 'ring-4 ring-offset-2 ring-slate-300 dark:ring-slate-600 scale-110' : 'hover:scale-105'} focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all" title="${color.charAt(0).toUpperCase() + color.slice(1)}" aria-label="Set ${color} accent color"></button>`;
-                }).join('')}
+            const bgClass = color === 'blue' ? 'bg-slate-500' : color === 'rose' ? 'bg-rose-500' : color === 'emerald' ? 'bg-emerald-500' : color === 'amber' ? 'bg-amber-500' : 'bg-violet-500';
+            const isSelected = (localStorage.getItem('mylib_accent') || 'blue') === color;
+            return `<button data-action="set-accent" data-value="${color}" aria-pressed="${isSelected}" class="w-10 h-10 rounded-full ${bgClass} ${isSelected ? 'ring-4 ring-offset-2 ring-slate-300 dark:ring-slate-600 scale-110' : 'hover:scale-105'} focus-visible:ring-2 focus-visible:ring-primary outline-none transition-all" title="${color.charAt(0).toUpperCase() + color.slice(1)}" aria-label="Set ${color} accent color"></button>`;
+        }).join('')}
                                     </div>
                                 </div>
                             </div>
@@ -1418,190 +1467,190 @@
 
                 </div>
             `;
+    }
+
+    async function saveSharingSettings() {
+        const email = document.getElementById('share-email').value.trim().toLowerCase();
+        if (!email) return;
+
+        const btn = document.getElementById('save-sharing-btn');
+        const originalText = btn.innerText;
+        btn.disabled = true;
+        btn.innerText = 'Sending...';
+
+        try {
+            if (email === (currentUser.email || '').toLowerCase()) {
+                showToast('You cannot share with yourself.', 'error');
+                return;
             }
 
-            async function saveSharingSettings() {
-                const email = document.getElementById('share-email').value.trim().toLowerCase();
-                if (!email) return;
+            // Look up via the userLookup index (email → uid)
+            const lookupDoc = await db.collection('userLookup').doc(email).get();
+            if (!lookupDoc.exists) {
+                showToast('User not found. They must log in at least once.', 'error');
+                return;
+            }
+            const partnerId = lookupDoc.data().uid;
 
-                const btn = document.getElementById('save-sharing-btn');
-                const originalText = btn.innerText;
-                btn.disabled = true;
-                btn.innerText = 'Sending...';
-
-                try {
-                    if (email === (currentUser.email || '').toLowerCase()) {
-                        showToast('You cannot share with yourself.', 'error');
-                        return;
-                    }
-
-                    // Look up via the userLookup index (email → uid)
-                    const lookupDoc = await db.collection('userLookup').doc(email).get();
-                    if (!lookupDoc.exists) {
-                        showToast('User not found. They must log in at least once.', 'error');
-                        return;
-                    }
-                    const partnerId = lookupDoc.data().uid;
-
-                    if (partnerId === currentUser.uid) {
-                        showToast('You cannot share with yourself.', 'error');
-                        return;
-                    }
-
-                    // Deterministic ID — required by the new rules
-                    const ids = [currentUser.uid, partnerId].sort();
-                    const requestId = `${ids[0]}_${ids[1]}`;
-
-                    const reqRef = db.collection('collaborationRequests').doc(requestId);
-                    const existing = await reqRef.get();
-                    if (existing.exists) {
-                        const d = existing.data();
-                        if (d.status === 'accepted') { showToast('Already collaborating.', 'info'); return; }
-                        if (d.status === 'pending') { showToast('Request already pending.', 'info'); return; }
-                    }
-
-                    await reqRef.set({
-                        fromUserId: currentUser.uid,
-                        fromEmail: currentUser.email || '',
-                        fromName: userProfile?.displayName || currentUser.displayName || currentUser.email || 'A user',
-                        toUserId: partnerId,
-                        toEmail: email,
-                        status: 'pending',
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-
-                    showToast(`Collaboration request sent to ${email}!`, 'success');
-                    document.getElementById('share-email').value = '';
-                } catch (err) {
-                    showToast('Error sending request: ' + err.message, 'error');
-                } finally {
-                    btn.disabled = false;
-                    btn.innerText = originalText;
-                }
+            if (partnerId === currentUser.uid) {
+                showToast('You cannot share with yourself.', 'error');
+                return;
             }
 
-            window.acceptCollaborationRequest = async (requestId) => {
-                try {
-                    const reqRef = db.collection('collaborationRequests').doc(requestId);
-                    const reqDoc = await reqRef.get();
-                    if (!reqDoc.exists) { showToast('Request no longer exists.', 'error'); return; }
+            // Deterministic ID — required by the new rules
+            const ids = [currentUser.uid, partnerId].sort();
+            const requestId = `${ids[0]}_${ids[1]}`;
 
-                    const req = reqDoc.data();
-                    if (req.status !== 'pending') { showToast('Request is no longer pending.', 'info'); return; }
-                    if (req.toUserId !== currentUser.uid) {
-                        showToast('You cannot accept this request.', 'error'); return;
-                    }
+            const reqRef = db.collection('collaborationRequests').doc(requestId);
+            const existing = await reqRef.get();
+            if (existing.exists) {
+                const d = existing.data();
+                if (d.status === 'accepted') { showToast('Already collaborating.', 'info'); return; }
+                if (d.status === 'pending') { showToast('Request already pending.', 'info'); return; }
+            }
 
-                    // 1. Flip the request to accepted
-                    await reqRef.update({
-                        status: 'accepted',
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+            await reqRef.set({
+                fromUserId: currentUser.uid,
+                fromEmail: currentUser.email || '',
+                fromName: userProfile?.displayName || currentUser.displayName || currentUser.email || 'A user',
+                toUserId: partnerId,
+                toEmail: email,
+                status: 'pending',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
 
-                    // 2. Now create the partnership document.
-                    //    The rules will verify that the request above exists and is accepted.
-                    const ids = [req.fromUserId, req.toUserId].sort();
-                    const partnershipId = `${ids[0]}_${ids[1]}`;
+            showToast(`Collaboration request sent to ${email}!`, 'success');
+            document.getElementById('share-email').value = '';
+        } catch (err) {
+            showToast('Error sending request: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerText = originalText;
+        }
+    }
 
-                    await db.collection('partnerships').doc(partnershipId).set({
-                        userId1: ids[0],
-                        userId2: ids[1],
-                        initiatorId: req.fromUserId,
-                        status: 'accepted',
-                        user1Unsubscribed: false,
-                        user2Unsubscribed: false,
-                        allowAddBooks: false,   // rules require this to start false
-                        grantedBy: '',          // no add-books grant exists yet
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+    window.acceptCollaborationRequest = async (requestId) => {
+        try {
+            const reqRef = db.collection('collaborationRequests').doc(requestId);
+            const reqDoc = await reqRef.get();
+            if (!reqDoc.exists) { showToast('Request no longer exists.', 'error'); return; }
 
-                    showToast('Collaboration accepted!', 'success');
-                    window.queueRenderMainApp();
-                } catch (err) {
-                    console.error('Accept error:', err);
-                    showToast('Failed to accept request: ' + err.message, 'error');
-                }
-            };
+            const req = reqDoc.data();
+            if (req.status !== 'pending') { showToast('Request is no longer pending.', 'info'); return; }
+            if (req.toUserId !== currentUser.uid) {
+                showToast('You cannot accept this request.', 'error'); return;
+            }
 
-            window.rejectCollaborationRequest = async (requestId) => {
-                try {
-                    const reqDoc = await db.collection('collaborationRequests').doc(requestId).get();
-                    if (!reqDoc.exists) {
-                        showToast('Collaboration request no longer exists.', 'error');
-                        return;
-                    }
+            // 1. Flip the request to accepted
+            await reqRef.update({
+                status: 'accepted',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
 
-                    await db.collection('collaborationRequests').doc(requestId).update({
-                        status: 'rejected',
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+            // 2. Now create the partnership document.
+            //    The rules will verify that the request above exists and is accepted.
+            const ids = [req.fromUserId, req.toUserId].sort();
+            const partnershipId = `${ids[0]}_${ids[1]}`;
 
-                    showToast('Collaboration request rejected.', 'info');
-                    window.queueRenderMainApp();
-                } catch (err) {
-                    showToast('Failed to reject request: ' + err.message, 'error');
-                }
-            };
+            await db.collection('partnerships').doc(partnershipId).set({
+                userId1: ids[0],
+                userId2: ids[1],
+                initiatorId: req.fromUserId,
+                status: 'accepted',
+                user1Unsubscribed: false,
+                user2Unsubscribed: false,
+                allowAddBooks: false,   // rules require this to start false
+                grantedBy: '',          // no add-books grant exists yet
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
 
-            window.acceptInvitation = window.acceptCollaborationRequest;
-            window.declineInvitation = window.rejectCollaborationRequest;
-            window.cancelInvitation = async (requestId) => {
-                try {
-                    await db.collection('collaborationRequests').doc(requestId).update({
-                        status: 'cancelled',
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    showToast('Collaboration request cancelled.', 'info');
-                    window.queueRenderMainApp();
-                } catch (err) {
-                    showToast('Error cancelling request: ' + err.message, 'error');
-                }
-            };
+            showToast('Collaboration accepted!', 'success');
+            window.queueRenderMainApp();
+        } catch (err) {
+            console.error('Accept error:', err);
+            showToast('Failed to accept request: ' + err.message, 'error');
+        }
+    };
 
-            // Update partnership permission to allow/disallow adding books
-            window.updatePartnershipPermission = async (partnershipId, allowAddBooks) => {
-                try {
-                    await db.collection('partnerships').doc(partnershipId).update({
-                        allowAddBooks: allowAddBooks,
-                        // The library owner records themselves as the granter (required by rules).
-                        grantedBy: allowAddBooks ? currentUser.uid : '',
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    showToast(allowAddBooks ? 'Permission granted!' : 'Permission revoked', 'success');
-                    renderPartners();
-                } catch (err) {
-                    showToast('Error updating permission: ' + err.message, 'error');
-                }
-            };
+    window.rejectCollaborationRequest = async (requestId) => {
+        try {
+            const reqDoc = await db.collection('collaborationRequests').doc(requestId).get();
+            if (!reqDoc.exists) {
+                showToast('Collaboration request no longer exists.', 'error');
+                return;
+            }
 
-            async function renderPartners() {
-                const listEl = document.getElementById('collaborators-list');
-                if (!listEl) return;
+            await db.collection('collaborationRequests').doc(requestId).update({
+                status: 'rejected',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
 
-                const acceptedPartnerships = allPartnerships.filter(p => p.status === 'accepted' || p.status === undefined);
-                const pendingRequests = collaborationRequests.filter(r => r.status === 'pending');
+            showToast('Collaboration request rejected.', 'info');
+            window.queueRenderMainApp();
+        } catch (err) {
+            showToast('Failed to reject request: ' + err.message, 'error');
+        }
+    };
 
-                if (acceptedPartnerships.length === 0 && pendingRequests.length === 0) {
-                    listEl.innerHTML = '<p class="text-xs text-slate-400 italic px-1">No partnerships yet. Share your library to connect with friends!</p>';
-                    return;
-                }
+    window.acceptInvitation = window.acceptCollaborationRequest;
+    window.declineInvitation = window.rejectCollaborationRequest;
+    window.cancelInvitation = async (requestId) => {
+        try {
+            await db.collection('collaborationRequests').doc(requestId).update({
+                status: 'cancelled',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            showToast('Collaboration request cancelled.', 'info');
+            window.queueRenderMainApp();
+        } catch (err) {
+            showToast('Error cancelling request: ' + err.message, 'error');
+        }
+    };
 
-                // Fetch partner user details for accepted partnerships
-                const partnerIds = acceptedPartnerships.map(doc => {
-                    const data = doc;
-                    return data.userId1 === currentUser.uid ? data.userId2 : data.userId1;
-                });
+    // Update partnership permission to allow/disallow adding books
+    window.updatePartnershipPermission = async (partnershipId, allowAddBooks) => {
+        try {
+            await db.collection('partnerships').doc(partnershipId).update({
+                allowAddBooks: allowAddBooks,
+                // The library owner records themselves as the granter (required by rules).
+                grantedBy: allowAddBooks ? currentUser.uid : '',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            showToast(allowAddBooks ? 'Permission granted!' : 'Permission revoked', 'success');
+            renderPartners();
+        } catch (err) {
+            showToast('Error updating permission: ' + err.message, 'error');
+        }
+    };
 
-                const userDocs = await Promise.all(
-                    partnerIds.map(id => db.collection('users').doc(id).get())
-                );
+    async function renderPartners() {
+        const listEl = document.getElementById('collaborators-list');
+        if (!listEl) return;
 
-                const pendingHTML = pendingRequests.map(r => {
-                    const isOutgoing = r.fromUserId === currentUser.uid;
-                    const displayName = isOutgoing ? r.toEmail : (r.fromName || r.fromEmail);
+        const acceptedPartnerships = allPartnerships.filter(p => p.status === 'accepted' || p.status === undefined);
+        const pendingRequests = collaborationRequests.filter(r => r.status === 'pending');
 
-                    return `
+        if (acceptedPartnerships.length === 0 && pendingRequests.length === 0) {
+            listEl.innerHTML = '<p class="text-xs text-slate-400 italic px-1">No partnerships yet. Share your library to connect with friends!</p>';
+            return;
+        }
+
+        // Fetch partner user details for accepted partnerships
+        const partnerIds = acceptedPartnerships.map(doc => {
+            const data = doc;
+            return data.userId1 === currentUser.uid ? data.userId2 : data.userId1;
+        });
+
+        const userDocs = await Promise.all(
+            partnerIds.map(id => db.collection('users').doc(id).get())
+        );
+
+        const pendingHTML = pendingRequests.map(r => {
+            const isOutgoing = r.fromUserId === currentUser.uid;
+            const displayName = isOutgoing ? r.toEmail : (r.fromName || r.fromEmail);
+
+            return `
                     <div class="flex items-center justify-between p-4 bg-amber-50/50 dark:bg-amber-950/10 rounded-xl border border-amber-100 dark:border-amber-900/50 gap-4">
                         <div class="flex-1">
                             <span class="text-sm font-bold block">${escapeHTML(displayName)}</span>
@@ -1619,16 +1668,16 @@
                         </div>
                     </div>
                     `;
-                }).join('');
+        }).join('');
 
-                const acceptedHTML = acceptedPartnerships.map((partnership, idx) => {
-                    const isUser1 = partnership.userId1 === currentUser.uid;
-                    const isUnsubscribed = isUser1 ? partnership.user1Unsubscribed : partnership.user2Unsubscribed;
-                    const partnerUnsubscribed = isUser1 ? partnership.user2Unsubscribed : partnership.user1Unsubscribed;
-                    const partnerName = userDocs[idx].data()?.displayName || 'Unknown User';
-                    const allowAddBooks = partnership.allowAddBooks || false;
+        const acceptedHTML = acceptedPartnerships.map((partnership, idx) => {
+            const isUser1 = partnership.userId1 === currentUser.uid;
+            const isUnsubscribed = isUser1 ? partnership.user1Unsubscribed : partnership.user2Unsubscribed;
+            const partnerUnsubscribed = isUser1 ? partnership.user2Unsubscribed : partnership.user1Unsubscribed;
+            const partnerName = userDocs[idx].data()?.displayName || 'Unknown User';
+            const allowAddBooks = partnership.allowAddBooks || false;
 
-                    return `
+            return `
                     <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800 gap-4">
                         <div class="flex-1">
                             <span class="text-sm font-medium block">${escapeHTML(partnerName)}</span>
@@ -1645,58 +1694,58 @@
                         </div>
                     </div>
                 `;
-                }).join('');
+        }).join('');
 
-                listEl.innerHTML = pendingHTML + acceptedHTML;
-            }
+        listEl.innerHTML = pendingHTML + acceptedHTML;
+    }
 
-            window.leavePartnership = async (partnershipId) => {
-                try {
-                    const partnershipDoc = await db.collection('partnerships').doc(partnershipId).get();
-                    const data = partnershipDoc.data();
-                    const isUser1 = data.userId1 === currentUser.uid;
+    window.leavePartnership = async (partnershipId) => {
+        try {
+            const partnershipDoc = await db.collection('partnerships').doc(partnershipId).get();
+            const data = partnershipDoc.data();
+            const isUser1 = data.userId1 === currentUser.uid;
 
-                    // Toggle unsubscribed status for current user
-                    const currentStatus = isUser1 ? data.user1Unsubscribed : data.user2Unsubscribed;
-                    const updateData = isUser1 ? { user1Unsubscribed: !currentStatus } : { user2Unsubscribed: !currentStatus };
+            // Toggle unsubscribed status for current user
+            const currentStatus = isUser1 ? data.user1Unsubscribed : data.user2Unsubscribed;
+            const updateData = isUser1 ? { user1Unsubscribed: !currentStatus } : { user2Unsubscribed: !currentStatus };
 
-                    await db.collection('partnerships').doc(partnershipId).update(updateData);
-                    showToast(!currentStatus ? 'Partnership unfollowed' : 'Partnership rejoined', 'info');
-                    subscribeToBooks();
-                } catch (err) {
-                    showToast('Error: ' + err.message, 'error');
-                }
-            };
+            await db.collection('partnerships').doc(partnershipId).update(updateData);
+            showToast(!currentStatus ? 'Partnership unfollowed' : 'Partnership rejoined', 'info');
+            subscribeToBooks();
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        }
+    };
 
-            // ---------- Render Main App (authenticated) ----------
-            /**
-             * ⚡ Bolt: Render batching for Main App.
-             * Uses requestAnimationFrame to debounce multiple synchronous calls into a single render pass per frame.
-             */
-            function renderMainApp() {
-                if (renderPending) return;
-                renderPending = true;
-                requestAnimationFrame(() => {
-                    doRenderMainApp();
-                    renderPending = false;
-                });
-            }
+    // ---------- Render Main App (authenticated) ----------
+    /**
+     * ⚡ Bolt: Render batching for Main App.
+     * Uses requestAnimationFrame to debounce multiple synchronous calls into a single render pass per frame.
+     */
+    function renderMainApp() {
+        if (renderPending) return;
+        renderPending = true;
+        requestAnimationFrame(() => {
+            doRenderMainApp();
+            renderPending = false;
+        });
+    }
 
-            function doRenderMainApp() {
-                if (!currentUser) return;
+    function doRenderMainApp() {
+        if (!currentUser) return;
 
-                // ⚡ Bolt: Use pre-calculated statusCounts from libraryStats
-                const statusCounts = libraryStats.statusCounts;
-                const isDark = document.documentElement.classList.contains('dark');
+        // ⚡ Bolt: Use pre-calculated statusCounts from libraryStats
+        const statusCounts = libraryStats.statusCounts;
+        const isDark = document.documentElement.classList.contains('dark');
 
-                // Rebuild the app shell when tab changes OR when counts have changed since last render.
-                const countsKey = `${statusCounts.finished}|${statusCounts.reading}|${libraryStats.wishlistCount}`;
-                const countsChanged = appEl.dataset.lastCounts !== countsKey;
+        // Rebuild the app shell when tab changes OR when counts have changed since last render.
+        const countsKey = `${statusCounts.finished}|${statusCounts.reading}|${libraryStats.wishlistCount}`;
+        const countsChanged = appEl.dataset.lastCounts !== countsKey;
 
-                if (!appEl.querySelector('header') || activeTab !== lastActiveTab || countsChanged) {
-                    lastActiveTab = activeTab;
-                    appEl.dataset.lastCounts = countsKey;
-                    appEl.innerHTML = `
+        if (!appEl.querySelector('header') || activeTab !== lastActiveTab || countsChanged) {
+            lastActiveTab = activeTab;
+            appEl.dataset.lastCounts = countsKey;
+            appEl.innerHTML = `
                     <div class="fixed inset-0 bg-slate-50/30 dark:bg-slate-900 pointer-events-none -z-10"></div>
 
                     <!-- Desktop Left Sidebar (>= 1024px) -->
@@ -1762,8 +1811,8 @@
                             <!-- ⚡ Theme toggle replacing the + button -->
                             <button data-action="toggle-sidebar-theme" class="p-2.5 hover:bg-muted rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none text-muted-foreground" title="${isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}" aria-label="${isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}">
                                 ${isDark
-                            ? '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>'
-                            : '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>'}
+                    ? '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>'
+                    : '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>'}
                             </button>
                         </div>
                     </aside>
@@ -1856,29 +1905,35 @@
                         </button>
                     </nav>
                 `;
-                    attachGlobalListeners();
-                }
+            attachGlobalListeners();
+        }
 
-                const mainContentEl = document.getElementById('main-content');
-                if (activeTab === 'settings') {
-                    mainContentEl.innerHTML = renderSettings();
-                    attachSettingsListeners();
-                } else if (activeTab === 'explore') {
-                    mainContentEl.innerHTML = renderExplore();
-                    attachActivityListeners();
-                } else if (activeTab === 'mybooks') {
-                    mainContentEl.innerHTML = renderMyBooks();
-                } else if (activeTab === 'insight') {
-                    mainContentEl.innerHTML = renderLibraryInsight();
-                    loadLastAIAnalysis();
-                    document.getElementById('run-ai-analysis-btn')?.addEventListener('click', runAILibraryAnalysis);
-                    document.getElementById('run-ai-roadmap-btn')?.addEventListener('click', generateReadingRoadmap);
-                    attachActivityListeners();
-                } else if (activeTab === 'activity') {
-                    mainContentEl.innerHTML = renderActivity();
-                } else {
-                    if (!document.getElementById('search-input')) {
-                        mainContentEl.innerHTML = `
+        const mainContentEl = document.getElementById('main-content');
+        if (activeTab === 'settings') {
+            mainContentEl.innerHTML = renderSettings();
+            attachSettingsListeners();
+        } else if (activeTab === 'explore') {
+            mainContentEl.innerHTML = renderExplore();
+            attachActivityListeners();
+        } else if (activeTab === 'mybooks') {
+            mainContentEl.innerHTML = renderMyBooks();
+            mainContentEl.querySelectorAll('[data-stagger]').forEach(el => {
+                window.setDynamicStyle(el, { delay: (parseInt(el.dataset.stagger) || 0) * 50 });
+            });
+            mainContentEl.querySelectorAll('[data-bar-width]').forEach(el => {
+                window.setDynamicStyle(el, { width: parseFloat(el.dataset.barWidth) || 0 });
+            });
+        } else if (activeTab === 'insight') {
+            mainContentEl.innerHTML = renderLibraryInsight();
+            loadLastAIAnalysis();
+            document.getElementById('run-ai-analysis-btn')?.addEventListener('click', runAILibraryAnalysis);
+            document.getElementById('run-ai-roadmap-btn')?.addEventListener('click', generateReadingRoadmap);
+            attachActivityListeners();
+        } else if (activeTab === 'activity') {
+            mainContentEl.innerHTML = renderActivity();
+        } else {
+            if (!document.getElementById('search-input')) {
+                mainContentEl.innerHTML = `
                         <!-- Smart Search Bar -->
                         <div class="mb-6 flex gap-2">
                             <div class="relative group flex-1">
@@ -1922,93 +1977,93 @@
                         <div id="controls-bar-container"></div>
                         <div id="library-container-wrapper"></div>
                     `;
-                        const searchInput = document.getElementById('search-input');
-                        const searchHint = document.getElementById('search-hint');
-                        searchInput.addEventListener('input', e => {
-                            searchQuery = e.target.value;
-                            document.getElementById('clear-search-btn').classList.toggle('hidden', !searchQuery);
-                            if (searchHint) searchHint.classList.toggle('opacity-0', !!searchQuery);
-                            if (searchTimeout) clearTimeout(searchTimeout);
-                            searchTimeout = setTimeout(() => {
-                                window.queueRenderLibraryOnly();
-                            }, 150);
-                        });
-                        searchInput.addEventListener('keydown', e => {
-                            if (e.key === 'Enter' && searchQuery.trim()) {
-                                saveRecentSearch(searchQuery.trim());
-                                window.queueRenderLibraryOnly();
-                            }
-                            if (e.key === 'Escape') {
-                                searchQuery = '';
-                                searchInput.value = '';
-                                searchInput.blur();
-                                document.getElementById('clear-search-btn').classList.add('hidden');
-                                if (searchHint) searchHint.classList.remove('opacity-0');
-                                window.queueRenderLibraryOnly();
-                            }
-                        });
-                        searchInput.addEventListener('focus', () => {
-                            if (searchHint) searchHint.classList.add('opacity-0');
-                        });
-                        searchInput.addEventListener('blur', () => {
-                            if (searchHint && !searchQuery) searchHint.classList.remove('opacity-0');
-                        });
-                        document.getElementById('clear-search-btn').addEventListener('click', () => {
-                            searchQuery = '';
-                            const input = document.getElementById('search-input');
-                            input.value = '';
-                            input.focus();
-                            if (searchHint) searchHint.classList.add('opacity-0');
-                            document.getElementById('clear-search-btn').classList.add('hidden');
-                            input.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            window.queueRenderLibraryOnly();
-                        });
-                        document.getElementById('advanced-search-btn').addEventListener('click', openAdvancedSearch);
-                    }
-                    window.queueRenderLibraryOnly();
-                }
-                if (window.processPendingCharts) {
-                    window.processPendingCharts();
-                }
-            }
-
-            window.clearSelection = () => {
-                selectedBookIds.clear();
-                if (document.getElementById('bulk-actions-bar')) {
-                    window.queueRenderLibraryOnly();
-                }
-            };
-
-            window.bulkTransfer = async () => {
-                if (!selectedBookIds.size) return;
-
-                const activePartnerships = allPartnerships.filter(p => {
-                    const isUser1 = p.userId1 === currentUser.uid;
-                    const isUnsubscribed = isUser1 ? p.user1Unsubscribed : p.user2Unsubscribed;
-                    const isAccepted = p.status === 'accepted' || p.status === undefined;
-                    return !isUnsubscribed && isAccepted;
+                const searchInput = document.getElementById('search-input');
+                const searchHint = document.getElementById('search-hint');
+                searchInput.addEventListener('input', e => {
+                    searchQuery = e.target.value;
+                    document.getElementById('clear-search-btn').classList.toggle('hidden', !searchQuery);
+                    if (searchHint) searchHint.classList.toggle('opacity-0', !!searchQuery);
+                    if (searchTimeout) clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        window.queueRenderLibraryOnly();
+                    }, 150);
                 });
+                searchInput.addEventListener('keydown', e => {
+                    if (e.key === 'Enter' && searchQuery.trim()) {
+                        saveRecentSearch(searchQuery.trim());
+                        window.queueRenderLibraryOnly();
+                    }
+                    if (e.key === 'Escape') {
+                        searchQuery = '';
+                        searchInput.value = '';
+                        searchInput.blur();
+                        document.getElementById('clear-search-btn').classList.add('hidden');
+                        if (searchHint) searchHint.classList.remove('opacity-0');
+                        window.queueRenderLibraryOnly();
+                    }
+                });
+                searchInput.addEventListener('focus', () => {
+                    if (searchHint) searchHint.classList.add('opacity-0');
+                });
+                searchInput.addEventListener('blur', () => {
+                    if (searchHint && !searchQuery) searchHint.classList.remove('opacity-0');
+                });
+                document.getElementById('clear-search-btn').addEventListener('click', () => {
+                    searchQuery = '';
+                    const input = document.getElementById('search-input');
+                    input.value = '';
+                    input.focus();
+                    if (searchHint) searchHint.classList.add('opacity-0');
+                    document.getElementById('clear-search-btn').classList.add('hidden');
+                    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    window.queueRenderLibraryOnly();
+                });
+                document.getElementById('advanced-search-btn').addEventListener('click', openAdvancedSearch);
+            }
+            window.queueRenderLibraryOnly();
+        }
+        if (window.processPendingCharts) {
+            window.processPendingCharts();
+        }
+    }
 
-                if (activePartnerships.length === 0) {
-                    showToast('You need an active collaborator to transfer books. Add one in Settings.', 'info');
-                    return;
-                }
+    window.clearSelection = () => {
+        selectedBookIds.clear();
+        if (document.getElementById('bulk-actions-bar')) {
+            window.queueRenderLibraryOnly();
+        }
+    };
 
-                const closeLoading = showModal(`
+    window.bulkTransfer = async () => {
+        if (!selectedBookIds.size) return;
+
+        const activePartnerships = allPartnerships.filter(p => {
+            const isUser1 = p.userId1 === currentUser.uid;
+            const isUnsubscribed = isUser1 ? p.user1Unsubscribed : p.user2Unsubscribed;
+            const isAccepted = p.status === 'accepted' || p.status === undefined;
+            return !isUnsubscribed && isAccepted;
+        });
+
+        if (activePartnerships.length === 0) {
+            showToast('You need an active collaborator to transfer books. Add one in Settings.', 'info');
+            return;
+        }
+
+        const closeLoading = showModal(`
                     <div class="glass max-w-sm w-full rounded-[2.5rem] p-10 flex flex-col items-center justify-center gap-6 animate-pulse">
                         <div class="w-16 h-16 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin"></div>
                         <p class="text-slate-500 font-bold uppercase tracking-widest text-xs">Loading Collaborators...</p>
                     </div>
                 `);
 
-                try {
-                    const partnerIds = activePartnerships.map(p => p.userId1 === currentUser.uid ? p.userId2 : p.userId1);
-                    const userDocs = await Promise.all(partnerIds.map(id => db.collection('users').doc(id).get()));
-                    const partners = userDocs.map(doc => ({ uid: doc.id, ...doc.data() }));
+        try {
+            const partnerIds = activePartnerships.map(p => p.userId1 === currentUser.uid ? p.userId2 : p.userId1);
+            const userDocs = await Promise.all(partnerIds.map(id => db.collection('users').doc(id).get()));
+            const partners = userDocs.map(doc => ({ uid: doc.id, ...doc.data() }));
 
-                    closeLoading();
+            closeLoading();
 
-                    const modalHtml = `
+            const modalHtml = `
                     <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up border border-slate-200/50 dark:border-slate-800">
                         <h2 class="text-2xl font-black font-serif italic mb-2">Transfer Books</h2>
                         <p class="text-sm text-slate-500 mb-6">Transfer ${selectedBookIds.size} selected books to a collaborator's library. You will lose ownership of these books.</p>
@@ -2028,194 +2083,194 @@
                         <button data-close class="w-full py-4 text-slate-400 hover:text-slate-600 font-bold uppercase tracking-widest text-xs transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none rounded-xl">Cancel</button>
                     </div>
                     `;
-                    showModal(modalHtml);
-                } catch (err) {
-                    closeLoading();
-                    showToast('Failed to load collaborators', 'error');
-                }
-            };
+            showModal(modalHtml);
+        } catch (err) {
+            closeLoading();
+            showToast('Failed to load collaborators', 'error');
+        }
+    };
 
-            window.executeBookTransfer = async (bookId, targetUserId, targetName) => {
-                if (!confirm(`Are you sure you want to transfer ownership of this book to ${targetName}? You will lose ownership and cannot undo this action.`)) return;
+    window.executeBookTransfer = async (bookId, targetUserId, targetName) => {
+        if (!confirm(`Are you sure you want to transfer ownership of this book to ${targetName}? You will lose ownership and cannot undo this action.`)) return;
 
-                const closeLoading = showModal(`
+        const closeLoading = showModal(`
                     <div class="glass max-w-sm w-full rounded-[2.5rem] p-10 flex flex-col items-center justify-center gap-6 animate-pulse">
                         <div class="w-16 h-16 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin"></div>
                         <p class="text-slate-500 font-bold uppercase tracking-widest text-xs">Transferring book...</p>
                     </div>
                 `);
 
-                try {
-                    const bookDoc = await db.collection('books').doc(bookId).get();
-                    if (!bookDoc.exists) {
-                        closeLoading();
-                        showToast('Book not found.', 'error');
-                        return;
-                    }
-                    const book = bookDoc.data();
+        try {
+            const bookDoc = await db.collection('books').doc(bookId).get();
+            if (!bookDoc.exists) {
+                closeLoading();
+                showToast('Book not found.', 'error');
+                return;
+            }
+            const book = bookDoc.data();
 
-                    // Update ownership in Firestore
-                    await db.collection('books').doc(bookId).update({
+            // Update ownership in Firestore
+            await db.collection('books').doc(bookId).update({
+                userId: targetUserId,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            // Add transfer message to recipient activityFeed
+            await db.collection('activityFeed').add({
+                type: 'book_transfer',
+                bookId: bookId,
+                bookTitle: book.title || 'Unknown Book',
+                userName: currentUser.displayName || currentUser.email || 'A collaborator',
+                userId: currentUser.uid,
+                recipientId: targetUserId,
+                libraryId: targetUserId,
+                message: `${currentUser.displayName || currentUser.email || 'A collaborator'} transferred the book "${book.title}" to you.`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            closeLoading();
+
+            // Close all modals
+            document.querySelectorAll('[data-close]').forEach(btn => btn.click());
+
+            showToast(`Successfully transferred "${book.title}" to ${targetName}.`, 'success');
+            window.queueRenderMainApp();
+        } catch (err) {
+            closeLoading();
+            showToast('Transfer failed: ' + err.message, 'error');
+        }
+    };
+
+    window.executeBulkTransfer = async (targetUserId, targetName) => {
+        if (!confirm(`Transfer ${selectedBookIds.size} books to ${targetName}? This action cannot be undone.`)) return;
+
+        const ids = Array.from(selectedBookIds);
+        showToast(`Transferring ${ids.length} books...`, 'info');
+
+        try {
+            // Chunks of 150 because we have 3 writes per book (update book + 2 activity feed entries)
+            // 150 * 3 = 450, which is safely under the Firestore batch limit of 500
+            for (let i = 0; i < ids.length; i += 150) {
+                const chunk = ids.slice(i, i + 150);
+                const batch = db.batch();
+
+                chunk.forEach(id => {
+                    const book = books.find(b => b.id === id);
+                    batch.update(db.collection('books').doc(id), {
                         userId: targetUserId,
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
 
-                    // Add transfer message to recipient activityFeed
-                    await db.collection('activityFeed').add({
-                        type: 'book_transfer',
-                        bookId: bookId,
-                        bookTitle: book.title || 'Unknown Book',
-                        userName: currentUser.displayName || currentUser.email || 'A collaborator',
+                    // Add activity entry for sender
+                    const activityRef = db.collection('activityFeed').doc();
+                    batch.set(activityRef, {
+                        type: 'user_message',
+                        text: `transferred "${book?.title || 'a book'}" to ${targetName}.`,
+                        userName: currentUser.displayName || currentUser.email || currentUser.uid,
                         userId: currentUser.uid,
-                        recipientId: targetUserId,
-                        libraryId: targetUserId,
-                        message: `${currentUser.displayName || currentUser.email || 'A collaborator'} transferred the book "${book.title}" to you.`,
+                        libraryId: currentUser.uid,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
 
-                    closeLoading();
+                    // // Add activity entry for recipient
+                    // const activityRef2 = db.collection('activityFeed').doc();
+                    // batch.set(activityRef2, {
+                    //     type: 'book_added',
+                    //     bookId: id,
+                    //     bookTitle: book?.title || 'Unknown Book',
+                    //     userName: currentUser.displayName || currentUser.email || currentUser.uid,
+                    //     userId: targetUserId,
+                    //     addedTo: 'My',
+                    //     libraryId: targetUserId,
+                    //     timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    // });
+                });
+                await batch.commit();
+            }
 
-                    // Close all modals
-                    document.querySelectorAll('[data-close]').forEach(btn => btn.click());
+            selectedBookIds.clear();
+            if (currentModalCloseHandler) currentModalCloseHandler();
+            showToast(`Successfully transferred ${ids.length} books to ${targetName}.`, 'success');
+            window.queueRenderMainApp();
+        } catch (err) {
+            showToast('Transfer failed: ' + err.message, 'error');
+        }
+    };
 
-                    showToast(`Successfully transferred "${book.title}" to ${targetName}.`, 'success');
-                    window.queueRenderMainApp();
-                } catch (err) {
-                    closeLoading();
-                    showToast('Transfer failed: ' + err.message, 'error');
-                }
-            };
+    window.bulkDelete = async () => {
+        if (!selectedBookIds.size) return;
+        if (confirm(`Delete ${selectedBookIds.size} selected books?`)) {
+            showToast(`Deleting ${selectedBookIds.size} books...`, 'info');
 
-            window.executeBulkTransfer = async (targetUserId, targetName) => {
-                if (!confirm(`Transfer ${selectedBookIds.size} books to ${targetName}? This action cannot be undone.`)) return;
+            const ids = Array.from(selectedBookIds);
+            const deletedItems = [];
 
-                const ids = Array.from(selectedBookIds);
-                showToast(`Transferring ${ids.length} books...`, 'info');
-
-                try {
-                    // Chunks of 150 because we have 3 writes per book (update book + 2 activity feed entries)
-                    // 150 * 3 = 450, which is safely under the Firestore batch limit of 500
-                    for (let i = 0; i < ids.length; i += 150) {
-                        const chunk = ids.slice(i, i + 150);
-                        const batch = db.batch();
-
-                        chunk.forEach(id => {
-                            const book = books.find(b => b.id === id);
-                            batch.update(db.collection('books').doc(id), {
-                                userId: targetUserId,
-                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                            });
-
-                            // Add activity entry for sender
-                            const activityRef = db.collection('activityFeed').doc();
-                            batch.set(activityRef, {
-                                type: 'user_message',
-                                text: `transferred "${book?.title || 'a book'}" to ${targetName}.`,
-                                userName: currentUser.displayName || currentUser.email || currentUser.uid,
-                                userId: currentUser.uid,
-                                libraryId: currentUser.uid,
-                                timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                            });
-
-                            // Add activity entry for recipient
-                            const activityRef2 = db.collection('activityFeed').doc();
-                            batch.set(activityRef2, {
-                                type: 'book_added',
-                                bookId: id,
-                                bookTitle: book?.title || 'Unknown Book',
-                                userName: currentUser.displayName || currentUser.email || currentUser.uid,
-                                userId: targetUserId,
-                                addedTo: 'My',
-                                libraryId: targetUserId,
-                                timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                            });
+            try {
+                // Populate safety net
+                ids.forEach(id => {
+                    const book = books.find(b => b.id === id);
+                    if (book) {
+                        deletedItems.push({
+                            book: { ...book },
+                            status: { ...getStatusData(id) }
                         });
-                        await batch.commit();
                     }
+                });
+                window.lastDeleted = deletedItems;
 
-                    selectedBookIds.clear();
-                    if (currentModalCloseHandler) currentModalCloseHandler();
-                    showToast(`Successfully transferred ${ids.length} books to ${targetName}.`, 'success');
-                    window.queueRenderMainApp();
-                } catch (err) {
-                    showToast('Transfer failed: ' + err.message, 'error');
+                // Firestore batches are limited to 500 operations. Each delete is 2 operations here.
+                // 200 * 2 = 400 operations, which is within the 500 limit.
+                for (let i = 0; i < ids.length; i += 200) {
+                    const chunk = ids.slice(i, i + 200);
+                    const batch = db.batch();
+                    chunk.forEach(id => {
+                        batch.delete(db.collection('books').doc(id));
+                        batch.delete(db.collection('books').doc(id).collection('readingStatus').doc(currentUser.uid));
+                    });
+                    await batch.commit();
                 }
-            };
 
-            window.bulkDelete = async () => {
-                if (!selectedBookIds.size) return;
-                if (confirm(`Delete ${selectedBookIds.size} selected books?`)) {
-                    showToast(`Deleting ${selectedBookIds.size} books...`, 'info');
+                selectedBookIds.clear();
+                showToast(`Deleted ${ids.length} books successfully.`, 'success', 10000, '<button data-action="undo-delete" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Undo</button>');
+            } catch (err) {
+                console.error('Bulk delete error:', err);
+                showToast('Failed to delete books: ' + err.message, 'error');
+            }
+        }
+    };
 
-                    const ids = Array.from(selectedBookIds);
-                    const deletedItems = [];
+    window.undoDelete = async () => {
+        if (!window.lastDeleted || window.lastDeleted.length === 0) return;
+        showToast(`Restoring ${window.lastDeleted.length} books...`, 'info');
 
-                    try {
-                        // Populate safety net
-                        ids.forEach(id => {
-                            const book = books.find(b => b.id === id);
-                            if (book) {
-                                deletedItems.push({
-                                    book: { ...book },
-                                    status: { ...getStatusData(id) }
-                                });
-                            }
-                        });
-                        window.lastDeleted = deletedItems;
+        try {
+            // Chunks of 200 * 2 writes = 400 operations, under the 500 limit.
+            for (let i = 0; i < window.lastDeleted.length; i += 200) {
+                const chunk = window.lastDeleted.slice(i, i + 200);
+                const batch = db.batch();
 
-                        // Firestore batches are limited to 500 operations. Each delete is 2 operations here.
-                        // 200 * 2 = 400 operations, which is within the 500 limit.
-                        for (let i = 0; i < ids.length; i += 200) {
-                            const chunk = ids.slice(i, i + 200);
-                            const batch = db.batch();
-                            chunk.forEach(id => {
-                                batch.delete(db.collection('books').doc(id));
-                                batch.delete(db.collection('books').doc(id).collection('readingStatus').doc(currentUser.uid));
-                            });
-                            await batch.commit();
-                        }
+                chunk.forEach(item => {
+                    const bookData = { ...item.book };
+                    const bookId = bookData.id;
+                    delete bookData.id;
+                    // Strip every client-side pre-computed field so none are persisted.
+                    Object.keys(bookData).forEach(key => { if (key.startsWith('_')) delete bookData[key]; });
 
-                        selectedBookIds.clear();
-                        showToast(`Deleted ${ids.length} books successfully.`, 'success', 10000, '<button data-action="undo-delete" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Undo</button>');
-                    } catch (err) {
-                        console.error('Bulk delete error:', err);
-                        showToast('Failed to delete books: ' + err.message, 'error');
-                    }
-                }
-            };
+                    batch.set(db.collection('books').doc(bookId), bookData);
+                    batch.set(db.collection('books').doc(bookId).collection('readingStatus').doc(currentUser.uid), item.status);
+                });
+                await batch.commit();
+            }
+            window.lastDeleted = [];
+            showToast('Books restored successfully!', 'success');
+        } catch (err) {
+            console.error('Undo error:', err);
+            showToast('Failed to restore books: ' + err.message, 'error');
+        }
+    };
 
-            window.undoDelete = async () => {
-                if (!window.lastDeleted || window.lastDeleted.length === 0) return;
-                showToast(`Restoring ${window.lastDeleted.length} books...`, 'info');
-
-                try {
-                    // Chunks of 200 * 2 writes = 400 operations, under the 500 limit.
-                    for (let i = 0; i < window.lastDeleted.length; i += 200) {
-                        const chunk = window.lastDeleted.slice(i, i + 200);
-                        const batch = db.batch();
-
-                        chunk.forEach(item => {
-                            const bookData = { ...item.book };
-                            const bookId = bookData.id;
-                            delete bookData.id;
-                            // Strip every client-side pre-computed field so none are persisted.
-                            Object.keys(bookData).forEach(key => { if (key.startsWith('_')) delete bookData[key]; });
-
-                            batch.set(db.collection('books').doc(bookId), bookData);
-                            batch.set(db.collection('books').doc(bookId).collection('readingStatus').doc(currentUser.uid), item.status);
-                        });
-                        await batch.commit();
-                    }
-                    window.lastDeleted = [];
-                    showToast('Books restored successfully!', 'success');
-                } catch (err) {
-                    console.error('Undo error:', err);
-                    showToast('Failed to restore books: ' + err.message, 'error');
-                }
-            };
-
-            window.openUserProfile = async (userId) => {
-                const closeLoading = showModal(`
+    window.openUserProfile = async (userId) => {
+        const closeLoading = showModal(`
     <div class="glass max-w-md w-full rounded-[2.5rem] p-8">
         <div class="flex flex-col items-center mb-6">
             <div class="skeleton-base skeleton-avatar w-20 h-20 mb-4"></div>
@@ -2234,14 +2289,14 @@
     </div>
 `);
 
-                try {
-                    const userDoc = await db.collection('users').doc(userId).get();
-                    const profile = userDoc.data();
-                    const reviewsSnapshot = await db.collection('reviews').where('userId', '==', userId).orderBy('createdAt', 'desc').get();
-                    const userReviews = reviewsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        try {
+            const userDoc = await db.collection('users').doc(userId).get();
+            const profile = userDoc.data();
+            const reviewsSnapshot = await db.collection('reviews').where('userId', '==', userId).orderBy('createdAt', 'desc').get();
+            const userReviews = reviewsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-                    closeLoading();
-                    const modalHtml = `
+            closeLoading();
+            const modalHtml = `
                     <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
                         <div class="bg-slate-50 dark:bg-slate-900 w-full h-full sm:h-auto sm:max-w-3xl sm:rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up overflow-y-auto sm:max-h-[90vh]">
                             <div class="flex flex-col items-center text-center mb-10">
@@ -2280,16 +2335,16 @@
                         </div>
                     </div>
                     `;
-                    showModal(modalHtml);
-                } catch (err) {
-                    closeLoading();
-                    showToast('Failed to load profile', 'error');
-                    console.error(err);
-                }
-            };
+            showModal(modalHtml);
+        } catch (err) {
+            closeLoading();
+            showToast('Failed to load profile', 'error');
+            console.error(err);
+        }
+    };
 
-            window.visitCollaboratorLibrary = async (profileUserId) => {
-                const closeLoading = showModal(`
+    window.visitCollaboratorLibrary = async (profileUserId) => {
+        const closeLoading = showModal(`
     <div class="bg-slate-50 dark:bg-slate-900 w-full h-full sm:h-auto sm:max-w-4xl sm:rounded-[2.5rem] p-6 sm:p-10 sm:max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-6">
             <div class="space-y-2">
@@ -2311,35 +2366,35 @@
     </div>
 `);
 
-                try {
-                    // Check partnership status locally using allPartnerships array to avoid direct query permission issues
-                    const ids = [currentUser.uid, profileUserId].sort();
-                    const partnershipId = `${ids[0]}_${ids[1]}`;
-                    const localPartnership = allPartnerships.find(p => p.id === partnershipId);
+        try {
+            // Check partnership status locally using allPartnerships array to avoid direct query permission issues
+            const ids = [currentUser.uid, profileUserId].sort();
+            const partnershipId = `${ids[0]}_${ids[1]}`;
+            const localPartnership = allPartnerships.find(p => p.id === partnershipId);
 
-                    if (!localPartnership || (localPartnership.status !== 'accepted' && localPartnership.status !== undefined)) {
-                        closeLoading();
-                        showToast("You can only visit libraries of accepted collaborators.", "error");
-                        return;
-                    }
+            if (!localPartnership || (localPartnership.status !== 'accepted' && localPartnership.status !== undefined)) {
+                closeLoading();
+                showToast("You can only visit libraries of accepted collaborators.", "error");
+                return;
+            }
 
-                    // Fetch profile user's name
-                    const profileDoc = await db.collection('users').doc(profileUserId).get();
-                    const profileName = profileDoc.data()?.displayName || 'User';
+            // Fetch profile user's name
+            const profileDoc = await db.collection('users').doc(profileUserId).get();
+            const profileName = profileDoc.data()?.displayName || 'User';
 
-                    // Restrict visited library query to books owned directly by this collaborator to respect Firestore security rules
-                    const collaboratorIds = [profileUserId];
+            // Restrict visited library query to books owned directly by this collaborator to respect Firestore security rules
+            const collaboratorIds = [profileUserId];
 
-                    // Fetch books belonging to collaborators
-                    let visitedBooks = [];
-                    const booksSnapshot = await db.collection('books').where('userId', '==', profileUserId).get();
-                    booksSnapshot.docs.forEach(doc => {
-                        visitedBooks.push({ id: doc.id, ...doc.data() });
-                    });
+            // Fetch books belonging to collaborators
+            let visitedBooks = [];
+            const booksSnapshot = await db.collection('books').where('userId', '==', profileUserId).get();
+            booksSnapshot.docs.forEach(doc => {
+                visitedBooks.push({ id: doc.id, ...doc.data() });
+            });
 
-                    closeLoading();
+            closeLoading();
 
-                    const modalHtml = `
+            const modalHtml = `
                     <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
                         <div class="bg-slate-50 dark:bg-slate-900 w-full h-full sm:h-auto sm:max-w-4xl sm:rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up overflow-y-auto sm:max-h-[90vh]">
                             <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
@@ -2360,10 +2415,10 @@
                             ` : `
                                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                                     ${visitedBooks.map((book, idx) => {
-                        const title = book.title || 'Untitled';
-                        const author = book.author || 'Unknown Author';
-                        const coverUrl = book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover';
-                        return `
+                const title = book.title || 'Untitled';
+                const author = book.author || 'Unknown Author';
+                const coverUrl = book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover';
+                return `
                                         <div data-action="open-visited-book" data-value="${escapeHTML(book.id)}" data-value2="${escapeHTML(JSON.stringify(collaboratorIds))}"class="bg-white dark:bg-slate-800 p-4 rounded-3xl flex gap-4 cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all border border-slate-100 dark:border-slate-800" role="button" aria-label="${escapeHTML(title)} by ${escapeHTML(author)}">
                                             <img src="${escapeHTML(coverUrl)}" class="w-16 h-24 object-cover rounded-2xl shadow-md border border-slate-200 dark:border-slate-700 flex-shrink-0">
                                             <div class="flex-1 flex flex-col justify-center min-w-0">
@@ -2373,7 +2428,7 @@
                                             </div>
                                         </div>
                                         `;
-                    }).join('')}
+            }).join('')}
                                 </div>
                             `}
 
@@ -2383,56 +2438,56 @@
                         </div>
                     </div>
                     `;
-                    showModal(modalHtml);
-                } catch (err) {
-                    closeLoading();
-                    showToast('Failed to load library: ' + err.message, 'error');
-                    console.error(err);
-                }
-            };
+            showModal(modalHtml);
+        } catch (err) {
+            closeLoading();
+            showToast('Failed to load library: ' + err.message, 'error');
+            console.error(err);
+        }
+    };
 
-            window.openVisitedBookDetails = async (bookId, collaboratorIds) => {
-                const closeLoading = showModal(`
+    window.openVisitedBookDetails = async (bookId, collaboratorIds) => {
+        const closeLoading = showModal(`
                     <div class="glass max-w-sm w-full rounded-[2.5rem] p-10 flex flex-col items-center justify-center gap-6 animate-pulse">
                         <div class="w-16 h-16 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin"></div>
                         <p class="text-slate-500 font-bold uppercase tracking-widest text-xs">Opening Details...</p>
                     </div>
                 `);
 
-                try {
-                    const bookDoc = await db.collection('books').doc(bookId).get();
-                    if (!bookDoc.exists) {
-                        closeLoading();
-                        showToast('Book not found.', 'error');
-                        return;
-                    }
-                    const book = { id: bookDoc.id, ...bookDoc.data() };
+        try {
+            const bookDoc = await db.collection('books').doc(bookId).get();
+            if (!bookDoc.exists) {
+                closeLoading();
+                showToast('Book not found.', 'error');
+                return;
+            }
+            const book = { id: bookDoc.id, ...bookDoc.data() };
 
-                    // Fetch all reading statuses/reviews
-                    const allStatusesSnapshot = await db.collection('books').doc(bookId).collection('readingStatus').get();
-                    const allStatuses = allStatusesSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+            // Fetch all reading statuses/reviews
+            const allStatusesSnapshot = await db.collection('books').doc(bookId).collection('readingStatus').get();
+            const allStatuses = allStatusesSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
 
-                    // Filter only status/reviews from the collaborator ids
-                    const collaboratorStatuses = allStatuses.filter(s => collaboratorIds.includes(s.uid));
+            // Filter only status/reviews from the collaborator ids
+            const collaboratorStatuses = allStatuses.filter(s => collaboratorIds.includes(s.uid));
 
-                    // Fetch user profiles for display names
-                    const userProfiles = {};
-                    const missingUserIds = collaboratorStatuses.map(s => s.uid);
-                    if (missingUserIds.length > 0) {
-                        for (let i = 0; i < missingUserIds.length; i += 10) {
-                            const chunk = missingUserIds.slice(i, i + 10);
-                            const usersSnapshot = await db.collection('users').where('uid', 'in', chunk).limit(50).get();
-                            usersSnapshot.docs.forEach(doc => {
-                                userProfiles[doc.id] = doc.data();
-                            });
-                        }
-                    }
+            // Fetch user profiles for display names
+            const userProfiles = {};
+            const missingUserIds = collaboratorStatuses.map(s => s.uid);
+            if (missingUserIds.length > 0) {
+                for (let i = 0; i < missingUserIds.length; i += 10) {
+                    const chunk = missingUserIds.slice(i, i + 10);
+                    const usersSnapshot = await db.collection('users').where('uid', 'in', chunk).limit(50).get();
+                    usersSnapshot.docs.forEach(doc => {
+                        userProfiles[doc.id] = doc.data();
+                    });
+                }
+            }
 
-                    closeLoading();
+            closeLoading();
 
-                    const stars = STAR_CACHE[book.rating] || STAR_CACHE[0];
+            const stars = STAR_CACHE[book.rating] || STAR_CACHE[0];
 
-                    const modalHtml = `
+            const modalHtml = `
                     <div class="fixed inset-0 z-[60] flex items-center justify-center p-4">
                         <div class="bg-sky-50 dark:bg-gray-800 w-full h-full sm:h-auto sm:max-w-3xl sm:rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up overflow-y-auto sm:max-h-[90vh]">
                             <div class="flex flex-col sm:flex-row gap-8">
@@ -2476,55 +2531,55 @@
                         </div>
                     </div>
                     `;
-                    showModal(modalHtml);
-                } catch (err) {
-                    closeLoading();
-                    showToast('Failed to load book details: ' + err.message, 'error');
-                    console.error(err);
-                }
-            };
+            showModal(modalHtml);
+        } catch (err) {
+            closeLoading();
+            showToast('Failed to load book details: ' + err.message, 'error');
+            console.error(err);
+        }
+    };
 
-            window.updateNotificationBadge = () => {
-                const hasPendingRequests = allPartnerships.some(p => p.status === 'pending' && p.initiatorId !== currentUser.uid);
-                const badge = document.getElementById('notification-badge');
-                if (badge) {
-                    if (hasPendingRequests) {
-                        badge.classList.remove('hidden');
-                    } else {
-                        badge.classList.add('hidden');
-                    }
-                }
-            };
+    window.updateNotificationBadge = () => {
+        const hasPendingRequests = allPartnerships.some(p => p.status === 'pending' && p.initiatorId !== currentUser.uid);
+        const badge = document.getElementById('notification-badge');
+        if (badge) {
+            if (hasPendingRequests) {
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+    };
 
-            window.openNotificationsModal = async () => {
-                const closeLoading = showModal(`
+    window.openNotificationsModal = async () => {
+        const closeLoading = showModal(`
                     <div class="glass max-w-sm w-full rounded-[2.5rem] p-10 flex flex-col items-center justify-center gap-6 animate-pulse">
                         <div class="w-16 h-16 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin"></div>
                         <p class="text-slate-500 font-bold uppercase tracking-widest text-xs">Loading Notifications...</p>
                     </div>
                 `);
 
-                try {
-                    // Fetch pending partnerships
-                    const pendingPartnerships = allPartnerships.filter(p => p.status === 'pending');
+        try {
+            // Fetch pending partnerships
+            const pendingPartnerships = allPartnerships.filter(p => p.status === 'pending');
 
-                    // Fetch user profiles for display names
-                    const partnerIds = pendingPartnerships.map(p => {
-                        return p.userId1 === currentUser.uid ? p.userId2 : p.userId1;
-                    });
+            // Fetch user profiles for display names
+            const partnerIds = pendingPartnerships.map(p => {
+                return p.userId1 === currentUser.uid ? p.userId2 : p.userId1;
+            });
 
-                    const userDocs = await Promise.all(
-                        partnerIds.map(id => db.collection('users').doc(id).get())
-                    );
+            const userDocs = await Promise.all(
+                partnerIds.map(id => db.collection('users').doc(id).get())
+            );
 
-                    const userNames = {};
-                    partnerIds.forEach((id, idx) => {
-                        userNames[id] = userDocs[idx].data()?.displayName || 'Unknown';
-                    });
+            const userNames = {};
+            partnerIds.forEach((id, idx) => {
+                userNames[id] = userDocs[idx].data()?.displayName || 'Unknown';
+            });
 
-                    closeLoading();
+            closeLoading();
 
-                    const modalHtml = `
+            const modalHtml = `
                     <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
                         <div class="bg-slate-50 dark:bg-slate-900 w-full h-full sm:h-auto sm:max-w-xl sm:rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up overflow-y-auto sm:max-h-[85vh]">
                             <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
@@ -2541,11 +2596,11 @@
                                         <p class="text-slate-400 italic">No pending requests at the moment.</p>
                                     </div>
                                 ` : pendingPartnerships.map(p => {
-                        const partnerId = p.userId1 === currentUser.uid ? p.userId2 : p.userId1;
-                        const partnerName = userNames[partnerId];
-                        const isInitiator = p.initiatorId === currentUser.uid;
+                const partnerId = p.userId1 === currentUser.uid ? p.userId2 : p.userId1;
+                const partnerName = userNames[partnerId];
+                const isInitiator = p.initiatorId === currentUser.uid;
 
-                        return `
+                return `
                                     <div class="flex items-center justify-between p-4 bg-amber-50/50 dark:bg-amber-950/10 rounded-xl border border-amber-100 dark:border-amber-900/50 gap-4">
                                         <div class="flex-1">
                                             <span class="text-sm font-bold block">${escapeHTML(partnerName)}</span>
@@ -2563,7 +2618,7 @@
                                         </div>
                                     </div>
                                     `;
-                    }).join('')}
+            }).join('')}
                             </div>
 
                             <div class="mt-8 flex justify-end">
@@ -2572,260 +2627,260 @@
                         </div>
                     </div>
                     `;
-                    showModal(modalHtml);
-                } catch (err) {
-                    closeLoading();
-                    showToast('Failed to load notifications: ' + err.message, 'error');
-                    console.error(err);
-                }
-            };
+            showModal(modalHtml);
+        } catch (err) {
+            closeLoading();
+            showToast('Failed to load notifications: ' + err.message, 'error');
+            console.error(err);
+        }
+    };
 
-            async function runAISearch() {
-                const config = getAIConfig();
-                if (!config.apiKey) { showToast('Please set your AI API key in Settings.', 'error'); return; }
-                const searchInput = document.getElementById('search-input');
-                const btn = document.getElementById('ai-search-btn');
-                if (!searchQuery) return;
-                saveRecentSearch(searchQuery);
+    async function runAISearch() {
+        const config = getAIConfig();
+        if (!config.apiKey) { showToast('Please set your AI API key in Settings.', 'error'); return; }
+        const searchInput = document.getElementById('search-input');
+        const btn = document.getElementById('ai-search-btn');
+        if (!searchQuery) return;
+        saveRecentSearch(searchQuery);
 
-                const originalText = btn.innerHTML;
-                btn.disabled = true;
-                btn.innerHTML = '<div class="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>';
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<div class="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>';
 
-                try {
-                    const libraryData = books.map(b => ({ id: b.id, t: b.title, a: b.author, g: getBookGenres(b), tags: b.tags || [], d: b.description || '' }));
-                    const prompt = `Analyze the provided library data and return the IDs of books that best match this natural language query: "${searchQuery}".
+        try {
+            const libraryData = books.map(b => ({ id: b.id, t: b.title, a: b.author, g: getBookGenres(b), tags: b.tags || [], d: b.description || '' }));
+            const prompt = `Analyze the provided library data and return the IDs of books that best match this natural language query: "${searchQuery}".
                     Include books that match the intent, themes, or specific attributes mentioned.
                     Library Data: ${JSON.stringify(libraryData)}
                     Return ONLY a valid JSON array of matching book ID strings. If no matches are found, return [].`;
 
-                    const response = await callAI(prompt, "Respond ONLY with a valid JSON array of strings.");
-                    const cleaned = response.replace(/```json|```/g, '').trim();
-                    aiSearchResults = JSON.parse(cleaned);
-                    aiSearchResultsSet = new Set(aiSearchResults);
-                    window.queueRenderLibraryOnly();
-                } catch (err) {
-                    showToast('AI Search failed: ' + err.message, 'error');
-                } finally {
-                    btn.disabled = false;
-                    btn.innerHTML = originalText;
-                }
+            const response = await callAI(prompt, "Respond ONLY with a valid JSON array of strings.");
+            const cleaned = response.replace(/```json|```/g, '').trim();
+            aiSearchResults = JSON.parse(cleaned);
+            aiSearchResultsSet = new Set(aiSearchResults);
+            window.queueRenderLibraryOnly();
+        } catch (err) {
+            showToast('AI Search failed: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
+
+    /**
+     * ⚡ Bolt: Render batching for Library view.
+     * Debounces updates (e.g. from multiple Firestore snapshots) to prevent UI thrashing.
+     */
+    function renderLibraryOnly() {
+        if (libraryRenderPending) return;
+        libraryRenderPending = true;
+        requestAnimationFrame(() => {
+            doRenderLibraryOnly();
+            libraryRenderPending = false;
+        });
+    }
+
+    function doRenderLibraryOnly() {
+        books = books.map(b => b._escapedTitle ? b : normalizeBook(b));
+        renderRecentSearches();
+        // ⚡ Bolt: Hoist density class calculation out of the mapping loop
+        const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
+        const clearSearchBtn = document.getElementById('clear-search-btn');
+        const searchHint = document.getElementById('search-hint');
+        if (clearSearchBtn) {
+            clearSearchBtn.classList.toggle('hidden', !searchQuery);
+        }
+        if (searchHint) {
+            searchHint.classList.toggle('hidden', !!searchQuery);
+            if (!searchQuery && document.activeElement !== document.getElementById('search-input')) {
+                searchHint.classList.remove('opacity-0');
+            }
+        }
+        const searchLower = searchQuery.toLowerCase();
+
+        // ⚡ Bolt: Cache values outside the filter loop to avoid redundant conversions
+        const advRating = advancedFilters.rating === 'all' ? -1 : parseInt(advancedFilters.rating);
+        const startTime = advancedFilters.startDate ? new Date(advancedFilters.startDate).getTime() : null;
+        const endTime = advancedFilters.endDate ? new Date(advancedFilters.endDate).getTime() : null;
+
+        // ⚡ Bolt: Use pre-calculated aiSearchResultsSet for O(1) lookup complexity
+        const aiIds = aiSearchResultsSet;
+
+        let filteredBooks = books.filter(b => {
+            const statusData = getStatusData(b.id);
+            const isOwner = b.userId === currentUser.uid;
+
+            // ⚡ Bolt: Hide collaborator wishlist books from main library and search
+            if (b.isWishlist && !isOwner && !statusData.updatedAt) return false;
+
+            const isWishlist = statusData.isWishlist || (isOwner && b.isWishlist) || false;
+            const matchesTab = (activeTab === 'mybooks')
+                ? (myBooksSubTab === 'wishlist' ? isWishlist : statusData.status === 'finished')
+                : (!isWishlist && !b.excludeFromLibrary);
+
+            // ⚡ Bolt: Use pre-normalized _searchStr for O(1) string check per book
+            let matchesSearch = !searchQuery || b._searchStr.includes(searchLower);
+            if (aiIds) {
+                matchesSearch = aiIds.has(b.id);
             }
 
-            /**
-             * ⚡ Bolt: Render batching for Library view.
-             * Debounces updates (e.g. from multiple Firestore snapshots) to prevent UI thrashing.
-             */
-            function renderLibraryOnly() {
-                if (libraryRenderPending) return;
-                libraryRenderPending = true;
-                requestAnimationFrame(() => {
-                    doRenderLibraryOnly();
-                    libraryRenderPending = false;
-                });
+            const bookStatus = statusData.status;
+
+            const matchesStatus = statusFilter === 'all' || bookStatus === statusFilter;
+            // ⚡ Bolt: Use pre-normalized _genres
+            const matchesCategory = categoryFilter === 'all' || b._genres.includes(categoryFilter);
+            const matchesCopyType = copyTypeFilter === 'all' || b.copyType === copyTypeFilter;
+            const matchesAuthor = authorFilter === 'all' || b.author === authorFilter;
+            const matchesOwner = ownerFilter === 'all' || b.owner === ownerFilter;
+            const matchesTag = !tagFilter || (b.tags && b.tags.includes(tagFilter));
+            const matchesFavorites = !favoritesOnly || statusData.isFavorite;
+
+            // ⚡ Bolt: Exact rating matching (checks user rating first, falls back to book rating)
+            const bookRating = statusData.rating || b.rating || 0;
+            const matchesAdvancedRating = advRating === -1 || bookRating === advRating;
+            const matchesPrice = (!advancedFilters.minPrice || b.price >= advancedFilters.minPrice) &&
+                (!advancedFilters.maxPrice || b.price <= advancedFilters.maxPrice);
+
+            let matchesDate = true;
+            // ⚡ Bolt: Use pre-calculated _purchaseTime and cached start/end times
+            if (startTime || endTime) {
+                const bTime = b._purchaseTime;
+                if (startTime && bTime < startTime) matchesDate = false;
+                if (endTime && bTime > endTime) matchesDate = false;
             }
 
-            function doRenderLibraryOnly() {
-                books = books.map(b => b._escapedTitle ? b : normalizeBook(b));
-                renderRecentSearches();
-                // ⚡ Bolt: Hoist density class calculation out of the mapping loop
-                const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
-                const clearSearchBtn = document.getElementById('clear-search-btn');
-                const searchHint = document.getElementById('search-hint');
-                if (clearSearchBtn) {
-                    clearSearchBtn.classList.toggle('hidden', !searchQuery);
+            const isCurrentlyBorrowed = !!b.borrowedBy && (!Array.isArray(b.borrowHistory) || b.borrowHistory.length === 0 || !b.borrowHistory[b.borrowHistory.length - 1].returnDate);
+            const matchesBorrowed = sortBy !== 'borrowed_to_others' || isCurrentlyBorrowed;
+
+            return matchesTab && matchesSearch && matchesStatus && matchesCategory && matchesCopyType && matchesAuthor && matchesOwner && matchesTag && matchesFavorites && matchesAdvancedRating && matchesPrice && matchesDate && matchesBorrowed;
+        });
+
+        // ⚡ Bolt: Select the comparator once to avoid branching inside the sort loop
+        let sortComparator;
+        if (sortBy === 'title') {
+            sortComparator = (a, b) => (a._sortTitle < b._sortTitle ? -1 : (a._sortTitle > b._sortTitle ? 1 : 0));
+        } else if (sortBy === 'author') {
+            sortComparator = (a, b) => (a._sortAuthor < b._sortAuthor ? -1 : (a._sortAuthor > b._sortAuthor ? 1 : 0));
+        } else if (sortBy === 'oldest') {
+            sortComparator = (a, b) => a._createdTime - b._createdTime;
+        } else if (sortBy === 'copy_type') {
+            const copyTypeOrder = {
+                'New Copy': 1,
+                'Old Copy': 2,
+                'Gifted': 3
+            };
+            sortComparator = (a, b) => {
+                const valA = a.copyType || 'New Copy';
+                const valB = b.copyType || 'New Copy';
+                const orderA = copyTypeOrder[valA] || 99;
+                const orderB = copyTypeOrder[valB] || 99;
+                if (orderA !== orderB) {
+                    return orderA - orderB;
                 }
-                if (searchHint) {
-                    searchHint.classList.toggle('hidden', !!searchQuery);
-                    if (!searchQuery && document.activeElement !== document.getElementById('search-input')) {
-                        searchHint.classList.remove('opacity-0');
-                    }
-                }
-                const searchLower = searchQuery.toLowerCase();
+                const titleA = a._sortTitle || '';
+                const titleB = b._sortTitle || '';
+                return titleA.localeCompare(titleB);
+            };
+        } else { // default: newest
+            sortComparator = (a, b) => b._createdTime - a._createdTime;
+        }
+        // ⚡ Bolt: Bypass redundant sorting if sortBy is 'newest' (data is already sorted by listener)
+        if (sortBy !== 'newest') {
+            filteredBooks.sort(sortComparator);
+        }
 
-                // ⚡ Bolt: Cache values outside the filter loop to avoid redundant conversions
-                const advRating = advancedFilters.rating === 'all' ? -1 : parseInt(advancedFilters.rating);
-                const startTime = advancedFilters.startDate ? new Date(advancedFilters.startDate).getTime() : null;
-                const endTime = advancedFilters.endDate ? new Date(advancedFilters.endDate).getTime() : null;
+        const activeFiltersContainer = document.getElementById('active-filters-bar');
+        if (activeFiltersContainer) {
+            let html = '';
+            let activeCount = 0;
+            if (advancedFilters.rating !== 'all') {
+                html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">${advancedFilters.rating} Stars <button data-action="clear-adv-filter" data-value="rating" aria-label="Remove rating filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-amber-500 outline-none">×</button></span>`;
+                activeCount++;
+            }
+            if (advancedFilters.minPrice || advancedFilters.maxPrice) {
+                html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">${getCurrencySymbol()}${advancedFilters.minPrice || 0} - ${getCurrencySymbol()}${advancedFilters.maxPrice || '∞'} <button data-action="clear-adv-filter" data-value="price" aria-label="Remove price filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none">×</button></span>`;
+                activeCount++;
+            }
+            if (advancedFilters.startDate || advancedFilters.endDate) {
+                html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Date Range <button data-action="clear-adv-filter" data-value="date" aria-label="Remove date filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">×</button></span>`;
+                activeCount++;
+            }
+            if (favoritesOnly) {
+                html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Favorites <button data-action="clear-fav-filter" data-value="false" aria-label="Remove favorites filter" class="hover:bg-white/20 rounded px-1 transition-colors">×</button></span>`;
+                activeCount++;
+            }
+            if (sortBy === 'borrowed_to_others') {
+                html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Borrowed to Others <button data-action="clear-sort" data-value="borrowed_to_others" aria-label="Remove borrowed filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-amber-500 outline-none">×</button></span>`;
+                activeCount++;
+            }
+            if (copyTypeFilter !== 'all') {
+                html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Copy Type: ${escapeHTML(copyTypeFilter)} <button data-action="set-copy-type" data-value="all" aria-label="Remove copy type filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">×</button></span>`;
+                activeCount++;
+            }
 
-                // ⚡ Bolt: Use pre-calculated aiSearchResultsSet for O(1) lookup complexity
-                const aiIds = aiSearchResultsSet;
+            if (activeCount > 1) {
+                html += `<button data-action="clear-all-filters" class="text-[10px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest ml-2 px-2 py-1 focus-visible:ring-2 focus-visible:ring-primary outline-none rounded transition-all">Clear All</button>`;
+            }
 
-                let filteredBooks = books.filter(b => {
-                    const statusData = getStatusData(b.id);
-                    const isOwner = b.userId === currentUser.uid;
+            if (window.innerWidth < 768) {
+                if (sortBy !== defaultSort) activeCount++;
+                if (favoritesOnly) activeCount++;
+                if (categoryFilter !== 'all') activeCount++;
+                if (copyTypeFilter !== 'all') activeCount++;
+                if (statusFilter !== 'all') activeCount++;
+                if (authorFilter !== 'all') activeCount++;
+            }
 
-                    // ⚡ Bolt: Hide collaborator wishlist books from main library and search
-                    if (b.isWishlist && !isOwner && !statusData.updatedAt) return false;
+            if (aiSearchResults) {
+                html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">AI Search: "${searchQuery}" <button data-action="clear-ai-search" aria-label="Clear AI search" class="hover:bg-white/20 rounded px-1 transition-colors">×</button></span>`;
+                activeCount++;
+            }
 
-                    const isWishlist = statusData.isWishlist || (isOwner && b.isWishlist) || false;
-                    const matchesTab = (activeTab === 'mybooks')
-                        ? (myBooksSubTab === 'wishlist' ? isWishlist : statusData.status === 'finished')
-                        : (!isWishlist && !b.excludeFromLibrary);
+            activeFiltersContainer.innerHTML = html;
+            document.getElementById('filter-dot')?.classList.toggle('hidden', activeCount === 0);
+        }
 
-                    // ⚡ Bolt: Use pre-normalized _searchStr for O(1) string check per book
-                    let matchesSearch = !searchQuery || b._searchStr.includes(searchLower);
-                    if (aiIds) {
-                        matchesSearch = aiIds.has(b.id);
-                    }
+        window.clearAISearch = () => {
+            aiSearchResults = null;
+            aiSearchResultsSet = null;
+            window.queueRenderLibraryOnly();
+        };
 
-                    const bookStatus = statusData.status;
+        const bulkBar = document.getElementById('bulk-actions-bar');
+        if (bulkBar) {
+            bulkBar.classList.toggle('hidden', selectedBookIds.size === 0);
+            const countEl = document.getElementById('selected-count');
+            if (countEl) countEl.innerText = `${selectedBookIds.size} Selected`;
 
-                    const matchesStatus = statusFilter === 'all' || bookStatus === statusFilter;
-                    // ⚡ Bolt: Use pre-normalized _genres
-                    const matchesCategory = categoryFilter === 'all' || b._genres.includes(categoryFilter);
-                    const matchesCopyType = copyTypeFilter === 'all' || b.copyType === copyTypeFilter;
-                    const matchesAuthor = authorFilter === 'all' || b.author === authorFilter;
-                    const matchesOwner = ownerFilter === 'all' || b.owner === ownerFilter;
-                    const matchesTag = !tagFilter || (b.tags && b.tags.includes(tagFilter));
-                    const matchesFavorites = !favoritesOnly || statusData.isFavorite;
+            const bulkGenreSelect = document.getElementById('bulk-genre');
+            if (bulkGenreSelect) {
+                bulkGenreSelect.onchange = async (e) => {
+                    const newCat = e.target.value;
+                    if (!newCat || !selectedBookIds.size) return;
+                    showToast(`Updating ${selectedBookIds.size} books...`, 'info');
 
-                    // ⚡ Bolt: Exact rating matching (checks user rating first, falls back to book rating)
-                    const bookRating = statusData.rating || b.rating || 0;
-                    const matchesAdvancedRating = advRating === -1 || bookRating === advRating;
-                    const matchesPrice = (!advancedFilters.minPrice || b.price >= advancedFilters.minPrice) &&
-                        (!advancedFilters.maxPrice || b.price <= advancedFilters.maxPrice);
-
-                    let matchesDate = true;
-                    // ⚡ Bolt: Use pre-calculated _purchaseTime and cached start/end times
-                    if (startTime || endTime) {
-                        const bTime = b._purchaseTime;
-                        if (startTime && bTime < startTime) matchesDate = false;
-                        if (endTime && bTime > endTime) matchesDate = false;
-                    }
-
-                    const isCurrentlyBorrowed = !!b.borrowedBy && (!Array.isArray(b.borrowHistory) || b.borrowHistory.length === 0 || !b.borrowHistory[b.borrowHistory.length - 1].returnDate);
-                    const matchesBorrowed = sortBy !== 'borrowed_to_others' || isCurrentlyBorrowed;
-
-                    return matchesTab && matchesSearch && matchesStatus && matchesCategory && matchesCopyType && matchesAuthor && matchesOwner && matchesTag && matchesFavorites && matchesAdvancedRating && matchesPrice && matchesDate && matchesBorrowed;
-                });
-
-                // ⚡ Bolt: Select the comparator once to avoid branching inside the sort loop
-                let sortComparator;
-                if (sortBy === 'title') {
-                    sortComparator = (a, b) => (a._sortTitle < b._sortTitle ? -1 : (a._sortTitle > b._sortTitle ? 1 : 0));
-                } else if (sortBy === 'author') {
-                    sortComparator = (a, b) => (a._sortAuthor < b._sortAuthor ? -1 : (a._sortAuthor > b._sortAuthor ? 1 : 0));
-                } else if (sortBy === 'oldest') {
-                    sortComparator = (a, b) => a._createdTime - b._createdTime;
-                } else if (sortBy === 'copy_type') {
-                    const copyTypeOrder = {
-                        'New Copy': 1,
-                        'Old Copy': 2,
-                        'Gifted': 3
-                    };
-                    sortComparator = (a, b) => {
-                        const valA = a.copyType || 'New Copy';
-                        const valB = b.copyType || 'New Copy';
-                        const orderA = copyTypeOrder[valA] || 99;
-                        const orderB = copyTypeOrder[valB] || 99;
-                        if (orderA !== orderB) {
-                            return orderA - orderB;
-                        }
-                        const titleA = a._sortTitle || '';
-                        const titleB = b._sortTitle || '';
-                        return titleA.localeCompare(titleB);
-                    };
-                } else { // default: newest
-                    sortComparator = (a, b) => b._createdTime - a._createdTime;
-                }
-                // ⚡ Bolt: Bypass redundant sorting if sortBy is 'newest' (data is already sorted by listener)
-                if (sortBy !== 'newest') {
-                    filteredBooks.sort(sortComparator);
-                }
-
-                const activeFiltersContainer = document.getElementById('active-filters-bar');
-                if (activeFiltersContainer) {
-                    let html = '';
-                    let activeCount = 0;
-                    if (advancedFilters.rating !== 'all') {
-                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">${advancedFilters.rating} Stars <button data-action="clear-adv-filter" data-value="rating" aria-label="Remove rating filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-amber-500 outline-none">×</button></span>`;
-                        activeCount++;
-                    }
-                    if (advancedFilters.minPrice || advancedFilters.maxPrice) {
-                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">${getCurrencySymbol()}${advancedFilters.minPrice || 0} - ${getCurrencySymbol()}${advancedFilters.maxPrice || '∞'} <button data-action="clear-adv-filter" data-value="price" aria-label="Remove price filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none">×</button></span>`;
-                        activeCount++;
-                    }
-                    if (advancedFilters.startDate || advancedFilters.endDate) {
-                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Date Range <button data-action="clear-adv-filter" data-value="date" aria-label="Remove date filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">×</button></span>`;
-                        activeCount++;
-                    }
-                    if (favoritesOnly) {
-                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Favorites <button data-action="clear-fav-filter" data-value="false" aria-label="Remove favorites filter" class="hover:bg-white/20 rounded px-1 transition-colors">×</button></span>`;
-                        activeCount++;
-                    }
-                    if (sortBy === 'borrowed_to_others') {
-                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Borrowed to Others <button data-action="clear-sort" data-value="borrowed_to_others" aria-label="Remove borrowed filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-amber-500 outline-none">×</button></span>`;
-                        activeCount++;
-                    }
-                    if (copyTypeFilter !== 'all') {
-                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">Copy Type: ${escapeHTML(copyTypeFilter)} <button data-action="set-copy-type" data-value="all" aria-label="Remove copy type filter" class="hover:bg-white/20 rounded px-1 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 outline-none">×</button></span>`;
-                        activeCount++;
+                    const ids = Array.from(selectedBookIds);
+                    for (let i = 0; i < ids.length; i += 500) {
+                        const chunk = ids.slice(i, i + 500);
+                        const batch = db.batch();
+                        chunk.forEach(id => {
+                            batch.update(db.collection('books').doc(id), {
+                                categories: [newCat],
+                                category: firebase.firestore.FieldValue.delete()
+                            });
+                        });
+                        await batch.commit();
                     }
 
-                    if (activeCount > 1) {
-                        html += `<button data-action="clear-all-filters" class="text-[10px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest ml-2 px-2 py-1 focus-visible:ring-2 focus-visible:ring-primary outline-none rounded transition-all">Clear All</button>`;
-                    }
-
-                    if (window.innerWidth < 768) {
-                        if (sortBy !== defaultSort) activeCount++;
-                        if (favoritesOnly) activeCount++;
-                        if (categoryFilter !== 'all') activeCount++;
-                        if (copyTypeFilter !== 'all') activeCount++;
-                        if (statusFilter !== 'all') activeCount++;
-                        if (authorFilter !== 'all') activeCount++;
-                    }
-
-                    if (aiSearchResults) {
-                        html += `<span class="px-3 py-1 active-filter-chip rounded-full text-[10px] font-bold flex items-center gap-2">AI Search: "${searchQuery}" <button data-action="clear-ai-search" aria-label="Clear AI search" class="hover:bg-white/20 rounded px-1 transition-colors">×</button></span>`;
-                        activeCount++;
-                    }
-
-                    activeFiltersContainer.innerHTML = html;
-                    document.getElementById('filter-dot')?.classList.toggle('hidden', activeCount === 0);
-                }
-
-                window.clearAISearch = () => {
-                    aiSearchResults = null;
-                    aiSearchResultsSet = null;
-                    window.queueRenderLibraryOnly();
+                    selectedBookIds.clear();
+                    showToast('Updated books successfully', 'success');
                 };
+            }
+        }
 
-                const bulkBar = document.getElementById('bulk-actions-bar');
-                if (bulkBar) {
-                    bulkBar.classList.toggle('hidden', selectedBookIds.size === 0);
-                    const countEl = document.getElementById('selected-count');
-                    if (countEl) countEl.innerText = `${selectedBookIds.size} Selected`;
-
-                    const bulkGenreSelect = document.getElementById('bulk-genre');
-                    if (bulkGenreSelect) {
-                        bulkGenreSelect.onchange = async (e) => {
-                            const newCat = e.target.value;
-                            if (!newCat || !selectedBookIds.size) return;
-                            showToast(`Updating ${selectedBookIds.size} books...`, 'info');
-
-                            const ids = Array.from(selectedBookIds);
-                            for (let i = 0; i < ids.length; i += 500) {
-                                const chunk = ids.slice(i, i + 500);
-                                const batch = db.batch();
-                                chunk.forEach(id => {
-                                    batch.update(db.collection('books').doc(id), {
-                                        categories: [newCat],
-                                        category: firebase.firestore.FieldValue.delete()
-                                    });
-                                });
-                                await batch.commit();
-                            }
-
-                            selectedBookIds.clear();
-                            showToast('Updated books successfully', 'success');
-                        };
-                    }
-                }
-
-                const tagContainer = document.getElementById('tag-filter-container');
-                if (tagContainer) {
-                    tagContainer.innerHTML = tagFilter ? `
+        const tagContainer = document.getElementById('tag-filter-container');
+        if (tagContainer) {
+            tagContainer.innerHTML = tagFilter ? `
                     <div class="mb-4 flex items-center gap-2">
                         <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Tag:</span>
                         <span class="px-3 py-1 active-filter-chip rounded-full text-xs font-bold flex items-center gap-2">
@@ -2836,11 +2891,11 @@
                         </span>
                     </div>
                 ` : '';
-                }
+        }
 
-                const copyTypeContainer = document.getElementById('copy-type-filters-container');
-                if (copyTypeContainer) {
-                    copyTypeContainer.innerHTML = `
+        const copyTypeContainer = document.getElementById('copy-type-filters-container');
+        if (copyTypeContainer) {
+            copyTypeContainer.innerHTML = `
                     <div class="flex items-center gap-2 flex-wrap mb-4">
                         <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-1">Copy Type:</span>
                         <button data-action="set-copy-type" data-value="all" class="px-3 py-1.5 rounded-full text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${copyTypeFilter === 'all' ? 'active-filter-chip shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}" aria-pressed="${copyTypeFilter === 'all'}" aria-label="Show all copy types">All</button>
@@ -2849,11 +2904,11 @@
                         <button data-action="set-copy-type" data-value="Gifted" class="px-3 py-1.5 rounded-full text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${copyTypeFilter === 'Gifted' ? 'active-filter-chip text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}" aria-pressed="${copyTypeFilter === 'Gifted'}" aria-label="Filter by Gifted copies">Gifted copies</button>
                     </div>
                     `;
-                }
+        }
 
-                const controlsBar = document.getElementById('controls-bar-container');
-                if (controlsBar) {
-                    controlsBar.innerHTML = `
+        const controlsBar = document.getElementById('controls-bar-container');
+        if (controlsBar) {
+            controlsBar.innerHTML = `
                     <div class="mb-8 sticky top-20 z-30 md:static">
                         <!-- Filter card for mobile/desktop -->
                         <div class="glass rounded-3xl p-5 border border-slate-200 dark:border-slate-700 mb-6 hidden md:block shadow-sm">
@@ -2922,37 +2977,37 @@
                         </div>
                     </div>
                 `;
-                    attachFilteredListeners();
-                }
+            attachFilteredListeners();
+        }
 
-                const libraryWrapper = document.getElementById('library-container-wrapper');
-                if (libraryWrapper) {
-                    if (isInitialSync && books.length === 0) {
-                        const skeletonGridClass = viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3';
-                        libraryWrapper.innerHTML = `<div class="${skeletonGridClass}">${renderSkeletonBookGrid(6, viewMode)}</div>`;
-                        return;
+        const libraryWrapper = document.getElementById('library-container-wrapper');
+        if (libraryWrapper) {
+            if (isInitialSync && books.length === 0) {
+                const skeletonGridClass = viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3';
+                libraryWrapper.innerHTML = `<div class="${skeletonGridClass}">${renderSkeletonBookGrid(6, viewMode)}</div>`;
+                return;
+            }
+
+            // Performance optimization: Single-pass O(N) grouping of books
+            const myOwnBooks = [];
+            const partnerLibraries = {};
+
+            filteredBooks.forEach(b => {
+                if (b.userId === currentUser.uid) {
+                    myOwnBooks.push(b);
+                } else {
+                    if (!partnerLibraries[b.userId]) {
+                        partnerLibraries[b.userId] = [];
                     }
+                    partnerLibraries[b.userId].push(b);
+                }
+            });
 
-                    // Performance optimization: Single-pass O(N) grouping of books
-                    const myOwnBooks = [];
-                    const partnerLibraries = {};
+            let html = '';
 
-                    filteredBooks.forEach(b => {
-                        if (b.userId === currentUser.uid) {
-                            myOwnBooks.push(b);
-                        } else {
-                            if (!partnerLibraries[b.userId]) {
-                                partnerLibraries[b.userId] = [];
-                            }
-                            partnerLibraries[b.userId].push(b);
-                        }
-                    });
-
-                    let html = '';
-
-                    // My own books section
-                    if (myOwnBooks.length > 0) {
-                        html += `
+            // My own books section
+            if (myOwnBooks.length > 0) {
+                html += `
                         <div>
                             <h2 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200">My Books (${myOwnBooks.length})</h2>
                             <div class="${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : viewMode === 'compact' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'flex flex-col gap-3'}">
@@ -2960,16 +3015,16 @@
                             </div>
                         </div>
                         `;
-                    }
+            }
 
-                    // Partner libraries
-                    Object.entries(partnerLibraries).forEach(([ownerId, books]) => {
-                        if (books.length > 0) {
-                            // ⚡ Bolt: Use userProfileCache directly to avoid "loading..." flash and subsequent DOM updates
-                            const cachedUser = userProfileCache[ownerId];
-                            const name = cachedUser ? (cachedUser.displayName || cachedUser.email || 'Unknown') : 'loading...';
+            // Partner libraries
+            Object.entries(partnerLibraries).forEach(([ownerId, books]) => {
+                if (books.length > 0) {
+                    // ⚡ Bolt: Use userProfileCache directly to avoid "loading..." flash and subsequent DOM updates
+                    const cachedUser = userProfileCache[ownerId];
+                    const name = cachedUser ? (cachedUser.displayName || cachedUser.email || 'Unknown') : 'loading...';
 
-                            html += `
+                    html += `
                             <div ${html ? 'class="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800"' : ''}>
                                 <h3 class="text-lg font-black font-serif mb-4 text-slate-700 dark:text-slate-200" data-owner-id="${escapeHTML(ownerId)}">
                                     From <span data-name="${escapeHTML(name)}">${escapeHTML(name)}</span>'s Library (${books.length})
@@ -2979,41 +3034,41 @@
                                 </div>
                             </div>
                             `;
+                }
+            });
+
+            // Empty state
+            if (filteredBooks.length === 0) {
+                const isAnyFilterActive = searchQuery || statusFilter !== 'all' || categoryFilter !== 'all' || copyTypeFilter !== 'all' || authorFilter !== 'all' || tagFilter || advancedFilters.rating !== 'all' || advancedFilters.minPrice || advancedFilters.maxPrice || advancedFilters.startDate || advancedFilters.endDate;
+
+                let suggestionHtml = '';
+                if (searchQuery && !aiSearchResults) {
+                    const trimmedSearch = searchQuery.trim().toLowerCase();
+                    let bestMatch = null;
+                    let maxSim = 0;
+
+                    // Simple heuristic: check titles and authors
+                    for (const b of books) {
+                        const titleSim = getSimilarity(trimmedSearch, b.title.toLowerCase());
+                        const authorSim = getSimilarity(trimmedSearch, b.author.toLowerCase());
+                        const currentMax = Math.max(titleSim, authorSim);
+
+                        if (currentMax > maxSim) {
+                            maxSim = currentMax;
+                            bestMatch = currentMax === titleSim ? b.title : b.author;
                         }
-                    });
+                        if (maxSim > 0.95) break; // Good enough
+                    }
 
-                    // Empty state
-                    if (filteredBooks.length === 0) {
-                        const isAnyFilterActive = searchQuery || statusFilter !== 'all' || categoryFilter !== 'all' || copyTypeFilter !== 'all' || authorFilter !== 'all' || tagFilter || advancedFilters.rating !== 'all' || advancedFilters.minPrice || advancedFilters.maxPrice || advancedFilters.startDate || advancedFilters.endDate;
-
-                        let suggestionHtml = '';
-                        if (searchQuery && !aiSearchResults) {
-                            const trimmedSearch = searchQuery.trim().toLowerCase();
-                            let bestMatch = null;
-                            let maxSim = 0;
-
-                            // Simple heuristic: check titles and authors
-                            for (const b of books) {
-                                const titleSim = getSimilarity(trimmedSearch, b.title.toLowerCase());
-                                const authorSim = getSimilarity(trimmedSearch, b.author.toLowerCase());
-                                const currentMax = Math.max(titleSim, authorSim);
-
-                                if (currentMax > maxSim) {
-                                    maxSim = currentMax;
-                                    bestMatch = currentMax === titleSim ? b.title : b.author;
-                                }
-                                if (maxSim > 0.95) break; // Good enough
-                            }
-
-                            if (maxSim > 0.6 && maxSim < 1) {
-                                suggestionHtml = `
+                    if (maxSim > 0.6 && maxSim < 1) {
+                        suggestionHtml = `
                                 <div class="mb-6 animate-slide-up">
                                     <p class="text-sm text-slate-500">Did you mean <button data-action="apply-suggestion" data-value="${escapeHTML(bestMatch)}" class="text-primary font-bold hover:underline focus-visible:ring-2 focus-visible:ring-primary outline-none rounded px-1">"${escapeHTML(bestMatch)}"</button>?</p>
                                 </div>`;
-                            }
-                        }
+                    }
+                }
 
-                        html = `
+                html = `
                         <div class="py-32 text-center">
                             ${suggestionHtml}
                             <div class="bg-slate-50 dark:bg-slate-800 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -3051,553 +3106,560 @@
                             </div>
                         </div>
                         `;
-                    }
+            }
 
-                    libraryWrapper.innerHTML = `<div>${html}</div>`;
+            libraryWrapper.innerHTML = `<div>${html}</div>`;
+            // Apply CSP-safe dynamic styles from data-* attributes
+            libraryWrapper.querySelectorAll('[data-stagger]').forEach(el => {
+                window.setDynamicStyle(el, { delay: (parseInt(el.dataset.stagger) || 0) * 50 });
+            });
+            libraryWrapper.querySelectorAll('[data-bar-width]').forEach(el => {
+                window.setDynamicStyle(el, { width: parseFloat(el.dataset.barWidth) || 0 });
+            });
 
-                    // Fetch owner names for partner libraries
-                    Object.keys(partnerLibraries).forEach(ownerId => {
-                        // ⚡ Bolt: Check userProfileCache first to avoid redundant Firestore calls
-                        if (userProfileCache[ownerId]) {
-                            const name = userProfileCache[ownerId].displayName || userProfileCache[ownerId].email || 'Unknown';
-                            const heading = libraryWrapper.querySelector(`[data-owner-id="${ownerId}"] [data-name]`);
-                            if (heading) heading.textContent = name;
-                            return;
-                        }
-
-                        db.collection('users').doc(ownerId).get().then(doc => {
-                            if (doc.exists) {
-                                const data = doc.data();
-                                userProfileCache[ownerId] = data; // Update cache
-                                const name = data.displayName || data.email || 'Unknown';
-                                const heading = libraryWrapper.querySelector(`[data-owner-id="${ownerId}"] [data-name]`);
-                                if (heading) heading.textContent = name;
-                            }
-                        });
-                    });
+            // Fetch owner names for partner libraries
+            Object.keys(partnerLibraries).forEach(ownerId => {
+                // ⚡ Bolt: Check userProfileCache first to avoid redundant Firestore calls
+                if (userProfileCache[ownerId]) {
+                    const name = userProfileCache[ownerId].displayName || userProfileCache[ownerId].email || 'Unknown';
+                    const heading = libraryWrapper.querySelector(`[data-owner-id="${ownerId}"] [data-name]`);
+                    if (heading) heading.textContent = name;
+                    return;
                 }
-            }
 
-            function attachGlobalListeners() {
-                // Online/Offline status listeners
-                const updateConnUI = () => {
-                    ['conn-indicator', 'conn-indicator-desktop'].forEach(id => {
-                        const indicator = document.getElementById(id);
-                        if (indicator) {
-                            const dot = indicator.querySelector('div');
-                            const label = indicator.querySelector('span');
-                            if (navigator.onLine) {
-                                dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse';
-                                label.textContent = 'Live';
-                                indicator.title = 'Online: Cloud Sync Active';
-                            } else {
-                                dot.className = 'w-1.5 h-1.5 rounded-full bg-amber-500';
-                                label.textContent = 'Offline';
-                                indicator.title = 'Offline: Local changes will sync when reconnected';
-                            }
-                        }
-                    });
-                };
-                window.addEventListener('online', updateConnUI);
-                window.addEventListener('offline', updateConnUI);
-
-                document.getElementById('scan-btn')?.addEventListener('click', openScanner);
-                document.querySelectorAll('.manual-add-trigger').forEach(btn => btn.addEventListener('click', () => openManualEntry('')));
-                document.getElementById('ai-chat-fab')?.addEventListener('click', openAIChat);
-
-                const scrollTopBtn = document.getElementById('scroll-top-btn');
-                window.addEventListener('scroll', () => {
-                    if (window.scrollY > 300) {
-                        scrollTopBtn?.classList.remove('opacity-0', 'translate-y-10', 'pointer-events-none');
-                        scrollTopBtn?.classList.add('opacity-100', 'translate-y-0', 'pointer-events-auto');
-                    } else {
-                        scrollTopBtn?.classList.add('opacity-0', 'translate-y-10', 'pointer-events-none');
-                        scrollTopBtn?.classList.remove('opacity-100', 'translate-y-0', 'pointer-events-auto');
-                    }
-                });
-                scrollTopBtn?.addEventListener('click', () => {
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                });
-            }
-
-            function attachSettingsListeners() {
-                document.getElementById('logout-btn')?.addEventListener('click', () => auth.signOut());
-                document.getElementById('install-app-btn')?.addEventListener('click', async () => {
-                    if (deferredPrompt) {
-                        deferredPrompt.prompt();
-                        const { outcome } = await deferredPrompt.userChoice;
-                        if (outcome === 'accepted') {
-                            deferredPrompt = null;
-                            window.queueRenderMainApp();
-                        }
-                    }
-                });
-                document.getElementById('import-btn')?.addEventListener('click', importCSV);
-                document.getElementById('export-btn')?.addEventListener('click', exportCSV);
-                document.getElementById('import-json-btn')?.addEventListener('click', importJSON);
-                document.getElementById('export-json-btn')?.addEventListener('click', exportJSON);
-                document.getElementById('notify-btn')?.addEventListener('click', requestNotificationPermission);
-                document.getElementById('save-sharing-btn')?.addEventListener('click', saveSharingSettings);
-                document.getElementById('ai-cleanup-btn')?.addEventListener('click', runLibraryCleanup);
-
-                document.getElementById('ai-provider-select')?.addEventListener('change', (e) => {
-                    const provider = e.target.value;
-                    const geminiSec = document.getElementById('gemini-config-section');
-                    const groqSec = document.getElementById('groq-config-section');
-                    if (provider === 'groq') {
-                        geminiSec?.classList.add('hidden');
-                        groqSec?.classList.remove('hidden');
-                    } else {
-                        geminiSec?.classList.remove('hidden');
-                        groqSec?.classList.add('hidden');
-                    }
-                });
-
-                document.getElementById('toggle-api-key-visibility')?.addEventListener('click', () => {
-                    const input = document.getElementById('gemini-api-key');
-                    const icon = document.getElementById('eye-icon');
-                    if (input.type === 'password') {
-                        input.type = 'text';
-                        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/>';
-                    } else {
-                        input.type = 'password';
-                        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>';
-                    }
-                });
-
-                document.getElementById('toggle-groq-api-key-visibility')?.addEventListener('click', () => {
-                    const input = document.getElementById('groq-api-key');
-                    const icon = document.getElementById('groq-eye-icon');
-                    if (input.type === 'password') {
-                        input.type = 'text';
-                        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/>';
-                    } else {
-                        input.type = 'password';
-                        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>';
-                    }
-                });
-
-                document.getElementById('profile-display-name')?.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') document.getElementById('save-profile-btn')?.click();
-                });
-                document.getElementById('profile-phone-number')?.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') document.getElementById('save-profile-btn')?.click();
-                });
-                document.getElementById('profile-address')?.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') document.getElementById('save-profile-btn')?.click();
-                });
-                document.getElementById('share-email')?.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') document.getElementById('save-sharing-btn')?.click();
-                });
-                document.getElementById('gemini-api-key')?.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') document.getElementById('save-ai-settings-btn')?.click();
-                });
-                document.getElementById('groq-api-key')?.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') document.getElementById('save-ai-settings-btn')?.click();
-                });
-
-                document.getElementById('save-ai-settings-btn')?.addEventListener('click', (e) => {
-                    const provider = document.getElementById('ai-provider-select')?.value || 'gemini';
-                    const geminiApiKey = document.getElementById('gemini-api-key')?.value.trim() || '';
-                    const groqApiKey = document.getElementById('groq-api-key')?.value.trim() || '';
-                    const model = document.getElementById('gemini-model')?.value || 'gemma-3-12b-it';
-                    const language = document.getElementById('gemini-language')?.value || 'English';
-
-                    localStorage.setItem('mylib_ai_provider', provider);
-                    // Stored in sessionStorage: cleared on tab close, not shared across tabs, not readable by other origins.
-                    sessionStorage.setItem('mylib_gemini_api_key', geminiApiKey);
-                    sessionStorage.setItem('mylib_groq_api_key', groqApiKey);
-                    localStorage.setItem('mylib_gemini_model', model);
-                    localStorage.setItem('mylib_ai_language', language);
-                    showToast('AI Settings saved!', 'success');
-                });
-
-                document.getElementById('save-profile-btn')?.addEventListener('click', async (e) => {
-                    const btn = e.currentTarget;
-                    const originalText = btn.innerText;
-                    const displayName = document.getElementById('profile-display-name').value.trim();
-                    const phoneNumber = document.getElementById('profile-phone-number').value.trim();
-                    const address = document.getElementById('profile-address').value.trim();
-
-                    if (phoneNumber && !/^\+?[0-9\s\-]{7,20}$/.test(phoneNumber)) {
-                        showToast('Please enter a valid phone number.', 'error');
-                        return;
-                    }
-
-                    btn.disabled = true;
-                    btn.innerText = 'Saving...';
-                    try {
-                        // Public fields → parent doc
-                        await db.collection('users').doc(currentUser.uid).update({
-                            displayName,
-                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-
-                        // Private fields → subcollection
-                        await db.collection('users').doc(currentUser.uid)
-                            .collection('private').doc('data')
-                            .set({
-                                phoneNumber,
-                                address,
-                                email: currentUser.email || '',
-                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                            }, { merge: true });
-
-                        if (displayName !== currentUser.displayName) {
-                            await currentUser.updateProfile({ displayName });
-                        }
-
-                        userProfile = { ...userProfile, displayName, phoneNumber, address };
-                        userProfileCache[currentUser.uid] = { ...userProfileCache[currentUser.uid], displayName };
-
-                        showToast('Profile updated!', 'success');
-                        window.queueRenderMainApp();
-                    } catch (err) {
-                        showToast('Error updating profile: ' + err.message, 'error');
-                    } finally {
-                        btn.disabled = false;
-                        btn.innerText = originalText;
-                    }
-                });
-
-                document.getElementById('pref-default-view')?.addEventListener('change', e => {
-                    localStorage.setItem('mylib_viewMode', e.target.value);
-                    viewMode = e.target.value;
-                    window.queueRenderMainApp();
-                });
-                document.getElementById('pref-default-sort')?.addEventListener('change', e => {
-                    localStorage.setItem('mylib_defaultSort', e.target.value);
-                    defaultSort = e.target.value;
-                    sortBy = e.target.value;
-                    window.queueRenderMainApp();
-                });
-
-                document.getElementById('pref-reading-goal')?.addEventListener('input', e => {
-                    const val = parseInt(e.target.value) || 50;
-                    localStorage.setItem('mylib_readingGoal', val);
-                    readingGoal = val; // Update in-memory cache
-                });
-                document.getElementById('pref-reading-goal')?.addEventListener('blur', () => window.queueRenderMainApp());
-
-                document.getElementById('pref-card-density')?.addEventListener('change', e => {
-                    localStorage.setItem('mylib_density', e.target.value);
-                    cardDensity = e.target.value; // Update in-memory cache
-                    window.queueRenderMainApp();
-                });
-
-                document.getElementById('pref-currency')?.addEventListener('change', e => {
-                    const val = e.target.value;
-                    localStorage.setItem('mylib_currency', val);
-                    // ⚡ Bolt: Update cached currency symbol immediately
-                    cachedCurrencySymbol = CURRENCIES[val] || '$';
-                    window.queueRenderMainApp();
-                });
-
-                renderPartners();
-            }
-
-            window.editMetadata = async (type, oldVal) => {
-                const newVal = prompt(`Edit ${type}:`, oldVal);
-                if (!newVal || newVal === oldVal) return;
-
-                showToast(`Updating ${type}...`, 'info');
-
-                if (type === 'Genre') {
-                    const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).get();
-                    const batch = db.batch();
-                    let count = 0;
-                    snapshot.docs.forEach(doc => {
+                db.collection('users').doc(ownerId).get().then(doc => {
+                    if (doc.exists) {
                         const data = doc.data();
-                        let updated = false;
-                        let categories = getBookGenres(data);
-                        if (categories.includes(oldVal)) {
-                            categories = categories.map(c => c === oldVal ? newVal : c);
-                            batch.update(doc.ref, { categories, category: firebase.firestore.FieldValue.delete() });
-                            updated = true;
-                        }
-                        if (updated) count++;
-                    });
-                    await batch.commit();
-                    showToast(`Updated ${count} books`, 'success');
-                } else {
-                    const field = type.toLowerCase();
-                    const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).where(field, '==', oldVal).get();
-                    const batch = db.batch();
-                    snapshot.docs.forEach(doc => {
-                        batch.update(doc.ref, { [field]: newVal });
-                    });
-                    await batch.commit();
-                    showToast(`Updated ${snapshot.size} books`, 'success');
+                        userProfileCache[ownerId] = data; // Update cache
+                        const name = data.displayName || data.email || 'Unknown';
+                        const heading = libraryWrapper.querySelector(`[data-owner-id="${ownerId}"] [data-name]`);
+                        if (heading) heading.textContent = name;
+                    }
+                });
+            });
+        }
+    }
+
+    function attachGlobalListeners() {
+        // Online/Offline status listeners
+        const updateConnUI = () => {
+            ['conn-indicator', 'conn-indicator-desktop'].forEach(id => {
+                const indicator = document.getElementById(id);
+                if (indicator) {
+                    const dot = indicator.querySelector('div');
+                    const label = indicator.querySelector('span');
+                    if (navigator.onLine) {
+                        dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse';
+                        label.textContent = 'Live';
+                        indicator.title = 'Online: Cloud Sync Active';
+                    } else {
+                        dot.className = 'w-1.5 h-1.5 rounded-full bg-amber-500';
+                        label.textContent = 'Offline';
+                        indicator.title = 'Offline: Local changes will sync when reconnected';
+                    }
                 }
-                window.queueRenderMainApp();
-            };
+            });
+        };
+        window.addEventListener('online', updateConnUI);
+        window.addEventListener('offline', updateConnUI);
 
-            window.deleteMetadata = async (type, val) => {
-                const fallback = type === 'Genre' ? 'Other' : 'Unknown';
-                if (!confirm(`Remove "${val}" from all books? (They will be set to "${fallback}" if no other genres remain)`)) return;
+        document.getElementById('scan-btn')?.addEventListener('click', openScanner);
+        document.querySelectorAll('.manual-add-trigger').forEach(btn => btn.addEventListener('click', () => openManualEntry('')));
+        document.getElementById('ai-chat-fab')?.addEventListener('click', openAIChat);
 
-                showToast(`Updating books...`, 'info');
-                if (type === 'Genre') {
-                    const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).get();
-                    const batch = db.batch();
-                    let count = 0;
-                    snapshot.docs.forEach(doc => {
-                        const data = doc.data();
-                        let categories = getBookGenres(data);
-                        if (categories.includes(val)) {
-                            categories = categories.filter(c => c !== val);
-                            if (categories.length === 0) categories = [fallback];
-                            batch.update(doc.ref, { categories, category: firebase.firestore.FieldValue.delete() });
-                            count++;
-                        }
-                    });
-                    await batch.commit();
-                    showToast(`Updated ${count} books`, 'success');
-                } else {
-                    const field = type.toLowerCase();
-                    const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).where(field, '==', val).get();
-                    const batch = db.batch();
-                    snapshot.docs.forEach(doc => {
-                        batch.update(doc.ref, { [field]: fallback });
-                    });
-                    await batch.commit();
-                    showToast(`Updated ${snapshot.size} books`, 'success');
+        const scrollTopBtn = document.getElementById('scroll-top-btn');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 300) {
+                scrollTopBtn?.classList.remove('opacity-0', 'translate-y-10', 'pointer-events-none');
+                scrollTopBtn?.classList.add('opacity-100', 'translate-y-0', 'pointer-events-auto');
+            } else {
+                scrollTopBtn?.classList.add('opacity-0', 'translate-y-10', 'pointer-events-none');
+                scrollTopBtn?.classList.remove('opacity-100', 'translate-y-0', 'pointer-events-auto');
+            }
+        });
+        scrollTopBtn?.addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    }
+
+    function attachSettingsListeners() {
+        document.getElementById('logout-btn')?.addEventListener('click', () => auth.signOut());
+        document.getElementById('install-app-btn')?.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    deferredPrompt = null;
+                    window.queueRenderMainApp();
                 }
-                window.queueRenderMainApp();
-            };
+            }
+        });
+        document.getElementById('import-btn')?.addEventListener('click', importCSV);
+        document.getElementById('export-btn')?.addEventListener('click', exportCSV);
+        document.getElementById('import-json-btn')?.addEventListener('click', importJSON);
+        document.getElementById('export-json-btn')?.addEventListener('click', exportJSON);
+        document.getElementById('notify-btn')?.addEventListener('click', requestNotificationPermission);
+        document.getElementById('save-sharing-btn')?.addEventListener('click', saveSharingSettings);
+        document.getElementById('ai-cleanup-btn')?.addEventListener('click', runLibraryCleanup);
 
-            function attachFilteredListeners() {
-                document.getElementById('sort-select')?.addEventListener('change', e => {
-                    sortBy = e.target.value;
-                    localStorage.setItem('mylib_sortBy', sortBy);
-                    window.queueRenderLibraryOnly();
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                });
-                document.getElementById('status-filter')?.addEventListener('change', e => {
-                    statusFilter = e.target.value;
-                    localStorage.setItem('mylib_statusFilter', statusFilter);
-                    window.queueRenderLibraryOnly();
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                });
-                document.getElementById('category-filter')?.addEventListener('change', e => {
-                    categoryFilter = e.target.value;
-                    window.queueRenderLibraryOnly();
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                });
-                document.getElementById('author-filter')?.addEventListener('change', e => {
-                    authorFilter = e.target.value;
-                    window.queueRenderLibraryOnly();
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                });
-                document.getElementById('grid-view-btn')?.addEventListener('click', () => {
-                    viewMode = 'grid';
-                    localStorage.setItem('mylib_viewMode', 'grid');
-                    window.queueRenderLibraryOnly();
-                });
-                document.getElementById('compact-view-btn')?.addEventListener('click', () => {
-                    viewMode = 'compact';
-                    localStorage.setItem('mylib_viewMode', 'compact');
-                    window.queueRenderLibraryOnly();
-                });
-                document.getElementById('list-view-btn')?.addEventListener('click', () => {
-                    viewMode = 'list';
-                    localStorage.setItem('mylib_viewMode', 'list');
-                    window.queueRenderLibraryOnly();
-                });
+        document.getElementById('ai-provider-select')?.addEventListener('change', (e) => {
+            const provider = e.target.value;
+            const geminiSec = document.getElementById('gemini-config-section');
+            const groqSec = document.getElementById('groq-config-section');
+            if (provider === 'groq') {
+                geminiSec?.classList.add('hidden');
+                groqSec?.classList.remove('hidden');
+            } else {
+                geminiSec?.classList.remove('hidden');
+                groqSec?.classList.add('hidden');
+            }
+        });
+
+        document.getElementById('toggle-api-key-visibility')?.addEventListener('click', () => {
+            const input = document.getElementById('gemini-api-key');
+            const icon = document.getElementById('eye-icon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/>';
+            } else {
+                input.type = 'password';
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>';
+            }
+        });
+
+        document.getElementById('toggle-groq-api-key-visibility')?.addEventListener('click', () => {
+            const input = document.getElementById('groq-api-key');
+            const icon = document.getElementById('groq-eye-icon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/>';
+            } else {
+                input.type = 'password';
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>';
+            }
+        });
+
+        document.getElementById('profile-display-name')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('save-profile-btn')?.click();
+        });
+        document.getElementById('profile-phone-number')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('save-profile-btn')?.click();
+        });
+        document.getElementById('profile-address')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('save-profile-btn')?.click();
+        });
+        document.getElementById('share-email')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('save-sharing-btn')?.click();
+        });
+        document.getElementById('gemini-api-key')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('save-ai-settings-btn')?.click();
+        });
+        document.getElementById('groq-api-key')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('save-ai-settings-btn')?.click();
+        });
+
+        document.getElementById('save-ai-settings-btn')?.addEventListener('click', (e) => {
+            const provider = document.getElementById('ai-provider-select')?.value || 'gemini';
+            const geminiApiKey = document.getElementById('gemini-api-key')?.value.trim() || '';
+            const groqApiKey = document.getElementById('groq-api-key')?.value.trim() || '';
+            const model = document.getElementById('gemini-model')?.value || 'gemma-3-12b-it';
+            const language = document.getElementById('gemini-language')?.value || 'English';
+
+            localStorage.setItem('mylib_ai_provider', provider);
+            // Stored in sessionStorage: cleared on tab close, not shared across tabs, not readable by other origins.
+            sessionStorage.setItem('mylib_gemini_api_key', geminiApiKey);
+            sessionStorage.setItem('mylib_groq_api_key', groqApiKey);
+            localStorage.setItem('mylib_gemini_model', model);
+            localStorage.setItem('mylib_ai_language', language);
+            showToast('AI Settings saved!', 'success');
+        });
+
+        document.getElementById('save-profile-btn')?.addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            const originalText = btn.innerText;
+            const displayName = document.getElementById('profile-display-name').value.trim();
+            const phoneNumber = document.getElementById('profile-phone-number').value.trim();
+            const address = document.getElementById('profile-address').value.trim();
+
+            if (phoneNumber && !/^\+?[0-9\s\-]{7,20}$/.test(phoneNumber)) {
+                showToast('Please enter a valid phone number.', 'error');
+                return;
             }
 
-            window.toggleFavorite = async (bookId) => {
-                const statusData = getStatusData(bookId);
-                const newVal = !statusData.isFavorite;
+            btn.disabled = true;
+            btn.innerText = 'Saving...';
+            try {
+                // Public fields → parent doc
+                await db.collection('users').doc(currentUser.uid).update({
+                    displayName,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
 
-                try {
-                    await db.collection('books').doc(bookId).collection('readingStatus').doc(currentUser.uid).set({
-                        isFavorite: newVal,
+                // Private fields → subcollection
+                await db.collection('users').doc(currentUser.uid)
+                    .collection('private').doc('data')
+                    .set({
+                        phoneNumber,
+                        address,
+                        email: currentUser.email || '',
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                     }, { merge: true });
-                    showToast(newVal ? 'Added to favorites' : 'Removed from favorites', 'success');
 
-                    // If we are in book details, we might need to refresh it
-                    if (currentModalCloseHandler && document.querySelector(`[data-book-id="${bookId}"]`)) {
-                        // refreshing the modal is tricky, easiest is to just let the snapshot update the background
-                        // and if we are IN the modal, the button should have its own local state or we re-render modal.
-                        // For simplicity, renderLibraryOnly will be called by snapshot.
-                    }
-                } catch (err) {
-                    showToast('Error: ' + err.message, 'error');
+                if (displayName !== currentUser.displayName) {
+                    await currentUser.updateProfile({ displayName });
                 }
-            };
 
-            window.toggleFavoritesFilter = (val) => {
-                favoritesOnly = val !== undefined ? val : !favoritesOnly;
-                window.queueRenderLibraryOnly();
-            };
+                userProfile = { ...userProfile, displayName, phoneNumber, address };
+                userProfileCache[currentUser.uid] = { ...userProfileCache[currentUser.uid], displayName };
 
-            window.addHighlight = async (bookId, text, page) => {
-                if (!text || !text.trim()) return;
-                try {
-                    const bookDoc = await db.collection('books').doc(bookId).get();
-                    if (!bookDoc.exists) {
-                        showToast('Book not found', 'error');
-                        return;
-                    }
-                    const bookData = bookDoc.data();
-                    const highlights = [...(bookData.highlights || [])];
-
-                    const newHighlight = {
-                        id: Math.random().toString(36).substring(2, 11),
-                        text: text.trim(),
-                        page: page && page.trim() ? page.trim() : null,
-                        userId: currentUser.uid,
-                        userName: userProfile?.displayName || currentUser.email || 'Anonymous',
-                        timestamp: new Date().toISOString()
-                    };
-
-                    highlights.unshift(newHighlight);
-
-                    await db.collection('books').doc(bookId).update({
-                        highlights: highlights,
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-
-                    showToast('Highlight added!', 'success');
-
-                    // refresh modal with fresh data
-                    const updatedDoc = await db.collection('books').doc(bookId).get();
-                    openBookDetails({ id: bookId, ...updatedDoc.data() });
-                } catch (err) {
-                    showToast('Error adding highlight: ' + err.message, 'error');
-                }
-            };
-
-            window.deleteHighlight = async (bookId, highlightId) => {
-                try {
-                    const bookDoc = await db.collection('books').doc(bookId).get();
-                    if (!bookDoc.exists) {
-                        showToast('Book not found', 'error');
-                        return;
-                    }
-                    const bookData = bookDoc.data();
-                    const highlights = (bookData.highlights || []).filter(h => h.id !== highlightId);
-
-                    await db.collection('books').doc(bookId).update({
-                        highlights: highlights,
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-
-                    showToast('Highlight removed', 'info');
-
-                    // refresh modal with fresh data
-                    const updatedDoc = await db.collection('books').doc(bookId).get();
-                    openBookDetails({ id: bookId, ...updatedDoc.data() });
-                } catch (err) {
-                    showToast('Error deleting highlight: ' + err.message, 'error');
-                }
-            };
-
-            window.setTab = (tab) => {
-                activeTab = tab;
-                if ((tab === 'explore' || tab === 'activity') && socialReviews.length === 0) {
-                    fetchSocialReviews();
-                }
-                if (tab === 'activity') {
-                    setTimeout(() => {
-                        const input = document.getElementById('activity-message-input');
-                        if (input) {
-                            input.onkeydown = e => {
-                                if (e.key === 'Enter') window.postActivityMessage();
-                            };
-                        }
-                    }, 500);
-                }
+                showToast('Profile updated!', 'success');
                 window.queueRenderMainApp();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch (err) {
+                showToast('Error updating profile: ' + err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = originalText;
+            }
+        });
 
-                if (tab === 'library') {
-                    setTimeout(() => {
-                        const input = document.getElementById('search-input');
-                        if (input) {
-                            input.focus();
-                            input.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }
-                    }, 100);
+        document.getElementById('pref-default-view')?.addEventListener('change', e => {
+            localStorage.setItem('mylib_viewMode', e.target.value);
+            viewMode = e.target.value;
+            window.queueRenderMainApp();
+        });
+        document.getElementById('pref-default-sort')?.addEventListener('change', e => {
+            localStorage.setItem('mylib_defaultSort', e.target.value);
+            defaultSort = e.target.value;
+            sortBy = e.target.value;
+            window.queueRenderMainApp();
+        });
+
+        document.getElementById('pref-reading-goal')?.addEventListener('input', e => {
+            const val = parseInt(e.target.value) || 50;
+            localStorage.setItem('mylib_readingGoal', val);
+            readingGoal = val; // Update in-memory cache
+        });
+        document.getElementById('pref-reading-goal')?.addEventListener('blur', () => window.queueRenderMainApp());
+
+        document.getElementById('pref-card-density')?.addEventListener('change', e => {
+            localStorage.setItem('mylib_density', e.target.value);
+            cardDensity = e.target.value; // Update in-memory cache
+            window.queueRenderMainApp();
+        });
+
+        document.getElementById('pref-currency')?.addEventListener('change', e => {
+            const val = e.target.value;
+            localStorage.setItem('mylib_currency', val);
+            // ⚡ Bolt: Update cached currency symbol immediately
+            cachedCurrencySymbol = CURRENCIES[val] || '$';
+            window.queueRenderMainApp();
+        });
+
+        renderPartners();
+    }
+
+    window.editMetadata = async (type, oldVal) => {
+        const newVal = prompt(`Edit ${type}:`, oldVal);
+        if (!newVal || newVal === oldVal) return;
+
+        showToast(`Updating ${type}...`, 'info');
+
+        if (type === 'Genre') {
+            const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).get();
+            const batch = db.batch();
+            let count = 0;
+            snapshot.docs.forEach(doc => {
+                const data = doc.data();
+                let updated = false;
+                let categories = getBookGenres(data);
+                if (categories.includes(oldVal)) {
+                    categories = categories.map(c => c === oldVal ? newVal : c);
+                    batch.update(doc.ref, { categories, category: firebase.firestore.FieldValue.delete() });
+                    updated = true;
                 }
+                if (updated) count++;
+            });
+            await batch.commit();
+            showToast(`Updated ${count} books`, 'success');
+        } else {
+            const field = type.toLowerCase();
+            const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).where(field, '==', oldVal).get();
+            const batch = db.batch();
+            snapshot.docs.forEach(doc => {
+                batch.update(doc.ref, { [field]: newVal });
+            });
+            await batch.commit();
+            showToast(`Updated ${snapshot.size} books`, 'success');
+        }
+        window.queueRenderMainApp();
+    };
+
+    window.deleteMetadata = async (type, val) => {
+        const fallback = type === 'Genre' ? 'Other' : 'Unknown';
+        if (!confirm(`Remove "${val}" from all books? (They will be set to "${fallback}" if no other genres remain)`)) return;
+
+        showToast(`Updating books...`, 'info');
+        if (type === 'Genre') {
+            const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).get();
+            const batch = db.batch();
+            let count = 0;
+            snapshot.docs.forEach(doc => {
+                const data = doc.data();
+                let categories = getBookGenres(data);
+                if (categories.includes(val)) {
+                    categories = categories.filter(c => c !== val);
+                    if (categories.length === 0) categories = [fallback];
+                    batch.update(doc.ref, { categories, category: firebase.firestore.FieldValue.delete() });
+                    count++;
+                }
+            });
+            await batch.commit();
+            showToast(`Updated ${count} books`, 'success');
+        } else {
+            const field = type.toLowerCase();
+            const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).where(field, '==', val).get();
+            const batch = db.batch();
+            snapshot.docs.forEach(doc => {
+                batch.update(doc.ref, { [field]: fallback });
+            });
+            await batch.commit();
+            showToast(`Updated ${snapshot.size} books`, 'success');
+        }
+        window.queueRenderMainApp();
+    };
+
+    function attachFilteredListeners() {
+        document.getElementById('sort-select')?.addEventListener('change', e => {
+            sortBy = e.target.value;
+            localStorage.setItem('mylib_sortBy', sortBy);
+            window.queueRenderLibraryOnly();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+        document.getElementById('status-filter')?.addEventListener('change', e => {
+            statusFilter = e.target.value;
+            localStorage.setItem('mylib_statusFilter', statusFilter);
+            window.queueRenderLibraryOnly();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+        document.getElementById('category-filter')?.addEventListener('change', e => {
+            categoryFilter = e.target.value;
+            window.queueRenderLibraryOnly();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+        document.getElementById('author-filter')?.addEventListener('change', e => {
+            authorFilter = e.target.value;
+            window.queueRenderLibraryOnly();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+        document.getElementById('grid-view-btn')?.addEventListener('click', () => {
+            viewMode = 'grid';
+            localStorage.setItem('mylib_viewMode', 'grid');
+            window.queueRenderLibraryOnly();
+        });
+        document.getElementById('compact-view-btn')?.addEventListener('click', () => {
+            viewMode = 'compact';
+            localStorage.setItem('mylib_viewMode', 'compact');
+            window.queueRenderLibraryOnly();
+        });
+        document.getElementById('list-view-btn')?.addEventListener('click', () => {
+            viewMode = 'list';
+            localStorage.setItem('mylib_viewMode', 'list');
+            window.queueRenderLibraryOnly();
+        });
+    }
+
+    window.toggleFavorite = async (bookId) => {
+        const statusData = getStatusData(bookId);
+        const newVal = !statusData.isFavorite;
+
+        try {
+            await db.collection('books').doc(bookId).collection('readingStatus').doc(currentUser.uid).set({
+                isFavorite: newVal,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            showToast(newVal ? 'Added to favorites' : 'Removed from favorites', 'success');
+
+            // If we are in book details, we might need to refresh it
+            if (currentModalCloseHandler && document.querySelector(`[data-book-id="${bookId}"]`)) {
+                // refreshing the modal is tricky, easiest is to just let the snapshot update the background
+                // and if we are IN the modal, the button should have its own local state or we re-render modal.
+                // For simplicity, renderLibraryOnly will be called by snapshot.
+            }
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        }
+    };
+
+    window.toggleFavoritesFilter = (val) => {
+        favoritesOnly = val !== undefined ? val : !favoritesOnly;
+        window.queueRenderLibraryOnly();
+    };
+
+    window.addHighlight = async (bookId, text, page) => {
+        if (!text || !text.trim()) return;
+        try {
+            const bookDoc = await db.collection('books').doc(bookId).get();
+            if (!bookDoc.exists) {
+                showToast('Book not found', 'error');
+                return;
+            }
+            const bookData = bookDoc.data();
+            const highlights = [...(bookData.highlights || [])];
+
+            const newHighlight = {
+                id: Math.random().toString(36).substring(2, 11),
+                text: text.trim(),
+                page: page && page.trim() ? page.trim() : null,
+                userId: currentUser.uid,
+                userName: userProfile?.displayName || currentUser.email || 'Anonymous',
+                timestamp: new Date().toISOString()
             };
 
-            window.loadMoreReviews = async (btn) => {
-                if (!hasMoreReviews) return;
-                const originalText = btn.innerText;
-                btn.disabled = true;
-                btn.innerText = 'Loading More...';
-                try {
-                    await fetchSocialReviews(true);
-                } finally {
-                    btn.disabled = false;
-                    btn.innerText = originalText;
+            highlights.unshift(newHighlight);
+
+            await db.collection('books').doc(bookId).update({
+                highlights: highlights,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            showToast('Highlight added!', 'success');
+
+            // refresh modal with fresh data
+            const updatedDoc = await db.collection('books').doc(bookId).get();
+            openBookDetails({ id: bookId, ...updatedDoc.data() });
+        } catch (err) {
+            showToast('Error adding highlight: ' + err.message, 'error');
+        }
+    };
+
+    window.deleteHighlight = async (bookId, highlightId) => {
+        try {
+            const bookDoc = await db.collection('books').doc(bookId).get();
+            if (!bookDoc.exists) {
+                showToast('Book not found', 'error');
+                return;
+            }
+            const bookData = bookDoc.data();
+            const highlights = (bookData.highlights || []).filter(h => h.id !== highlightId);
+
+            await db.collection('books').doc(bookId).update({
+                highlights: highlights,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            showToast('Highlight removed', 'info');
+
+            // refresh modal with fresh data
+            const updatedDoc = await db.collection('books').doc(bookId).get();
+            openBookDetails({ id: bookId, ...updatedDoc.data() });
+        } catch (err) {
+            showToast('Error deleting highlight: ' + err.message, 'error');
+        }
+    };
+
+    window.setTab = (tab) => {
+        activeTab = tab;
+        if ((tab === 'explore' || tab === 'activity') && socialReviews.length === 0) {
+            fetchSocialReviews();
+        }
+        if (tab === 'activity') {
+            setTimeout(() => {
+                const input = document.getElementById('activity-message-input');
+                if (input) {
+                    input.onkeydown = e => {
+                        if (e.key === 'Enter') window.postActivityMessage();
+                    };
                 }
-            };
+            }, 500);
+        }
+        window.queueRenderMainApp();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
 
-            window.toggleLike = async (reviewId, btn) => {
-                if (!currentUser) return;
-                const svg = btn.querySelector('svg');
-                const span = btn.querySelector('span');
-
-                // Optimistic UI
-                const isLiked = svg.classList.contains('fill-rose-500');
-                const count = parseInt(span.innerText);
-
-                svg.classList.toggle('fill-rose-500', !isLiked);
-                svg.classList.toggle('text-rose-500', !isLiked);
-                svg.classList.toggle('heart-burst', !isLiked);
-                span.innerText = isLiked ? Math.max(0, count - 1) : count + 1;
-
-                try {
-                    const likeRef = db.collection('reviews').doc(reviewId).collection('likes').doc(currentUser.uid);
-                    const reviewRef = db.collection('reviews').doc(reviewId);
-                    // Batch the like document and the counter so rules can verify the two
-                    // moved together (blocks forged likesCount).
-                    const batch = db.batch();
-
-                    if (isLiked) {
-                        batch.delete(likeRef);
-                        batch.update(reviewRef, { likesCount: firebase.firestore.FieldValue.increment(-1) });
-                    } else {
-                        batch.set(likeRef, { userId: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-                        batch.update(reviewRef, { likesCount: firebase.firestore.FieldValue.increment(1) });
-                    }
-                    await batch.commit();
-
-                    // Update local state to maintain liked status across renders
-                    const review = socialReviews.find(r => r.id === reviewId);
-                    if (review) {
-                        review.isLiked = !isLiked;
-                        review.likesCount = isLiked ? Math.max(0, (review.likesCount || 1) - 1) : (review.likesCount || 0) + 1;
-                    }
-                } catch (err) {
-                    console.error("Like error:", err);
-                    // Revert UI on failure
-                    svg.classList.toggle('fill-rose-500', isLiked);
-                    svg.classList.toggle('text-rose-500', isLiked);
-                    span.innerText = count;
-                    showToast('Failed to sync like', 'error');
+        if (tab === 'library') {
+            setTimeout(() => {
+                const input = document.getElementById('search-input');
+                if (input) {
+                    input.focus();
+                    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
-            };
+            }, 100);
+        }
+    };
 
-            window.toggleComments = async (reviewId) => {
-                const container = document.getElementById(`comments-${reviewId}`);
-                if (!container) return;
+    window.loadMoreReviews = async (btn) => {
+        if (!hasMoreReviews) return;
+        const originalText = btn.innerText;
+        btn.disabled = true;
+        btn.innerText = 'Loading More...';
+        try {
+            await fetchSocialReviews(true);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = originalText;
+        }
+    };
 
-                const isHidden = container.classList.contains('hidden');
-                container.classList.toggle('hidden');
+    window.toggleLike = async (reviewId, btn) => {
+        if (!currentUser) return;
+        const svg = btn.querySelector('svg');
+        const span = btn.querySelector('span');
 
-                if (isHidden && container.innerHTML === '') {
-                    container.innerHTML = `<div class="flex justify-center py-4"><div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div></div>`;
+        // Optimistic UI
+        const isLiked = svg.classList.contains('fill-rose-500');
+        const count = parseInt(span.innerText);
 
-                    try {
-                        const snapshot = await db.collection('reviews').doc(reviewId).collection('comments').orderBy('createdAt', 'asc').get();
-                        const comments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        svg.classList.toggle('fill-rose-500', !isLiked);
+        svg.classList.toggle('text-rose-500', !isLiked);
+        svg.classList.toggle('heart-burst', !isLiked);
+        span.innerText = isLiked ? Math.max(0, count - 1) : count + 1;
 
-                        let html = comments.map(c => `
+        try {
+            const likeRef = db.collection('reviews').doc(reviewId).collection('likes').doc(currentUser.uid);
+            const reviewRef = db.collection('reviews').doc(reviewId);
+            // Batch the like document and the counter so rules can verify the two
+            // moved together (blocks forged likesCount).
+            const batch = db.batch();
+
+            if (isLiked) {
+                batch.delete(likeRef);
+                batch.update(reviewRef, { likesCount: firebase.firestore.FieldValue.increment(-1) });
+            } else {
+                batch.set(likeRef, { userId: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                batch.update(reviewRef, { likesCount: firebase.firestore.FieldValue.increment(1) });
+            }
+            await batch.commit();
+
+            // Update local state to maintain liked status across renders
+            const review = socialReviews.find(r => r.id === reviewId);
+            if (review) {
+                review.isLiked = !isLiked;
+                review.likesCount = isLiked ? Math.max(0, (review.likesCount || 1) - 1) : (review.likesCount || 0) + 1;
+            }
+        } catch (err) {
+            console.error("Like error:", err);
+            // Revert UI on failure
+            svg.classList.toggle('fill-rose-500', isLiked);
+            svg.classList.toggle('text-rose-500', isLiked);
+            span.innerText = count;
+            showToast('Failed to sync like', 'error');
+        }
+    };
+
+    window.toggleComments = async (reviewId) => {
+        const container = document.getElementById(`comments-${reviewId}`);
+        if (!container) return;
+
+        const isHidden = container.classList.contains('hidden');
+        container.classList.toggle('hidden');
+
+        if (isHidden && container.innerHTML === '') {
+            container.innerHTML = `<div class="flex justify-center py-4"><div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div></div>`;
+
+            try {
+                const snapshot = await db.collection('reviews').doc(reviewId).collection('comments').orderBy('createdAt', 'asc').get();
+                const comments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                let html = comments.map(c => `
                             <div class="flex gap-3 animate-slide-up">
                                 <div class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[10px] font-black uppercase flex-shrink-0">${escapeHTML(c.userName?.substring(0, 2) || '??')}</div>
                                 <div class="flex-1">
@@ -3612,7 +3674,7 @@
                             </div>
                         `).join('');
 
-                        html += `
+                html += `
                             <div class="flex gap-2 mt-4">
                                 <input id="comment-input-${escapeHTML(reviewId)}" type="text" placeholder="Add a comment..." class="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-primary outline-none text-xs transition-all">
                                 <button data-action="add-comment" data-value="${escapeHTML(reviewId)}"  class="p-2 bg-primary text-white rounded-xl hover:bg-slate-800 transition active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Post comment">
@@ -3620,184 +3682,187 @@
                                 </button>
                             </div>
                         `;
-                        container.innerHTML = html;
+                container.innerHTML = html;
 
-                        const input = document.getElementById(`comment-input-${reviewId}`);
-                        input?.addEventListener('keydown', (e) => {
-                            if (e.key === 'Enter') window.addComment(reviewId);
-                        });
-                        input?.focus();
-                    } catch (err) {
-                        container.innerHTML = `<p class="text-center text-rose-500 text-xs py-4">Failed to load comments</p>`;
-                    }
-                }
-            };
-
-            window.addComment = async (reviewId) => {
                 const input = document.getElementById(`comment-input-${reviewId}`);
-                const body = input.value?.trim() || "";
-                if (!body) return;
+                input?.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') window.addComment(reviewId);
+                });
+                input?.focus();
+            } catch (err) {
+                container.innerHTML = `<p class="text-center text-rose-500 text-xs py-4">Failed to load comments</p>`;
+            }
+        }
+    };
 
-                if (body.length > 500) { showToast('Comment is too long (max 500)', 'error'); return; }
+    window.addComment = async (reviewId) => {
+        const input = document.getElementById(`comment-input-${reviewId}`);
+        const body = input.value?.trim() || "";
+        if (!body) return;
 
-                input.disabled = true;
-                try {
-                    const commentData = {
-                        userId: currentUser.uid,
-                        userName: userProfile.displayName || currentUser.email,
-                        body: body,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    };
+        if (body.length > 500) { showToast('Comment is too long (max 500)', 'error'); return; }
 
-                    // Comment document + counter commit together (atomic).
-                    const batch = db.batch();
-                    batch.set(db.collection('reviews').doc(reviewId).collection('comments').doc(), commentData);
-                    batch.update(db.collection('reviews').doc(reviewId), { commentsCount: firebase.firestore.FieldValue.increment(1) });
-                    await batch.commit();
-
-                    input.value = '';
-                    const container = document.getElementById(`comments-${reviewId}`);
-                    container.innerHTML = ''; // Force reload
-                    await window.toggleComments(reviewId);
-                    showToast('Comment posted!', 'success');
-                } catch (err) {
-                    showToast('Failed to post comment', 'error');
-                } finally {
-                    input.disabled = false;
-                }
+        input.disabled = true;
+        try {
+            const commentData = {
+                userId: currentUser.uid,
+                userName: userProfile.displayName || currentUser.email,
+                body: body,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
             };
 
-            window.setMyBooksSubTab = (tab) => {
-                myBooksSubTab = tab;
-                window.queueRenderMainApp();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            };
+            // Comment document + counter commit together (atomic).
+            const batch = db.batch();
+            batch.set(db.collection('reviews').doc(reviewId).collection('comments').doc(), commentData);
+            batch.update(db.collection('reviews').doc(reviewId), { commentsCount: firebase.firestore.FieldValue.increment(1) });
+            await batch.commit();
 
-            window.setCopyTypeFilter = (copyType) => {
-                if (copyType === 'all') {
-                    copyTypeFilter = 'all';
-                } else if (copyTypeFilter === copyType) {
-                    copyTypeFilter = 'all';
-                } else {
-                    copyTypeFilter = copyType;
-                }
-                window.queueRenderMainApp();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            };
+            input.value = '';
+            const container = document.getElementById(`comments-${reviewId}`);
+            container.innerHTML = ''; // Force reload
+            await window.toggleComments(reviewId);
+            showToast('Comment posted!', 'success');
+        } catch (err) {
+            showToast('Failed to post comment', 'error');
+        } finally {
+            input.disabled = false;
+        }
+    };
 
-            window.setTagFilter = (tag) => {
-                tagFilter = tag;
-                window.queueRenderMainApp();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            };
+    window.setMyBooksSubTab = (tab) => {
+        myBooksSubTab = tab;
+        window.queueRenderMainApp();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
-            window.setAuthorFilter = (author) => {
-                authorFilter = author;
-                window.queueRenderMainApp();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            };
+    window.setCopyTypeFilter = (copyType) => {
+        if (copyType === 'all') {
+            copyTypeFilter = 'all';
+        } else if (copyTypeFilter === copyType) {
+            copyTypeFilter = 'all';
+        } else {
+            copyTypeFilter = copyType;
+        }
+        window.queueRenderMainApp();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
-            window.setOwnerFilter = (owner) => {
-                // Reuse the author filter mechanism — owners are stored on books as `owner`,
-                // not `author`, so we set a dedicated filter variable.
-                ownerFilter = owner === 'all' ? 'all' : owner;
-                window.queueRenderMainApp();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            };
+    window.setTagFilter = (tag) => {
+        tagFilter = tag;
+        window.queueRenderMainApp();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
-            window.setCategoryFilter = (category) => {
-                categoryFilter = category;
-                window.queueRenderMainApp();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            };
+    window.setAuthorFilter = (author) => {
+        authorFilter = author;
+        window.queueRenderMainApp();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
-            window.applyInsightFilter = (type, value) => {
-                activeTab = 'library';
-                searchQuery = '';
-                tagFilter = type === 'tag' ? value : null;
-                categoryFilter = type === 'genre' ? value : 'all';
-                authorFilter = type === 'author' ? value : 'all';
-                copyTypeFilter = type === 'copy_type' ? value : 'all';
-                advancedFilters = { rating: 'all', minPrice: null, maxPrice: null, startDate: null, endDate: null };
-                window.queueRenderMainApp();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            };
+    window.setOwnerFilter = (owner) => {
+        // Reuse the author filter mechanism — owners are stored on books as `owner`,
+        // not `author`, so we set a dedicated filter variable.
+        ownerFilter = owner === 'all' ? 'all' : owner;
+        window.queueRenderMainApp();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
-            window.setTheme = (theme) => {
-                document.documentElement.classList.remove('dark', 'sepia');
-                if (theme !== 'light') document.documentElement.classList.add(theme);
-                localStorage.setItem('mylib_theme', theme);
-                window.queueRenderMainApp(); // Re-render to update border classes
-            };
+    window.setCategoryFilter = (category) => {
+        categoryFilter = category;
+        window.queueRenderMainApp();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
-            // ⚡ New: Toggle dark/light theme from the sidebar button
-            window.toggleSidebarTheme = () => {
-                const isDark = document.documentElement.classList.contains('dark');
-                window.setTheme(isDark ? 'light' : 'dark');
-            };
+    window.applyInsightFilter = (type, value) => {
+        activeTab = 'library';
+        searchQuery = '';
+        tagFilter = type === 'tag' ? value : null;
+        categoryFilter = type === 'genre' ? value : 'all';
+        authorFilter = type === 'author' ? value : 'all';
+        copyTypeFilter = type === 'copy_type' ? value : 'all';
+        advancedFilters = { rating: 'all', minPrice: null, maxPrice: null, startDate: null, endDate: null };
+        window.queueRenderMainApp();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
-            window.setAccent = (color) => {
-                const colors = {
-                    blue: '#3b82f6',
-                    rose: '#f43f5e',
-                    emerald: '#10b981',
-                    amber: '#f59e0b',
-                    violet: '#8b5cf6'
-                };
-                const primary = colors[color] || colors.blue;
-                document.documentElement.style.setProperty('--primary-color', primary);
-                localStorage.setItem('mylib_accent', color);
-                window.queueRenderMainApp();
-            };
+    window.setTheme = (theme) => {
+        document.documentElement.classList.remove('dark', 'sepia');
+        if (theme !== 'light') document.documentElement.classList.add(theme);
+        localStorage.setItem('mylib_theme', theme);
+        window.queueRenderMainApp(); // Re-render to update border classes
+    };
 
-            // Initialize accent on load
-            window.setAccent(localStorage.getItem('mylib_accent') || 'blue');
+    // ⚡ New: Toggle dark/light theme from the sidebar button
+    window.toggleSidebarTheme = () => {
+        const isDark = document.documentElement.classList.contains('dark');
+        window.setTheme(isDark ? 'light' : 'dark');
+    };
 
-            window.toggleSelection = (id) => {
-                if (selectedBookIds.has(id)) selectedBookIds.delete(id);
-                else selectedBookIds.add(id);
-                window.queueRenderLibraryOnly();
-            };
+    window.setAccent = (color) => {
+        const colors = {
+            blue: '#3b82f6',
+            rose: '#f43f5e',
+            emerald: '#10b981',
+            amber: '#f59e0b',
+            violet: '#8b5cf6'
+        };
+        const primary = colors[color] || colors.blue;
 
-            window.clearAdvancedFilter = (type) => {
-                if (type === 'rating') advancedFilters.rating = 'all';
-                if (type === 'price') { advancedFilters.minPrice = null; advancedFilters.maxPrice = null; }
-                if (type === 'date') { advancedFilters.startDate = null; advancedFilters.endDate = null; }
-                window.queueRenderLibraryOnly();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            };
+        // ✅ CSP-safe: update the sheet we created at the top of the IIFE
+        window.__accentSheet.replaceSync(`:root { --primary-color: ${primary}; }`);
 
-            window.clearSortFilter = (type) => {
-                sortBy = 'newest';
-                localStorage.setItem('mylib_sortBy', 'newest');
-                const sortSelect = document.getElementById('sort-select');
-                if (sortSelect) sortSelect.value = 'newest';
-                const advSort = document.getElementById('adv-sort');
-                if (advSort) advSort.value = 'newest';
-                window.queueRenderMainApp();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            };
+        localStorage.setItem('mylib_accent', color);
+        window.queueRenderMainApp();
+    };
 
-            window.clearAllFilters = () => {
-                searchQuery = '';
-                aiSearchResults = null;
-                aiSearchResultsSet = null;
-                tagFilter = null;
-                categoryFilter = 'all';
-                copyTypeFilter = 'all';
-                authorFilter = 'all';
-                ownerFilter = 'all';
-                favoritesOnly = false;
-                advancedFilters = { rating: 'all', minPrice: null, maxPrice: null, startDate: null, endDate: null };
-                const searchInput = document.getElementById('search-input');
-                if (searchInput) searchInput.value = '';
-                window.queueRenderMainApp();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            };
+    // Initialize accent on load
+    window.setAccent(localStorage.getItem('mylib_accent') || 'blue');
 
-            function openAdvancedSearch() {
-                const isMobile = window.innerWidth < 768;
-                const modalHtml = `
+    window.toggleSelection = (id) => {
+        if (selectedBookIds.has(id)) selectedBookIds.delete(id);
+        else selectedBookIds.add(id);
+        window.queueRenderLibraryOnly();
+    };
+
+    window.clearAdvancedFilter = (type) => {
+        if (type === 'rating') advancedFilters.rating = 'all';
+        if (type === 'price') { advancedFilters.minPrice = null; advancedFilters.maxPrice = null; }
+        if (type === 'date') { advancedFilters.startDate = null; advancedFilters.endDate = null; }
+        window.queueRenderLibraryOnly();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    window.clearSortFilter = (type) => {
+        sortBy = 'newest';
+        localStorage.setItem('mylib_sortBy', 'newest');
+        const sortSelect = document.getElementById('sort-select');
+        if (sortSelect) sortSelect.value = 'newest';
+        const advSort = document.getElementById('adv-sort');
+        if (advSort) advSort.value = 'newest';
+        window.queueRenderMainApp();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    window.clearAllFilters = () => {
+        searchQuery = '';
+        aiSearchResults = null;
+        aiSearchResultsSet = null;
+        tagFilter = null;
+        categoryFilter = 'all';
+        copyTypeFilter = 'all';
+        authorFilter = 'all';
+        ownerFilter = 'all';
+        favoritesOnly = false;
+        advancedFilters = { rating: 'all', minPrice: null, maxPrice: null, startDate: null, endDate: null };
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) searchInput.value = '';
+        window.queueRenderMainApp();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    function openAdvancedSearch() {
+        const isMobile = window.innerWidth < 768;
+        const modalHtml = `
                 <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up overflow-y-auto max-h-[90vh]">
                     <h2 class="text-2xl font-black mb-6 font-serif italic">Advanced Filters</h2>
                     <div class="space-y-6">
@@ -3871,370 +3936,361 @@
                     </div>
                 </div>
             `;
-                const close = showModal(modalHtml);
-                document.getElementById('adv-rating')?.focus();
-                document.getElementById('apply-filters').addEventListener('click', () => {
-                    advancedFilters.rating = document.getElementById('adv-rating').value;
-                    advancedFilters.minPrice = document.getElementById('adv-min-price').value ? parseFloat(document.getElementById('adv-min-price').value) : null;
-                    advancedFilters.maxPrice = document.getElementById('adv-max-price').value ? parseFloat(document.getElementById('adv-max-price').value) : null;
-                    advancedFilters.startDate = document.getElementById('adv-start-date').value || null;
-                    advancedFilters.endDate = document.getElementById('adv-end-date').value || null;
+        const close = showModal(modalHtml);
+        document.getElementById('adv-rating')?.focus();
+        document.getElementById('apply-filters').addEventListener('click', () => {
+            advancedFilters.rating = document.getElementById('adv-rating').value;
+            advancedFilters.minPrice = document.getElementById('adv-min-price').value ? parseFloat(document.getElementById('adv-min-price').value) : null;
+            advancedFilters.maxPrice = document.getElementById('adv-max-price').value ? parseFloat(document.getElementById('adv-max-price').value) : null;
+            advancedFilters.startDate = document.getElementById('adv-start-date').value || null;
+            advancedFilters.endDate = document.getElementById('adv-end-date').value || null;
 
-                    if (isMobile) {
-                        sortBy = document.getElementById('adv-sort').value;
-                        categoryFilter = document.getElementById('adv-genre').value;
-                        statusFilter = document.getElementById('adv-status').value;
-                        authorFilter = document.getElementById('adv-author').value;
-                        localStorage.setItem('mylib_sortBy', sortBy);
-                        localStorage.setItem('mylib_statusFilter', statusFilter);
-                    }
-
-                    window.queueRenderLibraryOnly();
-                    close();
-                });
+            if (isMobile) {
+                sortBy = document.getElementById('adv-sort').value;
+                categoryFilter = document.getElementById('adv-genre').value;
+                statusFilter = document.getElementById('adv-status').value;
+                authorFilter = document.getElementById('adv-author').value;
+                localStorage.setItem('mylib_sortBy', sortBy);
+                localStorage.setItem('mylib_statusFilter', statusFilter);
             }
 
+            window.queueRenderLibraryOnly();
+            close();
+        });
+    }
 
-            function toggleViewMode() {
-                viewMode = viewMode === 'grid' ? 'list' : 'grid';
-                localStorage.setItem('mylib_viewMode', viewMode);
-                window.queueRenderMainApp();
+
+    function toggleViewMode() {
+        viewMode = viewMode === 'grid' ? 'list' : 'grid';
+        localStorage.setItem('mylib_viewMode', viewMode);
+        window.queueRenderMainApp();
+    }
+
+    function setupSearchableDropdown(inputId, menuId, dataList, onAdd) {
+        const input = document.getElementById(inputId);
+        const menu = document.getElementById(menuId);
+        if (!input || !menu) return;
+
+        // Ensure hidden by default
+        menu.classList.add('hidden');
+
+        let selectedIndex = -1;
+
+        const renderMenu = (filter = '') => {
+            const filtered = dataList.filter(item => item.toLowerCase().includes(filter.toLowerCase()));
+            let items = filtered.map(item => ({ type: 'item', value: item }));
+
+            if (filter && !filtered.some(item => item.toLowerCase() === filter.toLowerCase())) {
+                items.push({ type: 'add', value: filter });
             }
 
-            function setupSearchableDropdown(inputId, menuId, dataList, onAdd) {
-                const input = document.getElementById(inputId);
-                const menu = document.getElementById(menuId);
-                if (!input || !menu) return;
+            let html = items.map((item, i) => `
+        <div class="dropdown-item ${i === selectedIndex ? 'bg-slate-100 dark:bg-slate-700 text-sky-600' : ''} ${item.type === 'add' ? 'font-bold text-sky-600 dark:text-blue-400 border-t border-slate-100 dark:border-slate-800' : ''}"
+             data-value="${escapeHTML(item.value)}"
+             data-action="${item.type}"
+             data-index="${i}">
+            ${item.type === 'add' ? `+ Add "${escapeHTML(item.value)}"` : escapeHTML(item.value)}
+        </div>
+    `).join('');
 
-                let selectedIndex = -1;
+            menu.innerHTML = html;
+            menu.classList.toggle('hidden', !html);   // ✅ class toggling, not .style
+            return items.length;
+        };
 
-                const renderMenu = (filter = '') => {
-                    const filtered = dataList.filter(item => item.toLowerCase().includes(filter.toLowerCase()));
-                    let items = filtered.map(item => ({ type: 'item', value: item }));
+        input.addEventListener('focus', () => { selectedIndex = -1; renderMenu(input.value); });
+        input.addEventListener('input', () => { selectedIndex = -1; renderMenu(input.value); });
 
-                    if (filter && !filtered.some(item => item.toLowerCase() === filter.toLowerCase())) {
-                        items.push({ type: 'add', value: filter });
-                    }
+        input.addEventListener('keydown', (e) => {
+            const items = menu.querySelectorAll('.dropdown-item');
+            const isHidden = menu.classList.contains('hidden');   // ✅ class check
 
-                    let html = items.map((item, i) => `
-                    <div class="dropdown-item ${i === selectedIndex ? 'bg-slate-100 dark:bg-slate-700 text-sky-600' : ''} ${item.type === 'add' ? 'font-bold text-sky-600 dark:text-blue-400 border-t border-slate-100 dark:border-slate-800' : ''}"
-                         data-value="${escapeHTML(item.value)}"
-                         data-action="${item.type}"
-                         data-index="${i}">
-                        ${item.type === 'add' ? `+ Add "${escapeHTML(item.value)}"` : escapeHTML(item.value)}
-                    </div>
-                `).join('');
-
-                    menu.innerHTML = html;
-                    menu.style.display = html ? 'block' : 'none';
-                    return items.length;
-                };
-
-                input.addEventListener('focus', () => {
-                    selectedIndex = -1;
-                    renderMenu(input.value);
-                });
-                input.addEventListener('input', () => {
-                    selectedIndex = -1;
-                    renderMenu(input.value);
-                });
-
-                input.addEventListener('keydown', (e) => {
-                    const items = menu.querySelectorAll('.dropdown-item');
-                    if (menu.style.display === 'none') {
-                        if (e.key === 'ArrowDown') renderMenu(input.value);
-                        return;
-                    }
-
-                    if (e.key === 'ArrowDown') {
-                        e.preventDefault();
-                        selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
-                        renderMenu(input.value);
-                        menu.querySelectorAll('.dropdown-item')[selectedIndex]?.scrollIntoView({ block: 'nearest' });
-                    } else if (e.key === 'ArrowUp') {
-                        e.preventDefault();
-                        selectedIndex = Math.max(selectedIndex - 1, 0);
-                        renderMenu(input.value);
-                        menu.querySelectorAll('.dropdown-item')[selectedIndex]?.scrollIntoView({ block: 'nearest' });
-                    } else if (e.key === 'Enter' && selectedIndex >= 0) {
-                        e.preventDefault();
-                        const item = items[selectedIndex];
-                        if (item.dataset.action === 'add') {
-                            onAdd(item.dataset.value);
-                        } else {
-                            input.value = item.dataset.value;
-                        }
-                        menu.style.display = 'none';
-                    } else if (e.key === 'Escape') {
-                        menu.style.display = 'none';
-                    }
-                });
-
-                document.addEventListener('click', (e) => {
-                    if (!input.contains(e.target) && !menu.contains(e.target)) {
-                        menu.style.display = 'none';
-                    }
-                });
-
-                menu.addEventListener('click', (e) => {
-                    const item = e.target.closest('.dropdown-item');
-                    if (!item) return;
-
-                    if (item.dataset.action === 'add') {
-                        onAdd(item.dataset.value);
-                    } else {
-                        input.value = item.dataset.value;
-                    }
-                    menu.style.display = 'none';
-                });
+            if (isHidden) {
+                if (e.key === 'ArrowDown') renderMenu(input.value);
+                return;
             }
 
-            function requestNotificationPermission() {
-                if (!('Notification' in window)) {
-                    showToast('This browser does not support notifications.', 'error');
-                    return;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                renderMenu(input.value);
+                menu.querySelectorAll('.dropdown-item')[selectedIndex]?.scrollIntoView({ block: 'nearest' });
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, 0);
+                renderMenu(input.value);
+                menu.querySelectorAll('.dropdown-item')[selectedIndex]?.scrollIntoView({ block: 'nearest' });
+            } else if (e.key === 'Enter' && selectedIndex >= 0) {
+                e.preventDefault();
+                const item = items[selectedIndex];
+                if (item.dataset.action === 'add') onAdd(item.dataset.value);
+                else input.value = item.dataset.value;
+                menu.classList.add('hidden');   // ✅
+            } else if (e.key === 'Escape') {
+                menu.classList.add('hidden');   // ✅
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!input.contains(e.target) && !menu.contains(e.target)) {
+                menu.classList.add('hidden');   // ✅
+            }
+        });
+
+        menu.addEventListener('click', (e) => {
+            const item = e.target.closest('.dropdown-item');
+            if (!item) return;
+            if (item.dataset.action === 'add') onAdd(item.dataset.value);
+            else input.value = item.dataset.value;
+            menu.classList.add('hidden');   // ✅
+        });
+    }
+    function requestNotificationPermission() {
+        if (!('Notification' in window)) {
+            showToast('This browser does not support notifications.', 'error');
+            return;
+        }
+        Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+                showToast('Notifications enabled!', 'success');
+            } else {
+                showToast('Notifications disabled.', 'info');
+            }
+        });
+    }
+
+    const GENRE_FALLBACK = ['Other'];
+    // Helper to get book genres as an array
+    function getBookGenres(book) {
+        if (Array.isArray(book.genres)) return book.genres;
+        if (Array.isArray(book.categories)) return book.categories;
+        if (book.category) return [book.category];
+        return GENRE_FALLBACK;
+    }
+
+    /**
+     * ⚡ Bolt: Pre-normalize book data to speed up filtering and sorting.
+     * This reduces redundant computations in render loops.
+     */
+    function normalizeBook(book) {
+        const genres = getBookGenres(book);
+        const escapedAuthor = escapeHTML(book.author || 'Unknown');
+        const jsAuthor = (book.author || 'Unknown').replace(/'/g, "\\'");
+        const tags = book.tags || [];
+
+        const searchParts = [
+            book.title,
+            book.author,
+            ...genres,
+            book.isbn,
+            ...tags
+        ];
+
+        return {
+            ...book,
+            _genres: genres,
+            _searchStr: searchParts.filter(Boolean).join(' ').toLowerCase(),
+            _sortTitle: (book.title || '').toLowerCase(),
+            _sortAuthor: (book.author || '').toLowerCase(),
+            _purchaseTime: book.purchaseDate ? new Date(book.purchaseDate).getTime() : 0,
+            _createdTime: book.createdAt?.toMillis() || 0,
+            // Pre-calculated fragments for render performance
+            _escapedTitle: escapeHTML(book.title),
+            _escapedAuthor: escapedAuthor,
+            _jsAuthor: jsAuthor,
+            _escapedOwner: book.owner ? escapeHTML(book.owner) : '',
+            _jsOwner: book.owner ? book.owner.replace(/'/g, "\\'") : '',
+            // ⚡ Bolt: Pre-calculate UI strings to shift computation from render-time (O(N)) to sync-time (O(1))
+            _formattedRating: book.averageRating ? book.averageRating.toFixed(1) : (book.rating || 0).toFixed(1),
+            _formattedDate: book.purchaseDate ? new Date(book.purchaseDate).toLocaleDateString() : '',
+            _genresHTML: genres.map(g => {
+                const escapedG = escapeHTML(g);
+                return `<button data-action="filter-genre" data-value="${escapedG}" class="inline-block bg-slate-50 hover:bg-blue-100 text-sky-600 dark:bg-blue-950/30 dark:hover:bg-blue-900/50 dark:text-blue-400 px-2 py-0.5 rounded-full text-[9px] font-bold transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none whitespace-nowrap" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>`;
+            }).join(' '),
+            _tagsHTML_grid: tags.map(tag => {
+                const escapedTag = escapeHTML(tag);
+                return `<button data-action="filter-tag" data-value="${escapedTag}" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-sky-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by tag: ${escapedTag}">${escapedTag}</button>`;
+            }).join(''),
+            _tagsHTML_list: tags.map(tag => {
+                const escapedTag = escapeHTML(tag);
+                return `<button data-action="filter-tag" data-value="${escapedTag}" class="text-[8px] bg-slate-100 dark:bg-slate-700 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by tag: ${escapedTag}">${escapedTag}</button>`;
+            }).join('')
+        };
+    }
+
+    const STAR_CACHE = Object.freeze({
+        0: '☆☆☆☆☆',
+        1: '★☆☆☆☆',
+        2: '★★☆☆☆',
+        3: '★★★☆☆',
+        4: '★★★★☆',
+        5: '★★★★★'
+    });
+
+    /**
+     * ⚡ Bolt: Comprehensive O(N) library analysis.
+     * Consolidates metadata caching, statistics calculation, and AI context generation
+     * into a single pass to eliminate redundant processing and memory overhead.
+     */
+    function updateLibraryStats() {
+        books = books.map(b => b._escapedTitle ? b : normalizeBook(b));
+        const authorsSet = new Set();
+        const genresSet = new Set();
+
+        // Reset stats
+        libraryStats = {
+            libBooksCount: 0,
+            wishlistCount: 0,
+            totalValue: 0,
+            totalTags: 0,
+            statusCounts: { finished: 0, reading: 0, want_to_read: 0 },
+            ratingDist: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
+            genresCount: {},
+            authorsCount: {},
+            tagsCount: {},
+            copyTypesCount: { 'New Copy': 0, 'Old Copy': 0, 'Gifted': 0 },
+            firstBookTime: Date.now(),
+            recentMomentum: 0,
+            finishedThisYear: 0,
+            readingStreak: 0,
+            aiContext: {
+                finished: [],
+                notYetFinished: [],
+                topGenres: []
+            }
+        };
+
+        const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+        const genreCountsForAI = {};
+
+        books.forEach(b => {
+            const statusData = getStatusData(b.id);
+            const isOwner = b.userId === currentUser.uid;
+
+            // ⚡ Bolt: Hide collaborator wishlist books from stats and metadata.
+            // If the book is marked as wishlist on the document and we are not the owner,
+            // only consider it if we have explicitly changed its status/wishlist state ourselves.
+            const isPrivateWishlist = b.isWishlist && !isOwner && !statusData.updatedAt;
+            if (isPrivateWishlist) return;
+
+            const isWishlist = statusData.isWishlist || (isOwner && b.isWishlist) || false;
+            const status = statusData.status;
+
+            // ⚡ Bolt: Collect metadata for ALL books (including wishlist) to preserve autocomplete/global filters.
+            if (b.author) authorsSet.add(b.author);
+            (b._genres || []).forEach(g => { if (g) genresSet.add(g); });
+
+            // Original logic for main app header: Finished wishlist books are counted.
+            if (isWishlist) {
+                libraryStats.wishlistCount++;
+                if (status === 'finished') libraryStats.statusCounts.finished++;
+                return;
+            }
+            if (b.excludeFromLibrary) return;
+
+            libraryStats.libBooksCount++;
+
+            // Copy type distribution count
+            const cType = b.copyType || 'New Copy';
+            libraryStats.copyTypesCount[cType] = (libraryStats.copyTypesCount[cType] || 0) + 1;
+
+            // Analysis Metadata (Library only)
+            if (b.author) {
+                libraryStats.authorsCount[b.author] = (libraryStats.authorsCount[b.author] || 0) + 1;
+            }
+
+            (b._genres || []).forEach(g => {
+                if (g) {
+                    libraryStats.genresCount[g] = (libraryStats.genresCount[g] || 0) + 1;
+                    genreCountsForAI[g] = (genreCountsForAI[g] || 0) + 1;
                 }
-                Notification.requestPermission().then(permission => {
-                    if (permission === 'granted') {
-                        showToast('Notifications enabled!', 'success');
-                    } else {
-                        showToast('Notifications disabled.', 'info');
-                    }
-                });
-            }
-
-            const GENRE_FALLBACK = ['Other'];
-            // Helper to get book genres as an array
-            function getBookGenres(book) {
-                if (Array.isArray(book.genres)) return book.genres;
-                if (Array.isArray(book.categories)) return book.categories;
-                if (book.category) return [book.category];
-                return GENRE_FALLBACK;
-            }
-
-            /**
-             * ⚡ Bolt: Pre-normalize book data to speed up filtering and sorting.
-             * This reduces redundant computations in render loops.
-             */
-            function normalizeBook(book) {
-                const genres = getBookGenres(book);
-                const escapedAuthor = escapeHTML(book.author || 'Unknown');
-                const jsAuthor = (book.author || 'Unknown').replace(/'/g, "\\'");
-                const tags = book.tags || [];
-
-                const searchParts = [
-                    book.title,
-                    book.author,
-                    ...genres,
-                    book.isbn,
-                    ...tags
-                ];
-
-                return {
-                    ...book,
-                    _genres: genres,
-                    _searchStr: searchParts.filter(Boolean).join(' ').toLowerCase(),
-                    _sortTitle: (book.title || '').toLowerCase(),
-                    _sortAuthor: (book.author || '').toLowerCase(),
-                    _purchaseTime: book.purchaseDate ? new Date(book.purchaseDate).getTime() : 0,
-                    _createdTime: book.createdAt?.toMillis() || 0,
-                    // Pre-calculated fragments for render performance
-                    _escapedTitle: escapeHTML(book.title),
-                    _escapedAuthor: escapedAuthor,
-                    _jsAuthor: jsAuthor,
-                    _escapedOwner: book.owner ? escapeHTML(book.owner) : '',
-                    _jsOwner: book.owner ? book.owner.replace(/'/g, "\\'") : '',
-                    // ⚡ Bolt: Pre-calculate UI strings to shift computation from render-time (O(N)) to sync-time (O(1))
-                    _formattedRating: book.averageRating ? book.averageRating.toFixed(1) : (book.rating || 0).toFixed(1),
-                    _formattedDate: book.purchaseDate ? new Date(book.purchaseDate).toLocaleDateString() : '',
-                    _genresHTML: genres.map(g => {
-                        const escapedG = escapeHTML(g);
-                        return `<button data-action="filter-genre" data-value="${escapedG}" class="inline-block bg-slate-50 hover:bg-blue-100 text-sky-600 dark:bg-blue-950/30 dark:hover:bg-blue-900/50 dark:text-blue-400 px-2 py-0.5 rounded-full text-[9px] font-bold transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none whitespace-nowrap" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>`;
-                    }).join(' '),
-                    _tagsHTML_grid: tags.map(tag => {
-                        const escapedTag = escapeHTML(tag);
-                        return `<button data-action="filter-tag" data-value="${escapedTag}" class="text-[9px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:text-sky-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by tag: ${escapedTag}">${escapedTag}</button>`;
-                    }).join(''),
-                    _tagsHTML_list: tags.map(tag => {
-                        const escapedTag = escapeHTML(tag);
-                        return `<button data-action="filter-tag" data-value="${escapedTag}" class="text-[8px] bg-slate-100 dark:bg-slate-700 px-1.5 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by tag: ${escapedTag}">${escapedTag}</button>`;
-                    }).join('')
-                };
-            }
-
-            const STAR_CACHE = Object.freeze({
-                0: '☆☆☆☆☆',
-                1: '★☆☆☆☆',
-                2: '★★☆☆☆',
-                3: '★★★☆☆',
-                4: '★★★★☆',
-                5: '★★★★★'
             });
 
-            /**
-             * ⚡ Bolt: Comprehensive O(N) library analysis.
-             * Consolidates metadata caching, statistics calculation, and AI context generation
-             * into a single pass to eliminate redundant processing and memory overhead.
-             */
-            function updateLibraryStats() {
-                books = books.map(b => b._escapedTitle ? b : normalizeBook(b));
-                const authorsSet = new Set();
-                const genresSet = new Set();
+            (b.tags || []).forEach(t => {
+                libraryStats.tagsCount[t] = (libraryStats.tagsCount[t] || 0) + 1;
+                libraryStats.totalTags++;
+            });
 
-                // Reset stats
-                libraryStats = {
-                    libBooksCount: 0,
-                    wishlistCount: 0,
-                    totalValue: 0,
-                    totalTags: 0,
-                    statusCounts: { finished: 0, reading: 0, want_to_read: 0 },
-                    ratingDist: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
-                    genresCount: {},
-                    authorsCount: {},
-                    tagsCount: {},
-                    copyTypesCount: { 'New Copy': 0, 'Old Copy': 0, 'Gifted': 0 },
-                    firstBookTime: Date.now(),
-                    recentMomentum: 0,
-                    finishedThisYear: 0,
-                    readingStreak: 0,
-                    aiContext: {
-                        finished: [],
-                        notYetFinished: [],
-                        topGenres: []
-                    }
-                };
+            // Financials & Rating
+            libraryStats.totalValue += (parseFloat(b.price) || 0);
+            const rating = statusData.rating || 0;
+            if (rating >= 1 && rating <= 5) libraryStats.ratingDist[rating]++;
 
-                const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
-                const genreCountsForAI = {};
-
-                books.forEach(b => {
-                    const statusData = getStatusData(b.id);
-                    const isOwner = b.userId === currentUser.uid;
-
-                    // ⚡ Bolt: Hide collaborator wishlist books from stats and metadata.
-                    // If the book is marked as wishlist on the document and we are not the owner,
-                    // only consider it if we have explicitly changed its status/wishlist state ourselves.
-                    const isPrivateWishlist = b.isWishlist && !isOwner && !statusData.updatedAt;
-                    if (isPrivateWishlist) return;
-
-                    const isWishlist = statusData.isWishlist || (isOwner && b.isWishlist) || false;
-                    const status = statusData.status;
-
-                    // ⚡ Bolt: Collect metadata for ALL books (including wishlist) to preserve autocomplete/global filters.
-                    if (b.author) authorsSet.add(b.author);
-                    (b._genres || []).forEach(g => { if (g) genresSet.add(g); });
-
-                    // Original logic for main app header: Finished wishlist books are counted.
-                    if (isWishlist) {
-                        libraryStats.wishlistCount++;
-                        if (status === 'finished') libraryStats.statusCounts.finished++;
-                        return;
-                    }
-                    if (b.excludeFromLibrary) return;
-
-                    libraryStats.libBooksCount++;
-
-                    // Copy type distribution count
-                    const cType = b.copyType || 'New Copy';
-                    libraryStats.copyTypesCount[cType] = (libraryStats.copyTypesCount[cType] || 0) + 1;
-
-                    // Analysis Metadata (Library only)
-                    if (b.author) {
-                        libraryStats.authorsCount[b.author] = (libraryStats.authorsCount[b.author] || 0) + 1;
-                    }
-
-                    (b._genres || []).forEach(g => {
-                        if (g) {
-                            libraryStats.genresCount[g] = (libraryStats.genresCount[g] || 0) + 1;
-                            genreCountsForAI[g] = (genreCountsForAI[g] || 0) + 1;
-                        }
-                    });
-
-                    (b.tags || []).forEach(t => {
-                        libraryStats.tagsCount[t] = (libraryStats.tagsCount[t] || 0) + 1;
-                        libraryStats.totalTags++;
-                    });
-
-                    // Financials & Rating
-                    libraryStats.totalValue += (parseFloat(b.price) || 0);
-                    const rating = statusData.rating || 0;
-                    if (rating >= 1 && rating <= 5) libraryStats.ratingDist[rating]++;
-
-                    // Status & Velocity
-                    if (libraryStats.statusCounts.hasOwnProperty(status)) libraryStats.statusCounts[status]++;
-                    if (b._createdTime > 0 && b._createdTime < libraryStats.firstBookTime) {
-                        libraryStats.firstBookTime = b._createdTime;
-                    }
-
-                    if (status === 'finished' && statusData.updatedAt) {
-                        const finishedTime = statusData.updatedAt.toMillis ? statusData.updatedAt.toMillis() : new Date(statusData.updatedAt).getTime();
-                        if (finishedTime > thirtyDaysAgo) libraryStats.recentMomentum++;
-                        const startOfYear = new Date(new Date().getFullYear(), 0, 1).getTime();
-                        if (finishedTime >= startOfYear) libraryStats.finishedThisYear++;
-                    }
-
-                    // AI Context
-                    if (status === 'finished') {
-                        libraryStats.aiContext.finished.push({
-                            t: b.title,
-                            a: b.author,
-                            g: (b._genres || []).slice(0, 2),
-                            r: statusData.rating
-                        });
-                    } else if (libraryStats.aiContext.notYetFinished.length < 50) {
-                        libraryStats.aiContext.notYetFinished.push({
-                            t: b.title,
-                            a: b.author,
-                            g: (b._genres || []).slice(0, 2)
-                        });
-                    }
-                });
-
-                // Finalize Metadata Cache
-                metadataCache.authors = [...authorsSet].sort();
-                metadataCache.genres = [...genresSet].sort();
-
-                // Finalize AI Context
-                libraryStats.aiContext.topGenres = Object.entries(genreCountsForAI)
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 3)
-                    .map(e => e[0]);
-
-                // Calculate Reading Streak (consecutive days with activity)
-                const activityDates = new Set();
-                activities.forEach(a => {
-                    if (a.userId === currentUser.uid && a.timestamp) {
-                        const d = new Date(a.timestamp);
-                        activityDates.add(d.toISOString().split('T')[0]);
-                    }
-                });
-                Object.values(readingStatuses).forEach(s => {
-                    if (s.updatedAt) {
-                        const d = s.updatedAt.toMillis ? new Date(s.updatedAt.toMillis()) : new Date(s.updatedAt);
-                        activityDates.add(d.toISOString().split('T')[0]);
-                    }
-                });
-                const sortedDates = [...activityDates].sort().reverse();
-                let streak = 0;
-                const todayStr = new Date().toISOString().split('T')[0];
-                const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-                let checkDateStr = sortedDates.includes(todayStr) ? todayStr : (sortedDates.includes(yesterdayStr) ? yesterdayStr : null);
-                if (checkDateStr) {
-                    streak = 1;
-                    let curr = new Date(checkDateStr);
-                    while (true) {
-                        curr.setDate(curr.getDate() - 1);
-                        const dStr = curr.toISOString().split('T')[0];
-                        if (activityDates.has(dStr)) streak++;
-                        else break;
-                        if (streak > 365) break; // Safety
-                    }
-                }
-                libraryStats.readingStreak = streak;
+            // Status & Velocity
+            if (libraryStats.statusCounts.hasOwnProperty(status)) libraryStats.statusCounts[status]++;
+            if (b._createdTime > 0 && b._createdTime < libraryStats.firstBookTime) {
+                libraryStats.firstBookTime = b._createdTime;
             }
 
-            function renderSkeletonCard() {
-                return `
+            if (status === 'finished' && statusData.updatedAt) {
+                const finishedTime = statusData.updatedAt.toMillis ? statusData.updatedAt.toMillis() : new Date(statusData.updatedAt).getTime();
+                if (finishedTime > thirtyDaysAgo) libraryStats.recentMomentum++;
+                const startOfYear = new Date(new Date().getFullYear(), 0, 1).getTime();
+                if (finishedTime >= startOfYear) libraryStats.finishedThisYear++;
+            }
+
+            // AI Context
+            if (status === 'finished') {
+                libraryStats.aiContext.finished.push({
+                    t: b.title,
+                    a: b.author,
+                    g: (b._genres || []).slice(0, 2),
+                    r: statusData.rating
+                });
+            } else if (libraryStats.aiContext.notYetFinished.length < 50) {
+                libraryStats.aiContext.notYetFinished.push({
+                    t: b.title,
+                    a: b.author,
+                    g: (b._genres || []).slice(0, 2)
+                });
+            }
+        });
+
+        // Finalize Metadata Cache
+        metadataCache.authors = [...authorsSet].sort();
+        metadataCache.genres = [...genresSet].sort();
+
+        // Finalize AI Context
+        libraryStats.aiContext.topGenres = Object.entries(genreCountsForAI)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map(e => e[0]);
+
+        // Calculate Reading Streak (consecutive days with activity)
+        const activityDates = new Set();
+        activities.forEach(a => {
+            if (a.userId === currentUser.uid && a.timestamp) {
+                const d = new Date(a.timestamp);
+                activityDates.add(d.toISOString().split('T')[0]);
+            }
+        });
+        Object.values(readingStatuses).forEach(s => {
+            if (s.updatedAt) {
+                const d = s.updatedAt.toMillis ? new Date(s.updatedAt.toMillis()) : new Date(s.updatedAt);
+                activityDates.add(d.toISOString().split('T')[0]);
+            }
+        });
+        const sortedDates = [...activityDates].sort().reverse();
+        let streak = 0;
+        const todayStr = new Date().toISOString().split('T')[0];
+        const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+        let checkDateStr = sortedDates.includes(todayStr) ? todayStr : (sortedDates.includes(yesterdayStr) ? yesterdayStr : null);
+        if (checkDateStr) {
+            streak = 1;
+            let curr = new Date(checkDateStr);
+            while (true) {
+                curr.setDate(curr.getDate() - 1);
+                const dStr = curr.toISOString().split('T')[0];
+                if (activityDates.has(dStr)) streak++;
+                else break;
+                if (streak > 365) break; // Safety
+            }
+        }
+        libraryStats.readingStreak = streak;
+    }
+
+    function renderSkeletonCard() {
+        return `
                     <div class="glass rounded-[2.5rem] p-5 flex gap-5 border border-slate-200/50 dark:border-slate-800">
                         <div class="skeleton-base skeleton-thumb w-28 h-40 flex-shrink-0"></div>
                         <div class="flex-1 flex flex-col justify-between py-1">
@@ -4251,20 +4307,20 @@
                         </div>
                     </div>
                 `;
-            }
+    }
 
-            function renderSkeletonBookGrid(count = 6, mode = 'grid') {
-                if (mode === 'compact') {
-                    return Array(count).fill(0).map(() => `
+    function renderSkeletonBookGrid(count = 6, mode = 'grid') {
+        if (mode === 'compact') {
+            return Array(count).fill(0).map(() => `
                         <div class="rounded-2xl overflow-hidden">
                             <div class="skeleton-base skeleton-thumb aspect-[2/3] w-full"></div>
                             <div class="skeleton-base skeleton-text w-3/4 mt-2 opacity-70"></div>
                             <div class="skeleton-base skeleton-text w-1/2 mt-1 opacity-40"></div>
                         </div>
                     `).join('');
-                }
-                if (mode === 'list') {
-                    return Array(count).fill(0).map(() => `
+        }
+        if (mode === 'list') {
+            return Array(count).fill(0).map(() => `
                         <div class="glass px-6 py-4 rounded-2xl flex items-center gap-4 border border-slate-200/50 dark:border-slate-800">
                             <div class="skeleton-base skeleton-thumb w-12 h-16 flex-shrink-0"></div>
                             <div class="flex-1 space-y-2">
@@ -4275,12 +4331,12 @@
                             <div class="skeleton-base skeleton-text w-16"></div>
                         </div>
                     `).join('');
-                }
-                return Array(count).fill(0).map(() => renderSkeletonCard()).join('');
-            }
+        }
+        return Array(count).fill(0).map(() => renderSkeletonCard()).join('');
+    }
 
-            function renderSkeletonReviewCard() {
-                return `
+    function renderSkeletonReviewCard() {
+        return `
                     <div class="glass rounded-[2.5rem] p-8 border border-slate-200/50 dark:border-slate-800">
                         <div class="flex items-center justify-between mb-6">
                             <div class="flex items-center gap-3">
@@ -4304,10 +4360,10 @@
                         </div>
                     </div>
                 `;
-            }
+    }
 
-            function renderSkeletonActivityItem() {
-                return `
+    function renderSkeletonActivityItem() {
+        return `
                     <div class="glass p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-4">
                         <div class="skeleton-base skeleton-thumb w-10 h-10 flex-shrink-0"></div>
                         <div class="flex-1 space-y-2">
@@ -4316,10 +4372,10 @@
                         </div>
                     </div>
                 `;
-            }
+    }
 
-            function renderSkeletonUserProfileModal() {
-                return `
+    function renderSkeletonUserProfileModal() {
+        return `
                     <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
                         <div class="bg-slate-50 dark:bg-slate-900 w-full h-full sm:h-auto sm:max-w-3xl sm:rounded-[2.5rem] p-6 sm:p-10 shadow-2xl overflow-y-auto sm:max-h-[90vh]">
                             <div class="flex flex-col items-center mb-10">
@@ -4337,10 +4393,10 @@
                         </div>
                     </div>
                 `;
-            }
+    }
 
-            function renderSkeletonBookDetailsModal() {
-                return `
+    function renderSkeletonBookDetailsModal() {
+        return `
                     <div class="fixed inset-0 z-50 flex items-center justify-center">
                         <div class="bg-sky-50 dark:bg-gray-800 w-full h-full p-6 sm:p-10 overflow-y-auto">
                             <div class="flex flex-col sm:flex-row gap-8 max-w-6xl mx-auto">
@@ -4362,10 +4418,10 @@
                         </div>
                     </div>
                 `;
-            }
+    }
 
-            function renderSkeletonLibraryModal() {
-                return `
+    function renderSkeletonLibraryModal() {
+        return `
                     <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
                         <div class="bg-slate-50 dark:bg-slate-900 w-full h-full sm:h-auto sm:max-w-4xl sm:rounded-[2.5rem] p-6 sm:p-10 shadow-2xl overflow-y-auto sm:max-h-[90vh]">
                             <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
@@ -4389,10 +4445,10 @@
                         </div>
                     </div>
                 `;
-            }
+    }
 
-            function renderSkeletonChart(height = 'h-44') {
-                return `
+    function renderSkeletonChart(height = 'h-44') {
+        return `
                     <div class="flex flex-col sm:flex-row items-center gap-6">
                         <div class="skeleton-base skeleton-avatar w-44 h-44 flex-shrink-0"></div>
                         <div class="flex-1 w-full space-y-3">
@@ -4404,38 +4460,38 @@
                         </div>
                     </div>
                 `;
-            }
+    }
 
-            // Helper to render a single book card
-            /**
-             * ⚡ Bolt: Optimized renderBookCard.
-             * Uses pre-calculated densityClass and direct property lookups for status colors.
-             */
-            function renderBookCard(book, densityClass, options = {}) {
-                const statusData = getStatusData(book.id);
-                const isFavorite = statusData.isFavorite || false;
-                const bookStatus = statusData.status;
-                const userRating = statusData.rating;
-                const userProgress = statusData.progress;
+    // Helper to render a single book card
+    /**
+     * ⚡ Bolt: Optimized renderBookCard.
+     * Uses pre-calculated densityClass and direct property lookups for status colors.
+     */
+    function renderBookCard(book, densityClass, options = {}) {
+        const statusData = getStatusData(book.id);
+        const isFavorite = statusData.isFavorite || false;
+        const bookStatus = statusData.status;
+        const userRating = statusData.rating;
+        const userProgress = statusData.progress;
 
-                const displayRating = book.averageRating ? Math.round(book.averageRating) : (userRating || book.rating || 0);
-                const stars = STAR_CACHE[displayRating] || '';
+        const displayRating = book.averageRating ? Math.round(book.averageRating) : (userRating || book.rating || 0);
+        const stars = STAR_CACHE[displayRating] || '';
 
-                const isSelected = selectedBookIds.has(book.id);
-                const isSharedBook = book.userId !== currentUser.uid;
-                const addedByBadge = book.addedBy && book.addedBy !== currentUser.uid ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">Added by contributor</div>` : '';
+        const isSelected = selectedBookIds.has(book.id);
+        const isSharedBook = book.userId !== currentUser.uid;
+        const addedByBadge = book.addedBy && book.addedBy !== currentUser.uid ? `<div class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300">Added by contributor</div>` : '';
 
-                if (viewMode === 'compact') {
-                    return `
+        if (viewMode === 'compact') {
+            return `
                     <div class="book-card relative group cursor-pointer focus-visible:ring-4 focus-visible:ring-primary/30 outline-none rounded-2xl" data-book-id="${escapeHTML(book.id)}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}">
                         <div class="absolute inset-0 bg-slate-900/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity rounded-2xl"></div>
                         <div class="aspect-[2/3] bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm relative">
                             ${book.coverUrl || book.thumbnail ?
-                            `<img src="${escapeHTML(book.coverUrl || book.thumbnail || '')}"  class="w-full h-full object-cover transition group-hover:scale-105" alt="cover" loading="lazy">` :
-                            `<div class="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-slate-50 dark:bg-slate-800 text-blue-200 dark:text-slate-600">
+                    `<img src="${escapeHTML(book.coverUrl || book.thumbnail || '')}"  class="w-full h-full object-cover transition group-hover:scale-105" alt="cover" loading="lazy">` :
+                    `<div class="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-slate-50 dark:bg-slate-800 text-blue-200 dark:text-slate-600">
                                     <span class="text-[8px] font-black uppercase font-serif line-clamp-3">${book._escapedTitle}</span>
                                 </div>`
-                        }
+                }
                             <div class="absolute bottom-2 right-2 flex flex-col items-end gap-1">
                                 <!-- ⚡ Bolt: Use direct property lookup for 'solid' color instead of string .includes() searching -->
                                 <div class="px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase text-white ${READING_STATUSES[bookStatus].solid} ${bookStatus === 'reading' ? 'animate-pulse-subtle' : ''}">
@@ -4458,10 +4514,10 @@
                         </div>
                     </div>
                     `;
-                }
+        }
 
-                if (viewMode === 'list') {
-                    return `
+        if (viewMode === 'list') {
+            return `
                     <div class="book-card glass px-3 py-3 sm:px-6 sm:py-4 rounded-2xl flex items-center gap-3 sm:gap-4 cursor-pointer hover:bg-white dark:hover:bg-slate-800 transition-all border ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-lg' : 'border-slate-200/50 dark:border-slate-800'} group relative focus-visible:ring-4 focus-visible:ring-primary/30 outline-none" data-book-id="${escapeHTML(book.id)}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}">
                         <div class="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                             <input type="checkbox" ${isSelected ? 'checked' : ''} data-action="select-book" data-value="${escapeHTML(book.id)}" class="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-blue-500" aria-label="Select '${book._escapedTitle}' for bulk actions">
@@ -4506,14 +4562,14 @@ ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 trunca
                         </div>
                     </div>
                 `;
-                }
+        }
 
-                const activeDensityClass = densityClass !== undefined ? densityClass : (cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '');
-                const index = options.index || 0;
-                const staggerDelay = `${(index % 10) * 50}ms`;
+        const activeDensityClass = densityClass !== undefined ? densityClass : (cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '');
+        const index = options.index || 0;
+        const staggerSlot = Math.min(index % 10, 9);
 
-                return `
-                <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-slate-200/50 dark:border-slate-800'} relative ${activeDensityClass} focus-visible:ring-4 focus-visible:ring-primary/30 outline-none animate-slide-up" data-book-id="${escapeHTML(book.id)}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}" style="animation-delay: ${staggerDelay}">
+        return `
+                <div class="book-card glass p-5 rounded-[2.5rem] flex gap-5 cursor-pointer hover:shadow-xl group border ${isSelected ? 'border-primary ring-4 ring-primary/10 shadow-xl' : 'border-slate-200/50 dark:border-slate-800'} relative ${activeDensityClass} focus-visible:ring-4 focus-visible:ring-primary/30 outline-none animate-slide-up" data-book-id="${escapeHTML(book.id)}" data-stagger="${staggerSlot}" tabindex="0" role="button" aria-label="${book._escapedTitle} by ${book._escapedAuthor}">
                     <div class="absolute top-4 left-4 z-20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex flex-col gap-3">
                         <input type="checkbox" ${isSelected ? 'checked' : ''} data-action="select-book" data-value="${escapeHTML(book.id)}" class="w-6 h-6 rounded-lg border-white/20 bg-white/20 backdrop-blur-sm text-sky-600 focus:ring-blue-500 shadow-lg cursor-pointer" aria-label="Select '${book._escapedTitle}' for bulk actions">
                                 <button data-action="toggle-fav" data-value="${escapeHTML(book.id)}" class="w-6 h-6 flex items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm shadow-lg text-white hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-rose-500 outline-none" aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
@@ -4526,7 +4582,7 @@ ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 trunca
                     <div class="w-28 h-40 bg-slate-100 dark:bg-slate-800 rounded-3xl overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 relative shadow-lg">
                         ${bookStatus === 'reading' ? `
                             <div class="absolute bottom-0 left-0 right-0 h-3.5 bg-slate-900/40 backdrop-blur-sm z-10 flex items-center" role="progressbar" aria-valuenow="${userProgress || book.progress || 0}" aria-valuemin="0" aria-valuemax="100" aria-label="Reading progress: ${userProgress || book.progress || 0}%">
-                                <div class="h-full bg-gradient-to-r from-blue-500 to-indigo-400 transition-all duration-500" style="width: ${userProgress || book.progress || 0}%"></div>
+                                <div class="h-full bg-gradient-to-r from-blue-500 to-indigo-400 transition-all duration-500 dynamic-bar" data-bar-width="${userProgress || book.progress || 0}"></div>
                                 <span class="absolute inset-0 flex items-center justify-center text-[8px] font-black text-white drop-shadow-md pointer-events-none">${userProgress || book.progress || 0}%</span>
                                 <button data-action="quick-progress" data-value="${escapeHTML(book.id)}" class="absolute right-0 bottom-full mb-1 mr-1 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 active:scale-90 transition-all opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary outline-none" title="Quickly increment progress by 5%" aria-label="Quickly increment progress by 5%">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 6v12m6-6H6"/></svg>
@@ -4534,9 +4590,9 @@ ${book.owner ? `<button class="text-[8px] font-medium text-slate-400 mt-1 trunca
                             </div>
                         ` : ''}
                         ${book.coverUrl || book.thumbnail ?
-                        `<img src="${escapeHTML(book.coverUrl || book.thumbnail || '')}" class="w-full h-full object-cover transition group-hover:scale-110" alt="cover" loading="lazy">` :
-                        `<div class="w-full h-full flex items-center justify-center bg-slate-50 dark:bg-slate-800 text-blue-200 dark:text-slate-600 text-[10px] font-bold uppercase p-2 text-center">No Cover</div>`
-                    }
+                `<img src="${escapeHTML(book.coverUrl || book.thumbnail || '')}" class="w-full h-full object-cover transition group-hover:scale-110" alt="cover" loading="lazy">` :
+                `<div class="w-full h-full flex items-center justify-center bg-slate-50 dark:bg-slate-800 text-blue-200 dark:text-slate-600 text-[10px] font-bold uppercase p-2 text-center">No Cover</div>`
+            }
                         
                     </div>
                     <div class="flex-1 flex flex-col justify-between overflow-hidden py-1">
@@ -4581,235 +4637,235 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     </div>
                 </div>
             `;
+    }
+
+    // ---------- Firestore Sync ----------
+    let unsubscribePartnershipBooks1 = null;
+    let unsubscribePartnershipBooks2 = null;
+    let unsubscribeOwnBooks = null;
+    let unsubscribeActivity = null;
+
+    async function subscribeToBooks() {
+        if (unsubscribeBooks) unsubscribeBooks();
+        if (unsubscribeStatus) unsubscribeStatus();
+        if (unsubscribePartnershipBooks1) unsubscribePartnershipBooks1();
+        if (unsubscribePartnershipBooks2) unsubscribePartnershipBooks2();
+        if (unsubscribeOwnBooks) unsubscribeOwnBooks();
+        if (unsubscribeActivity) unsubscribeActivity();
+        if (unsubscribeCollabReq1) unsubscribeCollabReq1();
+        if (unsubscribeCollabReq2) unsubscribeCollabReq2();
+        if (!currentUser) return;
+
+        let partnerships1 = [];
+        let partnerships2 = [];
+        let collabReqs1 = [];
+        let collabReqs2 = [];
+
+        // Query collaboration requests where current user is fromUserId
+        unsubscribeCollabReq1 = db.collection('collaborationRequests')
+            .where('fromUserId', '==', currentUser.uid)
+            .onSnapshot(snapshot => {
+                collabReqs1 = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                collaborationRequests = [...collabReqs1, ...collabReqs2];
+                if (activeTab === 'settings') renderPartners();
+                if (activeTab === 'activity') window.queueRenderMainApp();
+                window.updateNotificationBadge();
+            }, err => {
+                console.error("Collab Req Query 1 Error:", err);
+            });
+
+        // Query collaboration requests where current user is toUserId
+        unsubscribeCollabReq2 = db.collection('collaborationRequests')
+            .where('toUserId', '==', currentUser.uid)
+            .onSnapshot(snapshot => {
+                collabReqs2 = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                collaborationRequests = [...collabReqs1, ...collabReqs2];
+                if (activeTab === 'settings') renderPartners();
+                if (activeTab === 'activity') window.queueRenderMainApp();
+                window.updateNotificationBadge();
+            }, err => {
+                console.error("Collab Req Query 2 Error:", err);
+            });
+
+        // Query partnerships where current user is userId1
+        unsubscribePartnershipBooks1 = db.collection('partnerships')
+            .where('userId1', '==', currentUser.uid)
+            .onSnapshot(snapshot => {
+                partnerships1 = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                allPartnerships = [...partnerships1, ...partnerships2];
+                if (activeTab === 'settings') renderPartners();
+                fetchBooksFromPartnerships();
+            }, err => {
+                console.error("Partnership Query 1 Error:", err);
+            });
+
+        // Query partnerships where current user is userId2
+        unsubscribePartnershipBooks2 = db.collection('partnerships')
+            .where('userId2', '==', currentUser.uid)
+            .onSnapshot(snapshot => {
+                partnerships2 = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                allPartnerships = [...partnerships1, ...partnerships2];
+                if (activeTab === 'settings') renderPartners();
+                fetchBooksFromPartnerships();
+            }, err => {
+                console.error("Partnership Query 2 Error:", err);
+            });
+
+        function fetchBooksFromPartnerships() {
+            // 1. Build the list of userIds whose libraries we need to watch
+            let userIdsToFetch = [currentUser.uid];
+            allPartnerships.forEach(partnership => {
+                const isAccepted = partnership.status === 'accepted' || partnership.status === undefined;
+                if (!isAccepted) return;
+                const isUser1 = partnership.userId1 === currentUser.uid;
+                const currentUserUnsubscribed = isUser1 ? partnership.user1Unsubscribed : partnership.user2Unsubscribed;
+                if (!currentUserUnsubscribed) {
+                    const partnerId = isUser1 ? partnership.userId2 : partnership.userId1;
+                    if (!userIdsToFetch.includes(partnerId)) userIdsToFetch.push(partnerId);
+                }
+            });
+
+            // 2. Tear down old subscriptions
+            if (unsubscribeOwnBooks) {
+                if (Array.isArray(unsubscribeOwnBooks)) unsubscribeOwnBooks.forEach(u => u());
+                else unsubscribeOwnBooks();
+            }
+            if (unsubscribeActivity) {
+                if (Array.isArray(unsubscribeActivity)) unsubscribeActivity.forEach(u => u());
+                else unsubscribeActivity();
             }
 
-            // ---------- Firestore Sync ----------
-            let unsubscribePartnershipBooks1 = null;
-            let unsubscribePartnershipBooks2 = null;
-            let unsubscribeOwnBooks = null;
-            let unsubscribeActivity = null;
+            // 3. BOOKS — one equality query per userId (NOT `in`)
+            const bookUnsubs = [];
+            const chunkedBooksMap = new Map();
+            userIdsToFetch.forEach((uid, idx) => {
+                const map = new Map();
+                chunkedBooksMap.set(idx, map);
 
-            async function subscribeToBooks() {
-                if (unsubscribeBooks) unsubscribeBooks();
-                if (unsubscribeStatus) unsubscribeStatus();
-                if (unsubscribePartnershipBooks1) unsubscribePartnershipBooks1();
-                if (unsubscribePartnershipBooks2) unsubscribePartnershipBooks2();
-                if (unsubscribeOwnBooks) unsubscribeOwnBooks();
-                if (unsubscribeActivity) unsubscribeActivity();
-                if (unsubscribeCollabReq1) unsubscribeCollabReq1();
-                if (unsubscribeCollabReq2) unsubscribeCollabReq2();
-                if (!currentUser) return;
-
-                let partnerships1 = [];
-                let partnerships2 = [];
-                let collabReqs1 = [];
-                let collabReqs2 = [];
-
-                // Query collaboration requests where current user is fromUserId
-                unsubscribeCollabReq1 = db.collection('collaborationRequests')
-                    .where('fromUserId', '==', currentUser.uid)
-                    .onSnapshot(snapshot => {
-                        collabReqs1 = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        collaborationRequests = [...collabReqs1, ...collabReqs2];
-                        if (activeTab === 'settings') renderPartners();
-                        if (activeTab === 'activity') window.queueRenderMainApp();
-                        window.updateNotificationBadge();
-                    }, err => {
-                        console.error("Collab Req Query 1 Error:", err);
-                    });
-
-                // Query collaboration requests where current user is toUserId
-                unsubscribeCollabReq2 = db.collection('collaborationRequests')
-                    .where('toUserId', '==', currentUser.uid)
-                    .onSnapshot(snapshot => {
-                        collabReqs2 = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        collaborationRequests = [...collabReqs1, ...collabReqs2];
-                        if (activeTab === 'settings') renderPartners();
-                        if (activeTab === 'activity') window.queueRenderMainApp();
-                        window.updateNotificationBadge();
-                    }, err => {
-                        console.error("Collab Req Query 2 Error:", err);
-                    });
-
-                // Query partnerships where current user is userId1
-                unsubscribePartnershipBooks1 = db.collection('partnerships')
-                    .where('userId1', '==', currentUser.uid)
-                    .onSnapshot(snapshot => {
-                        partnerships1 = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        allPartnerships = [...partnerships1, ...partnerships2];
-                        if (activeTab === 'settings') renderPartners();
-                        fetchBooksFromPartnerships();
-                    }, err => {
-                        console.error("Partnership Query 1 Error:", err);
-                    });
-
-                // Query partnerships where current user is userId2
-                unsubscribePartnershipBooks2 = db.collection('partnerships')
-                    .where('userId2', '==', currentUser.uid)
-                    .onSnapshot(snapshot => {
-                        partnerships2 = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        allPartnerships = [...partnerships1, ...partnerships2];
-                        if (activeTab === 'settings') renderPartners();
-                        fetchBooksFromPartnerships();
-                    }, err => {
-                        console.error("Partnership Query 2 Error:", err);
-                    });
-
-                function fetchBooksFromPartnerships() {
-                    // 1. Build the list of userIds whose libraries we need to watch
-                    let userIdsToFetch = [currentUser.uid];
-                    allPartnerships.forEach(partnership => {
-                        const isAccepted = partnership.status === 'accepted' || partnership.status === undefined;
-                        if (!isAccepted) return;
-                        const isUser1 = partnership.userId1 === currentUser.uid;
-                        const currentUserUnsubscribed = isUser1 ? partnership.user1Unsubscribed : partnership.user2Unsubscribed;
-                        if (!currentUserUnsubscribed) {
-                            const partnerId = isUser1 ? partnership.userId2 : partnership.userId1;
-                            if (!userIdsToFetch.includes(partnerId)) userIdsToFetch.push(partnerId);
-                        }
-                    });
-
-                    // 2. Tear down old subscriptions
-                    if (unsubscribeOwnBooks) {
-                        if (Array.isArray(unsubscribeOwnBooks)) unsubscribeOwnBooks.forEach(u => u());
-                        else unsubscribeOwnBooks();
-                    }
-                    if (unsubscribeActivity) {
-                        if (Array.isArray(unsubscribeActivity)) unsubscribeActivity.forEach(u => u());
-                        else unsubscribeActivity();
-                    }
-
-                    // 3. BOOKS — one equality query per userId (NOT `in`)
-                    const bookUnsubs = [];
-                    const chunkedBooksMap = new Map();
-                    userIdsToFetch.forEach((uid, idx) => {
-                        const map = new Map();
-                        chunkedBooksMap.set(idx, map);
-
-                        const unsub = db.collection('books')
-                            .where('userId', '==', uid)
-                            .onSnapshot(snapshot => {
-                                snapshot.docChanges().forEach(change => {
-                                    if (change.type === 'removed') {
-                                        map.delete(change.doc.id);
-                                    } else {
-                                        map.set(change.doc.id, normalizeBook({ id: change.doc.id, ...change.doc.data() }));
-                                    }
-                                });
-                                const allBooks = [];
-                                for (const m of chunkedBooksMap.values()) {
-                                    for (const b of m.values()) allBooks.push(b);
-                                }
-                                books = allBooks.sort((a, b) => b._createdTime - a._createdTime);
-                                updateLibraryStats();
-                                if (isInitialSync) isInitialSync = false;
-                                window.queueRenderMainApp();
-                            }, err => {
-                                console.error("Firestore Error for user:", uid, err);
-                            });
-                        bookUnsubs.push(unsub);
-                    });
-                    unsubscribeOwnBooks = bookUnsubs;
-
-                    // 4. ACTIVITY FEED — same pattern
-                    const activityUnsubs = [];
-                    const chunkedActivitiesMap = new Map();
-                    userIdsToFetch.forEach((uid, idx) => {
-                        const map = new Map();
-                        chunkedActivitiesMap.set(idx, map);
-
-                        const unsub = db.collection('activityFeed')
-                            .where('libraryId', '==', uid)
-                            .orderBy('timestamp', 'desc')
-                            .limit(30)
-                            .onSnapshot(snapshot => {
-                                snapshot.docChanges().forEach(change => {
-                                    if (change.type === 'removed') {
-                                        map.delete(change.doc.id);
-                                    } else {
-                                        map.set(change.doc.id, {
-                                            id: change.doc.id,
-                                            ...change.doc.data(),
-                                            timestamp: change.doc.data().timestamp?.toDate() || new Date()
-                                        });
-                                    }
-                                });
-                                const allActivities = [];
-                                for (const m of chunkedActivitiesMap.values()) {
-                                    for (const a of m.values()) allActivities.push(a);
-                                }
-                                activities = allActivities.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
-                                if (activeTab === 'explore' || activeTab === 'activity') window.queueRenderMainApp();
-                            }, err => {
-                                console.error("Activity Listener Error for user:", uid, err);
-                            });
-                        activityUnsubs.push(unsub);
-                    });
-                    unsubscribeActivity = activityUnsubs;
-                }
-
-                // Use a collection group listener to get reading statuses for THIS user efficiently.
-                // Performance optimization: use docChanges() for incremental updates instead of re-processing the entire collection.
-                // This reduces the update complexity from O(N) to O(1) for most sync events.
-                unsubscribeStatus = db.collectionGroup('readingStatus')
-                    .where('userId', '==', currentUser.uid)
+                const unsub = db.collection('books')
+                    .where('userId', '==', uid)
                     .onSnapshot(snapshot => {
                         snapshot.docChanges().forEach(change => {
-                            const bookId = change.doc.ref.parent.parent.id;
                             if (change.type === 'removed') {
-                                delete readingStatuses[bookId];
+                                map.delete(change.doc.id);
                             } else {
-                                const data = change.doc.data();
-                                // Normalize data upon receipt to optimize render performance
-                                readingStatuses[bookId] = {
-                                    status: data.status === 'unread' ? 'want_to_read' : (data.status || 'want_to_read'),
-                                    rating: data.rating || 0,
-                                    progress: data.progress || 0,
-                                    comment: data.comment || '',
-                                    isWishlist: data.isWishlist || false,
-                                    isFavorite: data.isFavorite || false,
-                                    highlights: data.highlights || [],
-                                    updatedAt: data.updatedAt || null
-                                };
+                                map.set(change.doc.id, normalizeBook({ id: change.doc.id, ...change.doc.data() }));
                             }
                         });
+                        const allBooks = [];
+                        for (const m of chunkedBooksMap.values()) {
+                            for (const b of m.values()) allBooks.push(b);
+                        }
+                        books = allBooks.sort((a, b) => b._createdTime - a._createdTime);
                         updateLibraryStats();
-                        window.queueRenderLibraryOnly();
-                        syncLibraryStats();
+                        if (isInitialSync) isInitialSync = false;
+                        window.queueRenderMainApp();
                     }, err => {
-                        console.error("Status Listener Error (Ensure index is created):", err);
+                        console.error("Firestore Error for user:", uid, err);
                     });
+                bookUnsubs.push(unsub);
+            });
+            unsubscribeOwnBooks = bookUnsubs;
 
-                if (unsubscribeBookRequests) unsubscribeBookRequests();
-                unsubscribeBookRequests = db.collection('bookRequests')
-                    .where('toUserId', '==', currentUser.uid)
+            // 4. ACTIVITY FEED — same pattern
+            const activityUnsubs = [];
+            const chunkedActivitiesMap = new Map();
+            userIdsToFetch.forEach((uid, idx) => {
+                const map = new Map();
+                chunkedActivitiesMap.set(idx, map);
+
+                const unsub = db.collection('activityFeed')
+                    .where('libraryId', '==', uid)
+                    .orderBy('timestamp', 'desc')
+                    .limit(30)
                     .onSnapshot(snapshot => {
-                        bookRequests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        if (activeTab === 'activity') window.queueRenderMainApp();
+                        snapshot.docChanges().forEach(change => {
+                            if (change.type === 'removed') {
+                                map.delete(change.doc.id);
+                            } else {
+                                map.set(change.doc.id, {
+                                    id: change.doc.id,
+                                    ...change.doc.data(),
+                                    timestamp: change.doc.data().timestamp?.toDate() || new Date()
+                                });
+                            }
+                        });
+                        const allActivities = [];
+                        for (const m of chunkedActivitiesMap.values()) {
+                            for (const a of m.values()) allActivities.push(a);
+                        }
+                        activities = allActivities.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
+                        if (activeTab === 'explore' || activeTab === 'activity') window.queueRenderMainApp();
                     }, err => {
-                        console.error("Book Requests Listener Error:", err);
+                        console.error("Activity Listener Error for user:", uid, err);
                     });
-            }
+                activityUnsubs.push(unsub);
+            });
+            unsubscribeActivity = activityUnsubs;
+        }
 
-            // ---------- Scanner Logic ----------
-            let scanner = null;
-            let globalScanTargetLibrary = null; // Store globally for scanner flow
+        // Use a collection group listener to get reading statuses for THIS user efficiently.
+        // Performance optimization: use docChanges() for incremental updates instead of re-processing the entire collection.
+        // This reduces the update complexity from O(N) to O(1) for most sync events.
+        unsubscribeStatus = db.collectionGroup('readingStatus')
+            .where('userId', '==', currentUser.uid)
+            .onSnapshot(snapshot => {
+                snapshot.docChanges().forEach(change => {
+                    const bookId = change.doc.ref.parent.parent.id;
+                    if (change.type === 'removed') {
+                        delete readingStatuses[bookId];
+                    } else {
+                        const data = change.doc.data();
+                        // Normalize data upon receipt to optimize render performance
+                        readingStatuses[bookId] = {
+                            status: data.status === 'unread' ? 'want_to_read' : (data.status || 'want_to_read'),
+                            rating: data.rating || 0,
+                            progress: data.progress || 0,
+                            comment: data.comment || '',
+                            isWishlist: data.isWishlist || false,
+                            isFavorite: data.isFavorite || false,
+                            highlights: data.highlights || [],
+                            updatedAt: data.updatedAt || null
+                        };
+                    }
+                });
+                updateLibraryStats();
+                window.queueRenderLibraryOnly();
+                syncLibraryStats();
+            }, err => {
+                console.error("Status Listener Error (Ensure index is created):", err);
+            });
 
-            // Helper: Show library selector for scanner
-            async function showLibrarySelectorForScan() {
-                const partnersWhoAllowAdding = allPartnerships.filter(p => p.allowAddBooks === true).map(p => {
-                    const isUser1 = p.userId1 === currentUser.uid;
-                    const partnerId = isUser1 ? p.userId2 : p.userId1;
-                    return { partnershipId: p.id, userId: partnerId, isActive: isUser1 ? !p.user1Unsubscribed : !p.user2Unsubscribed };
-                }).filter(p => p.isActive);
+        if (unsubscribeBookRequests) unsubscribeBookRequests();
+        unsubscribeBookRequests = db.collection('bookRequests')
+            .where('toUserId', '==', currentUser.uid)
+            .onSnapshot(snapshot => {
+                bookRequests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                if (activeTab === 'activity') window.queueRenderMainApp();
+            }, err => {
+                console.error("Book Requests Listener Error:", err);
+            });
+    }
 
-                if (partnersWhoAllowAdding.length === 0) {
-                    globalScanTargetLibrary = currentUser.uid;
-                    return;
-                }
+    // ---------- Scanner Logic ----------
+    let scanner = null;
+    let globalScanTargetLibrary = null; // Store globally for scanner flow
 
-                return new Promise((resolve) => {
-                    let destHtml = `
+    // Helper: Show library selector for scanner
+    async function showLibrarySelectorForScan() {
+        const partnersWhoAllowAdding = allPartnerships.filter(p => p.allowAddBooks === true).map(p => {
+            const isUser1 = p.userId1 === currentUser.uid;
+            const partnerId = isUser1 ? p.userId2 : p.userId1;
+            return { partnershipId: p.id, userId: partnerId, isActive: isUser1 ? !p.user1Unsubscribed : !p.user2Unsubscribed };
+        }).filter(p => p.isActive);
+
+        if (partnersWhoAllowAdding.length === 0) {
+            globalScanTargetLibrary = currentUser.uid;
+            return;
+        }
+
+        return new Promise((resolve) => {
+            let destHtml = `
                     <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up">
                         <h2 class="text-2xl font-black mb-4">Add To Which Library?</h2>
                         <div class="space-y-3">
@@ -4819,16 +4875,16 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                             </label>
                     `;
 
-                    partnersWhoAllowAdding.forEach(p => {
-                        destHtml += `
+            partnersWhoAllowAdding.forEach(p => {
+                destHtml += `
                             <label class="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer border-2 border-transparent" data-dest="${escapeHTML(p.userId)}" data-partner-id="${escapeHTML(p.userId)}">
                                 <input type="radio" name="scan-library-dest" value="${escapeHTML(p.userId)}" class="w-5 h-5 text-sky-600">
                                 <span class="font-medium" data-name="">Loading...</span>
                             </label>
                         `;
-                    });
+            });
 
-                    destHtml += `
+            destHtml += `
                         <div class="flex gap-4 mt-8">
                             <button data-close class="flex-1 px-4 py-4 bg-slate-200 dark:bg-slate-700 rounded-2xl font-bold focus-visible:ring-2 focus-visible:ring-slate-400 outline-none">Cancel</button>
                             <button id="scan-start-btn" class="flex-1 px-4 py-4 bg-slate-900 text-white rounded-2xl font-bold focus-visible:ring-2 focus-visible:ring-primary outline-none">Start Scan</button>
@@ -4836,34 +4892,34 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     </div>
                     `;
 
-                    const close = showModal(destHtml);
+            const close = showModal(destHtml);
 
-                    // Fetch partner names
-                    Promise.all(partnersWhoAllowAdding.map(p =>
-                        db.collection('users').doc(p.userId).get()
-                    )).then(docs => {
-                        partnersWhoAllowAdding.forEach((p, idx) => {
-                            const label = modalContainer.querySelector(`[data-partner-id="${p.userId}"]`);
-                            const nameSpan = label?.querySelector('[data-name]');
-                            if (nameSpan && docs[idx].exists) {
-                                const name = docs[idx].data()?.displayName || docs[idx].data()?.email || 'Partner';
-                                nameSpan.textContent = `${name}'s Library`;
-                            }
-                        });
-                    });
-
-                    document.getElementById('scan-start-btn').addEventListener('click', () => {
-                        const selected = document.querySelector('input[name="scan-library-dest"]:checked');
-                        globalScanTargetLibrary = selected ? selected.value : currentUser.uid;
-                        close();
-                        resolve();
-                    });
+            // Fetch partner names
+            Promise.all(partnersWhoAllowAdding.map(p =>
+                db.collection('users').doc(p.userId).get()
+            )).then(docs => {
+                partnersWhoAllowAdding.forEach((p, idx) => {
+                    const label = modalContainer.querySelector(`[data-partner-id="${p.userId}"]`);
+                    const nameSpan = label?.querySelector('[data-name]');
+                    if (nameSpan && docs[idx].exists) {
+                        const name = docs[idx].data()?.displayName || docs[idx].data()?.email || 'Partner';
+                        nameSpan.textContent = `${name}'s Library`;
+                    }
                 });
-            }
+            });
 
-            window.openScanner = function () {
-                showLibrarySelectorForScan().then(() => {
-                    const modalHtml = `
+            document.getElementById('scan-start-btn').addEventListener('click', () => {
+                const selected = document.querySelector('input[name="scan-library-dest"]:checked');
+                globalScanTargetLibrary = selected ? selected.value : currentUser.uid;
+                close();
+                resolve();
+            });
+        });
+    }
+
+    window.openScanner = function () {
+        showLibrarySelectorForScan().then(() => {
+            const modalHtml = `
                     <div class="w-full h-full flex flex-col p-6 overflow-y-auto">
                         <div class="flex justify-between items-center mb-8">
                             <h2 class="text-3xl font-black font-serif italic">Scan QR / Barcode</h2>
@@ -4879,135 +4935,135 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                         </div>
                     </div>
                 `;
-                    const closeScanner = showModal(modalHtml, () => stopScanner(), true);
+            const closeScanner = showModal(modalHtml, () => stopScanner(), true);
 
-                    scanner = new Html5Qrcode("reader");
-                    const config = {
-                        fps: 20,
-                        qrbox: { width: 250, height: 150 },
-                        aspectRatio: 1.0
-                    };
+            scanner = new Html5Qrcode("reader");
+            const config = {
+                fps: 20,
+                qrbox: { width: 250, height: 150 },
+                aspectRatio: 1.0
+            };
 
-                    scanner.start(
-                        { facingMode: "environment" },
-                        config,
-                        onScanSuccess,
-                        onScanFailure
-                    ).catch(err => {
-                        console.warn("Camera start failed, falling back to any camera", err);
-                        scanner.start({ facingMode: "user" }, config, onScanSuccess, onScanFailure);
-                    });
-                });
+            scanner.start(
+                { facingMode: "environment" },
+                config,
+                onScanSuccess,
+                onScanFailure
+            ).catch(err => {
+                console.warn("Camera start failed, falling back to any camera", err);
+                scanner.start({ facingMode: "user" }, config, onScanSuccess, onScanFailure);
+            });
+        });
+    }
+
+    function stopScanner() {
+        if (scanner) {
+            try { scanner.stop(); } catch (e) { }
+            scanner = null;
+        }
+    }
+
+    async function onScanSuccess(decodedText) {
+        if (navigator.vibrate) navigator.vibrate(50);
+        stopScanner();
+        modalContainer.innerHTML = '';
+        modalContainer.classList.remove('pointer-events-auto');
+        showToast('Processing code...', 'info');
+        await fetchBookDetails(decodedText);
+    }
+
+    function onScanFailure(err) { /* silent */ }
+
+    // ---------- Fetch Book Details (Google Books + Open Library + Smart Parsing) ----------
+    async function fetchBookDetails(query) {
+        // Try smart parse first
+        const parsed = parseBookText(query);
+        if (parsed && parsed.title) {
+            showApprovalModal(parsed, query);
+            return;
+        }
+
+        // Clean ISBN
+        const clean = query.replace(/[^0-9X]/gi, '');
+        const lookupTerm = clean || query.trim();
+
+        let bookResult = null;
+
+        try {
+            // 1. Try Google Books
+            let res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${lookupTerm}`);
+            let data = await res.json();
+            if (!data.items && !clean) {
+                res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=1`);
+                data = await res.json();
             }
 
-            function stopScanner() {
-                if (scanner) {
-                    try { scanner.stop(); } catch (e) { }
-                    scanner = null;
-                }
+            if (data.items && data.items.length > 0) {
+                const info = data.items[0].volumeInfo;
+                bookResult = {
+                    title: info.title || 'Untitled',
+                    author: info.authors ? info.authors.join(', ') : 'Unknown',
+                    category: info.categories ? info.categories[0] : 'Other',
+                    isbn: clean || (info.industryIdentifiers ? info.industryIdentifiers[0].identifier : ''),
+                    thumbnail: info.imageLinks ? info.imageLinks.thumbnail.replace('http:', 'https:') : null,
+                    tags: info.categories || []
+                };
             }
 
-            async function onScanSuccess(decodedText) {
-                if (navigator.vibrate) navigator.vibrate(50);
-                stopScanner();
-                modalContainer.innerHTML = '';
-                modalContainer.classList.remove('pointer-events-auto');
-                showToast('Processing code...', 'info');
-                await fetchBookDetails(decodedText);
-            }
+            // 2. Try Open Library if Google failed or thumbnail is missing
+            if (clean && (!bookResult || !bookResult.thumbnail)) {
+                const olRes = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${clean}&format=json&jscmd=data`);
+                const olData = await olRes.json();
+                const olBook = olData[`ISBN:${clean}`];
 
-            function onScanFailure(err) { /* silent */ }
-
-            // ---------- Fetch Book Details (Google Books + Open Library + Smart Parsing) ----------
-            async function fetchBookDetails(query) {
-                // Try smart parse first
-                const parsed = parseBookText(query);
-                if (parsed && parsed.title) {
-                    showApprovalModal(parsed, query);
-                    return;
-                }
-
-                // Clean ISBN
-                const clean = query.replace(/[^0-9X]/gi, '');
-                const lookupTerm = clean || query.trim();
-
-                let bookResult = null;
-
-                try {
-                    // 1. Try Google Books
-                    let res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${lookupTerm}`);
-                    let data = await res.json();
-                    if (!data.items && !clean) {
-                        res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=1`);
-                        data = await res.json();
-                    }
-
-                    if (data.items && data.items.length > 0) {
-                        const info = data.items[0].volumeInfo;
+                if (olBook) {
+                    if (!bookResult) {
                         bookResult = {
-                            title: info.title || 'Untitled',
-                            author: info.authors ? info.authors.join(', ') : 'Unknown',
-                            category: info.categories ? info.categories[0] : 'Other',
-                            isbn: clean || (info.industryIdentifiers ? info.industryIdentifiers[0].identifier : ''),
-                            thumbnail: info.imageLinks ? info.imageLinks.thumbnail.replace('http:', 'https:') : null,
-                            tags: info.categories || []
+                            title: olBook.title,
+                            author: olBook.authors ? olBook.authors.map(a => a.name).join(', ') : 'Unknown',
+                            category: olBook.subjects ? olBook.subjects[0].name : 'Other',
+                            isbn: clean,
+                            tags: olBook.subjects ? olBook.subjects.map(s => s.name) : []
                         };
                     }
-
-                    // 2. Try Open Library if Google failed or thumbnail is missing
-                    if (clean && (!bookResult || !bookResult.thumbnail)) {
-                        const olRes = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${clean}&format=json&jscmd=data`);
-                        const olData = await olRes.json();
-                        const olBook = olData[`ISBN:${clean}`];
-
-                        if (olBook) {
-                            if (!bookResult) {
-                                bookResult = {
-                                    title: olBook.title,
-                                    author: olBook.authors ? olBook.authors.map(a => a.name).join(', ') : 'Unknown',
-                                    category: olBook.subjects ? olBook.subjects[0].name : 'Other',
-                                    isbn: clean,
-                                    tags: olBook.subjects ? olBook.subjects.map(s => s.name) : []
-                                };
-                            }
-                            if (olBook.cover) {
-                                bookResult.thumbnail = olBook.cover.large || olBook.cover.medium || olBook.cover.small;
-                            }
-                        }
+                    if (olBook.cover) {
+                        bookResult.thumbnail = olBook.cover.large || olBook.cover.medium || olBook.cover.small;
                     }
-                } catch (err) {
-                    console.error("Fetch error:", err);
-                }
-
-                if (bookResult) {
-                    const book = {
-                        ...bookResult,
-                        price: null,
-                        purchaseDate: new Date().toISOString(),
-                        comments: '',
-                        source: 'scanned',
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    };
-                    addBookToFirestore(book, 'want_to_read', globalScanTargetLibrary || currentUser.uid);
-                } else {
-                    showToast('No book found. Please enter details.', 'info');
-                    openManualEntry(query);
                 }
             }
+        } catch (err) {
+            console.error("Fetch error:", err);
+        }
 
-            function parseBookText(text) {
-                const result = { title: null, author: null, isbn: null };
-                const titleMatch = text.match(/(?:title|book)[:\s]+([^\n\r]+)/i);
-                if (titleMatch) result.title = titleMatch[1].trim();
-                const authorMatch = text.match(/(?:author|by)[:\s]+([^\n\r]+)/i);
-                if (authorMatch) result.author = authorMatch[1].trim();
-                const isbnMatch = text.match(/isbn[:\s]*([0-9-]+)/i);
-                if (isbnMatch) result.isbn = isbnMatch[1].trim();
-                return result.title ? result : null;
-            }
+        if (bookResult) {
+            const book = {
+                ...bookResult,
+                price: null,
+                purchaseDate: new Date().toISOString(),
+                comments: '',
+                source: 'scanned',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            addBookToFirestore(book, 'want_to_read', globalScanTargetLibrary || currentUser.uid);
+        } else {
+            showToast('No book found. Please enter details.', 'info');
+            openManualEntry(query);
+        }
+    }
 
-            function showApprovalModal(parsed, raw) {
-                const modalHtml = `
+    function parseBookText(text) {
+        const result = { title: null, author: null, isbn: null };
+        const titleMatch = text.match(/(?:title|book)[:\s]+([^\n\r]+)/i);
+        if (titleMatch) result.title = titleMatch[1].trim();
+        const authorMatch = text.match(/(?:author|by)[:\s]+([^\n\r]+)/i);
+        if (authorMatch) result.author = authorMatch[1].trim();
+        const isbnMatch = text.match(/isbn[:\s]*([0-9-]+)/i);
+        if (isbnMatch) result.isbn = isbnMatch[1].trim();
+        return result.title ? result : null;
+    }
+
+    function showApprovalModal(parsed, raw) {
+        const modalHtml = `
                 <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up">
                         <h2 class="text-2xl font-black mb-2">Approve Details</h2>
@@ -5024,71 +5080,71 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     </div>
                 </div>
             `;
-                const close = showModal(modalHtml);
-                document.getElementById('save-approved').addEventListener('click', () => {
-                    const book = {
-                        title: document.getElementById('modal-title').value,
-                        author: document.getElementById('modal-author').value,
-                        isbn: document.getElementById('modal-isbn').value,
-                        category: 'Scanned',
-                        price: null,
-                        purchaseDate: new Date().toISOString(),
-                        comments: '',
-                        thumbnail: null,
-                        source: 'scanned',
-                        tags: ['Scanned'],
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    };
-                    addBookToFirestore(book, 'want_to_read', globalScanTargetLibrary || currentUser.uid);
-                    close();
-                });
+        const close = showModal(modalHtml);
+        document.getElementById('save-approved').addEventListener('click', () => {
+            const book = {
+                title: document.getElementById('modal-title').value,
+                author: document.getElementById('modal-author').value,
+                isbn: document.getElementById('modal-isbn').value,
+                category: 'Scanned',
+                price: null,
+                purchaseDate: new Date().toISOString(),
+                comments: '',
+                thumbnail: null,
+                source: 'scanned',
+                tags: ['Scanned'],
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            addBookToFirestore(book, 'want_to_read', globalScanTargetLibrary || currentUser.uid);
+            close();
+        });
+    }
+
+    function openManualEntry(code, existingBook = null, options = {}) {
+        const isEdit = !!existingBook;
+        const updateDescCount = () => {
+            const textarea = document.getElementById('man-description');
+            const counter = document.getElementById('desc-char-count');
+            if (textarea && counter) {
+                const count = textarea.value.length;
+                counter.textContent = `${count} character${count !== 1 ? 's' : ''}`;
             }
+        };
+        let currentGenres = getBookGenres(existingBook || {});
+        if (currentGenres.length === 1 && currentGenres[0] === 'Other' && !isEdit) currentGenres = [];
+        let selectedLibraryUserId = currentUser.uid; // Track which library this book is being added to
 
-            function openManualEntry(code, existingBook = null, options = {}) {
-                const isEdit = !!existingBook;
-                const updateDescCount = () => {
-                    const textarea = document.getElementById('man-description');
-                    const counter = document.getElementById('desc-char-count');
-                    if (textarea && counter) {
-                        const count = textarea.value.length;
-                        counter.textContent = `${count} character${count !== 1 ? 's' : ''}`;
-                    }
-                };
-                let currentGenres = getBookGenres(existingBook || {});
-                if (currentGenres.length === 1 && currentGenres[0] === 'Other' && !isEdit) currentGenres = [];
-                let selectedLibraryUserId = currentUser.uid; // Track which library this book is being added to
+        const POPULAR_GENRES = ['Fiction', 'Non-Fiction', 'Science', 'History', 'Biography', 'Mystery', 'Fantasy', 'Self-Help', 'Business', 'Other'];
 
-                const POPULAR_GENRES = ['Fiction', 'Non-Fiction', 'Science', 'History', 'Biography', 'Mystery', 'Fantasy', 'Self-Help', 'Business', 'Other'];
-
-                const renderGenres = () => {
-                    const container = document.getElementById('genres-badge-container');
-                    if (container) {
-                        container.innerHTML = currentGenres.map((g, i) => {
-                            const safeG = escapeHTML(g);
-                            return `
+        const renderGenres = () => {
+            const container = document.getElementById('genres-badge-container');
+            if (container) {
+                container.innerHTML = currentGenres.map((g, i) => {
+                    const safeG = escapeHTML(g);
+                    return `
             <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
                 ${safeG}
                 <button data-genre-index="${i}" class="genre-remove-btn ml-2 hover:text-blue-900 dark:hover:text-blue-100 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none rounded px-1 transition-all" aria-label="Remove genre: ${safeG}">&times;</button>
             </span>
             `;
-                        }).join('');
-                    }
+                }).join('');
+            }
 
-                    const selectContainer = document.getElementById('genres-multiselect-container');
-                    if (selectContainer) {
-                        selectContainer.innerHTML = POPULAR_GENRES.map(g => {
-                            const isActive = currentGenres.includes(g);
-                            const safeG = escapeHTML(g);
-                            return `
+            const selectContainer = document.getElementById('genres-multiselect-container');
+            if (selectContainer) {
+                selectContainer.innerHTML = POPULAR_GENRES.map(g => {
+                    const isActive = currentGenres.includes(g);
+                    const safeG = escapeHTML(g);
+                    return `
             <button type="button" data-genre-pill="${safeG}" class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none active:scale-95 ${isActive ? 'bg-slate-900 text-white shadow-md shadow-blue-500/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}" aria-pressed="${isActive}">
                 ${safeG}
             </button>
             `;
-                        }).join('');
-                    }
-                };
+                }).join('');
+            }
+        };
 
-                const modalHtml = `
+        const modalHtml = `
                 <div class="w-full h-full flex flex-col p-6 overflow-y-auto bg-slate-50 dark:bg-slate-900">
                     <div class="max-w-2xl mx-auto w-full">
                         <div class="flex justify-between items-center mb-8">
@@ -5132,7 +5188,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                             <div class="relative">
                                 <label for="man-author" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Author <span class="text-rose-500">*</span></label>
                                 <input id="man-author" required placeholder="e.g. F. Scott Fitzgerald" value="${escapeHTML(existingBook?.author || '')}" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" autocomplete="off">
-                                <div id="author-dropdown" class="dropdown-menu"></div>
+                                <div id="author-dropdown" class="dropdown-menu hidden"></div>
                             </div>
 
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -5146,7 +5202,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                 <label for="man-category" class="text-[10px] font-bold text-slate-400 uppercase ml-1">Custom Genre / Selected</label>
                                 <div id="genres-badge-container" class="flex flex-wrap gap-2 mb-2"></div>
                                 <input id="man-category" placeholder="Add custom genre..." class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" autocomplete="off">
-                                <div id="category-dropdown" class="dropdown-menu"></div>
+                                <div id="category-dropdown" class="dropdown-menu hidden"></div>
                             </div>
 
                             <div>
@@ -5206,332 +5262,332 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     </div>
                 </div>
             `;
-                const close = showModal(modalHtml, () => {
-                    if (!isEdit) {
-                        // Clear draft when modal is explicitly closed/saved
-                        sessionStorage.removeItem(DRAFT_KEY);
-                    }
-                }, true);
-                document.getElementById('man-title')?.focus();
-                document.getElementById('man-scan-btn')?.addEventListener('click', () => {
-                    close();
-                    window.openScanner();
-                });
+        const close = showModal(modalHtml, () => {
+            if (!isEdit) {
+                // Clear draft when modal is explicitly closed/saved
+                sessionStorage.removeItem(DRAFT_KEY);
+            }
+        }, true);
+        document.getElementById('man-title')?.focus();
+        document.getElementById('man-scan-btn')?.addEventListener('click', () => {
+            close();
+            window.openScanner();
+        });
+        renderGenres();
+        updateDescCount();
+
+        document.getElementById('genres-badge-container')?.addEventListener('click', (e) => {
+            const btn = e.target.closest('.genre-remove-btn');
+            if (btn) {
+                const index = parseInt(btn.dataset.genreIndex);
+                currentGenres.splice(index, 1);
                 renderGenres();
-                updateDescCount();
+            }
+        });
 
-                document.getElementById('genres-badge-container')?.addEventListener('click', (e) => {
-                    const btn = e.target.closest('.genre-remove-btn');
-                    if (btn) {
-                        const index = parseInt(btn.dataset.genreIndex);
-                        currentGenres.splice(index, 1);
-                        renderGenres();
-                    }
-                });
-
-                document.getElementById('genres-multiselect-container')?.addEventListener('click', (e) => {
-                    const btn = e.target.closest('[data-genre-pill]');
-                    if (btn) {
-                        const genre = btn.dataset.genrePill;
-                        const idx = currentGenres.indexOf(genre);
-                        if (idx > -1) {
-                            currentGenres.splice(idx, 1);
-                        } else {
-                            currentGenres.push(genre);
-                        }
-                        renderGenres();
-                        if (!isEdit) saveDraft();
-                    }
-                });
-
-                const saveDraft = () => {
-                    if (isEdit) return;
-                    const draft = {
-                        title: document.getElementById('man-title').value,
-                        author: document.getElementById('man-author').value,
-                        cover: document.getElementById('man-cover').value,
-                        isbn: document.getElementById('man-isbn').value,
-                        tags: document.getElementById('man-tags').value,
-                        description: document.getElementById('man-description').value,
-                        price: document.getElementById('man-price').value,
-                        date: document.getElementById('man-date').value,
-                        wishlist: document.getElementById('man-wishlist').checked,
-                        genres: currentGenres,
-                        copyType: document.querySelector('input[name="man-copytype"]:checked')?.value || 'New Copy',
-                        gifterName: document.getElementById('man-gifter').value
-                    };
-                    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-                };
-
-                // Draft Recovery Logic
-                if (!isEdit) {
-                    const savedDraft = sessionStorage.getItem(DRAFT_KEY);
-                    if (savedDraft) {
-                        try {
-                            const draft = JSON.parse(savedDraft);
-                            if (confirm('Restore your unsaved book draft?')) {
-                                document.getElementById('man-title').value = draft.title || '';
-                                document.getElementById('man-author').value = draft.author || '';
-                                document.getElementById('man-cover').value = draft.cover || '';
-                                document.getElementById('man-isbn').value = draft.isbn || '';
-                                document.getElementById('man-tags').value = draft.tags || '';
-                                document.getElementById('man-description').value = draft.description || '';
-                                document.getElementById('man-price').value = draft.price || '';
-                                document.getElementById('man-date').value = draft.date || '';
-                                document.getElementById('man-wishlist').checked = draft.wishlist || false;
-                                if (draft.genres) {
-                                    currentGenres = draft.genres;
-                                    renderGenres();
-                                }
-                                const restoredCopyType = draft.copyType || 'New Copy';
-                                const targetRadio = document.querySelector(`input[name="man-copytype"][value="${restoredCopyType}"]`);
-                                if (targetRadio) {
-                                    targetRadio.checked = true;
-                                }
-                                document.getElementById('man-gifter').value = draft.gifterName || '';
-                                const gifterContainer = document.getElementById('man-gifter-container');
-                                if (gifterContainer) {
-                                    if (restoredCopyType === 'Gifted') {
-                                        gifterContainer.classList.remove('hidden');
-                                    } else {
-                                        gifterContainer.classList.add('hidden');
-                                    }
-                                }
-                                updateDescCount();
-                            } else {
-                                sessionStorage.removeItem(DRAFT_KEY);
-                            }
-                        } catch (e) {
-                            console.error('Failed to parse draft', e);
-                        }
-                    }
-
-                    // Attach auto-save listeners
-                    ['man-title', 'man-author', 'man-cover', 'man-isbn', 'man-owner', 'man-tags', 'man-description', 'man-price', 'man-date', 'man-gifter'].forEach(id => {
-                        document.getElementById(id)?.addEventListener('input', saveDraft);
-                    });
-                    document.getElementById('man-wishlist')?.addEventListener('change', saveDraft);
+        document.getElementById('genres-multiselect-container')?.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-genre-pill]');
+            if (btn) {
+                const genre = btn.dataset.genrePill;
+                const idx = currentGenres.indexOf(genre);
+                if (idx > -1) {
+                    currentGenres.splice(idx, 1);
+                } else {
+                    currentGenres.push(genre);
                 }
+                renderGenres();
+                if (!isEdit) saveDraft();
+            }
+        });
 
-                // Attach copy type radio listeners
-                document.querySelectorAll('input[name="man-copytype"]').forEach(radio => {
-                    radio.addEventListener('change', (e) => {
+        const saveDraft = () => {
+            if (isEdit) return;
+            const draft = {
+                title: document.getElementById('man-title').value,
+                author: document.getElementById('man-author').value,
+                cover: document.getElementById('man-cover').value,
+                isbn: document.getElementById('man-isbn').value,
+                tags: document.getElementById('man-tags').value,
+                description: document.getElementById('man-description').value,
+                price: document.getElementById('man-price').value,
+                date: document.getElementById('man-date').value,
+                wishlist: document.getElementById('man-wishlist').checked,
+                genres: currentGenres,
+                copyType: document.querySelector('input[name="man-copytype"]:checked')?.value || 'New Copy',
+                gifterName: document.getElementById('man-gifter').value
+            };
+            sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+        };
+
+        // Draft Recovery Logic
+        if (!isEdit) {
+            const savedDraft = sessionStorage.getItem(DRAFT_KEY);
+            if (savedDraft) {
+                try {
+                    const draft = JSON.parse(savedDraft);
+                    if (confirm('Restore your unsaved book draft?')) {
+                        document.getElementById('man-title').value = draft.title || '';
+                        document.getElementById('man-author').value = draft.author || '';
+                        document.getElementById('man-cover').value = draft.cover || '';
+                        document.getElementById('man-isbn').value = draft.isbn || '';
+                        document.getElementById('man-tags').value = draft.tags || '';
+                        document.getElementById('man-description').value = draft.description || '';
+                        document.getElementById('man-price').value = draft.price || '';
+                        document.getElementById('man-date').value = draft.date || '';
+                        document.getElementById('man-wishlist').checked = draft.wishlist || false;
+                        if (draft.genres) {
+                            currentGenres = draft.genres;
+                            renderGenres();
+                        }
+                        const restoredCopyType = draft.copyType || 'New Copy';
+                        const targetRadio = document.querySelector(`input[name="man-copytype"][value="${restoredCopyType}"]`);
+                        if (targetRadio) {
+                            targetRadio.checked = true;
+                        }
+                        document.getElementById('man-gifter').value = draft.gifterName || '';
                         const gifterContainer = document.getElementById('man-gifter-container');
                         if (gifterContainer) {
-                            if (e.target.value === 'Gifted') {
+                            if (restoredCopyType === 'Gifted') {
                                 gifterContainer.classList.remove('hidden');
                             } else {
                                 gifterContainer.classList.add('hidden');
                             }
                         }
-                        saveDraft();
-                    });
-                });
+                        updateDescCount();
+                    } else {
+                        sessionStorage.removeItem(DRAFT_KEY);
+                    }
+                } catch (e) {
+                    console.error('Failed to parse draft', e);
+                }
+            }
 
-                document.getElementById('man-description')?.addEventListener('input', updateDescCount);
+            // Attach auto-save listeners
+            ['man-title', 'man-author', 'man-cover', 'man-isbn', 'man-owner', 'man-tags', 'man-description', 'man-price', 'man-date', 'man-gifter'].forEach(id => {
+                document.getElementById(id)?.addEventListener('input', saveDraft);
+            });
+            document.getElementById('man-wishlist')?.addEventListener('change', saveDraft);
+        }
 
-                // Populate library destination options
-                if (!isEdit) {
-                    const destContainer = document.getElementById('library-destination-container');
-                    if (destContainer) {
-                        // Get list of partnerships where we can add books
-                        const partnersWhoAllowAdding = allPartnerships.filter(p => p.allowAddBooks === true).map(p => {
-                            const isUser1 = p.userId1 === currentUser.uid;
-                            const partnerId = isUser1 ? p.userId2 : p.userId1;
-                            return { partnershipId: p.id, userId: partnerId, isActive: isUser1 ? !p.user1Unsubscribed : !p.user2Unsubscribed };
-                        }).filter(p => p.isActive);
+        // Attach copy type radio listeners
+        document.querySelectorAll('input[name="man-copytype"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const gifterContainer = document.getElementById('man-gifter-container');
+                if (gifterContainer) {
+                    if (e.target.value === 'Gifted') {
+                        gifterContainer.classList.remove('hidden');
+                    } else {
+                        gifterContainer.classList.add('hidden');
+                    }
+                }
+                saveDraft();
+            });
+        });
 
-                        // Create radio buttons for destinations
-                        let html = `<label class="flex items-center gap-2 cursor-pointer">
+        document.getElementById('man-description')?.addEventListener('input', updateDescCount);
+
+        // Populate library destination options
+        if (!isEdit) {
+            const destContainer = document.getElementById('library-destination-container');
+            if (destContainer) {
+                // Get list of partnerships where we can add books
+                const partnersWhoAllowAdding = allPartnerships.filter(p => p.allowAddBooks === true).map(p => {
+                    const isUser1 = p.userId1 === currentUser.uid;
+                    const partnerId = isUser1 ? p.userId2 : p.userId1;
+                    return { partnershipId: p.id, userId: partnerId, isActive: isUser1 ? !p.user1Unsubscribed : !p.user2Unsubscribed };
+                }).filter(p => p.isActive);
+
+                // Create radio buttons for destinations
+                let html = `<label class="flex items-center gap-2 cursor-pointer">
                             <input type="radio" name="library-dest" value="${escapeHTML(currentUser.uid)}" checked class="w-4 h-4 text-sky-600">
                             <span class="text-xs font-medium">My Library</span>
                         </label>`;
 
-                        // Add partner options
-                        if (partnersWhoAllowAdding.length > 0) {
-                            html += partnersWhoAllowAdding.map(p => `
+                // Add partner options
+                if (partnersWhoAllowAdding.length > 0) {
+                    html += partnersWhoAllowAdding.map(p => `
                                 <label class="flex items-center gap-2 cursor-pointer">
                                     <input type="radio" name="library-dest" value="${escapeHTML(p.userId)}" class="w-4 h-4 text-sky-600">
                                     <span class="text-xs font-medium" data-partner-id="${escapeHTML(p.userId)}">Loading...</span>
                                 </label>
                             `).join('');
 
-                            // Fetch partner names
-                            Promise.all(partnersWhoAllowAdding.map(p =>
-                                db.collection('users').doc(p.userId).get()
-                            )).then(docs => {
-                                partnersWhoAllowAdding.forEach((p, idx) => {
-                                    const span = destContainer.querySelector(`[data-partner-id="${p.userId}"]`);
-                                    if (span && docs[idx].exists) {
-                                        const name = docs[idx].data()?.displayName || docs[idx].data()?.email || 'Partner';
-                                        span.textContent = `${name}'s Library`;
-                                    }
-                                });
-                            });
-                        }
-
-                        destContainer.innerHTML = html;
-                    }
+                    // Fetch partner names
+                    Promise.all(partnersWhoAllowAdding.map(p =>
+                        db.collection('users').doc(p.userId).get()
+                    )).then(docs => {
+                        partnersWhoAllowAdding.forEach((p, idx) => {
+                            const span = destContainer.querySelector(`[data-partner-id="${p.userId}"]`);
+                            if (span && docs[idx].exists) {
+                                const name = docs[idx].data()?.displayName || docs[idx].data()?.email || 'Partner';
+                                span.textContent = `${name}'s Library`;
+                            }
+                        });
+                    });
                 }
 
-                // Setup searchable dropdowns
-                setupSearchableDropdown('man-author', 'author-dropdown', metadataCache.authors, (val) => {
-                    document.getElementById('man-author').value = val;
-                    if (!isEdit) saveDraft();
-                });
-                setupSearchableDropdown('man-category', 'category-dropdown', metadataCache.genres, (val) => {
+                destContainer.innerHTML = html;
+            }
+        }
+
+        // Setup searchable dropdowns
+        setupSearchableDropdown('man-author', 'author-dropdown', metadataCache.authors, (val) => {
+            document.getElementById('man-author').value = val;
+            if (!isEdit) saveDraft();
+        });
+        setupSearchableDropdown('man-category', 'category-dropdown', metadataCache.genres, (val) => {
+            if (!currentGenres.includes(val)) {
+                currentGenres.push(val);
+                renderGenres();
+                if (!isEdit) saveDraft();
+            }
+            document.getElementById('man-category').value = '';
+        });
+
+        // Add Enter key support for manual entry fields (excluding man-category)
+        ['man-title', 'man-author', 'man-isbn', 'man-tags', 'man-price', 'man-date'].forEach(id => {
+            document.getElementById(id)?.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    // Only trigger save if no dropdown is currently active/selected
+                    const menu = document.getElementById(id + '-dropdown') || document.getElementById(id.replace('man-', '') + '-dropdown');
+                    if (!menu || menu.style.display === 'none') {
+                        document.getElementById('save-manual')?.click();
+                    }
+                }
+            });
+        });
+
+        // Add special Enter key support for man-category to add to genre chips
+        document.getElementById('man-category')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+                const val = e.target.value.trim();
+                if (val) {
                     if (!currentGenres.includes(val)) {
                         currentGenres.push(val);
                         renderGenres();
                         if (!isEdit) saveDraft();
                     }
-                    document.getElementById('man-category').value = '';
-                });
+                    e.target.value = '';
+                }
+            }
+        });
 
-                // Add Enter key support for manual entry fields (excluding man-category)
-                ['man-title', 'man-author', 'man-isbn', 'man-tags', 'man-price', 'man-date'].forEach(id => {
-                    document.getElementById(id)?.addEventListener('keydown', (e) => {
-                        if (e.key === 'Enter') {
-                            // Only trigger save if no dropdown is currently active/selected
-                            const menu = document.getElementById(id + '-dropdown') || document.getElementById(id.replace('man-', '') + '-dropdown');
-                            if (!menu || menu.style.display === 'none') {
-                                document.getElementById('save-manual')?.click();
-                            }
-                        }
-                    });
-                });
+        document.getElementById('ai-magic-fill')?.addEventListener('click', async () => {
+            const title = document.getElementById('man-title').value.trim();
+            const author = document.getElementById('man-author').value.trim();
+            const isbn = document.getElementById('man-isbn').value.trim();
+            if (!title && !isbn) { showToast('Please enter a title or ISBN first', 'error'); return; }
+            const btn = document.getElementById('ai-magic-fill');
+            const originalContent = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+            try {
+                const prompt = `Fetch metadata for the book "${title}"${author ? ` by ${author}` : ''}${isbn ? ` or ISBN ${isbn}` : ''}. Author name, Genre and tags must be in English. Return ONLY a JSON object with: { "title": "string", "author": "string", "genres": ["string"], "tags": ["string"], "price": number, "description": "string", "isbn": "string" }`;
+                const response = await callAI(prompt, "You are a book metadata expert. Respond ONLY with valid JSON.");
+                const metadata = JSON.parse(response.replace(/```json|```/g, '').trim());
+                if (metadata.title && !document.getElementById('man-title').value) document.getElementById('man-title').value = metadata.title;
+                if (metadata.author && !document.getElementById('man-author').value) document.getElementById('man-author').value = metadata.author;
+                if (metadata.isbn && !document.getElementById('man-isbn').value) document.getElementById('man-isbn').value = metadata.isbn;
+                if (metadata.genres) { metadata.genres.forEach(g => { if (!currentGenres.includes(g)) currentGenres.push(g); }); renderGenres(); }
+                if (metadata.tags) { const currentTags = document.getElementById('man-tags').value.split(',').map(t => t.trim()).filter(Boolean); document.getElementById('man-tags').value = [...new Set([...currentTags, ...metadata.tags])].join(', '); }
+                if (metadata.price && !document.getElementById('man-price').value) document.getElementById('man-price').value = metadata.price;
+                if (metadata.description && !document.getElementById('man-description').value) {
+                    document.getElementById('man-description').value = metadata.description;
+                }
+                updateDescCount();
+                showToast('Magic Fill complete!', 'success');
+            } catch (err) { showToast('Magic Fill failed', 'error'); }
+            finally { btn.disabled = false; btn.innerHTML = originalContent; }
+        });
 
-                // Add special Enter key support for man-category to add to genre chips
-                document.getElementById('man-category')?.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const val = e.target.value.trim();
-                        if (val) {
-                            if (!currentGenres.includes(val)) {
-                                currentGenres.push(val);
-                                renderGenres();
-                                if (!isEdit) saveDraft();
-                            }
-                            e.target.value = '';
-                        }
-                    }
-                });
+        document.getElementById('save-manual').addEventListener('click', async (e) => {
+            const titleVal = document.getElementById('man-title').value.trim();
+            const authorVal = document.getElementById('man-author').value.trim();
 
-                document.getElementById('ai-magic-fill')?.addEventListener('click', async () => {
-                    const title = document.getElementById('man-title').value.trim();
-                    const author = document.getElementById('man-author').value.trim();
-                    const isbn = document.getElementById('man-isbn').value.trim();
-                    if (!title && !isbn) { showToast('Please enter a title or ISBN first', 'error'); return; }
-                    const btn = document.getElementById('ai-magic-fill');
-                    const originalContent = btn.innerHTML;
-                    btn.disabled = true;
-                    btn.innerHTML = `<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
-                    try {
-                        const prompt = `Fetch metadata for the book "${title}"${author ? ` by ${author}` : ''}${isbn ? ` or ISBN ${isbn}` : ''}. Author name, Genre and tags must be in English. Return ONLY a JSON object with: { "title": "string", "author": "string", "genres": ["string"], "tags": ["string"], "price": number, "description": "string", "isbn": "string" }`;
-                        const response = await callAI(prompt, "You are a book metadata expert. Respond ONLY with valid JSON.");
-                        const metadata = JSON.parse(response.replace(/```json|```/g, '').trim());
-                        if (metadata.title && !document.getElementById('man-title').value) document.getElementById('man-title').value = metadata.title;
-                        if (metadata.author && !document.getElementById('man-author').value) document.getElementById('man-author').value = metadata.author;
-                        if (metadata.isbn && !document.getElementById('man-isbn').value) document.getElementById('man-isbn').value = metadata.isbn;
-                        if (metadata.genres) { metadata.genres.forEach(g => { if (!currentGenres.includes(g)) currentGenres.push(g); }); renderGenres(); }
-                        if (metadata.tags) { const currentTags = document.getElementById('man-tags').value.split(',').map(t => t.trim()).filter(Boolean); document.getElementById('man-tags').value = [...new Set([...currentTags, ...metadata.tags])].join(', '); }
-                        if (metadata.price && !document.getElementById('man-price').value) document.getElementById('man-price').value = metadata.price;
-                        if (metadata.description && !document.getElementById('man-description').value) {
-                            document.getElementById('man-description').value = metadata.description;
-                        }
-                        updateDescCount();
-                        showToast('Magic Fill complete!', 'success');
-                    } catch (err) { showToast('Magic Fill failed', 'error'); }
-                    finally { btn.disabled = false; btn.innerHTML = originalContent; }
-                });
-
-                document.getElementById('save-manual').addEventListener('click', async (e) => {
-                    const titleVal = document.getElementById('man-title').value.trim();
-                    const authorVal = document.getElementById('man-author').value.trim();
-
-                    if (!titleVal) {
-                        showToast('Title is required', 'error');
-                        document.getElementById('man-title').focus();
-                        return;
-                    }
-                    if (!authorVal) {
-                        showToast('Author is required', 'error');
-                        document.getElementById('man-author').focus();
-                        return;
-                    }
-
-                    // ---- NEW: Validate cover URL before disabling the button ----
-                    const rawCoverUrl = document.getElementById('man-cover').value.trim();
-                    let safeCoverUrl = null;
-                    if (rawCoverUrl) {
-                        if (!isValidImageUrl(rawCoverUrl)) {
-                            showToast('Cover URL must start with http:// or https://', 'error');
-                            document.getElementById('man-cover').focus();
-                            return;
-                        }
-                        safeCoverUrl = rawCoverUrl;
-                    }
-
-                    const btn = e.currentTarget;
-                    const originalText = btn.innerText;
-                    btn.disabled = true;
-                    btn.innerText = 'Saving...';
-                    try {
-                        const tagsRaw = document.getElementById('man-tags').value;
-                        const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
-
-                        const safeDate = (val) => {
-                            const d = new Date(val);
-                            return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
-                        };
-
-                        const selectedCopyType = document.querySelector('input[name="man-copytype"]:checked')?.value || 'New Copy';
-                        const gifterNameVal = selectedCopyType === 'Gifted' ? document.getElementById('man-gifter').value.trim() : null;
-
-                        const bookData = {
-                            title: titleVal,
-                            author: authorVal,
-                            genres: currentGenres.length > 0 ? currentGenres : ['Other'],
-                            categories: currentGenres.length > 0 ? currentGenres : ['Other'],
-                            description: document.getElementById('man-description').value || '',
-                            tags: tags,
-                            coverUrl: safeCoverUrl,   // <-- validated
-                            isWishlist: document.getElementById('man-wishlist').checked,
-                            price: document.getElementById('man-price').value ? parseFloat(document.getElementById('man-price').value) : null,
-                            purchaseDate: safeDate(document.getElementById('man-date').value),
-                            isbn: document.getElementById('man-isbn').value || existingBook?.isbn || code || '',
-                            thumbnail: existingBook?.thumbnail || null,
-                            source: existingBook?.source || (code ? 'scanned' : 'manual'),
-                            copyType: selectedCopyType,
-                            gifterName: gifterNameVal,
-                            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            ...options
-                        };
-
-                        if (isEdit) {
-                            await db.collection('books').doc(existingBook.id).update(bookData);
-                            showToast('Book updated!', 'success');
-                            close();
-                        } else {
-                            // Get selected library destination
-                            const selectedDest = document.querySelector('input[name="library-dest"]:checked');
-                            const targetUserId = selectedDest ? selectedDest.value : currentUser.uid;
-                            const status = options.status || 'want_to_read';
-                            const result = await addBookToFirestore(bookData, status, targetUserId);
-                            if (result) close();
-                        }
-                    } catch (err) {
-                        showToast('Error: ' + err.message, 'error');
-                    } finally {
-                        btn.disabled = false;
-                        btn.innerText = originalText;
-                    }
-                });
+            if (!titleVal) {
+                showToast('Title is required', 'error');
+                document.getElementById('man-title').focus();
+                return;
+            }
+            if (!authorVal) {
+                showToast('Author is required', 'error');
+                document.getElementById('man-author').focus();
+                return;
             }
 
-            window.openAddFinishedBookModal = () => {
-                const modalHtml = `
+            // ---- NEW: Validate cover URL before disabling the button ----
+            const rawCoverUrl = document.getElementById('man-cover').value.trim();
+            let safeCoverUrl = null;
+            if (rawCoverUrl) {
+                if (!isValidImageUrl(rawCoverUrl)) {
+                    showToast('Cover URL must start with http:// or https://', 'error');
+                    document.getElementById('man-cover').focus();
+                    return;
+                }
+                safeCoverUrl = rawCoverUrl;
+            }
+
+            const btn = e.currentTarget;
+            const originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = 'Saving...';
+            try {
+                const tagsRaw = document.getElementById('man-tags').value;
+                const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+                const safeDate = (val) => {
+                    const d = new Date(val);
+                    return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+                };
+
+                const selectedCopyType = document.querySelector('input[name="man-copytype"]:checked')?.value || 'New Copy';
+                const gifterNameVal = selectedCopyType === 'Gifted' ? document.getElementById('man-gifter').value.trim() : null;
+
+                const bookData = {
+                    title: titleVal,
+                    author: authorVal,
+                    genres: currentGenres.length > 0 ? currentGenres : ['Other'],
+                    categories: currentGenres.length > 0 ? currentGenres : ['Other'],
+                    description: document.getElementById('man-description').value || '',
+                    tags: tags,
+                    coverUrl: safeCoverUrl,   // <-- validated
+                    isWishlist: document.getElementById('man-wishlist').checked,
+                    price: document.getElementById('man-price').value ? parseFloat(document.getElementById('man-price').value) : null,
+                    purchaseDate: safeDate(document.getElementById('man-date').value),
+                    isbn: document.getElementById('man-isbn').value || existingBook?.isbn || code || '',
+                    thumbnail: existingBook?.thumbnail || null,
+                    source: existingBook?.source || (code ? 'scanned' : 'manual'),
+                    copyType: selectedCopyType,
+                    gifterName: gifterNameVal,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    ...options
+                };
+
+                if (isEdit) {
+                    await db.collection('books').doc(existingBook.id).update(bookData);
+                    showToast('Book updated!', 'success');
+                    close();
+                } else {
+                    // Get selected library destination
+                    const selectedDest = document.querySelector('input[name="library-dest"]:checked');
+                    const targetUserId = selectedDest ? selectedDest.value : currentUser.uid;
+                    const status = options.status || 'want_to_read';
+                    const result = await addBookToFirestore(bookData, status, targetUserId);
+                    if (result) close();
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = originalText;
+            }
+        });
+    }
+
+    window.openAddFinishedBookModal = () => {
+        const modalHtml = `
                 <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up">
                     <h2 class="text-2xl font-black mb-6 font-serif italic text-primary">Add a Finished Book</h2>
                     <div class="grid grid-cols-1 gap-4">
@@ -5556,23 +5612,23 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                 </div>
                 `;
 
-                const close = showModal(modalHtml);
+        const close = showModal(modalHtml);
 
-                document.getElementById('select-existing-btn').addEventListener('click', () => {
-                    close();
-                    openSelectFromLibraryModal();
-                });
+        document.getElementById('select-existing-btn').addEventListener('click', () => {
+            close();
+            openSelectFromLibraryModal();
+        });
 
-                document.getElementById('add-new-finished-btn').addEventListener('click', () => {
-                    close();
-                    openManualEntry('', null, { status: 'finished', excludeFromLibrary: true });
-                });
-            };
+        document.getElementById('add-new-finished-btn').addEventListener('click', () => {
+            close();
+            openManualEntry('', null, { status: 'finished', excludeFromLibrary: true });
+        });
+    };
 
-            function openSelectFromLibraryModal() {
-                const myBooks = books.filter(b => b.userId === currentUser.uid && getStatusData(b.id).status !== 'finished');
+    function openSelectFromLibraryModal() {
+        const myBooks = books.filter(b => b.userId === currentUser.uid && getStatusData(b.id).status !== 'finished');
 
-                const modalHtml = `
+        const modalHtml = `
                 <div class="glass max-w-2xl w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up overflow-hidden flex flex-col max-h-[90vh]">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-black font-serif italic">Select from Library</h2>
@@ -5599,16 +5655,16 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                 </div>
                 `;
 
-                const close = showModal(modalHtml);
+        const close = showModal(modalHtml);
 
-                const searchInput = document.getElementById('select-book-search');
-                const listContainer = document.getElementById('select-book-list');
+        const searchInput = document.getElementById('select-book-search');
+        const listContainer = document.getElementById('select-book-list');
 
-                if (searchInput && listContainer) {
-                    searchInput.addEventListener('input', (e) => {
-                        const q = e.target.value.toLowerCase();
-                        const filtered = myBooks.filter(b => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q));
-                        listContainer.innerHTML = filtered.length > 0 ? filtered.map(b => `
+        if (searchInput && listContainer) {
+            searchInput.addEventListener('input', (e) => {
+                const q = e.target.value.toLowerCase();
+                const filtered = myBooks.filter(b => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q));
+                listContainer.innerHTML = filtered.length > 0 ? filtered.map(b => `
                             <button data-action="mark-finished-from-list" data-value="${escapeHTML(b.id)}" class="w-full flex items-center gap-4 p-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl hover:bg-slate-50 dark:hover:bg-blue-900/20 transition-all text-left group focus-visible:ring-2 focus-visible:ring-primary outline-none">
                                 <img src="${escapeHTML(b.coverUrl || b.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI2MCIgdmlld0JveD0iMCAwIDQwIDYwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjFmNWY5Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM5NGEzYjgiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjgiIGZvbnQtd2VpZ2h0PSJib2xkIj5ObyBDb3ZlcjwvdGV4dD48L3N2Zz4=')}" data-fallback-src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI2MCIgdmlld0JveD0iMCAwIDQwIDYwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjFmNWY5Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM5NGEzYjgiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjgiIGZvbnQtd2VpZ2h0PSJib2xkIj5ObyBDb3ZlcjwvdGV4dD48L3N2Zz4="class="w-12 h-16 object-cover rounded-lg shadow-sm"alt="Cover of ${escapeHTML(b.title || 'book')}"loading="lazy"decoding="async">
                                 <div class="flex-1 min-w-0">
@@ -5620,202 +5676,202 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                 </div>
                             </button>
                         `).join('') : '<p class="text-center py-10 text-slate-400 italic">No matching books found.</p>';
-                    });
+            });
+        }
+
+        window.markAsFinished = async (id, element) => {
+            let originalHTML = '';
+            if (element) {
+                originalHTML = element.innerHTML;
+                element.disabled = true;
+                element.innerHTML += ' <svg class="w-3 h-3 animate-spin inline ml-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+            }
+            try {
+                const b = books.find(book => book.id === id);
+                await db.collection('books').doc(id).collection('readingStatus').doc(currentUser.uid).set({
+                    status: 'finished',
+                    userId: currentUser.uid,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+
+                await db.collection('activityFeed').add({
+                    type: 'status_updated',
+                    bookId: id,
+                    bookTitle: b.title,
+                    userName: currentUser.displayName || currentUser.email || currentUser.uid,
+                    userId: currentUser.uid,
+                    status: 'finished',
+                    addedTo: 'My',
+                    libraryId: currentUser.uid,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                showToast(`"${b.title}" marked as finished!`, 'success');
+                close();
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+                if (element) {
+                    element.disabled = false;
+                    element.innerHTML = originalHTML;
                 }
+            }
+        };
+    }
 
-                window.markAsFinished = async (id, element) => {
-                    let originalHTML = '';
-                    if (element) {
-                        originalHTML = element.innerHTML;
-                        element.disabled = true;
-                        element.innerHTML += ' <svg class="w-3 h-3 animate-spin inline ml-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
-                    }
-                    try {
-                        const b = books.find(book => book.id === id);
-                        await db.collection('books').doc(id).collection('readingStatus').doc(currentUser.uid).set({
-                            status: 'finished',
-                            userId: currentUser.uid,
-                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                        }, { merge: true });
+    // Helper for duplicate detection within a specific user's library
+    function findDuplicateBook(bookData, targetUserId) {
+        const isbn = bookData.isbn?.replace(/[^0-9X]/gi, '');
+        const title = bookData.title?.trim().toLowerCase();
+        const author = bookData.author?.trim().toLowerCase();
 
-                        await db.collection('activityFeed').add({
-                            type: 'status_updated',
-                            bookId: id,
-                            bookTitle: b.title,
-                            userName: currentUser.displayName || currentUser.email || currentUser.uid,
-                            userId: currentUser.uid,
-                            status: 'finished',
-                            addedTo: 'My',
-                            libraryId: currentUser.uid,
-                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                        });
+        const targetLibraryBooks = books.filter(b => b.userId === targetUserId);
 
-                        showToast(`"${b.title}" marked as finished!`, 'success');
-                        close();
-                    } catch (err) {
-                        showToast('Error: ' + err.message, 'error');
-                        if (element) {
-                            element.disabled = false;
-                            element.innerHTML = originalHTML;
-                        }
-                    }
+        let duplicate = null;
+        if (isbn) {
+            duplicate = targetLibraryBooks.find(b => b.isbn?.replace(/[^0-9X]/gi, '') === isbn);
+        }
+        if (!duplicate && title && author) {
+            duplicate = targetLibraryBooks.find(b => b.title?.trim().toLowerCase() === title && b.author?.trim().toLowerCase() === author);
+        }
+        return duplicate;
+    }
+
+    // ---------- Firestore Write ----------
+    async function addBookToFirestore(bookData, status = 'want_to_read', targetUserId = null) {
+        if (!currentUser) return;
+        targetUserId = targetUserId || currentUser.uid;
+        const isAddingToSharedLibrary = targetUserId !== currentUser.uid;
+
+        // Sync genres and categories arrays
+        const finalGenres = bookData.genres || bookData.categories || (bookData.category ? [bookData.category] : ['Other']);
+        bookData.genres = finalGenres;
+        bookData.categories = finalGenres;
+
+        // ---- NEW: Validate and sanitize coverUrl before saving ----
+        if (bookData.coverUrl && !isValidImageUrl(bookData.coverUrl)) {
+            console.warn('Invalid coverUrl rejected:', bookData.coverUrl);
+            bookData.coverUrl = null;
+        }
+        // ---------------------------------------------------------
+
+        try {
+            // Check for duplicate in TARGET library
+            const duplicate = findDuplicateBook(bookData, targetUserId);
+
+            if (duplicate) {
+                const targetName = targetUserId === currentUser.uid ? 'your library' : 'this library';
+                const confirmUpdate = confirm(`This book ("${duplicate.title}") is already in ${targetName}. Would you like to update the existing record instead?`);
+                if (!confirmUpdate) return null;
+
+                const updateData = {
+                    ...bookData,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
-            }
+                delete updateData.createdAt;
+                delete updateData.userId;
+                delete updateData.readingStatus;
+                delete updateData.isWishlist;
 
-            // Helper for duplicate detection within a specific user's library
-            function findDuplicateBook(bookData, targetUserId) {
-                const isbn = bookData.isbn?.replace(/[^0-9X]/gi, '');
-                const title = bookData.title?.trim().toLowerCase();
-                const author = bookData.author?.trim().toLowerCase();
+                await db.collection('books').doc(duplicate.id).update(updateData);
 
-                const targetLibraryBooks = books.filter(b => b.userId === targetUserId);
-
-                let duplicate = null;
-                if (isbn) {
-                    duplicate = targetLibraryBooks.find(b => b.isbn?.replace(/[^0-9X]/gi, '') === isbn);
-                }
-                if (!duplicate && title && author) {
-                    duplicate = targetLibraryBooks.find(b => b.title?.trim().toLowerCase() === title && b.author?.trim().toLowerCase() === author);
-                }
-                return duplicate;
-            }
-
-            // ---------- Firestore Write ----------
-            async function addBookToFirestore(bookData, status = 'want_to_read', targetUserId = null) {
-                if (!currentUser) return;
-                targetUserId = targetUserId || currentUser.uid;
-                const isAddingToSharedLibrary = targetUserId !== currentUser.uid;
-
-                // Sync genres and categories arrays
-                const finalGenres = bookData.genres || bookData.categories || (bookData.category ? [bookData.category] : ['Other']);
-                bookData.genres = finalGenres;
-                bookData.categories = finalGenres;
-
-                // ---- NEW: Validate and sanitize coverUrl before saving ----
-                if (bookData.coverUrl && !isValidImageUrl(bookData.coverUrl)) {
-                    console.warn('Invalid coverUrl rejected:', bookData.coverUrl);
-                    bookData.coverUrl = null;
-                }
-                // ---------------------------------------------------------
-
-                try {
-                    // Check for duplicate in TARGET library
-                    const duplicate = findDuplicateBook(bookData, targetUserId);
-
-                    if (duplicate) {
-                        const targetName = targetUserId === currentUser.uid ? 'your library' : 'this library';
-                        const confirmUpdate = confirm(`This book ("${duplicate.title}") is already in ${targetName}. Would you like to update the existing record instead?`);
-                        if (!confirmUpdate) return null;
-
-                        const updateData = {
-                            ...bookData,
-                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                        };
-                        delete updateData.createdAt;
-                        delete updateData.userId;
-                        delete updateData.readingStatus;
-                        delete updateData.isWishlist;
-
-                        await db.collection('books').doc(duplicate.id).update(updateData);
-
-                        // Update per-user reading status
-                        await db.collection('books').doc(duplicate.id)
-                            .collection('readingStatus').doc(currentUser.uid).set({
-                                status: status,
-                                rating: bookData.rating || 0,
-                                progress: bookData.progress || 0,
-                                comment: bookData.comments || '',
-                                isWishlist: bookData.isWishlist || false,
-                                userId: currentUser.uid,
-                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                            }, { merge: true });
-
-                        showToast('Existing book updated!', 'success');
-                        return duplicate.id;
-                    }
-
-                    // Ensure default values to prevent visibility issues
-                    const finalData = {
-                        title: 'Untitled',
-                        author: 'Unknown',
-                        categories: ['Other'],
-                        rating: 0,
-                        source: 'manual',
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        ...bookData,
-                        userId: targetUserId
-                    };
-                    delete finalData.isWishlist;
-
-                    // Track who added the book if it's being added to someone else's library
-                    if (isAddingToSharedLibrary) {
-                        finalData.addedBy = currentUser.uid;
-                    }
-
-                    delete finalData.readingStatus; // Don't store status on the book itself
-
-                    const docRef = await db.collection('books').add(finalData);
-
-                    // Save per-user reading status in subcollection
-                    await docRef.collection('readingStatus').doc(currentUser.uid).set({
+                // Update per-user reading status
+                await db.collection('books').doc(duplicate.id)
+                    .collection('readingStatus').doc(currentUser.uid).set({
                         status: status,
-                        rating: finalData.rating || 0,
-                        progress: finalData.progress || 0,
-                        comment: finalData.comments || '',
+                        rating: bookData.rating || 0,
+                        progress: bookData.progress || 0,
+                        comment: bookData.comments || '',
                         isWishlist: bookData.isWishlist || false,
                         userId: currentUser.uid,
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                     }, { merge: true });
 
-                    showToast('Book added!', 'success');
-
-                    // Track activity for everyone
-                    const partner = allPartnerships?.find(p => (p.userId1 === targetUserId || p.userId2 === targetUserId) && (p.userId1 !== targetUserId || p.userId2 !== targetUserId));
-                    const targetUserName = targetUserId === currentUser.uid ? 'My' : 'Partner';
-                    await db.collection('activityFeed').add({
-                        type: 'book_added',
-                        bookTitle: bookData.title || 'Unknown',
-                        userName: currentUser.displayName || currentUser.email || currentUser.uid,
-                        userId: currentUser.uid,
-                        addedTo: targetUserName,
-                        libraryId: targetUserId,
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                        bookId: docRef.id
-                    });
-
-                    return docRef.id;
-                } catch (err) {
-                    showToast('Error saving: ' + err.message, 'error');
-                }
+                showToast('Existing book updated!', 'success');
+                return duplicate.id;
             }
 
-            // ---------- My Books Tab ----------
-            function saveRecentSearch(query) {
-                if (!query) return;
-                let searches = [];
-                try {
-                    searches = JSON.parse(localStorage.getItem('mylib_recent_searches') || '[]');
-                } catch (e) {
-                    searches = [];
-                }
-                searches = [query, ...searches.filter(s => s !== query)].slice(0, 5);
-                localStorage.setItem('mylib_recent_searches', JSON.stringify(searches));
+            // Ensure default values to prevent visibility issues
+            const finalData = {
+                title: 'Untitled',
+                author: 'Unknown',
+                categories: ['Other'],
+                rating: 0,
+                source: 'manual',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                ...bookData,
+                userId: targetUserId
+            };
+            delete finalData.isWishlist;
+
+            // Track who added the book if it's being added to someone else's library
+            if (isAddingToSharedLibrary) {
+                finalData.addedBy = currentUser.uid;
             }
 
-            function renderRecentSearches() {
-                const container = document.getElementById('recent-searches-bar');
-                if (!container) return;
-                let searches = [];
-                try {
-                    searches = JSON.parse(localStorage.getItem('mylib_recent_searches') || '[]');
-                } catch (e) {
-                    searches = [];
-                }
-                if (searches.length === 0 || searchQuery) {
-                    container.innerHTML = '';
-                    return;
-                }
-                container.innerHTML = `
+            delete finalData.readingStatus; // Don't store status on the book itself
+
+            const docRef = await db.collection('books').add(finalData);
+
+            // Save per-user reading status in subcollection
+            await docRef.collection('readingStatus').doc(currentUser.uid).set({
+                status: status,
+                rating: finalData.rating || 0,
+                progress: finalData.progress || 0,
+                comment: finalData.comments || '',
+                isWishlist: bookData.isWishlist || false,
+                userId: currentUser.uid,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+
+            showToast('Book added!', 'success');
+
+            // Track activity for everyone
+            const partner = allPartnerships?.find(p => (p.userId1 === targetUserId || p.userId2 === targetUserId) && (p.userId1 !== targetUserId || p.userId2 !== targetUserId));
+            const targetUserName = targetUserId === currentUser.uid ? 'My' : 'Partner';
+            await db.collection('activityFeed').add({
+                type: 'book_added',
+                bookTitle: bookData.title || 'Unknown',
+                userName: currentUser.displayName || currentUser.email || currentUser.uid,
+                userId: currentUser.uid,
+                addedTo: targetUserName,
+                libraryId: targetUserId,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                bookId: docRef.id
+            });
+
+            return docRef.id;
+        } catch (err) {
+            showToast('Error saving: ' + err.message, 'error');
+        }
+    }
+
+    // ---------- My Books Tab ----------
+    function saveRecentSearch(query) {
+        if (!query) return;
+        let searches = [];
+        try {
+            searches = JSON.parse(localStorage.getItem('mylib_recent_searches') || '[]');
+        } catch (e) {
+            searches = [];
+        }
+        searches = [query, ...searches.filter(s => s !== query)].slice(0, 5);
+        localStorage.setItem('mylib_recent_searches', JSON.stringify(searches));
+    }
+
+    function renderRecentSearches() {
+        const container = document.getElementById('recent-searches-bar');
+        if (!container) return;
+        let searches = [];
+        try {
+            searches = JSON.parse(localStorage.getItem('mylib_recent_searches') || '[]');
+        } catch (e) {
+            searches = [];
+        }
+        if (searches.length === 0 || searchQuery) {
+            container.innerHTML = '';
+            return;
+        }
+        container.innerHTML = `
                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest self-center mr-1">Recent:</span>
                     ${searches.map(s => `
                         <button data-recent-search="${escapeHTML(s)}" class="recent-search-chip px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-full text-[10px] font-bold hover:bg-slate-50 dark:hover:bg-blue-900/20 hover:text-sky-600 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none border border-transparent hover:border-slate-200 dark:hover:border-blue-800">
@@ -5823,26 +5879,26 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                         </button>
                     `).join('')}
                 `;
-            }
+    }
 
-            function renderMyBooks() {
-                books = books.map(b => b._escapedTitle ? b : normalizeBook(b));
-                renderRecentSearches();
-                // ⚡ Bolt: Hoist density class calculation out of the mapping loop
-                const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
-                const finishedBooks = books.filter(b => {
-                    const statusData = getStatusData(b.id);
-                    return statusData.status === 'finished';
-                });
+    function renderMyBooks() {
+        books = books.map(b => b._escapedTitle ? b : normalizeBook(b));
+        renderRecentSearches();
+        // ⚡ Bolt: Hoist density class calculation out of the mapping loop
+        const densityClass = cardDensity === 'relaxed' ? 'density-relaxed' : cardDensity === 'compact' ? 'density-compact' : '';
+        const finishedBooks = books.filter(b => {
+            const statusData = getStatusData(b.id);
+            return statusData.status === 'finished';
+        });
 
-                const wishlistBooks = books.filter(b => {
-                    const statusData = getStatusData(b.id);
-                    return statusData.isWishlist === true;
-                });
+        const wishlistBooks = books.filter(b => {
+            const statusData = getStatusData(b.id);
+            return statusData.isWishlist === true;
+        });
 
-                const displayBooks = myBooksSubTab === 'finished' ? finishedBooks : wishlistBooks;
+        const displayBooks = myBooksSubTab === 'finished' ? finishedBooks : wishlistBooks;
 
-                return `
+        return `
                 <div class="animate-slide-up space-y-8">
                     <!-- Stats & Chart Section -->
                     <div id="my-books-stats-container">
@@ -5887,164 +5943,164 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     </div>
                 </div>
                 `;
+    }
+
+    window.activeChartInstances = new Map();
+    window.pendingCharts = [];
+
+    window.processPendingCharts = () => {
+        console.log('Processing pending charts, count:', window.pendingCharts ? window.pendingCharts.length : 0);
+        if (!window.pendingCharts || window.pendingCharts.length === 0) return;
+        const isDark = document.documentElement.classList.contains('dark');
+        const isSepia = document.documentElement.classList.contains('sepia');
+        const tooltipBg = isDark ? '#1e293b' : (isSepia ? '#fbf4e3' : '#ffffff');
+        const tooltipTitle = isDark ? '#ffffff' : (isSepia ? '#3a2e1f' : '#1e293b');
+        const tooltipBody = isDark ? '#e2e8f0' : (isSepia ? '#7c6a4f' : '#475569');
+        const tooltipBorder = isDark ? '#334155' : (isSepia ? '#d9c9a8' : '#e2e8f0');
+        const gridLine = isDark ? '#334155' : (isSepia ? '#e8dcc3' : '#f1f5f9');
+        const tickColor = isDark ? '#94a3b8' : (isSepia ? '#7c6a4f' : '#64748b');
+
+        window.pendingCharts.forEach(chart => {
+            const ctx = document.getElementById(chart.id);
+            if (!ctx) return;
+            ctx.setAttribute('role', 'img');
+            ctx.setAttribute('aria-label', chart.ariaLabel || 'Data chart');
+
+            // Destroy existing chart if any is associated with this canvas to avoid glitches/overlapping
+            if (window.activeChartInstances.has(chart.id)) {
+                try {
+                    window.activeChartInstances.get(chart.id).destroy();
+                } catch (e) {
+                    console.error('Failed to destroy chart', e);
+                }
+                window.activeChartInstances.delete(chart.id);
             }
 
-            window.activeChartInstances = new Map();
-            window.pendingCharts = [];
-
-            window.processPendingCharts = () => {
-                console.log('Processing pending charts, count:', window.pendingCharts ? window.pendingCharts.length : 0);
-                if (!window.pendingCharts || window.pendingCharts.length === 0) return;
-                const isDark = document.documentElement.classList.contains('dark');
-                const isSepia = document.documentElement.classList.contains('sepia');
-                const tooltipBg = isDark ? '#1e293b' : (isSepia ? '#fbf4e3' : '#ffffff');
-                const tooltipTitle = isDark ? '#ffffff' : (isSepia ? '#3a2e1f' : '#1e293b');
-                const tooltipBody = isDark ? '#e2e8f0' : (isSepia ? '#7c6a4f' : '#475569');
-                const tooltipBorder = isDark ? '#334155' : (isSepia ? '#d9c9a8' : '#e2e8f0');
-                const gridLine = isDark ? '#334155' : (isSepia ? '#e8dcc3' : '#f1f5f9');
-                const tickColor = isDark ? '#94a3b8' : (isSepia ? '#7c6a4f' : '#64748b');
-
-                window.pendingCharts.forEach(chart => {
-                    const ctx = document.getElementById(chart.id);
-                    if (!ctx) return;
-                    ctx.setAttribute('role', 'img');
-                    ctx.setAttribute('aria-label', chart.ariaLabel || 'Data chart');
-
-                    // Destroy existing chart if any is associated with this canvas to avoid glitches/overlapping
-                    if (window.activeChartInstances.has(chart.id)) {
-                        try {
-                            window.activeChartInstances.get(chart.id).destroy();
-                        } catch (e) {
-                            console.error('Failed to destroy chart', e);
-                        }
-                        window.activeChartInstances.delete(chart.id);
-                    }
-
-                    try {
-                        let chartInstance;
-                        if (chart.type === 'doughnut' || chart.type === 'pie') {
-                            chartInstance = new Chart(ctx, {
-                                type: chart.type || 'doughnut',
-                                data: {
-                                    labels: chart.labels,
-                                    datasets: [{
-                                        data: chart.data,
-                                        backgroundColor: chart.colors,
-                                        borderColor: isDark ? '#0f172a' : '#ffffff',
-                                        borderWidth: 2,
-                                        hoverOffset: 6
-                                    }]
-                                },
-                                options: {
-                                    responsive: true,
-                                    maintainAspectRatio: false,
-                                    plugins: {
-                                        legend: { display: false },
-                                        tooltip: {
-                                            backgroundColor: isDark ? '#1e293b' : '#ffffff',
-                                            titleColor: isDark ? '#ffffff' : '#1e293b',
-                                            bodyColor: isDark ? '#e2e8f0' : '#475569',
-                                            borderColor: isDark ? '#334155' : '#e2e8f0',
-                                            borderWidth: 1,
-                                            callbacks: {
-                                                label: function (context) {
-                                                    const value = context.raw;
-                                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                                    const pct = Math.round((value / total) * 100) || 0;
-                                                    return ` ${context.label}: ${value} books (${pct}%)`;
-                                                }
-                                            }
-                                        }
-                                    },
-                                    cutout: chart.type === 'pie' ? '0%' : '70%',
-                                    animation: {
-                                        animateScale: true,
-                                        animateRotate: true
-                                    }
-                                }
-                            });
-                        } else if (chart.type === 'bar') {
-                            chartInstance = new Chart(ctx, {
-                                type: 'bar',
-                                data: {
-                                    labels: chart.labels,
-                                    datasets: [{
-                                        data: chart.data,
-                                        backgroundColor: chart.colors || '#3b82f6',
-                                        borderRadius: 6,
-                                        borderWidth: 0
-                                    }]
-                                },
-                                options: {
-                                    responsive: true,
-                                    maintainAspectRatio: false,
-                                    indexAxis: chart.indexAxis || 'x',
-                                    scales: {
-                                        x: {
-                                            grid: { display: false },
-                                            ticks: {
-                                                color: isDark ? '#94a3b8' : '#64748b',
-                                                font: { size: 10, weight: 'bold' }
-                                            }
-                                        },
-                                        y: {
-                                            grid: { color: isDark ? '#334155' : '#f1f5f9' },
-                                            ticks: {
-                                                color: isDark ? '#94a3b8' : '#64748b',
-                                                font: { size: 10 },
-                                                precision: 0
-                                            }
-                                        }
-                                    },
-                                    plugins: {
-                                        legend: { display: false },
-                                        tooltip: {
-                                            backgroundColor: isDark ? '#1e293b' : '#ffffff',
-                                            titleColor: isDark ? '#ffffff' : '#1e293b',
-                                            bodyColor: isDark ? '#e2e8f0' : '#475569',
-                                            borderColor: isDark ? '#334155' : '#e2e8f0',
-                                            borderWidth: 1
+            try {
+                let chartInstance;
+                if (chart.type === 'doughnut' || chart.type === 'pie') {
+                    chartInstance = new Chart(ctx, {
+                        type: chart.type || 'doughnut',
+                        data: {
+                            labels: chart.labels,
+                            datasets: [{
+                                data: chart.data,
+                                backgroundColor: chart.colors,
+                                borderColor: isDark ? '#0f172a' : '#ffffff',
+                                borderWidth: 2,
+                                hoverOffset: 6
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                                    titleColor: isDark ? '#ffffff' : '#1e293b',
+                                    bodyColor: isDark ? '#e2e8f0' : '#475569',
+                                    borderColor: isDark ? '#334155' : '#e2e8f0',
+                                    borderWidth: 1,
+                                    callbacks: {
+                                        label: function (context) {
+                                            const value = context.raw;
+                                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                            const pct = Math.round((value / total) * 100) || 0;
+                                            return ` ${context.label}: ${value} books (${pct}%)`;
                                         }
                                     }
                                 }
-                            });
+                            },
+                            cutout: chart.type === 'pie' ? '0%' : '70%',
+                            animation: {
+                                animateScale: true,
+                                animateRotate: true
+                            }
                         }
-                        if (chartInstance) {
-                            ctx.__chartInstance = chartInstance;
-                            window.activeChartInstances.set(chart.id, chartInstance);
+                    });
+                } else if (chart.type === 'bar') {
+                    chartInstance = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: chart.labels,
+                            datasets: [{
+                                data: chart.data,
+                                backgroundColor: chart.colors || '#3b82f6',
+                                borderRadius: 6,
+                                borderWidth: 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            indexAxis: chart.indexAxis || 'x',
+                            scales: {
+                                x: {
+                                    grid: { display: false },
+                                    ticks: {
+                                        color: isDark ? '#94a3b8' : '#64748b',
+                                        font: { size: 10, weight: 'bold' }
+                                    }
+                                },
+                                y: {
+                                    grid: { color: isDark ? '#334155' : '#f1f5f9' },
+                                    ticks: {
+                                        color: isDark ? '#94a3b8' : '#64748b',
+                                        font: { size: 10 },
+                                        precision: 0
+                                    }
+                                }
+                            },
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                                    titleColor: isDark ? '#ffffff' : '#1e293b',
+                                    bodyColor: isDark ? '#e2e8f0' : '#475569',
+                                    borderColor: isDark ? '#334155' : '#e2e8f0',
+                                    borderWidth: 1
+                                }
+                            }
                         }
-                    } catch (err) {
-                        console.error("Error building Chart.js chart for: " + chart.id, err);
-                    }
-                });
+                    });
+                }
+                if (chartInstance) {
+                    ctx.__chartInstance = chartInstance;
+                    window.activeChartInstances.set(chart.id, chartInstance);
+                }
+            } catch (err) {
+                console.error("Error building Chart.js chart for: " + chart.id, err);
+            }
+        });
 
-                // Clear pending charts list once processed
-                window.pendingCharts = [];
-            };
+        // Clear pending charts list once processed
+        window.pendingCharts = [];
+    };
 
-            function renderPieChart(entries, total, colors, centerValue, centerLabel, title, filterType, showCenter = true, showPercentageInLegend = false, chartType = 'doughnut') {
-                const chartId = `chart-${Math.random().toString(36).substr(2, 9)}`;
+    function renderPieChart(entries, total, colors, centerValue, centerLabel, title, filterType, showCenter = true, showPercentageInLegend = false, chartType = 'doughnut') {
+        const chartId = `chart-${Math.random().toString(36).substr(2, 9)}`;
 
-                // Standard Color Palette
-                const palette = colors && colors.length > 0 ? colors : [
-                    '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-                    '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#6366f1'
-                ];
+        // Standard Color Palette
+        const palette = colors && colors.length > 0 ? colors : [
+            '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+            '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#6366f1'
+        ];
 
-                if (!window.pendingCharts) window.pendingCharts = [];
-                window.pendingCharts.push({
-                    id: chartId,
-                    type: chartType,
-                    labels: entries.map(e => e[0]),
-                    data: entries.map(e => e[1]),
-                    colors: palette,
-                    showCenter,
-                    centerValue,
-                    centerLabel,
-                    ariaLabel: `${title}: ${entries.map(([l, c]) => `${l} ${c}`).join(', ')}`
-                });
+        if (!window.pendingCharts) window.pendingCharts = [];
+        window.pendingCharts.push({
+            id: chartId,
+            type: chartType,
+            labels: entries.map(e => e[0]),
+            data: entries.map(e => e[1]),
+            colors: palette,
+            showCenter,
+            centerValue,
+            centerLabel,
+            ariaLabel: `${title}: ${entries.map(([l, c]) => `${l} ${c}`).join(', ')}`
+        });
 
-                return `
+        return `
                     <div class="relative w-44 h-44 flex-shrink-0 mx-auto sm:mx-0">
                         <canvas id="${chartId}" class="w-full h-full"></canvas>
                         ${showCenter ? `
@@ -6058,10 +6114,10 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                         <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">${title}</h3>
                         <div class="grid grid-cols-1 gap-x-6 gap-y-2">
                             ${entries.slice(0, 6).map(([label, count], i) => {
-                    const clickHandler = filterType ? `data-action="apply-insight" data-value="${escapeHTML(filterType)}" data-value2="${escapeHTML(label)}"` : '';
-                    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-                    const displayCount = showPercentageInLegend ? `${count} <span class="text-[10px] font-normal text-slate-400">(${pct}%)</span>` : count;
-                    return `
+            const clickHandler = filterType ? `data-action="apply-insight" data-value="${escapeHTML(filterType)}" data-value2="${escapeHTML(label)}"` : '';
+            const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+            const displayCount = showPercentageInLegend ? `${count} <span class="text-[10px] font-normal text-slate-400">(${pct}%)</span>` : count;
+            return `
                                 <div class="flex items-center justify-between text-sm py-1 border-b border-slate-50 dark:border-slate-800/50 ${filterType ? 'cursor-pointer group' : ''}" ${clickHandler}>
                                     <div class="flex items-center gap-2 truncate">
                                         <div class="w-2 h-2 rounded-full" style="background-color: ${palette[i % palette.length]}"></div>
@@ -6070,17 +6126,17 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                     <span class="font-bold text-primary">${displayCount}</span>
                                 </div>
                                 `;
-                }).join('')}
+        }).join('')}
                             ${entries.length === 0 ? '<p class="text-xs text-slate-400 italic">No data available.</p>' : ''}
                         </div>
                     </div>
                 `;
-            }
+    }
 
-            function renderMyBooksStats(finishedBooks) {
-                // 🦴 Show skeleton while the app is still doing its initial Firestore sync
-                if (isInitialSync) {
-                    return `
+    function renderMyBooksStats(finishedBooks) {
+        // 🦴 Show skeleton while the app is still doing its initial Firestore sync
+        if (isInitialSync) {
+            return `
             <div class="space-y-6">
                 <!-- Card 1: Genre Chart Skeleton -->
                 <div class="glass p-6 rounded-3xl border border-slate-200/50 dark:border-slate-800">
@@ -6114,35 +6170,35 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                 </div>
             </div>
         `;
-                }
+        }
 
-                const genresCount = {};
-                finishedBooks.forEach(b => {
-                    getBookGenres(b).forEach(g => {
-                        genresCount[g] = (genresCount[g] || 0) + 1;
-                    });
-                });
+        const genresCount = {};
+        finishedBooks.forEach(b => {
+            getBookGenres(b).forEach(g => {
+                genresCount[g] = (genresCount[g] || 0) + 1;
+            });
+        });
 
-                const all = Object.entries(genresCount).sort((a, b) => b[1] - a[1]);
-                const top = all.slice(0, 6);
-                const rest = all.slice(6).reduce((s, [, c]) => s + c, 0);
-                const entries = rest > 0 ? [...top, ['Other', rest]] : top;
-                const total = finishedBooks.length;
-                const palette = ['#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#06b6d4', '#94a3b8'];
-                const chartId = `genre-chart-${Math.random().toString(36).substr(2, 9)}`;
+        const all = Object.entries(genresCount).sort((a, b) => b[1] - a[1]);
+        const top = all.slice(0, 6);
+        const rest = all.slice(6).reduce((s, [, c]) => s + c, 0);
+        const entries = rest > 0 ? [...top, ['Other', rest]] : top;
+        const total = finishedBooks.length;
+        const palette = ['#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#06b6d4', '#94a3b8'];
+        const chartId = `genre-chart-${Math.random().toString(36).substr(2, 9)}`;
 
-                if (!window.pendingCharts) window.pendingCharts = [];
-                window.pendingCharts.push({
-                    id: chartId,
-                    type: 'doughnut',
-                    labels: entries.map(e => e[0]),
-                    data: entries.map(e => e[1]),
-                    colors: palette,
-                    showCenter: false,
-                    ariaLabel: `Finished by Genre: ${entries.map(([l, c]) => `${l} ${c}`).join(', ')}`
-                });
+        if (!window.pendingCharts) window.pendingCharts = [];
+        window.pendingCharts.push({
+            id: chartId,
+            type: 'doughnut',
+            labels: entries.map(e => e[0]),
+            data: entries.map(e => e[1]),
+            colors: palette,
+            showCenter: false,
+            ariaLabel: `Finished by Genre: ${entries.map(([l, c]) => `${l} ${c}`).join(', ')}`
+        });
 
-                return `
+        return `
                 <div class="space-y-6">
                     <!-- Card 1: Finished by Genre -->
                     <div class="glass p-6 rounded-3xl border border-slate-200/50 dark:border-slate-800">
@@ -6158,9 +6214,9 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                 <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Finished by Genre</h3>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
                                     ${entries.map(([label, count], i) => {
-                    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-                    const color = palette[i % palette.length];
-                    return `
+            const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+            const color = palette[i % palette.length];
+            return `
                                         <button data-action="apply-insight" data-value="genre" data-value2="${escapeHTML(label)}" class="flex items-center justify-between gap-3 text-sm py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg px-2 -mx-2 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none group">
                                             <div class="flex items-center gap-2 min-w-0">
                                                 <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: ${color}"></span>
@@ -6174,7 +6230,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                             </div>
                                         </button>
                                         `;
-                }).join('')}
+        }).join('')}
                                     ${entries.length === 0 ? '<p class="text-xs text-slate-400 italic col-span-full px-2">No finished books yet.</p>' : ''}
                                 </div>
                             </div>
@@ -6187,48 +6243,48 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     </div>
                 </div>
                 `;
-            }
+    }
 
-            function renderCollaboratorStats() {
-                const partnerships = allPartnerships
-                    .filter(p => !p.user1Unsubscribed && !p.user2Unsubscribed);
+    function renderCollaboratorStats() {
+        const partnerships = allPartnerships
+            .filter(p => !p.user1Unsubscribed && !p.user2Unsubscribed);
 
-                if (!partnerships || partnerships.length === 0) {
-                    return `
+        if (!partnerships || partnerships.length === 0) {
+            return `
                     <div class="glass p-6 rounded-3xl border border-slate-200/50 dark:border-slate-800">
                         <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Collaborator Activity</h3>
                         <p class="text-xs text-slate-400 italic">No collaborators yet. Add one from Settings to see shared reading activity here.</p>
                     </div>
                     `;
-                }
+        }
 
-                const containerId = `collab-stats-${Math.random().toString(36).substr(2, 9)}`;
-                const partnerIds = partnerships.map(p => p.userId1 === currentUser.uid ? p.userId2 : p.userId1);
+        const containerId = `collab-stats-${Math.random().toString(36).substr(2, 9)}`;
+        const partnerIds = partnerships.map(p => p.userId1 === currentUser.uid ? p.userId2 : p.userId1);
 
-                Promise.all(partnerIds.map(id => db.collection('users').doc(id).get())).then(docs => {
-                    const el = document.getElementById(containerId);
-                    if (!el) return;
-                    el.classList.remove('animate-pulse');
+        Promise.all(partnerIds.map(id => db.collection('users').doc(id).get())).then(docs => {
+            const el = document.getElementById(containerId);
+            if (!el) return;
+            el.classList.remove('animate-pulse');
 
-                    const stats = docs.map((doc, idx) => {
-                        if (!doc.exists) return null;
-                        const data = doc.data();
-                        return {
-                            uid: partnerIds[idx],
-                            name: data.displayName || 'Partner',
-                            count: data.completedBooksCount || 0
-                        };
-                    }).filter(Boolean).sort((a, b) => b.count - a.count);
+            const stats = docs.map((doc, idx) => {
+                if (!doc.exists) return null;
+                const data = doc.data();
+                return {
+                    uid: partnerIds[idx],
+                    name: data.displayName || 'Partner',
+                    count: data.completedBooksCount || 0
+                };
+            }).filter(Boolean).sort((a, b) => b.count - a.count);
 
-                    el.innerHTML = `
+            el.innerHTML = `
                         <div class="glass p-6 rounded-3xl border border-slate-200/50 dark:border-slate-800">
                             <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Collaborator Activity</h3>
                             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                 ${stats.map((s, idx) => {
-                        const initials = s.name.trim().substring(0, 2).toUpperCase();
-                        const isZero = s.count === 0;
-                        const isLeader = idx === 0 && s.count > 0;
-                        return `
+                const initials = s.name.trim().substring(0, 2).toUpperCase();
+                const isZero = s.count === 0;
+                const isLeader = idx === 0 && s.count > 0;
+                return `
                                     <div role="button" tabindex="0" data-action="open-user-profile" data-value="${escapeHTML(s.uid)}" class="flex items-center gap-3 p-3 rounded-2xl border cursor-pointer ${isLeader ? 'border-amber-200 dark:border-amber-900/40 bg-amber-50/40 dark:bg-amber-950/10' : 'border-slate-100 dark:border-slate-800'} hover:bg-slate-50 dark:hover:bg-slate-800/50 text-left focus-visible:ring-2 focus-visible:ring-primary outline-none">
                                         <div class="relative flex-shrink-0">
                                             <div class="w-10 h-10 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center font-black text-xs">${escapeHTML(initials)}</div>
@@ -6247,13 +6303,13 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                         </div>
                                     </div>
                                     `;
-                    }).join('')}
+            }).join('')}
                             </div>
                         </div>
                     `;
-                });
+        });
 
-                return `
+        return `
                 <div id="${containerId}" class="glass p-6 rounded-3xl border border-slate-200/50 dark:border-slate-800">
                     <div class="skeleton-base skeleton-text w-32 mb-4"></div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -6268,67 +6324,67 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                         `).join('')}
                     </div>
                 </div>`;
-            }
+    }
 
 
-            window.postActivityMessage = async () => {
-                const input = document.getElementById('activity-message-input');
-                const text = input.value?.trim();
-                if (!text) return;
+    window.postActivityMessage = async () => {
+        const input = document.getElementById('activity-message-input');
+        const text = input.value?.trim();
+        if (!text) return;
 
-                const btn = document.getElementById('post-activity-msg-btn');
-                const originalContent = btn.innerHTML;
+        const btn = document.getElementById('post-activity-msg-btn');
+        const originalContent = btn.innerHTML;
 
-                input.disabled = true;
-                btn.disabled = true;
-                btn.innerHTML = '<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+        input.disabled = true;
+        btn.disabled = true;
+        btn.innerHTML = '<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
 
-                try {
-                    await db.collection('activityFeed').add({
-                        type: 'user_message',
-                        userId: currentUser.uid,
-                        userName: userProfile.displayName || currentUser.email,
-                        text: text,
-                        libraryId: currentUser.uid,
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    input.value = '';
-                    showToast('Message posted to activity feed', 'success');
-                } catch (err) {
-                    showToast('Failed to post message: ' + err.message, 'error');
-                } finally {
-                    input.disabled = false;
-                    btn.disabled = false;
-                    btn.innerHTML = originalContent;
-                }
-            };
+        try {
+            await db.collection('activityFeed').add({
+                type: 'user_message',
+                userId: currentUser.uid,
+                userName: userProfile.displayName || currentUser.email,
+                text: text,
+                libraryId: currentUser.uid,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            input.value = '';
+            showToast('Message posted to activity feed', 'success');
+        } catch (err) {
+            showToast('Failed to post message: ' + err.message, 'error');
+        } finally {
+            input.disabled = false;
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+        }
+    };
 
-            function renderLibraryInsight() {
-                // ⚡ Bolt: Use pre-calculated statistics from libraryStats to eliminate redundant O(N) loop
-                const {
-                    authorsCount,
-                    genresCount,
-                    tagsCount,
-                    totalValue,
-                    totalTags,
-                    libBooksCount,
-                    statusCounts,
-                    ratingDist,
-                    firstBookTime,
-                    recentMomentum,
-                    finishedThisYear,
-                    readingStreak
-                } = libraryStats;
+    function renderLibraryInsight() {
+        // ⚡ Bolt: Use pre-calculated statistics from libraryStats to eliminate redundant O(N) loop
+        const {
+            authorsCount,
+            genresCount,
+            tagsCount,
+            totalValue,
+            totalTags,
+            libBooksCount,
+            statusCounts,
+            ratingDist,
+            firstBookTime,
+            recentMomentum,
+            finishedThisYear,
+            readingStreak
+        } = libraryStats;
 
-                const avgPrice = libBooksCount > 0 ? (totalValue / libBooksCount).toFixed(2) : 0;
-                const avgTags = libBooksCount > 0 ? (totalTags / libBooksCount).toFixed(1) : 0;
+        const avgPrice = libBooksCount > 0 ? (totalValue / libBooksCount).toFixed(2) : 0;
+        const avgTags = libBooksCount > 0 ? (totalTags / libBooksCount).toFixed(1) : 0;
 
-                const monthsActive = Math.max(1, (Date.now() - firstBookTime) / (30 * 24 * 60 * 60 * 1000));
-                const readingVelocity = (statusCounts.finished / monthsActive).toFixed(1);
-                const goalPercent = Math.min(100, Math.round((finishedThisYear / readingGoal) * 100));
+        const monthsActive = Math.max(1, (Date.now() - firstBookTime) / (30 * 24 * 60 * 60 * 1000));
+        const readingVelocity = (statusCounts.finished / monthsActive).toFixed(1);
+        const goalPercent = Math.min(100, Math.round((finishedThisYear / readingGoal) * 100));
 
-                if (libBooksCount === 0) {
-                    return `
+        if (libBooksCount === 0) {
+            return `
                     <div class="max-w-4xl mx-auto py-32 text-center animate-slide-up">
                         <div class="bg-slate-50 dark:bg-slate-800 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
                             <svg class="w-12 h-12 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
@@ -6338,30 +6394,30 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                         <button data-action="set-tab" data-value="library" class="mt-8 px-6 py-3 bg-primary text-white rounded-full font-bold text-sm shadow-lg transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none">Go to Library</button>
                     </div>
                     `;
-                }
+        }
 
-                if (!window.pendingCharts) window.pendingCharts = [];
-                window.pendingCharts.push({
-                    id: 'rating-distribution-chart',
-                    type: 'bar',
-                    labels: ['5★', '4★', '3★', '2★', '1★'],
-                    data: [ratingDist[5], ratingDist[4], ratingDist[3], ratingDist[2], ratingDist[1]],
-                    colors: ['#fbbf24', '#fbbf24', '#fbbf24', '#fbbf24', '#fbbf24'],
-                    indexAxis: 'y'
-                });
+        if (!window.pendingCharts) window.pendingCharts = [];
+        window.pendingCharts.push({
+            id: 'rating-distribution-chart',
+            type: 'bar',
+            labels: ['5★', '4★', '3★', '2★', '1★'],
+            data: [ratingDist[5], ratingDist[4], ratingDist[3], ratingDist[2], ratingDist[1]],
+            colors: ['#fbbf24', '#fbbf24', '#fbbf24', '#fbbf24', '#fbbf24'],
+            indexAxis: 'y'
+        });
 
-                window.pendingCharts.push({
-                    id: 'reading-composition-chart',
-                    type: 'doughnut',
-                    labels: Object.keys(statusCounts).map(status => READING_STATUSES[status].label),
-                    data: Object.values(statusCounts),
-                    colors: ['#10b981', '#3b82f6', '#64748b'],
-                    showCenter: true,
-                    centerValue: libBooksCount,
-                    centerLabel: 'Total Books'
-                });
+        window.pendingCharts.push({
+            id: 'reading-composition-chart',
+            type: 'doughnut',
+            labels: Object.keys(statusCounts).map(status => READING_STATUSES[status].label),
+            data: Object.values(statusCounts),
+            colors: ['#10b981', '#3b82f6', '#64748b'],
+            showCenter: true,
+            centerValue: libBooksCount,
+            centerLabel: 'Total Books'
+        });
 
-                return `
+        return `
                 <div class="max-w-5xl mx-auto space-y-8 animate-slide-up">
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-1">
                             <h2 class="text-3xl font-black font-serif italic text-sky-600 dark:text-blue-400">Library Analysis</h2>
@@ -6449,9 +6505,9 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                     <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Reading Composition</h3>
                                     <div class="space-y-2">
                                         ${Object.entries(statusCounts).map(([status, count]) => {
-                    const percent = libBooksCount ? Math.round((count / libBooksCount) * 100) : 0;
-                    const colorClass = status === 'finished' ? 'bg-emerald-500' : status === 'reading' ? 'bg-sky-500' : 'bg-slate-400 dark:bg-slate-500';
-                    return `
+            const percent = libBooksCount ? Math.round((count / libBooksCount) * 100) : 0;
+            const colorClass = status === 'finished' ? 'bg-emerald-500' : status === 'reading' ? 'bg-sky-500' : 'bg-slate-400 dark:bg-slate-500';
+            return `
                                                 <div class="flex items-center justify-between text-sm py-1 border-b border-slate-50 dark:border-slate-800/50">
                                                     <div class="flex items-center gap-2 truncate">
                                                         <div class="w-2 h-2 rounded-full ${colorClass}"></div>
@@ -6460,7 +6516,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                                     <span class="font-bold text-primary">${count} <span class="text-[10px] font-normal text-slate-400">(${percent}%)</span></span>
                                                 </div>
                                             `;
-                }).join('')}
+        }).join('')}
                                     </div>
                                 </div>
                             </div>
@@ -6475,33 +6531,33 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-10 mb-10 pt-10 border-t border-slate-100 dark:border-slate-800">
                             <div class="flex flex-col sm:flex-row items-center gap-8">
                                 ${(() => {
-                        const all = Object.entries(genresCount).sort((a, b) => b[1] - a[1]);
-                        const top = all.slice(0, 6);
-                        const rest = all.slice(6).reduce((s, [, c]) => s + c, 0);
-                        const entries = rest > 0 ? [...top, ['Other', rest]] : top;
-                        const totalEntries = entries.reduce((acc, [_, count]) => acc + count, 0);
-                        return renderPieChart(entries, totalEntries, ['#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#06b6d4', '#94a3b8'], libBooksCount, 'Books', 'Genre Distribution', 'genre', false);
-                    })()}
+                const all = Object.entries(genresCount).sort((a, b) => b[1] - a[1]);
+                const top = all.slice(0, 6);
+                const rest = all.slice(6).reduce((s, [, c]) => s + c, 0);
+                const entries = rest > 0 ? [...top, ['Other', rest]] : top;
+                const totalEntries = entries.reduce((acc, [_, count]) => acc + count, 0);
+                return renderPieChart(entries, totalEntries, ['#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#06b6d4', '#94a3b8'], libBooksCount, 'Books', 'Genre Distribution', 'genre', false);
+            })()}
                             </div>
                             <div class="flex flex-col sm:flex-row items-center gap-8">
                                 ${(() => {
-                        const all = Object.entries(authorsCount).sort((a, b) => b[1] - a[1]);
-                        const top = all.slice(0, 6);
-                        const rest = all.slice(6).reduce((s, [, c]) => s + c, 0);
-                        const entries = rest > 0 ? [...top, ['Other', rest]] : top;
-                        const totalEntries = entries.reduce((acc, [_, count]) => acc + count, 0);
-                        return renderPieChart(entries, totalEntries, ['#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#06b6d4', '#94a3b8'], libBooksCount, 'Books', 'Author Distribution', 'author', false);
-                    })()}
+                const all = Object.entries(authorsCount).sort((a, b) => b[1] - a[1]);
+                const top = all.slice(0, 6);
+                const rest = all.slice(6).reduce((s, [, c]) => s + c, 0);
+                const entries = rest > 0 ? [...top, ['Other', rest]] : top;
+                const totalEntries = entries.reduce((acc, [_, count]) => acc + count, 0);
+                return renderPieChart(entries, totalEntries, ['#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#06b6d4', '#94a3b8'], libBooksCount, 'Books', 'Author Distribution', 'author', false);
+            })()}
                             </div>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-10 mb-10 pt-10 border-t border-slate-100 dark:border-slate-800">
                             <div class="flex flex-col sm:flex-row items-center gap-8">
                                 ${(() => {
-                        const entries = Object.entries(libraryStats.copyTypesCount || { 'New Copy': 0, 'Old Copy': 0, 'Gifted': 0 }).sort((a, b) => b[1] - a[1]);
-                        const totalEntries = entries.reduce((acc, [_, count]) => acc + count, 0);
-                        return renderPieChart(entries, totalEntries, ['#10b981', '#3b82f6', '#f59e0b'], libBooksCount, 'Books', 'Copy Type Distribution', 'copy_type', false, true, 'pie');
-                    })()}
+                const entries = Object.entries(libraryStats.copyTypesCount || { 'New Copy': 0, 'Old Copy': 0, 'Gifted': 0 }).sort((a, b) => b[1] - a[1]);
+                const totalEntries = entries.reduce((acc, [_, count]) => acc + count, 0);
+                return renderPieChart(entries, totalEntries, ['#10b981', '#3b82f6', '#f59e0b'], libBooksCount, 'Books', 'Copy Type Distribution', 'copy_type', false, true, 'pie');
+            })()}
                             </div>
                         </div>
 
@@ -6522,9 +6578,9 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                         </div>
 
                         ${(() => {
-                        const borrowedBooks = books.filter(b => !!b.borrowedBy && (!Array.isArray(b.borrowHistory) || b.borrowHistory.length === 0 || !b.borrowHistory[b.borrowHistory.length - 1].returnDate));
-                        if (borrowedBooks.length > 0) {
-                            return `
+                const borrowedBooks = books.filter(b => !!b.borrowedBy && (!Array.isArray(b.borrowHistory) || b.borrowHistory.length === 0 || !b.borrowHistory[b.borrowHistory.length - 1].returnDate));
+                if (borrowedBooks.length > 0) {
+                    return `
                                 <div class="mt-12 pt-12 border-t border-slate-100 dark:border-slate-800">
                                     <div class="mb-6">
                                         <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Currently Borrowed Books</h3>
@@ -6532,11 +6588,11 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                     </div>
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         ${borrowedBooks.map(b => {
-                                const lastEntry = b.borrowHistory && b.borrowHistory.length > 0 ? b.borrowHistory[b.borrowHistory.length - 1] : null;
-                                const borrower = lastEntry ? lastEntry.borrowerName : b.borrowedBy;
-                                const bDate = lastEntry && lastEntry.borrowDate ? lastEntry.borrowDate : b.borrowDate;
-                                const dateStr = bDate ? new Date(bDate).toLocaleDateString() : 'N/A';
-                                return `
+                        const lastEntry = b.borrowHistory && b.borrowHistory.length > 0 ? b.borrowHistory[b.borrowHistory.length - 1] : null;
+                        const borrower = lastEntry ? lastEntry.borrowerName : b.borrowedBy;
+                        const bDate = lastEntry && lastEntry.borrowDate ? lastEntry.borrowDate : b.borrowDate;
+                        const dateStr = bDate ? new Date(bDate).toLocaleDateString() : 'N/A';
+                        return `
                                             <div class="glass p-5 rounded-3xl border border-slate-200/30 dark:border-slate-800 flex justify-between items-center shadow-sm hover:scale-[1.01] transition-transform duration-300">
                                                 <div class="min-w-0 flex-1">
                                                     <h4 class="font-black text-sm text-slate-800 dark:text-slate-100 truncate">${escapeHTML(b.title)}</h4>
@@ -6550,12 +6606,12 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                                 </div>
                                             </div>
                                             `;
-                            }).join('')}
+                    }).join('')}
                                     </div>
                                 </div>
                                 `;
-                        } else {
-                            return `
+                } else {
+                    return `
                                 <div class="mt-12 pt-12 border-t border-slate-100 dark:border-slate-800">
                                     <div class="mb-4">
                                         <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Currently Borrowed Books</h3>
@@ -6564,8 +6620,8 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                     <p class="text-sm text-slate-400 dark:text-slate-500 italic">No books are currently lent out.</p>
                                 </div>
                                 `;
-                        }
-                    })()}
+                }
+            })()}
 
                         <div id="ai-insights-section" class="mt-12 pt-12 border-t border-slate-100 dark:border-slate-800">
                         <div class="flex items-center justify-between mb-8">
@@ -6589,25 +6645,25 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
 
                 </div>
                 `;
-            }
+    }
 
 
-            async function runLibraryCleanup() {
-                const btn = document.getElementById('ai-cleanup-btn');
-                const config = getAIConfig();
-                if (!config.apiKey) { showToast('Please set your AI API key first.', 'error'); return; }
-                const myBooks = books.filter(b => b.userId === currentUser.uid);
-                if (myBooks.length === 0) { showToast('Your library is empty.', 'info'); return; }
-                const originalText = btn.innerHTML;
-                btn.disabled = true;
-                btn.innerText = 'Scanning...';
-                try {
-                    const bookDataToScan = myBooks.map(b => ({ id: b.id, t: b.title, a: b.author, g: getBookGenres(b), tags: b.tags || [], d: b.description || '' }));
-                    const chunks = [];
-                    for (let i = 0; i < bookDataToScan.length; i += 15) chunks.push(bookDataToScan.slice(i, i + 15));
-                    let allFixes = [];
-                    for (const chunk of chunks) {
-                        const prompt = `Perform a high-quality metadata audit on these books.
+    async function runLibraryCleanup() {
+        const btn = document.getElementById('ai-cleanup-btn');
+        const config = getAIConfig();
+        if (!config.apiKey) { showToast('Please set your AI API key first.', 'error'); return; }
+        const myBooks = books.filter(b => b.userId === currentUser.uid);
+        if (myBooks.length === 0) { showToast('Your library is empty.', 'info'); return; }
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerText = 'Scanning...';
+        try {
+            const bookDataToScan = myBooks.map(b => ({ id: b.id, t: b.title, a: b.author, g: getBookGenres(b), tags: b.tags || [], d: b.description || '' }));
+            const chunks = [];
+            for (let i = 0; i < bookDataToScan.length; i += 15) chunks.push(bookDataToScan.slice(i, i + 15));
+            let allFixes = [];
+            for (const chunk of chunks) {
+                const prompt = `Perform a high-quality metadata audit on these books.
                         1. For missing descriptions, provide a professional 3-sentence summary.
                         2. For missing tags, provide 3 relevant keywords(in English).
                         3. Fix obvious spelling errors in titles/authors(in English).
@@ -6615,19 +6671,19 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
 
                         Data: ${JSON.stringify(chunk)}
                         Return ONLY JSON array: [{ "id": "book_id", "field": "author|genres|tags|description", "old": "value", "new": "fixed_value", "reason": "why" }]`;
-                        const response = await callAI(prompt, "Respond ONLY with a valid JSON array of objects.");
-                        try {
-                            const fixes = JSON.parse(response.replace(/```json|```/g, '').trim());
-                            allFixes = allFixes.concat(fixes);
-                        } catch (e) { }
-                    }
-                    if (allFixes.length === 0) { showToast('No fixes needed!', 'success'); return; }
-                    showCleanupReviewModal(allFixes);
-                } catch (err) { showToast('Cleanup failed', 'error'); }
-                finally { btn.disabled = false; btn.innerHTML = originalText; }
+                const response = await callAI(prompt, "Respond ONLY with a valid JSON array of objects.");
+                try {
+                    const fixes = JSON.parse(response.replace(/```json|```/g, '').trim());
+                    allFixes = allFixes.concat(fixes);
+                } catch (e) { }
             }
-            function showAISummaryModal(book, data) {
-                const modalHtml = `
+            if (allFixes.length === 0) { showToast('No fixes needed!', 'success'); return; }
+            showCleanupReviewModal(allFixes);
+        } catch (err) { showToast('Cleanup failed', 'error'); }
+        finally { btn.disabled = false; btn.innerHTML = originalText; }
+    }
+    function showAISummaryModal(book, data) {
+        const modalHtml = `
                 <div class="glass max-w-lg w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up border border-emerald-100 dark:border-emerald-900/30">
                     <div class="flex items-center gap-4 mb-6">
                         <div class="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/50 rounded-2xl flex items-center justify-center text-emerald-600">
@@ -6666,108 +6722,108 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                 </div>
                 `;
 
-                const close = showModal(modalHtml);
+        const close = showModal(modalHtml);
 
-                document.getElementById('apply-ai-enrichment').onclick = async () => {
-                    const btn = document.getElementById('apply-ai-enrichment');
-                    btn.disabled = true;
-                    btn.innerText = 'Saving...';
+        document.getElementById('apply-ai-enrichment').onclick = async () => {
+            const btn = document.getElementById('apply-ai-enrichment');
+            btn.disabled = true;
+            btn.innerText = 'Saving...';
 
-                    try {
-                        const mergedTags = [...new Set([...(book.tags || []), ...data.tags])].slice(0, 10);
-                        const updateData = {
-                            tags: mergedTags,
-                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                        };
-
-                        if (!book.description) {
-                            updateData.description = data.summary;
-                        }
-
-                        await db.collection('books').doc(book.id).update(updateData);
-                        showToast('Book enriched with AI insights!', 'success');
-                        close();
-                        // Refresh details
-                        openBookDetails(books.find(b => b.id === book.id));
-                    } catch (err) {
-                        showToast('Failed to save enrichment: ' + err.message, 'error');
-                    } finally {
-                        btn.disabled = false;
-                    }
+            try {
+                const mergedTags = [...new Set([...(book.tags || []), ...data.tags])].slice(0, 10);
+                const updateData = {
+                    tags: mergedTags,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
-            }
 
-            function showCleanupReviewModal(fixes) {
-                const modalHtml = '<div class="w-full h-full flex flex-col p-6 sm:p-10 overflow-y-auto bg-slate-50 dark:bg-slate-900">' +
-                    '<div class="max-w-3xl mx-auto w-full">' +
-                    '<div class="flex justify-between items-center mb-8"><div><h2 class="text-3xl font-black font-serif italic text-emerald-600">Review AI Fixes</h2><p class="text-slate-500 text-sm mt-1">AI found ' + fixes.length + ' fixes.</p></div>' +
-                    '<button data-close aria-label="Close modal" class="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button></div>' +
-                    '<div class="space-y-4 mb-10">' +
-                    fixes.map((f, i) => {
-                        const book = books.find(b => b.id === f.id);
-                        return '<div class="glass p-5 rounded-2xl border border-emerald-100 dark:border-emerald-900/30 flex items-start gap-4">' +
-                            '<div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600 flex-shrink-0 font-bold">' + (i + 1) + '</div>' +
-                            '<div class="flex-1 min-w-0"><div class="text-xs font-black text-slate-400 uppercase mb-1">' + escapeHTML(book?.title || 'Unknown') + '</div>' +
-                            '<div class="flex flex-wrap items-center gap-2 text-sm"><span class="line-through text-slate-500">' + escapeHTML(String(f.old || '')) + '</span><svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg><span class="text-emerald-700 font-bold">' + escapeHTML(String(f.new || '')) + '</span></div>' +
-                            '<p class="text-[10px] text-slate-400 mt-2">' + escapeHTML(f.reason || '') + '</p></div>' +
-                            '<input type="checkbox" checked data-fix-index="' + i + '" class="w-6 h-6 rounded text-emerald-600"></div>';
-                    }).join('') +
-                    '</div><div class="flex gap-4 sticky bottom-0 bg-slate-50/80 backdrop-blur-md py-6 border-t border-slate-200">' +
-                    '<button data-close class="flex-1 px-8 py-4 bg-white rounded-2xl font-bold focus-visible:ring-2 focus-visible:ring-slate-400 outline-none">Discard</button>' +
-                    '<button id="apply-cleanup-fixes" class="flex-[2] px-8 py-4 bg-emerald-600 text-white rounded-2xl font-bold focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none">Apply Fixes</button></div></div></div>';
-                showModal(modalHtml, null, true);
-                document.getElementById('apply-cleanup-fixes').addEventListener('click', async () => {
-                    const btn = document.getElementById('apply-cleanup-fixes');
-                    const selectedFixes = Array.from(document.querySelectorAll('[data-fix-index]')).filter(cb => cb.checked).map(cb => fixes[parseInt(cb.dataset.fixIndex)]);
-                    if (selectedFixes.length === 0) return;
-                    btn.disabled = true; btn.innerText = 'Applying...';
-                    try {
-                        const batch = db.batch();
-                        selectedFixes.forEach(f => {
-                            const ref = db.collection('books').doc(f.id);
-                            const updateData = {};
-                            if (f.field === 'genres') { updateData.categories = Array.isArray(f.new) ? f.new : [f.new]; updateData.category = firebase.firestore.FieldValue.delete(); }
-                            else if (f.field === 'tags') { updateData.tags = Array.isArray(f.new) ? f.new : [f.new]; }
-                            else { updateData[f.field] = f.new; }
-                            batch.update(ref, updateData);
-                        });
-                        await batch.commit();
-                        showToast(`Applied ${selectedFixes.length} fixes!`, 'success');
-                        modalContainer.innerHTML = '';
-                        modalContainer.classList.remove('pointer-events-auto');
-                    } catch (err) { showToast('Apply failed', 'error'); }
-                    finally { btn.disabled = false; }
+                if (!book.description) {
+                    updateData.description = data.summary;
+                }
+
+                await db.collection('books').doc(book.id).update(updateData);
+                showToast('Book enriched with AI insights!', 'success');
+                close();
+                // Refresh details
+                openBookDetails(books.find(b => b.id === book.id));
+            } catch (err) {
+                showToast('Failed to save enrichment: ' + err.message, 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        };
+    }
+
+    function showCleanupReviewModal(fixes) {
+        const modalHtml = '<div class="w-full h-full flex flex-col p-6 sm:p-10 overflow-y-auto bg-slate-50 dark:bg-slate-900">' +
+            '<div class="max-w-3xl mx-auto w-full">' +
+            '<div class="flex justify-between items-center mb-8"><div><h2 class="text-3xl font-black font-serif italic text-emerald-600">Review AI Fixes</h2><p class="text-slate-500 text-sm mt-1">AI found ' + fixes.length + ' fixes.</p></div>' +
+            '<button data-close aria-label="Close modal" class="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button></div>' +
+            '<div class="space-y-4 mb-10">' +
+            fixes.map((f, i) => {
+                const book = books.find(b => b.id === f.id);
+                return '<div class="glass p-5 rounded-2xl border border-emerald-100 dark:border-emerald-900/30 flex items-start gap-4">' +
+                    '<div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600 flex-shrink-0 font-bold">' + (i + 1) + '</div>' +
+                    '<div class="flex-1 min-w-0"><div class="text-xs font-black text-slate-400 uppercase mb-1">' + escapeHTML(book?.title || 'Unknown') + '</div>' +
+                    '<div class="flex flex-wrap items-center gap-2 text-sm"><span class="line-through text-slate-500">' + escapeHTML(String(f.old || '')) + '</span><svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg><span class="text-emerald-700 font-bold">' + escapeHTML(String(f.new || '')) + '</span></div>' +
+                    '<p class="text-[10px] text-slate-400 mt-2">' + escapeHTML(f.reason || '') + '</p></div>' +
+                    '<input type="checkbox" checked data-fix-index="' + i + '" class="w-6 h-6 rounded text-emerald-600"></div>';
+            }).join('') +
+            '</div><div class="flex gap-4 sticky bottom-0 bg-slate-50/80 backdrop-blur-md py-6 border-t border-slate-200">' +
+            '<button data-close class="flex-1 px-8 py-4 bg-white rounded-2xl font-bold focus-visible:ring-2 focus-visible:ring-slate-400 outline-none">Discard</button>' +
+            '<button id="apply-cleanup-fixes" class="flex-[2] px-8 py-4 bg-emerald-600 text-white rounded-2xl font-bold focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none">Apply Fixes</button></div></div></div>';
+        showModal(modalHtml, null, true);
+        document.getElementById('apply-cleanup-fixes').addEventListener('click', async () => {
+            const btn = document.getElementById('apply-cleanup-fixes');
+            const selectedFixes = Array.from(document.querySelectorAll('[data-fix-index]')).filter(cb => cb.checked).map(cb => fixes[parseInt(cb.dataset.fixIndex)]);
+            if (selectedFixes.length === 0) return;
+            btn.disabled = true; btn.innerText = 'Applying...';
+            try {
+                const batch = db.batch();
+                selectedFixes.forEach(f => {
+                    const ref = db.collection('books').doc(f.id);
+                    const updateData = {};
+                    if (f.field === 'genres') { updateData.categories = Array.isArray(f.new) ? f.new : [f.new]; updateData.category = firebase.firestore.FieldValue.delete(); }
+                    else if (f.field === 'tags') { updateData.tags = Array.isArray(f.new) ? f.new : [f.new]; }
+                    else { updateData[f.field] = f.new; }
+                    batch.update(ref, updateData);
                 });
-            }
-            async function generateReadingRoadmap() {
-                const btn = document.getElementById('run-ai-roadmap-btn');
-                const content = document.getElementById('ai-analysis-content');
-                if (!btn || !content) return;
+                await batch.commit();
+                showToast(`Applied ${selectedFixes.length} fixes!`, 'success');
+                modalContainer.innerHTML = '';
+                modalContainer.classList.remove('pointer-events-auto');
+            } catch (err) { showToast('Apply failed', 'error'); }
+            finally { btn.disabled = false; }
+        });
+    }
+    async function generateReadingRoadmap() {
+        const btn = document.getElementById('run-ai-roadmap-btn');
+        const content = document.getElementById('ai-analysis-content');
+        if (!btn || !content) return;
 
-                const config = getAIConfig();
-                if (!config.apiKey) { showToast('Please set AI API key in Settings', 'error'); return; }
+        const config = getAIConfig();
+        if (!config.apiKey) { showToast('Please set AI API key in Settings', 'error'); return; }
 
-                btn.disabled = true;
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '<div class="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>';
+        btn.disabled = true;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<div class="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>';
 
-                content.innerHTML = `
+        content.innerHTML = `
                     <div class="flex flex-col items-center gap-4">
                         <div class="w-12 h-12 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin"></div>
                         <p class="text-emerald-600 font-bold uppercase tracking-widest text-[10px]">Mapping your reading journey...</p>
                     </div>
                 `;
 
-                try {
-                    const context = getLibraryContext();
-                    const prompt = `Create a personalized 3-month 'Reading Roadmap' based on my library context: ${JSON.stringify(context)}.
+        try {
+            const context = getLibraryContext();
+            const prompt = `Create a personalized 3-month 'Reading Roadmap' based on my library context: ${JSON.stringify(context)}.
                     Recommend 3 books for each month: Month 1 (Build Foundation), Month 2 (Deep Dive), Month 3 (Expand Horizons).
                     Prioritize books already in my 'want_to_read' list, but suggest new ones if needed.`;
-                    const systemPrompt = `${getSystemPrompt()}\n\nTask: Reading Roadmap Generation.`;
+            const systemPrompt = `${getSystemPrompt()}\n\nTask: Reading Roadmap Generation.`;
 
-                    const result = await callAI(prompt, systemPrompt);
+            const result = await callAI(prompt, systemPrompt);
 
-                    content.innerHTML = `
+            content.innerHTML = `
                         <div class="relative group/copy">
                             <button data-copy-ai="${escapeHTML(result)}" class="absolute right-0 top-0 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm opacity-0 group-hover/copy:opacity-100 focus-visible:opacity-100 transition-opacity hover:text-primary active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none" title="Copy results" aria-label="Copy results">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
@@ -6775,31 +6831,31 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                             <div class="text-left text-sm leading-relaxed space-y-2">${formatAIText(result)}</div>
                         </div>
                     `;
-                } catch (err) {
-                    showToast('Roadmap generation failed: ' + err.message, 'error');
-                    content.innerHTML = `<p class="text-rose-500 font-medium">Failed to generate roadmap.</p>`;
-                } finally {
-                    btn.disabled = false;
-                    btn.innerHTML = originalText;
-                }
-            }
+        } catch (err) {
+            showToast('Roadmap generation failed: ' + err.message, 'error');
+            content.innerHTML = `<p class="text-rose-500 font-medium">Failed to generate roadmap.</p>`;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
 
-            async function runAILibraryAnalysis() {
-                const btn = document.getElementById('run-ai-analysis-btn');
-                const content = document.getElementById('ai-analysis-content');
-                if (!btn || !content) return;
+    async function runAILibraryAnalysis() {
+        const btn = document.getElementById('run-ai-analysis-btn');
+        const content = document.getElementById('ai-analysis-content');
+        if (!btn || !content) return;
 
-                const config = getAIConfig();
-                if (!config.apiKey) {
-                    showToast('Please set your AI API key in Settings.', 'error');
-                    return;
-                }
+        const config = getAIConfig();
+        if (!config.apiKey) {
+            showToast('Please set your AI API key in Settings.', 'error');
+            return;
+        }
 
-                btn.disabled = true;
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>';
+        btn.disabled = true;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>';
 
-                content.innerHTML = `
+        content.innerHTML = `
     <div class="text-left space-y-4 animate-slide-up">
         <div class="skeleton-base skeleton-title w-1/3 h-6"></div>
         <div class="space-y-2">
@@ -6822,9 +6878,9 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
     </div>
 `;
 
-                try {
-                    const context = getLibraryContext();
-                    const prompt = `Provide a deep-dive professional analysis of my personal library based on this data: ${JSON.stringify(context)}.
+        try {
+            const context = getLibraryContext();
+            const prompt = `Provide a deep-dive professional analysis of my personal library based on this data: ${JSON.stringify(context)}.
                     Your report should include:
                     1. ## Collection DNA: A sophisticated breakdown of my taste.
                     2. ## Reading Velocity: Analysis of completion rates and habits.
@@ -6832,11 +6888,11 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     4. ## Top 5 Curated Recommendations: Specific books I should add, with a brief 'why' for each.
 
                     Structure the response with clear headers and bullet points.`;
-                    const systemPrompt = `${getSystemPrompt()}\n\nTask: Comprehensive Library Analysis.`;
+            const systemPrompt = `${getSystemPrompt()}\n\nTask: Comprehensive Library Analysis.`;
 
-                    const result = await callAI(prompt, systemPrompt);
+            const result = await callAI(prompt, systemPrompt);
 
-                    content.innerHTML = `
+            content.innerHTML = `
                         <div class="relative group/copy">
                             <button data-copy-ai="${escapeHTML(result)}" class="absolute right-0 top-0 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm opacity-0 group-hover/copy:opacity-100 focus-visible:opacity-100 transition-opacity hover:text-primary active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none" title="Copy results" aria-label="Copy results">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
@@ -6845,37 +6901,37 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                         </div>
                     `;
 
-                    // Save to Firestore
-                    await db.collection('users').doc(currentUser.uid)
-                        .collection('private').doc('data')
-                        .set({
-                            lastAIAnalysis: result,
-                            lastAIAnalysisDate: firebase.firestore.FieldValue.serverTimestamp()
-                        }, { merge: true });
+            // Save to Firestore
+            await db.collection('users').doc(currentUser.uid)
+                .collection('private').doc('data')
+                .set({
+                    lastAIAnalysis: result,
+                    lastAIAnalysisDate: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
 
-                    if (userProfile) {
-                        userProfile.lastAIAnalysis = result;
-                        userProfile.lastAIAnalysisDate = new Date();
-                    }
-
-                } catch (err) {
-                    showToast('Analysis failed: ' + err.message, 'error');
-                    content.innerHTML = `<p class="text-rose-500 font-medium">Failed to generate analysis. ${err.message}</p>`;
-                } finally {
-                    btn.disabled = false;
-                    btn.innerText = 'Analyze Library';
-                }
+            if (userProfile) {
+                userProfile.lastAIAnalysis = result;
+                userProfile.lastAIAnalysisDate = new Date();
             }
 
-            function loadLastAIAnalysis() {
-                const content = document.getElementById('ai-analysis-content');
-                if (!content || !userProfile?.lastAIAnalysis) return;
+        } catch (err) {
+            showToast('Analysis failed: ' + err.message, 'error');
+            content.innerHTML = `<p class="text-rose-500 font-medium">Failed to generate analysis. ${err.message}</p>`;
+        } finally {
+            btn.disabled = false;
+            btn.innerText = 'Analyze Library';
+        }
+    }
 
-                const result = userProfile.lastAIAnalysis;
-                const date = userProfile.lastAIAnalysisDate?.toDate ? userProfile.lastAIAnalysisDate.toDate() : userProfile.lastAIAnalysisDate;
-                const formattedDate = date ? new Date(date).toLocaleDateString() : '';
+    function loadLastAIAnalysis() {
+        const content = document.getElementById('ai-analysis-content');
+        if (!content || !userProfile?.lastAIAnalysis) return;
 
-                content.innerHTML = `
+        const result = userProfile.lastAIAnalysis;
+        const date = userProfile.lastAIAnalysisDate?.toDate ? userProfile.lastAIAnalysisDate.toDate() : userProfile.lastAIAnalysisDate;
+        const formattedDate = date ? new Date(date).toLocaleDateString() : '';
+
+        content.innerHTML = `
                     <div class="relative group/copy">
                         <button data-copy-ai="${escapeHTML(result)}" class="absolute right-0 top-0 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm opacity-0 group-hover/copy:opacity-100 focus-visible:opacity-100 transition-opacity hover:text-primary active:scale-95 focus-visible:ring-2 focus-visible:ring-primary outline-none" title="Copy results" aria-label="Copy results">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
@@ -6886,98 +6942,98 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                         </div>
                     </div>
                 `;
-            }
+    }
 
-            // ---------- Social Feed Engine ----------
-            async function fetchSocialReviews(isLoadMore = false) {
-                if (!isLoadMore) {
-                    socialReviews = [];
-                    lastReviewDoc = null;
-                    hasMoreReviews = true;
-                }
+    // ---------- Social Feed Engine ----------
+    async function fetchSocialReviews(isLoadMore = false) {
+        if (!isLoadMore) {
+            socialReviews = [];
+            lastReviewDoc = null;
+            hasMoreReviews = true;
+        }
 
-                if (!hasMoreReviews) return;
+        if (!hasMoreReviews) return;
 
-                let query = db.collection('reviews');
-                if (activeFeedCategory !== 'All') {
-                    query = query.where('category', '==', activeFeedCategory);
-                }
-                query = query.orderBy('createdAt', 'desc').limit(10);
+        let query = db.collection('reviews');
+        if (activeFeedCategory !== 'All') {
+            query = query.where('category', '==', activeFeedCategory);
+        }
+        query = query.orderBy('createdAt', 'desc').limit(10);
 
-                if (lastReviewDoc) query = query.startAfter(lastReviewDoc);
+        if (lastReviewDoc) query = query.startAfter(lastReviewDoc);
 
-                const snapshot = await query.get();
-                if (snapshot.empty) {
-                    hasMoreReviews = false;
-                    if (activeTab === 'explore') window.queueRenderMainApp();
-                    return;
-                }
+        const snapshot = await query.get();
+        if (snapshot.empty) {
+            hasMoreReviews = false;
+            if (activeTab === 'explore') window.queueRenderMainApp();
+            return;
+        }
 
-                lastReviewDoc = snapshot.docs[snapshot.docs.length - 1];
-                const newReviews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        lastReviewDoc = snapshot.docs[snapshot.docs.length - 1];
+        const newReviews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-                // Fetch like status for each review
-                if (currentUser) {
-                    const likeChecks = newReviews.map(async rev => {
-                        const likeDoc = await db.collection('reviews').doc(rev.id).collection('likes').doc(currentUser.uid).get();
-                        rev.isLiked = likeDoc.exists;
-                    });
-                    await Promise.all(likeChecks);
-                }
+        // Fetch like status for each review
+        if (currentUser) {
+            const likeChecks = newReviews.map(async rev => {
+                const likeDoc = await db.collection('reviews').doc(rev.id).collection('likes').doc(currentUser.uid).get();
+                rev.isLiked = likeDoc.exists;
+            });
+            await Promise.all(likeChecks);
+        }
 
-                socialReviews = [...socialReviews, ...newReviews];
+        socialReviews = [...socialReviews, ...newReviews];
 
-                if (activeTab === 'explore') window.queueRenderMainApp();
-            }
+        if (activeTab === 'explore') window.queueRenderMainApp();
+    }
 
-            window.setFeedCategory = (cat) => {
-                activeFeedCategory = cat;
-                fetchSocialReviews();
-            };
+    window.setFeedCategory = (cat) => {
+        activeFeedCategory = cat;
+        fetchSocialReviews();
+    };
 
-            window.deleteReview = async (reviewId) => {
-                if (!confirm('Are you sure you want to delete this review?')) return;
-                try {
-                    await db.collection('reviews').doc(reviewId).delete();
-                    showToast('Review deleted successfully', 'success');
-                    socialReviews = socialReviews.filter(r => r.id !== reviewId);
-                    if (activeTab === 'explore') window.queueRenderMainApp();
-                } catch (err) {
-                    showToast('Failed to delete review: ' + err.message, 'error');
-                }
-            };
+    window.deleteReview = async (reviewId) => {
+        if (!confirm('Are you sure you want to delete this review?')) return;
+        try {
+            await db.collection('reviews').doc(reviewId).delete();
+            showToast('Review deleted successfully', 'success');
+            socialReviews = socialReviews.filter(r => r.id !== reviewId);
+            if (activeTab === 'explore') window.queueRenderMainApp();
+        } catch (err) {
+            showToast('Failed to delete review: ' + err.message, 'error');
+        }
+    };
 
-            async function fetchSocialReviewsWithSearch(q) {
-                socialReviews = [];
-                lastReviewDoc = null;
-                hasMoreReviews = false; // Disable pagination for simple search
-                window.queueRenderMainApp();
+    async function fetchSocialReviewsWithSearch(q) {
+        socialReviews = [];
+        lastReviewDoc = null;
+        hasMoreReviews = false; // Disable pagination for simple search
+        window.queueRenderMainApp();
 
-                try {
-                    // Simple search implementation (Firebase lacks full-text search)
-                    const snapshot = await db.collection('reviews').orderBy('bookTitle').startAt(q).endAt(q + '\uf8ff').limit(20).get();
-                    socialReviews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    window.queueRenderMainApp();
-                } catch (err) {
-                    showToast('Search failed', 'error');
-                }
-            }
+        try {
+            // Simple search implementation (Firebase lacks full-text search)
+            const snapshot = await db.collection('reviews').orderBy('bookTitle').startAt(q).endAt(q + '\uf8ff').limit(20).get();
+            socialReviews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            window.queueRenderMainApp();
+        } catch (err) {
+            showToast('Search failed', 'error');
+        }
+    }
 
-            function renderReviewCard(rev) {
-                const date = rev.createdAt?.toDate ? rev.createdAt.toDate() : new Date();
-                const stars = '★'.repeat(rev.rating) + '☆'.repeat(5 - rev.rating);
-                const wordCount = (rev.body || "").split(/\s+/).length;
-                const readTime = Math.max(1, Math.ceil(wordCount / 200));
-                const isOwner = currentUser && rev.userId === currentUser.uid;
+    function renderReviewCard(rev) {
+        const date = rev.createdAt?.toDate ? rev.createdAt.toDate() : new Date();
+        const stars = '★'.repeat(rev.rating) + '☆'.repeat(5 - rev.rating);
+        const wordCount = (rev.body || "").split(/\s+/).length;
+        const readTime = Math.max(1, Math.ceil(wordCount / 200));
+        const isOwner = currentUser && rev.userId === currentUser.uid;
 
-                const categoryColors = {
-                    'Help': 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
-                    'Review': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-                    'Others': 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400'
-                };
-                const catClass = categoryColors[rev.category] || categoryColors['Others'];
+        const categoryColors = {
+            'Help': 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
+            'Review': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+            'Others': 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400'
+        };
+        const catClass = categoryColors[rev.category] || categoryColors['Others'];
 
-                return `
+        return `
                 <div class="glass rounded-[2.5rem] p-8 border border-slate-200/50 dark:border-slate-800 hover:shadow-2xl transition-all animate-slide-up group relative">
                     ${isOwner ? `
                         <button data-action="delete-review" data-value="${escapeHTML(rev.id)}" class="absolute top-6 right-6 p-2 text-slate-400 hover:text-rose-500 transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 outline-none rounded-lg z-10" aria-label="Delete review">
@@ -7021,11 +7077,11 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     <div id="comments-${escapeHTML(rev.id)}" class="hidden mt-6 space-y-4 animate-slide-up"></div>
                 </div>
                 `;
-            }
+    }
 
-            function renderActivity() {
-                const pendingCollabRequests = collaborationRequests.filter(r => r.toUserId === currentUser?.uid && r.status === 'pending');
-                const pendingCollabHTML = pendingCollabRequests.length > 0 ? `
+    function renderActivity() {
+        const pendingCollabRequests = collaborationRequests.filter(r => r.toUserId === currentUser?.uid && r.status === 'pending');
+        const pendingCollabHTML = pendingCollabRequests.length > 0 ? `
                     <div class="glass p-6 rounded-[2.5rem] border border-blue-200 dark:border-blue-900/50 bg-slate-50/50 dark:bg-blue-950/20 mb-8 space-y-4">
                         <div class="flex items-center gap-2 text-blue-800 dark:text-blue-200">
                             <svg class="w-5 h-5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
@@ -7050,8 +7106,8 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     </div>
                 ` : '';
 
-                const pendingRequests = bookRequests.filter(r => r.status === 'pending');
-                const pendingRequestsHTML = pendingRequests.length > 0 ? `
+        const pendingRequests = bookRequests.filter(r => r.status === 'pending');
+        const pendingRequestsHTML = pendingRequests.length > 0 ? `
                     <div class="glass p-6 rounded-[2.5rem] border border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20 mb-8 space-y-4">
                         <div class="flex items-center gap-2 text-amber-800 dark:text-amber-200">
                             <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
@@ -7082,7 +7138,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     </div>
                 ` : '';
 
-                const messageInputHTML = `
+        const messageInputHTML = `
                     <div class="glass p-6 rounded-[2.5rem] border border-slate-200/50 dark:border-slate-800 mb-8">
                         <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Post a Message</h3>
                         <div class="flex gap-2">
@@ -7094,9 +7150,9 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     </div>
                 `;
 
-                if (activities.length === 0 && pendingRequests.length === 0 && pendingCollabRequests.length === 0) {
-                    if (isInitialSync) {
-                        return `
+        if (activities.length === 0 && pendingRequests.length === 0 && pendingCollabRequests.length === 0) {
+            if (isInitialSync) {
+                return `
             <div class="max-w-2xl mx-auto space-y-4 animate-slide-up">
                 <div class="glass p-6 rounded-[2.5rem] border border-slate-200/50 dark:border-slate-800 mb-8">
                     <div class="skeleton-base skeleton-text w-32 mb-4"></div>
@@ -7106,8 +7162,8 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                 ${Array(5).fill(0).map(() => renderSkeletonActivityItem()).join('')}
             </div>
         `;
-                    }
-                    return `
+            }
+            return `
                     <div class="max-w-2xl mx-auto animate-slide-up">
                         ${pendingCollabHTML}
                         ${pendingRequestsHTML}
@@ -7121,9 +7177,9 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                         </div>
                     </div>
                     `;
-                }
+        }
 
-                return `
+        return `
                 <div class="max-w-2xl mx-auto space-y-4 animate-slide-up">
                     ${pendingCollabHTML}
                     ${pendingRequestsHTML}
@@ -7134,46 +7190,46 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     </div>
                     <div class="space-y-3">
                         ${activities.map((a, i) => {
-                    let icon = '';
-                    let color = 'bg-blue-100 text-sky-600';
-                    let text = '';
+            let icon = '';
+            let color = 'bg-blue-100 text-sky-600';
+            let text = '';
 
-                    if (a.type === 'book_added') {
-                        icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>';
-                        color = 'bg-emerald-100 text-emerald-600';
-                        text = `<strong>${escapeHTML(a.userName)}</strong> added <strong>${escapeHTML(a.bookTitle)}</strong> to ${a.addedTo} library.`;
-                    } else if (a.type === 'status_updated') {
-                        icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
-                        color = 'bg-blue-100 text-sky-600';
-                        const statusLabel = READING_STATUSES[a.status]?.label || a.status;
-                        text = `<strong>${escapeHTML(a.userName)}</strong> marked <strong>${escapeHTML(a.bookTitle)}</strong> as <strong>${statusLabel}</strong>.`;
-                    } else if (a.type === 'rating_updated') {
-                        icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.175 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.382-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>';
-                        color = 'bg-amber-100 text-amber-600';
-                        text = `<strong>${escapeHTML(a.userName)}</strong> reviewed <strong>${escapeHTML(a.bookTitle)}</strong> with ${a.rating} stars.`;
-                    } else if (a.type === 'book_borrowed') {
-                        icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>';
-                        color = 'bg-violet-100 text-violet-600';
-                        text = `<strong>${escapeHTML(a.userName)}</strong> borrowed <strong>${escapeHTML(a.bookTitle)}</strong>.`;
-                    } else if (a.type === 'book_returned') {
-                        icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>';
-                        color = 'bg-indigo-100 text-indigo-600';
-                        text = `<strong>${escapeHTML(a.userName)}</strong> returned <strong>${escapeHTML(a.bookTitle)}</strong>.`;
-                    } else if (a.type === 'user_message') {
-                        icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>';
-                        color = 'bg-violet-100 text-violet-600';
-                        text = `<strong>${escapeHTML(a.userName)}</strong>: ${escapeHTML(a.text)}`;
-                    } else if (a.type === 'request_accepted') {
-                        icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
-                        color = 'bg-emerald-100 text-emerald-600';
-                        text = `<strong>${escapeHTML(a.userName)}</strong> ${escapeHTML(a.text)}`;
-                    } else if (a.type === 'request_rejected') {
-                        icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
-                        color = 'bg-rose-100 text-rose-600';
-                        text = `<strong>${escapeHTML(a.userName)}</strong> ${escapeHTML(a.text)}`;
-                    }
+            if (a.type === 'book_added') {
+                icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>';
+                color = 'bg-emerald-100 text-emerald-600';
+                text = `<strong>${escapeHTML(a.userName)}</strong> added <strong>${escapeHTML(a.bookTitle)}</strong> to ${a.addedTo} library.`;
+            } else if (a.type === 'status_updated') {
+                icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+                color = 'bg-blue-100 text-sky-600';
+                const statusLabel = READING_STATUSES[a.status]?.label || a.status;
+                text = `<strong>${escapeHTML(a.userName)}</strong> marked <strong>${escapeHTML(a.bookTitle)}</strong> as <strong>${statusLabel}</strong>.`;
+            } else if (a.type === 'rating_updated') {
+                icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.175 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.382-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>';
+                color = 'bg-amber-100 text-amber-600';
+                text = `<strong>${escapeHTML(a.userName)}</strong> reviewed <strong>${escapeHTML(a.bookTitle)}</strong> with ${a.rating} stars.`;
+            } else if (a.type === 'book_borrowed') {
+                icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>';
+                color = 'bg-violet-100 text-violet-600';
+                text = `<strong>${escapeHTML(a.userName)}</strong> borrowed <strong>${escapeHTML(a.bookTitle)}</strong>.`;
+            } else if (a.type === 'book_returned') {
+                icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>';
+                color = 'bg-indigo-100 text-indigo-600';
+                text = `<strong>${escapeHTML(a.userName)}</strong> returned <strong>${escapeHTML(a.bookTitle)}</strong>.`;
+            } else if (a.type === 'user_message') {
+                icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>';
+                color = 'bg-violet-100 text-violet-600';
+                text = `<strong>${escapeHTML(a.userName)}</strong>: ${escapeHTML(a.text)}`;
+            } else if (a.type === 'request_accepted') {
+                icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+                color = 'bg-emerald-100 text-emerald-600';
+                text = `<strong>${escapeHTML(a.userName)}</strong> ${escapeHTML(a.text)}`;
+            } else if (a.type === 'request_rejected') {
+                icon = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+                color = 'bg-rose-100 text-rose-600';
+                text = `<strong>${escapeHTML(a.userName)}</strong> ${escapeHTML(a.text)}`;
+            }
 
-                    return `
+            return `
                             <div class="glass p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 staggered-fade-in" style="animation-delay: ${i * 50}ms">
                                 <div class="w-10 h-10 rounded-xl ${color} flex items-center justify-center flex-shrink-0">
                                     ${icon}
@@ -7189,248 +7245,248 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                 ` : ''}
                             </div>
                             `;
-                }).join('')}
+        }).join('')}
                     </div>
                 </div>
                 `;
+    }
+
+    window.lastUserSearchQuery = "";
+
+    window.sendBookRequest = async (bookId, toUserId, bookTitle, btnElement) => {
+        if (!currentUser) return;
+        if (toUserId === currentUser.uid) {
+            showToast('You cannot request your own book.', 'error');
+            return;
+        }
+
+        if (btnElement) {
+            btnElement.disabled = true;
+            btnElement.innerText = 'Sending...';
+        }
+
+        try {
+            const existingSnap = await db.collection('bookRequests')
+                .where('fromUserId', '==', currentUser.uid)
+                .where('bookId', '==', bookId)
+                .where('status', '==', 'pending')
+                .get();
+
+            if (!existingSnap.empty) {
+                showToast('You have already requested this book.', 'info');
+                if (btnElement) {
+                    btnElement.innerText = 'Request Pending';
+                    btnElement.className = 'px-4 py-2 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 font-bold rounded-xl text-xs cursor-not-allowed';
+                }
+                return;
             }
 
-            window.lastUserSearchQuery = "";
+            await db.collection('bookRequests').add({
+                fromUserId: currentUser.uid,
+                fromEmail: currentUser.email || '',
+                toUserId: toUserId,
+                bookId: bookId,
+                bookTitle: bookTitle,
+                requesterName: userProfile?.displayName || currentUser.displayName || currentUser.email || 'Reader',
+                phoneNumber: userProfile?.phoneNumber || '',
+                address: userProfile?.address || '',
+                status: 'pending',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
 
-            window.sendBookRequest = async (bookId, toUserId, bookTitle, btnElement) => {
-                if (!currentUser) return;
-                if (toUserId === currentUser.uid) {
-                    showToast('You cannot request your own book.', 'error');
-                    return;
-                }
+            showToast(`Request sent for "${bookTitle}"!`, 'success');
+            if (btnElement) {
+                btnElement.disabled = true;
+                btnElement.innerText = 'Request Pending';
+                btnElement.className = 'px-4 py-2 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 font-bold rounded-xl text-xs cursor-not-allowed';
+            }
+        } catch (err) {
+            showToast('Failed to send request: ' + err.message, 'error');
+            if (btnElement) {
+                btnElement.disabled = false;
+                btnElement.innerText = 'Request Book';
+            }
+        }
+    };
 
-                if (btnElement) {
-                    btnElement.disabled = true;
-                    btnElement.innerText = 'Sending...';
-                }
+    window.acceptBookRequest = async (requestId) => {
+        try {
+            const reqDoc = await db.collection('bookRequests').doc(requestId).get();
+            if (!reqDoc.exists) {
+                showToast('Request no longer exists.', 'error');
+                return;
+            }
+            const req = { id: reqDoc.id, ...reqDoc.data() };
 
-                try {
-                    const existingSnap = await db.collection('bookRequests')
-                        .where('fromUserId', '==', currentUser.uid)
-                        .where('bookId', '==', bookId)
-                        .where('status', '==', 'pending')
-                        .get();
+            const bookDoc = await db.collection('books').doc(req.bookId).get();
+            if (!bookDoc.exists) {
+                showToast('Book not found.', 'error');
+                return;
+            }
+            const bookData = bookDoc.data();
+            if (bookData.borrowedBy) {
+                showToast('Book is already borrowed by someone else.', 'error');
+                return;
+            }
 
-                    if (!existingSnap.empty) {
-                        showToast('You have already requested this book.', 'info');
-                        if (btnElement) {
-                            btnElement.innerText = 'Request Pending';
-                            btnElement.className = 'px-4 py-2 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 font-bold rounded-xl text-xs cursor-not-allowed';
-                        }
-                        return;
-                    }
+            const borrowerDisplayName = req.requesterName || req.fromEmail || 'Borrower';
+            const nowIso = new Date().toISOString();
 
-                    await db.collection('bookRequests').add({
-                        fromUserId: currentUser.uid,
-                        fromEmail: currentUser.email || '',
-                        toUserId: toUserId,
-                        bookId: bookId,
-                        bookTitle: bookTitle,
-                        requesterName: userProfile?.displayName || currentUser.displayName || currentUser.email || 'Reader',
-                        phoneNumber: userProfile?.phoneNumber || '',
-                        address: userProfile?.address || '',
-                        status: 'pending',
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-
-                    showToast(`Request sent for "${bookTitle}"!`, 'success');
-                    if (btnElement) {
-                        btnElement.disabled = true;
-                        btnElement.innerText = 'Request Pending';
-                        btnElement.className = 'px-4 py-2 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 font-bold rounded-xl text-xs cursor-not-allowed';
-                    }
-                } catch (err) {
-                    showToast('Failed to send request: ' + err.message, 'error');
-                    if (btnElement) {
-                        btnElement.disabled = false;
-                        btnElement.innerText = 'Request Book';
-                    }
-                }
+            const existingHistory = Array.isArray(bookData.borrowHistory) ? bookData.borrowHistory : [];
+            const newHistoryEntry = {
+                borrowerName: borrowerDisplayName,
+                borrowerEmail: req.fromEmail || '',
+                borrowerUid: req.fromUserId || '',
+                borrowDate: nowIso,
+                returnDate: null
             };
 
-            window.acceptBookRequest = async (requestId) => {
-                try {
-                    const reqDoc = await db.collection('bookRequests').doc(requestId).get();
-                    if (!reqDoc.exists) {
-                        showToast('Request no longer exists.', 'error');
-                        return;
-                    }
-                    const req = { id: reqDoc.id, ...reqDoc.data() };
+            // Accept the request and mark the book borrowed atomically. Combined with
+            // the rules requiring `borrowedBy` to be empty before the transition, this
+            // prevents two users claiming the same book.
+            const batch = db.batch();
+            batch.update(db.collection('bookRequests').doc(requestId), {
+                status: 'accepted',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            batch.update(db.collection('books').doc(req.bookId), {
+                borrowedBy: borrowerDisplayName,
+                borrowDate: nowIso,
+                borrowHistory: [...existingHistory, newHistoryEntry]
+            });
+            await batch.commit();
 
-                    const bookDoc = await db.collection('books').doc(req.bookId).get();
-                    if (!bookDoc.exists) {
-                        showToast('Book not found.', 'error');
-                        return;
-                    }
-                    const bookData = bookDoc.data();
-                    if (bookData.borrowedBy) {
-                        showToast('Book is already borrowed by someone else.', 'error');
-                        return;
-                    }
+            const actMessage = `accepted ${borrowerDisplayName}'s request to borrow "${req.bookTitle}".`;
+            await db.collection('activityFeed').add({
+                type: 'request_accepted',
+                bookId: req.bookId,
+                bookTitle: req.bookTitle,
+                userName: userProfile?.displayName || currentUser.displayName || currentUser.email,
+                userId: currentUser.uid,
+                targetUserId: req.fromUserId,
+                text: actMessage,
+                libraryId: currentUser.uid,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
 
-                    const borrowerDisplayName = req.requesterName || req.fromEmail || 'Borrower';
-                    const nowIso = new Date().toISOString();
-
-                    const existingHistory = Array.isArray(bookData.borrowHistory) ? bookData.borrowHistory : [];
-                    const newHistoryEntry = {
-                        borrowerName: borrowerDisplayName,
-                        borrowerEmail: req.fromEmail || '',
-                        borrowerUid: req.fromUserId || '',
-                        borrowDate: nowIso,
-                        returnDate: null
-                    };
-
-                    // Accept the request and mark the book borrowed atomically. Combined with
-                    // the rules requiring `borrowedBy` to be empty before the transition, this
-                    // prevents two users claiming the same book.
-                    const batch = db.batch();
-                    batch.update(db.collection('bookRequests').doc(requestId), {
-                        status: 'accepted',
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    batch.update(db.collection('books').doc(req.bookId), {
-                        borrowedBy: borrowerDisplayName,
-                        borrowDate: nowIso,
-                        borrowHistory: [...existingHistory, newHistoryEntry]
-                    });
-                    await batch.commit();
-
-                    const actMessage = `accepted ${borrowerDisplayName}'s request to borrow "${req.bookTitle}".`;
-                    await db.collection('activityFeed').add({
-                        type: 'request_accepted',
-                        bookId: req.bookId,
-                        bookTitle: req.bookTitle,
-                        userName: userProfile?.displayName || currentUser.displayName || currentUser.email,
-                        userId: currentUser.uid,
-                        targetUserId: req.fromUserId,
-                        text: actMessage,
-                        libraryId: currentUser.uid,
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-
-                    if (req.fromUserId !== currentUser.uid) {
-                        await db.collection('activityFeed').add({
-                            type: 'request_accepted',
-                            bookId: req.bookId,
-                            bookTitle: req.bookTitle,
-                            userName: userProfile?.displayName || currentUser.displayName || currentUser.email,
-                            userId: currentUser.uid,
-                            targetUserId: req.fromUserId,
-                            text: actMessage,
-                            libraryId: req.fromUserId,
-                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                    }
-
-                    showToast(`Request accepted! Marked as borrowed to ${borrowerDisplayName}.`, 'success');
-                    if (activeTab === 'activity') window.queueRenderMainApp();
-                } catch (err) {
-                    showToast('Failed to accept request: ' + err.message, 'error');
-                }
-            };
-
-            window.rejectBookRequest = async (requestId) => {
-                try {
-                    const reqDoc = await db.collection('bookRequests').doc(requestId).get();
-                    if (!reqDoc.exists) {
-                        showToast('Request no longer exists.', 'error');
-                        return;
-                    }
-                    const req = { id: reqDoc.id, ...reqDoc.data() };
-
-                    await db.collection('bookRequests').doc(requestId).update({
-                        status: 'rejected',
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-
-                    const actMessage = `declined the request for "${req.bookTitle}".`;
-                    if (req.fromUserId !== currentUser.uid) {
-                        await db.collection('activityFeed').add({
-                            type: 'request_rejected',
-                            bookId: req.bookId,
-                            bookTitle: req.bookTitle,
-                            userName: userProfile?.displayName || currentUser.displayName || currentUser.email,
-                            userId: currentUser.uid,
-                            targetUserId: req.fromUserId,
-                            text: actMessage,
-                            libraryId: req.fromUserId,
-                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                    }
-
-                    showToast('Request declined.', 'info');
-                    if (activeTab === 'activity') window.queueRenderMainApp();
-                } catch (err) {
-                    showToast('Failed to decline request: ' + err.message, 'error');
-                }
-            };
-
-            window.toggleSearchBookDropdown = (bookId) => {
-                const dropdown = document.getElementById(`dropdown-${bookId}`);
-                const arrow = document.getElementById(`arrow-${bookId}`);
-                const header = document.getElementById(`book-header-${bookId}`);
-                if (!dropdown) return;
-
-                const isHidden = dropdown.classList.contains('hidden');
-
-                // Collapse all other dropdowns in search results
-                document.querySelectorAll('[id^="dropdown-"]').forEach(el => {
-                    if (el.id !== `dropdown-${bookId}`) {
-                        el.classList.add('hidden');
-                        const otherId = el.id.replace('dropdown-', '');
-                        const otherArrow = document.getElementById(`arrow-${otherId}`);
-                        const otherHeader = document.getElementById(`book-header-${otherId}`);
-                        if (otherArrow) otherArrow.classList.remove('rotate-180');
-                        if (otherHeader) otherHeader.setAttribute('aria-expanded', 'false');
-                    }
+            if (req.fromUserId !== currentUser.uid) {
+                await db.collection('activityFeed').add({
+                    type: 'request_accepted',
+                    bookId: req.bookId,
+                    bookTitle: req.bookTitle,
+                    userName: userProfile?.displayName || currentUser.displayName || currentUser.email,
+                    userId: currentUser.uid,
+                    targetUserId: req.fromUserId,
+                    text: actMessage,
+                    libraryId: req.fromUserId,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
+            }
 
-                if (isHidden) {
-                    dropdown.classList.remove('hidden');
-                    if (arrow) arrow.classList.add('rotate-180');
-                    if (header) header.setAttribute('aria-expanded', 'true');
-                } else {
-                    dropdown.classList.add('hidden');
-                    if (arrow) arrow.classList.remove('rotate-180');
-                    if (header) header.setAttribute('aria-expanded', 'false');
-                }
-            };
+            showToast(`Request accepted! Marked as borrowed to ${borrowerDisplayName}.`, 'success');
+            if (activeTab === 'activity') window.queueRenderMainApp();
+        } catch (err) {
+            showToast('Failed to accept request: ' + err.message, 'error');
+        }
+    };
 
-            window.searchUserByEmail = async () => {
-                const input = document.getElementById('user-search-input');
-                if (!input) return;
-                const email = input.value.trim().toLowerCase();
-                if (!email) { showToast('Please enter an email address', 'error'); return; }
+    window.rejectBookRequest = async (requestId) => {
+        try {
+            const reqDoc = await db.collection('bookRequests').doc(requestId).get();
+            if (!reqDoc.exists) {
+                showToast('Request no longer exists.', 'error');
+                return;
+            }
+            const req = { id: reqDoc.id, ...reqDoc.data() };
 
-                window.lastUserSearchQuery = email;
-                const container = document.getElementById('user-search-results-container');
-                container.className = "fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4";
-                container.classList.remove('hidden');
+            await db.collection('bookRequests').doc(requestId).update({
+                status: 'rejected',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
 
-                const handleEscape = (e) => {
-                    if (e.key === 'Escape') window.closeUserSearchModal();
-                };
+            const actMessage = `declined the request for "${req.bookTitle}".`;
+            if (req.fromUserId !== currentUser.uid) {
+                await db.collection('activityFeed').add({
+                    type: 'request_rejected',
+                    bookId: req.bookId,
+                    bookTitle: req.bookTitle,
+                    userName: userProfile?.displayName || currentUser.displayName || currentUser.email,
+                    userId: currentUser.uid,
+                    targetUserId: req.fromUserId,
+                    text: actMessage,
+                    libraryId: req.fromUserId,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
 
-                window.closeUserSearchModal = () => {
-                    container.className = "mt-6 hidden";
-                    container.innerHTML = "";
-                    window.lastUserSearchQuery = "";
-                    if (input) input.value = "";
-                    document.removeEventListener('keydown', handleEscape);
-                };
+            showToast('Request declined.', 'info');
+            if (activeTab === 'activity') window.queueRenderMainApp();
+        } catch (err) {
+            showToast('Failed to decline request: ' + err.message, 'error');
+        }
+    };
 
-                document.addEventListener('keydown', handleEscape);
+    window.toggleSearchBookDropdown = (bookId) => {
+        const dropdown = document.getElementById(`dropdown-${bookId}`);
+        const arrow = document.getElementById(`arrow-${bookId}`);
+        const header = document.getElementById(`book-header-${bookId}`);
+        if (!dropdown) return;
 
-                container.onclick = (e) => {
-                    if (e.target === container) window.closeUserSearchModal();
-                };
+        const isHidden = dropdown.classList.contains('hidden');
 
-                container.innerHTML = `
+        // Collapse all other dropdowns in search results
+        document.querySelectorAll('[id^="dropdown-"]').forEach(el => {
+            if (el.id !== `dropdown-${bookId}`) {
+                el.classList.add('hidden');
+                const otherId = el.id.replace('dropdown-', '');
+                const otherArrow = document.getElementById(`arrow-${otherId}`);
+                const otherHeader = document.getElementById(`book-header-${otherId}`);
+                if (otherArrow) otherArrow.classList.remove('rotate-180');
+                if (otherHeader) otherHeader.setAttribute('aria-expanded', 'false');
+            }
+        });
+
+        if (isHidden) {
+            dropdown.classList.remove('hidden');
+            if (arrow) arrow.classList.add('rotate-180');
+            if (header) header.setAttribute('aria-expanded', 'true');
+        } else {
+            dropdown.classList.add('hidden');
+            if (arrow) arrow.classList.remove('rotate-180');
+            if (header) header.setAttribute('aria-expanded', 'false');
+        }
+    };
+
+    window.searchUserByEmail = async () => {
+        const input = document.getElementById('user-search-input');
+        if (!input) return;
+        const email = input.value.trim().toLowerCase();
+        if (!email) { showToast('Please enter an email address', 'error'); return; }
+
+        window.lastUserSearchQuery = email;
+        const container = document.getElementById('user-search-results-container');
+        container.className = "fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4";
+        container.classList.remove('hidden');
+
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') window.closeUserSearchModal();
+        };
+
+        window.closeUserSearchModal = () => {
+            container.className = "mt-6 hidden";
+            container.innerHTML = "";
+            window.lastUserSearchQuery = "";
+            if (input) input.value = "";
+            document.removeEventListener('keydown', handleEscape);
+        };
+
+        document.addEventListener('keydown', handleEscape);
+
+        container.onclick = (e) => {
+            if (e.target === container) window.closeUserSearchModal();
+        };
+
+        container.innerHTML = `
         <div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up relative flex flex-col items-center justify-center py-20 text-center">
             <button data-action="close-user-search-modal" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close search results">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -7440,11 +7496,11 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
         </div>
     `;
 
-                try {
-                    // 1. Look up uid via the public lookup index
-                    const lookupDoc = await db.collection('userLookup').doc(email).get();
-                    if (!lookupDoc.exists) {
-                        container.innerHTML = `
+        try {
+            // 1. Look up uid via the public lookup index
+            const lookupDoc = await db.collection('userLookup').doc(email).get();
+            if (!lookupDoc.exists) {
+                container.innerHTML = `
                 <div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up relative text-center py-20">
                     <button data-action="close-user-search-modal" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close search results">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -7454,56 +7510,54 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     </div>
                 </div>
             `;
-                        return;
-                    }
+                return;
+            }
 
-                    const foundUserId = lookupDoc.data().uid;
+            const foundUserId = lookupDoc.data().uid;
 
-                    // 2. Read the PUBLIC profile only
-                    const userDoc = await db.collection('users').doc(foundUserId).get();
-                    if (!userDoc.exists) {
-                        container.innerHTML = `<div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-10 text-center"><p class="text-sm text-slate-500 italic">User profile missing.</p></div>`;
-                        return;
-                    }
+            // 2. Read the PUBLIC profile only
+            const userDoc = await db.collection('users').doc(foundUserId).get();
+            if (!userDoc.exists) {
+                container.innerHTML = `<div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-10 text-center"><p class="text-sm text-slate-500 italic">User profile missing.</p></div>`;
+                return;
+            }
 
-                    const profile = userDoc.data();
-                    const profileName = profile.displayName || 'User';
+            const profile = userDoc.data();
+            const profileName = profile.displayName || 'User';
 
-                    // 3. Determine collaborator status
-                    const ids = [currentUser.uid, foundUserId].sort();
-                    const partnershipId = `${ids[0]}_${ids[1]}`;
-                    const localPartnership = allPartnerships.find(p => p.id === partnershipId);
-                    const isCollaborator = foundUserId === currentUser.uid
-                        || (localPartnership && (localPartnership.status === 'accepted' || localPartnership.status === undefined));
+            // 3. Determine collaborator status
+            const ids = [currentUser.uid, foundUserId].sort();
+            const partnershipId = `${ids[0]}_${ids[1]}`;
+            const localPartnership = allPartnerships.find(p => p.id === partnershipId);
+            const isCollaborator = foundUserId === currentUser.uid
+                || (localPartnership && (localPartnership.status === 'accepted' || localPartnership.status === undefined));
 
-                    // 4. Fetch books only if collaborator
-                    let foundBooks = [];
-                    let errorMsg = "";
+            // 4. Fetch books only if collaborator
+            let foundBooks = [];
+            let errorMsg = "";
 
-                    if (isCollaborator) {
-                        try {
-                            const booksSnapshot = await db.collection('books').where('userId', '==', foundUserId).get();
-                            const statusSnapshots = await Promise.all(booksSnapshot.docs.map(doc =>
-                                db.collection('books').doc(doc.id).collection('readingStatus').doc(foundUserId).get()
-                            ));
+            if (isCollaborator) {
+                try {
+                    const booksSnapshot = await db.collection('books').where('userId', '==', foundUserId).get();
 
-                            booksSnapshot.docs.forEach((doc, idx) => {
-                                const data = doc.data();
-                                const statusData = statusSnapshots[idx].exists ? statusSnapshots[idx].data() : {};
-                                const isWishlist = data.isWishlist === true || statusData.isWishlist === true;
+                    booksSnapshot.docs.forEach(doc => {
+                        const data = doc.data();
+                        // Use the wishlist flag stored on the book doc itself.
+                        // Reading the collaborator's private readingStatus is not permitted by the rules.
+                        const isWishlist = data.isWishlist === true;
 
-                                if (data.userId === foundUserId && !isWishlist) {
-                                    foundBooks.push({ id: doc.id, ...data, _statusData: statusData });
-                                }
-                            });
-                        } catch (err) {
-                            errorMsg = "Unable to fetch books: " + err.message;
+                        if (data.userId === foundUserId && !isWishlist) {
+                            foundBooks.push({ id: doc.id, ...data, _statusData: {} });
                         }
-                    } else {
-                        errorMsg = "Books are only visible to accepted collaborators. Send a collaborator request in Settings!";
-                    }
+                    });
+                } catch (err) {
+                    errorMsg = "Unable to fetch books: " + err.message;
+                }
+            } else {
+                errorMsg = "Books are only visible to accepted collaborators. Send a collaborator request in Settings!";
+            }
 
-                    container.innerHTML = `
+            container.innerHTML = `
             <div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-slide-up relative space-y-6 text-left overflow-y-auto max-h-[90vh]">
                 <button data-action="close-user-search-modal" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close search results">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -7534,15 +7588,15 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     ${foundBooks.length > 0 ? `
                         <div class="space-y-4">
                             ${foundBooks.map(book => {
-                        const title = book.title || 'Untitled';
-                        const author = book.author || 'Unknown Author';
-                        const coverUrl = book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover';
-                        const bookGenres = getBookGenres(book);
-                        const copyType = book.copyType || 'New Copy';
-                        const isCurrentlyBorrowed = !!book.borrowedBy;
-                        const isSelf = currentUser && foundUserId === currentUser.uid;
+                const title = book.title || 'Untitled';
+                const author = book.author || 'Unknown Author';
+                const coverUrl = book.coverUrl || book.thumbnail || 'https://via.placeholder.com/120x180?text=No+Cover';
+                const bookGenres = getBookGenres(book);
+                const copyType = book.copyType || 'New Copy';
+                const isCurrentlyBorrowed = !!book.borrowedBy;
+                const isSelf = currentUser && foundUserId === currentUser.uid;
 
-                        return `
+                return `
                                     <div class="bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden transition-all shadow-sm hover:shadow-md">
                                         <div data-action="toggle-search-book" data-value="${escapeHTML(book.id)}" data-stop="false" class="p-4 flex items-center justify-between gap-4 cursor-pointer"  role="button" aria-expanded="false" id="book-header-${escapeHTML(book.id)}">
                                             <div class="flex items-center gap-4 min-w-0">
@@ -7595,7 +7649,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                         </div>
                                     </div>
                                 `;
-                    }).join('')}
+            }).join('')}
                         </div>
                     ` : `
                         <div class="p-8 text-center bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
@@ -7605,8 +7659,8 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                 </div>
             </div>
         `;
-                } catch (err) {
-                    container.innerHTML = `
+        } catch (err) {
+            container.innerHTML = `
             <div class="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-6 sm:p-10 shadow-2xl relative text-center py-20">
                 <button data-action="close-user-search-modal" class="absolute top-6 right-6 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Close">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -7616,12 +7670,12 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                 </div>
             </div>
         `;
-                }
-            };
+        }
+    };
 
-            function renderExplore() {
-                const categories = ['All', 'Help', 'Review', 'Others'];
-                const categorySelector = `
+    function renderExplore() {
+        const categories = ['All', 'Help', 'Review', 'Others'];
+        const categorySelector = `
                     <div class="flex flex-wrap gap-2 mb-8">
                         ${categories.map(cat => `
                             <button data-action="set-feed-category" data-value="${cat}" class="px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none ${activeFeedCategory === cat ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-105' : 'bg-white dark:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 border border-slate-100 dark:border-slate-800'}">${cat}</button>
@@ -7629,7 +7683,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     </div>
                 `;
 
-                const searchBarHTML = `
+        const searchBarHTML = `
                     <div class="glass p-6 rounded-[2rem] border border-slate-200/50 dark:border-slate-800 bg-gradient-to-br from-indigo-500/5 to-transparent mb-8">
                         <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Explore Users</h3>
                         <div class="flex gap-2">
@@ -7646,15 +7700,15 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     </div>
                 `;
 
-                if (window.lastUserSearchQuery) {
-                    setTimeout(() => {
-                        window.searchUserByEmail();
-                    }, 50);
-                }
+        if (window.lastUserSearchQuery) {
+            setTimeout(() => {
+                window.searchUserByEmail();
+            }, 50);
+        }
 
-                if (socialReviews.length === 0) {
-                    if (isInitialSync) {
-                        return `
+        if (socialReviews.length === 0) {
+            if (isInitialSync) {
+                return `
             <div class="max-w-3xl mx-auto space-y-6 animate-slide-up">
                 <div class="glass p-8 rounded-[2.5rem] border border-slate-200/50 dark:border-slate-800">
                     <div class="flex flex-col sm:flex-row items-center justify-between gap-6">
@@ -7671,8 +7725,8 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                 ${Array(3).fill(0).map(() => renderSkeletonReviewCard()).join('')}
             </div>
         `;
-                    }
-                    return `
+            }
+            return `
                     <div class="max-w-3xl mx-auto animate-slide-up">
                         ${searchBarHTML}
                         <div class="glass p-8 rounded-[2.5rem] border border-slate-200/50 dark:border-slate-800 bg-gradient-to-br from-blue-500/5 to-transparent mb-8">
@@ -7697,9 +7751,9 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                         </div>
                     </div>
                     `;
-                }
+        }
 
-                return `
+        return `
                 <div class="max-w-3xl mx-auto space-y-8 animate-slide-up">
                     ${searchBarHTML}
                     <div class="glass p-8 rounded-[2.5rem] border border-slate-200/50 dark:border-slate-800 bg-gradient-to-br from-blue-500/5 to-transparent">
@@ -7724,835 +7778,835 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     ` : '<p class="text-center text-slate-400 text-xs font-bold uppercase tracking-widest pt-12 italic">— You\'ve reached the end of the shelf —</p>'}
                 </div>
                 `;
+    }
+
+    function attachActivityListeners() {
+        // Activity tab listeners would go here
+    }
+
+    function formatDate(date) {
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+        if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+        if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+    }
+
+
+    window.quickUpdateProgress = async (bookId, element) => {
+        if (element) {
+            element.disabled = true;
+            element.classList.add('animate-pulse');
+        }
+        try {
+            await db.collection('books').doc(bookId)
+                .collection('readingStatus').doc(currentUser.uid).set({
+                    progress: firebase.firestore.FieldValue.increment(5),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+
+            const statusData = getStatusData(bookId);
+            if (statusData && (statusData.progress + 5) >= 100) {
+                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
             }
-
-            function attachActivityListeners() {
-                // Activity tab listeners would go here
+            showToast('Progress updated!', 'success', 1000);
+        } catch (err) {
+            console.error('Quick progress error:', err);
+            showToast('Failed to update progress: ' + err.message, 'error');
+        } finally {
+            if (element) {
+                element.disabled = false;
+                element.classList.remove('animate-pulse');
             }
+        }
+    };
 
-            function formatDate(date) {
-                const now = new Date();
-                const diffMs = now - date;
-                const diffMins = Math.floor(diffMs / 60000);
-                const diffHours = Math.floor(diffMs / 3600000);
-                const diffDays = Math.floor(diffMs / 86400000);
-
-                if (diffMins < 1) return 'Just now';
-                if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
-                if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-                if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-
-                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
-            }
-
-
-            window.quickUpdateProgress = async (bookId, element) => {
-                if (element) {
-                    element.disabled = true;
-                    element.classList.add('animate-pulse');
-                }
-                try {
-                    await db.collection('books').doc(bookId)
-                        .collection('readingStatus').doc(currentUser.uid).set({
-                            progress: firebase.firestore.FieldValue.increment(5),
-                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                        }, { merge: true });
-
-                    const statusData = getStatusData(bookId);
-                    if (statusData && (statusData.progress + 5) >= 100) {
-                        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-                    }
-                    showToast('Progress updated!', 'success', 1000);
-                } catch (err) {
-                    console.error('Quick progress error:', err);
-                    showToast('Failed to update progress: ' + err.message, 'error');
-                } finally {
-                    if (element) {
-                        element.disabled = false;
-                        element.classList.remove('animate-pulse');
-                    }
-                }
+    window.quickUpdateStatus = async (bookId, newStatus, element) => {
+        let originalHTML = '';
+        if (element) {
+            originalHTML = element.innerHTML;
+            element.disabled = true;
+            element.innerHTML = '<svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+        }
+        try {
+            const updateData = {
+                status: newStatus,
+                userId: currentUser.uid,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
+            if (newStatus === 'finished') updateData.progress = 100;
+            if (newStatus === 'reading') updateData.progress = 0;
 
-            window.quickUpdateStatus = async (bookId, newStatus, element) => {
-                let originalHTML = '';
-                if (element) {
-                    originalHTML = element.innerHTML;
-                    element.disabled = true;
-                    element.innerHTML = '<svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+            await db.collection('books').doc(bookId)
+                .collection('readingStatus').doc(currentUser.uid).set(updateData, { merge: true });
+
+            const book = books.find(b => b.id === bookId);
+            await db.collection('activityFeed').add({
+                type: 'book_transfer',
+                bookId,
+                bookTitle: book.title || 'Unknown Book',
+                userName: currentUser.displayName || currentUser.email || 'A collaborator',
+                userId: currentUser.uid,
+                recipientId: targetUserId,
+                libraryId: currentUser.uid,      // ✅ write to YOUR feed (always allowed)
+                message: `${currentUser.displayName || currentUser.email || 'A collaborator'} transferred the book "${book.title}" to you.`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            showToast(`Marked as ${READING_STATUSES[newStatus].label}!`, 'success');
+            if (newStatus === 'finished') {
+                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+            }
+        } catch (err) {
+            console.error('Quick status update error:', err);
+            showToast('Failed to update status: ' + err.message, 'error');
+        } finally {
+            if (element) {
+                element.disabled = false;
+                element.innerHTML = originalHTML;
+            }
+        }
+    };
+
+    window.copyAIResults = (text, element) => {
+        window.copyToClipboard(text, 'Results copied to clipboard!', element);
+    };
+
+    window.copyToClipboard = (text, message = 'Copied to clipboard!', element) => {
+        if (!navigator.clipboard) {
+            showToast('Clipboard not available', 'error');
+            return;
+        }
+        navigator.clipboard.writeText(text).then(() => {
+            showToast(message, 'success');
+            if (element) {
+                const svg = element.querySelector('svg');
+                if (svg) {
+                    const originalHTML = svg.outerHTML;
+                    svg.outerHTML = '<svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+                    setTimeout(() => {
+                        const newSvg = element.querySelector('svg.text-emerald-500');
+                        if (newSvg) newSvg.outerHTML = originalHTML;
+                    }, 2000);
                 }
-                try {
-                    const updateData = {
-                        status: newStatus,
-                        userId: currentUser.uid,
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }
+        }).catch(err => {
+            showToast('Failed to copy results', 'error');
+        });
+    };
+
+
+    window.jumpToBook = async (bookId) => {
+        window.clearAllFilters();
+        window.setTab('library');
+
+        // Find book and scroll to it
+        const book = books.find(b => b.id === bookId);
+        if (book) {
+            setTimeout(() => {
+                const element = document.querySelector(`[data-book-id="${bookId}"]`);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    element.classList.add('ring-4', 'ring-blue-500', 'ring-offset-2');
+                    setTimeout(() => {
+                        element.classList.remove('ring-4', 'ring-blue-500', 'ring-offset-2');
+                    }, 2000);
+                }
+            }, 100);
+
+            // Auto-open details after scroll
+            setTimeout(() => {
+                openBookDetails(book);
+            }, 800);
+        }
+    };
+
+    // ---------- CSV Import/Export ----------
+    let lastImportState = null;
+
+    function guessGenre(title) {
+        const lower = title.toLowerCase();
+        const keywords = {
+            'Islamic': ['islam', 'quran', 'hadith', 'prophet', 'prayer', 'আল্লাহ', 'ইসলাম', 'কোরআন', 'হাদীস', 'নবী', 'সালাত', 'দুয়া', 'জবাব', 'প্রত্যাবর্তন', 'প্যারাডক্সিক্যাল', 'সাজিদ', 'বড় আন্টির কাছে'],
+            'History': ['history', 'civilization', 'war', 'empire', 'ইতিহাস', 'শিকড়ের সন্ধানে'],
+            'Fiction': ['novel', 'story', 'fiction', 'উপন্যাস', 'গল্প', 'বিভূতিভূষণ'],
+            'Thriller': ['thriller', 'mystery', 'crime', 'থ্রিলার', 'রহস্য'],
+            'Science': ['science', 'physics', 'biology', 'মহাকাশ', 'বিজ্ঞান'],
+            'Childhood': ['parenting', 'child', 'প্যারেন্টিং', 'শিশু'],
+        };
+
+        for (const [genre, words] of Object.entries(keywords)) {
+            if (words.some(word => lower.includes(word.toLowerCase()))) return genre;
+        }
+        return 'Other';
+    }
+
+    window.runWishlistMigration = async () => {
+        if (!confirm('This will move wishlist status from the books themselves to your personal reading status. This ensures wishlist items are private to each user. Proceed?')) return;
+
+        showToast('Starting wishlist migration...', 'info');
+        try {
+            const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).where('isWishlist', '==', true).get();
+            if (snapshot.empty) {
+                showToast('No wishlist items found to migrate.', 'info');
+                return;
+            }
+
+            const batch = db.batch();
+            snapshot.docs.forEach(doc => {
+                batch.set(doc.ref.collection('readingStatus').doc(currentUser.uid), {
+                    isWishlist: true,
+                    userId: currentUser.uid,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+            });
+
+            await batch.commit();
+            showToast(`Successfully migrated ${snapshot.size} wishlist items!`, 'success');
+        } catch (err) {
+            showToast('Migration error: ' + err.message, 'error');
+        }
+    };
+
+    window.runDataMigration = async () => {
+        if (!confirm('This will move all books from the legacy "default" library to your personal library. Proceed?')) return;
+
+        showToast('Starting migration...', 'info');
+        try {
+            let migratedCount = 0;
+            // 1. Migrate books with libraryId: 'default'
+            const defaultSnapshot = await db.collection('books').where('libraryId', '==', 'default').get();
+            const batch1 = db.batch();
+            defaultSnapshot.docs.forEach(doc => {
+                batch1.update(doc.ref, { userId: currentUser.uid, libraryId: firebase.firestore.FieldValue.delete() });
+                migratedCount++;
+            });
+            await batch1.commit();
+
+            // 2. Migrate books with no userId (legacy structure)
+            // Note: This is tricky in Firestore without a specific index, so we'll do a general fetch if needed or skip if not common
+
+            showToast(`Successfully migrated ${migratedCount} books to your personal library!`, 'success');
+        } catch (err) {
+            showToast('Migration error: ' + err.message, 'error');
+        }
+    };
+
+    async function undoImport() {
+        if (!lastImportState) return;
+        showToast('Undoing import...', 'info');
+
+        const { addedIds, previousStates } = lastImportState;
+        const batch = db.batch();
+
+        // Delete added books
+        addedIds.forEach(id => {
+            batch.delete(db.collection('books').doc(id));
+        });
+
+        // Revert updated books
+        for (const [id, prevState] of Object.entries(previousStates)) {
+            const cleanState = { ...prevState };
+            delete cleanState.id;
+            // Strip every client-side pre-computed field so none are persisted.
+            Object.keys(cleanState).forEach(key => { if (key.startsWith('_')) delete cleanState[key]; });
+            batch.set(db.collection('books').doc(id), cleanState);
+        }
+
+        try {
+            await batch.commit();
+            showToast('Import undone successfully', 'success');
+            lastImportState = null;
+        } catch (err) {
+            showToast('Error undoing import: ' + err.message, 'error');
+        }
+    }
+
+    function importCSV() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.csv';
+        input.onchange = e => {
+            const file = e.target.files[0];
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: async (results) => {
+                    let importedCount = 0;
+                    let updatedCount = 0;
+                    const addedIds = [];
+                    const previousStates = {};
+
+                    const safeDate = (val) => {
+                        const d = new Date(val);
+                        return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
                     };
-                    if (newStatus === 'finished') updateData.progress = 100;
-                    if (newStatus === 'reading') updateData.progress = 0;
 
-                    await db.collection('books').doc(bookId)
-                        .collection('readingStatus').doc(currentUser.uid).set(updateData, { merge: true });
+                    const importPromises = results.data.map(async row => {
+                        const title = (row.Title || row.title || 'Untitled').trim();
+                        const author = (row.Author || row.author || 'Unknown').trim() || 'Unknown';
+                        let genreRaw = row.Genre || row.Genre || row.Category || row.category || '';
+                        const isbn = (row.ISBN || row.isbn || '').trim();
+                        const notes = (row.Notes || row.notes || row.Comments || row.comments || '').trim();
+                        const price = row.Price || row.price ? parseFloat(row.Price || row.price) : null;
+                        const dateAddedRaw = row['Date Added'] || row.date_added || row.Date || row.purchaseDate || new Date().toISOString();
 
-                    const book = books.find(b => b.id === bookId);
-                    await db.collection('activityFeed').add({
-                        type: 'status_updated',
-                        bookId: bookId,
-                        bookTitle: book?.title || 'Unknown Book',
-                        userName: currentUser.displayName || currentUser.email || currentUser.uid,
-                        userId: currentUser.uid,
-                        status: newStatus,
-                        addedTo: book?.userId === currentUser.uid ? 'My' : 'Partner',
-                        libraryId: book?.userId || currentUser.uid,
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-
-                    showToast(`Marked as ${READING_STATUSES[newStatus].label}!`, 'success');
-                    if (newStatus === 'finished') {
-                        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-                    }
-                } catch (err) {
-                    console.error('Quick status update error:', err);
-                    showToast('Failed to update status: ' + err.message, 'error');
-                } finally {
-                    if (element) {
-                        element.disabled = false;
-                        element.innerHTML = originalHTML;
-                    }
-                }
-            };
-
-            window.copyAIResults = (text, element) => {
-                window.copyToClipboard(text, 'Results copied to clipboard!', element);
-            };
-
-            window.copyToClipboard = (text, message = 'Copied to clipboard!', element) => {
-                if (!navigator.clipboard) {
-                    showToast('Clipboard not available', 'error');
-                    return;
-                }
-                navigator.clipboard.writeText(text).then(() => {
-                    showToast(message, 'success');
-                    if (element) {
-                        const svg = element.querySelector('svg');
-                        if (svg) {
-                            const originalHTML = svg.outerHTML;
-                            svg.outerHTML = '<svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
-                            setTimeout(() => {
-                                const newSvg = element.querySelector('svg.text-emerald-500');
-                                if (newSvg) newSvg.outerHTML = originalHTML;
-                            }, 2000);
+                        if (!genreRaw) {
+                            genreRaw = guessGenre(title);
                         }
-                    }
-                }).catch(err => {
-                    showToast('Failed to copy results', 'error');
-                });
-            };
 
+                        const categories = genreRaw.split(/[,;&]/).map(g => g.trim()).filter(Boolean);
+                        if (categories.length === 0) categories.push('Other');
 
-            window.jumpToBook = async (bookId) => {
-                window.clearAllFilters();
-                window.setTab('library');
+                        const bookData = {
+                            title,
+                            author,
+                            genres: categories,
+                            categories: categories,
+                            isbn,
+                            comments: notes,
+                            coverUrl: null,                  // CSV import has no cover URL column
+                            description: '',                  // CSV import has no description column
+                            price,
+                            purchaseDate: safeDate(dateAddedRaw),
+                            highlights: [],
+                            source: 'imported',
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            userId: currentUser.uid
+                        };
 
-                // Find book and scroll to it
-                const book = books.find(b => b.id === bookId);
-                if (book) {
-                    setTimeout(() => {
-                        const element = document.querySelector(`[data-book-id="${bookId}"]`);
-                        if (element) {
-                            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            element.classList.add('ring-4', 'ring-blue-500', 'ring-offset-2');
-                            setTimeout(() => {
-                                element.classList.remove('ring-4', 'ring-blue-500', 'ring-offset-2');
-                            }, 2000);
-                        }
-                    }, 100);
+                        const duplicate = findDuplicateBook(bookData, currentUser.uid);
 
-                    // Auto-open details after scroll
-                    setTimeout(() => {
-                        openBookDetails(book);
-                    }, 800);
-                }
-            };
+                        if (duplicate) {
+                            // Store previous state for undo
+                            previousStates[duplicate.id] = { ...duplicate };
+                            delete previousStates[duplicate.id].id; // Don't store id in doc
 
-            // ---------- CSV Import/Export ----------
-            let lastImportState = null;
-
-            function guessGenre(title) {
-                const lower = title.toLowerCase();
-                const keywords = {
-                    'Islamic': ['islam', 'quran', 'hadith', 'prophet', 'prayer', 'আল্লাহ', 'ইসলাম', 'কোরআন', 'হাদীস', 'নবী', 'সালাত', 'দুয়া', 'জবাব', 'প্রত্যাবর্তন', 'প্যারাডক্সিক্যাল', 'সাজিদ', 'বড় আন্টির কাছে'],
-                    'History': ['history', 'civilization', 'war', 'empire', 'ইতিহাস', 'শিকড়ের সন্ধানে'],
-                    'Fiction': ['novel', 'story', 'fiction', 'উপন্যাস', 'গল্প', 'বিভূতিভূষণ'],
-                    'Thriller': ['thriller', 'mystery', 'crime', 'থ্রিলার', 'রহস্য'],
-                    'Science': ['science', 'physics', 'biology', 'মহাকাশ', 'বিজ্ঞান'],
-                    'Childhood': ['parenting', 'child', 'প্যারেন্টিং', 'শিশু'],
-                };
-
-                for (const [genre, words] of Object.entries(keywords)) {
-                    if (words.some(word => lower.includes(word.toLowerCase()))) return genre;
-                }
-                return 'Other';
-            }
-
-            window.runWishlistMigration = async () => {
-                if (!confirm('This will move wishlist status from the books themselves to your personal reading status. This ensures wishlist items are private to each user. Proceed?')) return;
-
-                showToast('Starting wishlist migration...', 'info');
-                try {
-                    const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).where('isWishlist', '==', true).get();
-                    if (snapshot.empty) {
-                        showToast('No wishlist items found to migrate.', 'info');
-                        return;
-                    }
-
-                    const batch = db.batch();
-                    snapshot.docs.forEach(doc => {
-                        batch.set(doc.ref.collection('readingStatus').doc(currentUser.uid), {
-                            isWishlist: true,
-                            userId: currentUser.uid,
-                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                        }, { merge: true });
-                    });
-
-                    await batch.commit();
-                    showToast(`Successfully migrated ${snapshot.size} wishlist items!`, 'success');
-                } catch (err) {
-                    showToast('Migration error: ' + err.message, 'error');
-                }
-            };
-
-            window.runDataMigration = async () => {
-                if (!confirm('This will move all books from the legacy "default" library to your personal library. Proceed?')) return;
-
-                showToast('Starting migration...', 'info');
-                try {
-                    let migratedCount = 0;
-                    // 1. Migrate books with libraryId: 'default'
-                    const defaultSnapshot = await db.collection('books').where('libraryId', '==', 'default').get();
-                    const batch1 = db.batch();
-                    defaultSnapshot.docs.forEach(doc => {
-                        batch1.update(doc.ref, { userId: currentUser.uid, libraryId: firebase.firestore.FieldValue.delete() });
-                        migratedCount++;
-                    });
-                    await batch1.commit();
-
-                    // 2. Migrate books with no userId (legacy structure)
-                    // Note: This is tricky in Firestore without a specific index, so we'll do a general fetch if needed or skip if not common
-
-                    showToast(`Successfully migrated ${migratedCount} books to your personal library!`, 'success');
-                } catch (err) {
-                    showToast('Migration error: ' + err.message, 'error');
-                }
-            };
-
-            async function undoImport() {
-                if (!lastImportState) return;
-                showToast('Undoing import...', 'info');
-
-                const { addedIds, previousStates } = lastImportState;
-                const batch = db.batch();
-
-                // Delete added books
-                addedIds.forEach(id => {
-                    batch.delete(db.collection('books').doc(id));
-                });
-
-                // Revert updated books
-                for (const [id, prevState] of Object.entries(previousStates)) {
-                    const cleanState = { ...prevState };
-                    delete cleanState.id;
-                    // Strip every client-side pre-computed field so none are persisted.
-                    Object.keys(cleanState).forEach(key => { if (key.startsWith('_')) delete cleanState[key]; });
-                    batch.set(db.collection('books').doc(id), cleanState);
-                }
-
-                try {
-                    await batch.commit();
-                    showToast('Import undone successfully', 'success');
-                    lastImportState = null;
-                } catch (err) {
-                    showToast('Error undoing import: ' + err.message, 'error');
-                }
-            }
-
-            function importCSV() {
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = '.csv';
-                input.onchange = e => {
-                    const file = e.target.files[0];
-                    Papa.parse(file, {
-                        header: true,
-                        skipEmptyLines: true,
-                        complete: async (results) => {
-                            let importedCount = 0;
-                            let updatedCount = 0;
-                            const addedIds = [];
-                            const previousStates = {};
-
-                            const safeDate = (val) => {
-                                const d = new Date(val);
-                                return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
-                            };
-
-                            const importPromises = results.data.map(async row => {
-                                const title = (row.Title || row.title || 'Untitled').trim();
-                                const author = (row.Author || row.author || 'Unknown').trim() || 'Unknown';
-                                let genreRaw = row.Genre || row.Genre || row.Category || row.category || '';
-                                const isbn = (row.ISBN || row.isbn || '').trim();
-                                const notes = (row.Notes || row.notes || row.Comments || row.comments || '').trim();
-                                const price = row.Price || row.price ? parseFloat(row.Price || row.price) : null;
-                                const dateAddedRaw = row['Date Added'] || row.date_added || row.Date || row.purchaseDate || new Date().toISOString();
-
-                                if (!genreRaw) {
-                                    genreRaw = guessGenre(title);
-                                }
-
-                                const categories = genreRaw.split(/[,;&]/).map(g => g.trim()).filter(Boolean);
-                                if (categories.length === 0) categories.push('Other');
-
-                                const bookData = {
-                                    title,
-                                    author,
-                                    genres: categories,
-                                    categories: categories,
-                                    isbn,
-                                    comments: notes,
-                                    coverUrl: null,                  // CSV import has no cover URL column
-                                    description: '',                  // CSV import has no description column
-                                    price,
-                                    purchaseDate: safeDate(dateAddedRaw),
-                                    highlights: [],
-                                    source: 'imported',
-                                    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                                    userId: currentUser.uid
-                                };
-
-                                const duplicate = findDuplicateBook(bookData, currentUser.uid);
-
-                                if (duplicate) {
-                                    // Store previous state for undo
-                                    previousStates[duplicate.id] = { ...duplicate };
-                                    delete previousStates[duplicate.id].id; // Don't store id in doc
-
-                                    await db.collection('books').doc(duplicate.id).update({
-                                        ...bookData,
-                                        category: firebase.firestore.FieldValue.delete() // Clean up old field
-                                    });
-
-                                    let status = (row.Status || row.status || 'want_to_read').toLowerCase().replace(/\s+/g, '_');
-                                    if (status === 'unread') status = 'want_to_read';
-
-                                    await db.collection('books').doc(duplicate.id).collection('readingStatus').doc(currentUser.uid).set({
-                                        status: status,
-                                        userId: currentUser.uid,
-                                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                                    }, { merge: true });
-
-                                    updatedCount++;
-                                } else {
-                                    bookData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-                                    const docRef = await db.collection('books').add(bookData);
-                                    addedIds.push(docRef.id);
-
-                                    let status = (row.Status || row.status || 'want_to_read').toLowerCase().replace(/\s+/g, '_');
-                                    if (status === 'unread') status = 'want_to_read';
-
-                                    await docRef.collection('readingStatus').doc(currentUser.uid).set({
-                                        status: status,
-                                        userId: currentUser.uid,
-                                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                                    });
-                                    importedCount++;
-                                }
+                            await db.collection('books').doc(duplicate.id).update({
+                                ...bookData,
+                                category: firebase.firestore.FieldValue.delete() // Clean up old field
                             });
-                            await Promise.all(importPromises);
 
-                            lastImportState = { addedIds, previousStates };
+                            let status = (row.Status || row.status || 'want_to_read').toLowerCase().replace(/\s+/g, '_');
+                            if (status === 'unread') status = 'want_to_read';
 
-                            showToast(`Imported ${importedCount} new, updated ${updatedCount} existing.`, 'success', 10000, '<button data-action="undo-import" class="ml-4 underline font-bold uppercase text-xs focus-visible:ring-2 focus-visible:ring-white outline-none rounded" aria-label="Undo last import">Undo</button>');
-                            window.undoImport = undoImport;
+                            await db.collection('books').doc(duplicate.id).collection('readingStatus').doc(currentUser.uid).set({
+                                status: status,
+                                userId: currentUser.uid,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            }, { merge: true });
+
+                            updatedCount++;
+                        } else {
+                            bookData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                            const docRef = await db.collection('books').add(bookData);
+                            addedIds.push(docRef.id);
+
+                            let status = (row.Status || row.status || 'want_to_read').toLowerCase().replace(/\s+/g, '_');
+                            if (status === 'unread') status = 'want_to_read';
+
+                            await docRef.collection('readingStatus').doc(currentUser.uid).set({
+                                status: status,
+                                userId: currentUser.uid,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                            importedCount++;
                         }
                     });
-                };
-                input.click();
-            }
+                    await Promise.all(importPromises);
 
-            function exportCSV() {
-                const exportData = books.map(b => ({
-                    Title: b.title,
-                    Author: b.author,
-                    Category: getBookGenres(b).join(', '),
-                    Tags: (b.tags || []).join(', ')
-                }));
-                const csv = Papa.unparse(exportData);
-                const blob = new Blob([csv], { type: 'text/csv' });
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = 'mylib_export.csv';
-                a.click();
-            }
+                    lastImportState = { addedIds, previousStates };
 
-            function showFullScreenLoading(text) {
-                const overlay = document.createElement('div');
-                overlay.id = 'full-screen-loading-overlay';
-                overlay.className = 'fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center text-white';
-                overlay.innerHTML = `
+                    showToast(`Imported ${importedCount} new, updated ${updatedCount} existing.`, 'success', 10000, '<button data-action="undo-import" class="ml-4 underline font-bold uppercase text-xs focus-visible:ring-2 focus-visible:ring-white outline-none rounded" aria-label="Undo last import">Undo</button>');
+                    window.undoImport = undoImport;
+                }
+            });
+        };
+        input.click();
+    }
+
+    function exportCSV() {
+        const exportData = books.map(b => ({
+            Title: b.title,
+            Author: b.author,
+            Category: getBookGenres(b).join(', '),
+            Tags: (b.tags || []).join(', ')
+        }));
+        const csv = Papa.unparse(exportData);
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'mylib_export.csv';
+        a.click();
+    }
+
+    function showFullScreenLoading(text) {
+        const overlay = document.createElement('div');
+        overlay.id = 'full-screen-loading-overlay';
+        overlay.className = 'fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center text-white';
+        overlay.innerHTML = `
                     <div class="glass max-w-md w-full rounded-[2.5rem] p-10 flex flex-col items-center justify-center gap-6 shadow-2xl border border-white/10">
                         <div class="w-16 h-16 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin"></div>
                         <p class="text-white font-bold uppercase tracking-widest text-xs leading-relaxed">${text}</p>
                     </div>
                 `;
-                document.body.appendChild(overlay);
-                return () => {
-                    const el = document.getElementById('full-screen-loading-overlay');
-                    if (el) el.remove();
+        document.body.appendChild(overlay);
+        return () => {
+            const el = document.getElementById('full-screen-loading-overlay');
+            if (el) el.remove();
+        };
+    }
+
+    async function exportJSON() {
+        const btn = document.getElementById('export-json-btn');
+        const originalText = btn ? btn.innerHTML : 'Export JSON';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = 'Exporting...';
+        }
+
+        try {
+            const myBooks = books.filter(b => b.userId === currentUser.uid);
+
+            const exportedBooks = await Promise.all(myBooks.map(async b => {
+                // Fetch reading status
+                const statusDoc = await db.collection('books').doc(b.id).collection('readingStatus').doc(currentUser.uid).get();
+                const statusData = statusDoc.exists ? statusDoc.data() : {};
+
+                // Fetch community reviews
+                const reviewsSnapshot = await db.collection('reviews')
+                    .where('userId', '==', currentUser.uid)
+                    .where('bookTitle', '==', b.title)
+                    .get();
+                const reviews = reviewsSnapshot.docs.map(doc => ({
+                    body: doc.data().body || "",
+                    rating: doc.data().rating || 0,
+                    createdAt: doc.data().createdAt?.toDate()?.toISOString() || new Date().toISOString()
+                }));
+
+                // Fallback: if comment exists on readingStatus but no community review, add as a review object
+                if (statusData.comment && !reviews.some(r => r.body === statusData.comment)) {
+                    reviews.push({
+                        body: statusData.comment,
+                        rating: statusData.rating || b.rating || 0,
+                        createdAt: new Date().toISOString()
+                    });
+                }
+
+                return {
+                    title: b.title || "Untitled",
+                    author: b.author || "Unknown",
+                    authors: b.author ? [b.author] : ["Unknown"],
+                    coverUrl: b.coverUrl || b.thumbnail || "",
+                    isbn: b.isbn || "",
+                    description: b.description || "",
+                    price: b.price || null,
+                    prices: b.price ? [b.price] : [],
+                    purchaseDate: b.purchaseDate || null,
+                    purchasedDate: b.purchaseDate || null,
+                    tags: b.tags || [],
+                    genres: getBookGenres(b),
+                    rating: statusData.rating || b.rating || 0,
+                    ratings: [statusData.rating || b.rating || 0],
+                    status: statusData.status || "want_to_read",
+                    progress: statusData.progress || 0,
+                    isWishlist: statusData.isWishlist || b.isWishlist || false,
+                    highlights: b.highlights || [],
+                    reviews: reviews
                 };
-            }
+            }));
 
-            async function exportJSON() {
-                const btn = document.getElementById('export-json-btn');
-                const originalText = btn ? btn.innerHTML : 'Export JSON';
-                if (btn) {
-                    btn.disabled = true;
-                    btn.innerHTML = 'Exporting...';
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportedBooks, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "mylib_library_export.json");
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+
+            showToast('Library exported successfully as JSON!', 'success');
+        } catch (err) {
+            showToast('Export failed: ' + err.message, 'error');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+    }
+
+    function importJSON() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = async e => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const closeOverlay = showFullScreenLoading("importing your library, do not close the screen. it will take a minute");
+
+            try {
+                const text = await file.text();
+                const data = JSON.parse(text);
+
+                if (!Array.isArray(data)) {
+                    throw new Error("Invalid format: Top-level JSON must be an array of book objects.");
                 }
 
-                try {
-                    const myBooks = books.filter(b => b.userId === currentUser.uid);
+                // We can process books in chunks/batches
+                for (let i = 0; i < data.length; i++) {
+                    const item = data[i];
+                    const title = (item.title || "Untitled").trim();
+                    const author = (item.author || (item.authors && item.authors[0]) || "Unknown").trim();
+                    const genres = item.genres || item.categories || ["Other"];
+                    const tags = item.tags || [];
+                    const isbn = item.isbn || "";
+                    const coverUrl = item.coverUrl || item.thumbnail || null;
+                    const description = item.description || "";
+                    const price = item.price || (item.prices && item.prices[0]) || null;
+                    const purchaseDate = item.purchaseDate || item.purchasedDate || new Date().toISOString();
+                    const highlights = item.highlights || [];
 
-                    const exportedBooks = await Promise.all(myBooks.map(async b => {
-                        // Fetch reading status
-                        const statusDoc = await db.collection('books').doc(b.id).collection('readingStatus').doc(currentUser.uid).get();
-                        const statusData = statusDoc.exists ? statusDoc.data() : {};
+                    const bookData = {
+                        title,
+                        author,
+                        genres,
+                        categories: genres,
+                        isbn,
+                        coverUrl,
+                        description,
+                        price,
+                        purchaseDate,
+                        highlights,
+                        source: 'imported_json',
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        userId: currentUser.uid
+                    };
 
-                        // Fetch community reviews
-                        const reviewsSnapshot = await db.collection('reviews')
-                            .where('userId', '==', currentUser.uid)
-                            .where('bookTitle', '==', b.title)
-                            .get();
-                        const reviews = reviewsSnapshot.docs.map(doc => ({
-                            body: doc.data().body || "",
-                            rating: doc.data().rating || 0,
-                            createdAt: doc.data().createdAt?.toDate()?.toISOString() || new Date().toISOString()
-                        }));
+                    // Check duplicate
+                    const duplicate = findDuplicateBook(bookData, currentUser.uid);
+                    let bookId;
 
-                        // Fallback: if comment exists on readingStatus but no community review, add as a review object
-                        if (statusData.comment && !reviews.some(r => r.body === statusData.comment)) {
-                            reviews.push({
-                                body: statusData.comment,
-                                rating: statusData.rating || b.rating || 0,
-                                createdAt: new Date().toISOString()
-                            });
-                        }
-
-                        return {
-                            title: b.title || "Untitled",
-                            author: b.author || "Unknown",
-                            authors: b.author ? [b.author] : ["Unknown"],
-                            coverUrl: b.coverUrl || b.thumbnail || "",
-                            isbn: b.isbn || "",
-                            description: b.description || "",
-                            price: b.price || null,
-                            prices: b.price ? [b.price] : [],
-                            purchaseDate: b.purchaseDate || null,
-                            purchasedDate: b.purchaseDate || null,
-                            tags: b.tags || [],
-                            genres: getBookGenres(b),
-                            rating: statusData.rating || b.rating || 0,
-                            ratings: [statusData.rating || b.rating || 0],
-                            status: statusData.status || "want_to_read",
-                            progress: statusData.progress || 0,
-                            isWishlist: statusData.isWishlist || b.isWishlist || false,
-                            highlights: b.highlights || [],
-                            reviews: reviews
-                        };
-                    }));
-
-                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportedBooks, null, 2));
-                    const downloadAnchor = document.createElement('a');
-                    downloadAnchor.setAttribute("href", dataStr);
-                    downloadAnchor.setAttribute("download", "mylib_library_export.json");
-                    document.body.appendChild(downloadAnchor);
-                    downloadAnchor.click();
-                    downloadAnchor.remove();
-
-                    showToast('Library exported successfully as JSON!', 'success');
-                } catch (err) {
-                    showToast('Export failed: ' + err.message, 'error');
-                } finally {
-                    if (btn) {
-                        btn.disabled = false;
-                        btn.innerHTML = originalText;
-                    }
-                }
-            }
-
-            function importJSON() {
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = '.json';
-                input.onchange = async e => {
-                    const file = e.target.files[0];
-                    if (!file) return;
-
-                    const closeOverlay = showFullScreenLoading("importing your library, do not close the screen. it will take a minute");
-
-                    try {
-                        const text = await file.text();
-                        const data = JSON.parse(text);
-
-                        if (!Array.isArray(data)) {
-                            throw new Error("Invalid format: Top-level JSON must be an array of book objects.");
-                        }
-
-                        // We can process books in chunks/batches
-                        for (let i = 0; i < data.length; i++) {
-                            const item = data[i];
-                            const title = (item.title || "Untitled").trim();
-                            const author = (item.author || (item.authors && item.authors[0]) || "Unknown").trim();
-                            const genres = item.genres || item.categories || ["Other"];
-                            const tags = item.tags || [];
-                            const isbn = item.isbn || "";
-                            const coverUrl = item.coverUrl || item.thumbnail || null;
-                            const description = item.description || "";
-                            const price = item.price || (item.prices && item.prices[0]) || null;
-                            const purchaseDate = item.purchaseDate || item.purchasedDate || new Date().toISOString();
-                            const highlights = item.highlights || [];
-
-                            const bookData = {
-                                title,
-                                author,
-                                genres,
-                                categories: genres,
-                                isbn,
-                                coverUrl,
-                                description,
-                                price,
-                                purchaseDate,
-                                highlights,
-                                source: 'imported_json',
-                                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                                userId: currentUser.uid
-                            };
-
-                            // Check duplicate
-                            const duplicate = findDuplicateBook(bookData, currentUser.uid);
-                            let bookId;
-
-                            if (duplicate) {
-                                bookId = duplicate.id;
-                                // Merge highlights
-                                const existingHighlights = duplicate.highlights || [];
-                                const mergedHighlights = [...existingHighlights];
-                                highlights.forEach(ih => {
-                                    if (!mergedHighlights.some(eh => eh.text === ih.text)) {
-                                        mergedHighlights.push(ih);
-                                    }
-                                });
-
-                                await db.collection('books').doc(bookId).update({
-                                    ...bookData,
-                                    highlights: mergedHighlights
-                                });
-                            } else {
-                                bookData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-                                const docRef = await db.collection('books').add(bookData);
-                                bookId = docRef.id;
+                    if (duplicate) {
+                        bookId = duplicate.id;
+                        // Merge highlights
+                        const existingHighlights = duplicate.highlights || [];
+                        const mergedHighlights = [...existingHighlights];
+                        highlights.forEach(ih => {
+                            if (!mergedHighlights.some(eh => eh.text === ih.text)) {
+                                mergedHighlights.push(ih);
                             }
+                        });
 
-                            // Write reading status
-                            const status = item.status || "want_to_read";
-                            const rating = item.rating || (item.ratings && item.ratings[0]) || 0;
-                            const progress = item.progress || 0;
-                            const comment = item.comment || (item.reviews && item.reviews[0] && item.reviews[0].body) || "";
+                        await db.collection('books').doc(bookId).update({
+                            ...bookData,
+                            highlights: mergedHighlights
+                        });
+                    } else {
+                        bookData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                        const docRef = await db.collection('books').add(bookData);
+                        bookId = docRef.id;
+                    }
 
-                            await db.collection('books').doc(bookId).collection('readingStatus').doc(currentUser.uid).set({
-                                status,
-                                rating,
-                                progress,
-                                comment,
-                                isWishlist: item.isWishlist || false,
-                                userId: currentUser.uid,
-                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                            }, { merge: true });
+                    // Write reading status
+                    const status = item.status || "want_to_read";
+                    const rating = item.rating || (item.ratings && item.ratings[0]) || 0;
+                    const progress = item.progress || 0;
+                    const comment = item.comment || (item.reviews && item.reviews[0] && item.reviews[0].body) || "";
 
-                            // Import community reviews if any
-                            if (item.reviews && Array.isArray(item.reviews)) {
-                                for (const rev of item.reviews) {
-                                    const bodyText = typeof rev === 'string' ? rev : rev.body;
-                                    const revRating = typeof rev === 'string' ? rating : (rev.rating || rating);
-                                    if (bodyText) {
-                                        const dupReview = await db.collection('reviews')
-                                            .where('userId', '==', currentUser.uid)
-                                            .where('bookTitle', '==', title)
-                                            .where('body', '==', bodyText)
-                                            .limit(1)
-                                            .get();
-                                        if (dupReview.empty) {
-                                            await db.collection('reviews').add({
-                                                userId: currentUser.uid,
-                                                userName: userProfile.displayName || currentUser.email,
-                                                bookTitle: title,
-                                                author: author,
-                                                category: genres[0] || "Other",
-                                                body: bodyText,
-                                                rating: revRating,
-                                                likesCount: 0,
-                                                commentsCount: 0,
-                                                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                                            });
-                                        }
-                                    }
+                    await db.collection('books').doc(bookId).collection('readingStatus').doc(currentUser.uid).set({
+                        status,
+                        rating,
+                        progress,
+                        comment,
+                        isWishlist: item.isWishlist || false,
+                        userId: currentUser.uid,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+
+                    // Import community reviews if any
+                    if (item.reviews && Array.isArray(item.reviews)) {
+                        for (const rev of item.reviews) {
+                            const bodyText = typeof rev === 'string' ? rev : rev.body;
+                            const revRating = typeof rev === 'string' ? rating : (rev.rating || rating);
+                            if (bodyText) {
+                                const dupReview = await db.collection('reviews')
+                                    .where('userId', '==', currentUser.uid)
+                                    .where('bookTitle', '==', title)
+                                    .where('body', '==', bodyText)
+                                    .limit(1)
+                                    .get();
+                                if (dupReview.empty) {
+                                    await db.collection('reviews').add({
+                                        userId: currentUser.uid,
+                                        userName: userProfile.displayName || currentUser.email,
+                                        bookTitle: title,
+                                        author: author,
+                                        category: genres[0] || "Other",
+                                        body: bodyText,
+                                        rating: revRating,
+                                        likesCount: 0,
+                                        commentsCount: 0,
+                                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                    });
                                 }
                             }
                         }
-
-                        closeOverlay();
-                        showToast(`Successfully imported ${data.length} books from JSON!`, 'success');
-
-                        // Explicitly trigger a refresh
-                        subscribeToBooks();
-                        window.queueRenderMainApp();
-                    } catch (err) {
-                        closeOverlay();
-                        showToast(`Import failed: ${err.message}. Please retry with a valid file.`, 'error');
-                        console.error(err);
                     }
-                };
-                input.click();
+                }
+
+                closeOverlay();
+                showToast(`Successfully imported ${data.length} books from JSON!`, 'success');
+
+                // Explicitly trigger a refresh
+                subscribeToBooks();
+                window.queueRenderMainApp();
+            } catch (err) {
+                closeOverlay();
+                showToast(`Import failed: ${err.message}. Please retry with a valid file.`, 'error');
+                console.error(err);
             }
+        };
+        input.click();
+    }
 
-            // ---------- AI Librarian Service ----------
-            const AI_CONFIG = {
-                defaultModel: 'gemma-3-12b-it',
-                fallbackModel: 'gemma-3-12b-it',
-                groqModel: 'openai/gpt-oss-20b',
-                groqEndpoint: 'https://api.groq.com/openai/v1/chat/completions'
-            };
+    // ---------- AI Librarian Service ----------
+    const AI_CONFIG = {
+        defaultModel: 'gemma-3-12b-it',
+        fallbackModel: 'gemma-3-12b-it',
+        groqModel: 'openai/gpt-oss-20b',
+        groqEndpoint: 'https://api.groq.com/openai/v1/chat/completions'
+    };
 
-            window.getAIConfig = getAIConfig;
-            window.callAI = callAI;
+    window.getAIConfig = getAIConfig;
+    window.callAI = callAI;
 
-            function getAIConfig() {
-                const provider = localStorage.getItem('mylib_ai_provider') || 'gemini';
-                return {
-                    provider,
-                    apiKey: provider === 'groq' ? (sessionStorage.getItem('mylib_groq_api_key') || '') : (sessionStorage.getItem('mylib_gemini_api_key') || ''),
-                    model: provider === 'groq' ? AI_CONFIG.groqModel : (localStorage.getItem('mylib_gemini_model') || AI_CONFIG.defaultModel),
-                    language: localStorage.getItem('mylib_ai_language') || 'English'
-                };
-            }
+    function getAIConfig() {
+        const provider = localStorage.getItem('mylib_ai_provider') || 'gemini';
+        return {
+            provider,
+            apiKey: provider === 'groq' ? (sessionStorage.getItem('mylib_groq_api_key') || '') : (sessionStorage.getItem('mylib_gemini_api_key') || ''),
+            model: provider === 'groq' ? AI_CONFIG.groqModel : (localStorage.getItem('mylib_gemini_model') || AI_CONFIG.defaultModel),
+            language: localStorage.getItem('mylib_ai_language') || 'English'
+        };
+    }
 
-            // Main AI Abstraction Layer
-            async function callAI(userPrompt, systemInstruction, useFallback = false, history = []) {
-                const config = getAIConfig();
-                if (config.provider === 'groq') {
-                    return callGroqAI(userPrompt, systemInstruction, history);
+    // Main AI Abstraction Layer
+    async function callAI(userPrompt, systemInstruction, useFallback = false, history = []) {
+        const config = getAIConfig();
+        if (config.provider === 'groq') {
+            return callGroqAI(userPrompt, systemInstruction, history);
+        } else {
+            return callGeminiAI(userPrompt, systemInstruction, useFallback, history);
+        }
+    }
+
+    async function callGroqAI(userPrompt, systemInstruction, history = []) {
+        const config = getAIConfig();
+        if (!config.apiKey) throw new Error('API_KEY_MISSING');
+
+        const cacheKey = JSON.stringify({ provider: 'groq', userPrompt, model: config.model });
+        const cached = aiResponseCache.find(c => c.key === cacheKey);
+        if (cached) return cached.response;
+
+        const messages = [];
+        let hasSystemMsg = false;
+
+        if (history && history.length > 0) {
+            history.forEach(item => {
+                const role = item.role === 'model' ? 'assistant' : 'user';
+                const text = item.parts?.[0]?.text || '';
+                if (text.startsWith('SYSTEM:')) {
+                    hasSystemMsg = true;
+                    const contextMatch = text.match(/SYSTEM:\s*(.*?)\n\nCONTEXT:\s*(.*?)\n\nUSER:\s*(.*)$/s);
+                    if (contextMatch) {
+                        messages.push({ role: 'system', content: `${contextMatch[1]}\n\nCONTEXT: ${contextMatch[2]}` });
+                        messages.push({ role: 'user', content: contextMatch[3] });
+                    } else {
+                        messages.push({ role: 'system', content: systemInstruction });
+                        messages.push({ role: 'user', content: text });
+                    }
                 } else {
-                    return callGeminiAI(userPrompt, systemInstruction, useFallback, history);
+                    messages.push({ role, content: text });
                 }
+            });
+        }
+
+        if (!hasSystemMsg) {
+            const fullSystemPrompt = `${systemInstruction}\n\nCONTEXT: ${JSON.stringify(getLibraryContext())}`;
+            messages.unshift({ role: 'system', content: fullSystemPrompt });
+            if (messages.length === 1) {
+                messages.push({ role: 'user', content: userPrompt });
+            }
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+        try {
+            const response = await fetch(AI_CONFIG.groqEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${config.apiKey}`
+                },
+                body: JSON.stringify({
+                    model: config.model,
+                    messages,
+                    temperature: 0.7,
+                    max_tokens: 800
+                }),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                const msg = errorData.error?.message || '';
+
+                if (response.status === 401 || msg.includes('invalid_api_key') || msg.includes('API key')) {
+                    throw new Error('Your Groq API key is invalid. Please check your Settings.');
+                }
+                if (response.status === 429 || msg.includes('rate_limit')) {
+                    throw new Error('Groq rate limit reached. Please try again in a few minutes.');
+                }
+                if (response.status === 404 || msg.includes('model_not_found')) {
+                    throw new Error('Selected Groq model was not found.');
+                }
+
+                throw new Error(msg || 'Groq AI call failed.');
             }
 
-            async function callGroqAI(userPrompt, systemInstruction, history = []) {
-                const config = getAIConfig();
-                if (!config.apiKey) throw new Error('API_KEY_MISSING');
+            const data = await response.json();
+            const text = data.choices?.[0]?.message?.content || '';
 
-                const cacheKey = JSON.stringify({ provider: 'groq', userPrompt, model: config.model });
-                const cached = aiResponseCache.find(c => c.key === cacheKey);
-                if (cached) return cached.response;
+            aiResponseCache.unshift({ key: cacheKey, response: text });
+            if (aiResponseCache.length > 5) aiResponseCache.pop();
 
-                const messages = [];
-                let hasSystemMsg = false;
+            return text;
+        } catch (err) {
+            clearTimeout(timeoutId);
+            if (err.name === 'AbortError') throw new Error('The AI request timed out. Please try again.');
+            throw err;
+        }
+    }
 
-                if (history && history.length > 0) {
-                    history.forEach(item => {
-                        const role = item.role === 'model' ? 'assistant' : 'user';
-                        const text = item.parts?.[0]?.text || '';
-                        if (text.startsWith('SYSTEM:')) {
-                            hasSystemMsg = true;
-                            const contextMatch = text.match(/SYSTEM:\s*(.*?)\n\nCONTEXT:\s*(.*?)\n\nUSER:\s*(.*)$/s);
-                            if (contextMatch) {
-                                messages.push({ role: 'system', content: `${contextMatch[1]}\n\nCONTEXT: ${contextMatch[2]}` });
-                                messages.push({ role: 'user', content: contextMatch[3] });
-                            } else {
-                                messages.push({ role: 'system', content: systemInstruction });
-                                messages.push({ role: 'user', content: text });
-                            }
-                        } else {
-                            messages.push({ role, content: text });
-                        }
-                    });
-                }
+    async function callGeminiAI(userPrompt, systemInstruction, useFallback = false, history = []) {
+        const config = getAIConfig();
+        if (!config.apiKey) throw new Error('API_KEY_MISSING');
 
-                if (!hasSystemMsg) {
-                    const fullSystemPrompt = `${systemInstruction}\n\nCONTEXT: ${JSON.stringify(getLibraryContext())}`;
-                    messages.unshift({ role: 'system', content: fullSystemPrompt });
-                    if (messages.length === 1) {
-                        messages.push({ role: 'user', content: userPrompt });
+        // Check cache
+        const cacheKey = JSON.stringify({ provider: 'gemini', userPrompt, model: config.model });
+        const cached = aiResponseCache.find(c => c.key === cacheKey);
+        if (cached) return cached.response;
+
+        const model = useFallback ? AI_CONFIG.fallbackModel : config.model;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.apiKey}`;
+
+        const contents = history.length > 0 ? history : [
+            { role: 'user', parts: [{ text: `SYSTEM: ${systemInstruction}\n\nCONTEXT: ${JSON.stringify(getLibraryContext())}\n\nUSER: ${userPrompt}` }] }
+        ];
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents,
+                    generationConfig: {
+                        temperature: 0.7,
+                        maxOutputTokens: 800,
                     }
+                }),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                const error = await response.json();
+                const msg = error.error?.message || '';
+
+                if (!useFallback && model !== AI_CONFIG.fallbackModel) {
+                    console.warn("AI Primary failed, retrying with fallback...", error);
+                    return callGeminiAI(userPrompt, systemInstruction, true, history);
                 }
 
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 12000);
+                if (msg.includes('API_KEY_INVALID')) throw new Error('INVALID_API_KEY');
+                if (msg.includes('quota') || response.status === 429) throw new Error('RATE_LIMIT_EXCEEDED');
+                if (response.status === 404) throw new Error('MODEL_NOT_FOUND');
 
-                try {
-                    const response = await fetch(AI_CONFIG.groqEndpoint, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${config.apiKey}`
-                        },
-                        body: JSON.stringify({
-                            model: config.model,
-                            messages,
-                            temperature: 0.7,
-                            max_tokens: 800
-                        }),
-                        signal: controller.signal
-                    });
-
-                    clearTimeout(timeoutId);
-
-                    if (!response.ok) {
-                        const errorData = await response.json().catch(() => ({}));
-                        const msg = errorData.error?.message || '';
-
-                        if (response.status === 401 || msg.includes('invalid_api_key') || msg.includes('API key')) {
-                            throw new Error('Your Groq API key is invalid. Please check your Settings.');
-                        }
-                        if (response.status === 429 || msg.includes('rate_limit')) {
-                            throw new Error('Groq rate limit reached. Please try again in a few minutes.');
-                        }
-                        if (response.status === 404 || msg.includes('model_not_found')) {
-                            throw new Error('Selected Groq model was not found.');
-                        }
-
-                        throw new Error(msg || 'Groq AI call failed.');
-                    }
-
-                    const data = await response.json();
-                    const text = data.choices?.[0]?.message?.content || '';
-
-                    aiResponseCache.unshift({ key: cacheKey, response: text });
-                    if (aiResponseCache.length > 5) aiResponseCache.pop();
-
-                    return text;
-                } catch (err) {
-                    clearTimeout(timeoutId);
-                    if (err.name === 'AbortError') throw new Error('The AI request timed out. Please try again.');
-                    throw err;
-                }
+                throw new Error(msg || 'AI_CALL_FAILED');
             }
 
-            async function callGeminiAI(userPrompt, systemInstruction, useFallback = false, history = []) {
-                const config = getAIConfig();
-                if (!config.apiKey) throw new Error('API_KEY_MISSING');
+            const data = await response.json();
+            let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-                // Check cache
-                const cacheKey = JSON.stringify({ provider: 'gemini', userPrompt, model: config.model });
-                const cached = aiResponseCache.find(c => c.key === cacheKey);
-                if (cached) return cached.response;
-
-                const model = useFallback ? AI_CONFIG.fallbackModel : config.model;
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.apiKey}`;
-
-                const contents = history.length > 0 ? history : [
-                    { role: 'user', parts: [{ text: `SYSTEM: ${systemInstruction}\n\nCONTEXT: ${JSON.stringify(getLibraryContext())}\n\nUSER: ${userPrompt}` }] }
-                ];
-
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-                try {
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents,
-                            generationConfig: {
-                                temperature: 0.7,
-                                maxOutputTokens: 800,
-                            }
-                        }),
-                        signal: controller.signal
-                    });
-
-                    clearTimeout(timeoutId);
-
-                    if (!response.ok) {
-                        const error = await response.json();
-                        const msg = error.error?.message || '';
-
-                        if (!useFallback && model !== AI_CONFIG.fallbackModel) {
-                            console.warn("AI Primary failed, retrying with fallback...", error);
-                            return callGeminiAI(userPrompt, systemInstruction, true, history);
-                        }
-
-                        if (msg.includes('API_KEY_INVALID')) throw new Error('INVALID_API_KEY');
-                        if (msg.includes('quota') || response.status === 429) throw new Error('RATE_LIMIT_EXCEEDED');
-                        if (response.status === 404) throw new Error('MODEL_NOT_FOUND');
-
-                        throw new Error(msg || 'AI_CALL_FAILED');
-                    }
-
-                    const data = await response.json();
-                    let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-                    if (useFallback) {
-                        text = "*(Note: Using fallback model)*\n\n" + text;
-                    }
-
-                    // Update cache
-                    aiResponseCache.unshift({ key: cacheKey, response: text });
-                    if (aiResponseCache.length > 5) aiResponseCache.pop();
-
-                    return text;
-                } catch (err) {
-                    clearTimeout(timeoutId);
-                    if (err.name === 'AbortError') throw new Error('The AI request timed out. Please try again.');
-
-                    if (!useFallback && model !== AI_CONFIG.fallbackModel) {
-                        console.warn("AI Primary failed (catch), retrying with fallback...", err);
-                        return callGeminiAI(userPrompt, systemInstruction, true, history);
-                    }
-
-                    if (err.message === 'INVALID_API_KEY') throw new Error('Your API key is invalid. Please check your Settings.');
-                    if (err.message === 'RATE_LIMIT_EXCEEDED') throw new Error('AI rate limit reached. Please try again in a few minutes.');
-                    if (err.message === 'MODEL_NOT_FOUND') throw new Error('Selected AI model was not found.');
-
-                    throw err;
-                }
+            if (useFallback) {
+                text = "*(Note: Using fallback model)*\n\n" + text;
             }
 
-            function getLibraryContext() {
-                // ⚡ Bolt: Return pre-calculated AI context from libraryStats to eliminate redundant O(N) loop
-                const { aiContext, libBooksCount } = libraryStats;
-                return {
-                    summary: {
-                        total: libBooksCount,
-                        finished: aiContext.finished.length,
-                        topGenres: aiContext.topGenres
-                    },
-                    // Highly compressed data for token efficiency
-                    finished: aiContext.finished.slice(-50), // Use the last 50 finished
-                    not_yet_finished: aiContext.notYetFinished
-                };
+            // Update cache
+            aiResponseCache.unshift({ key: cacheKey, response: text });
+            if (aiResponseCache.length > 5) aiResponseCache.pop();
+
+            return text;
+        } catch (err) {
+            clearTimeout(timeoutId);
+            if (err.name === 'AbortError') throw new Error('The AI request timed out. Please try again.');
+
+            if (!useFallback && model !== AI_CONFIG.fallbackModel) {
+                console.warn("AI Primary failed (catch), retrying with fallback...", err);
+                return callGeminiAI(userPrompt, systemInstruction, true, history);
             }
 
-            function getSystemPrompt() {
-                const language = localStorage.getItem('mylib_ai_language') || 'English';
-                const currencySymbol = getCurrencySymbol();
+            if (err.message === 'INVALID_API_KEY') throw new Error('Your API key is invalid. Please check your Settings.');
+            if (err.message === 'RATE_LIMIT_EXCEEDED') throw new Error('AI rate limit reached. Please try again in a few minutes.');
+            if (err.message === 'MODEL_NOT_FOUND') throw new Error('Selected AI model was not found.');
 
-                let languageInstructions = `You MUST respond in ${language}.`;
-                if (language === 'Bengali') {
-                    languageInstructions += `
+            throw err;
+        }
+    }
+
+    function getLibraryContext() {
+        // ⚡ Bolt: Return pre-calculated AI context from libraryStats to eliminate redundant O(N) loop
+        const { aiContext, libBooksCount } = libraryStats;
+        return {
+            summary: {
+                total: libBooksCount,
+                finished: aiContext.finished.length,
+                topGenres: aiContext.topGenres
+            },
+            // Highly compressed data for token efficiency
+            finished: aiContext.finished.slice(-50), // Use the last 50 finished
+            not_yet_finished: aiContext.notYetFinished
+        };
+    }
+
+    function getSystemPrompt() {
+        const language = localStorage.getItem('mylib_ai_language') || 'English';
+        const currencySymbol = getCurrencySymbol();
+
+        let languageInstructions = `You MUST respond in ${language}.`;
+        if (language === 'Bengali') {
+            languageInstructions += `
 - Use Bengali for all your prose, explanations, and general conversation.
 - HOWEVER, you MUST keep book titles, author names, genres, and tags in English. DO NOT translate these specific metadata fields to Bengali.`;
-                }
+        }
 
-                return `You are the Expert AI Librarian for "My Lib", a sophisticated personal library management app.
+        return `You are the Expert AI Librarian for "My Lib", a sophisticated personal library management app.
 Your personality is warm, bibliophilic, and deeply encouraging. You speak as a true book lover who knows the user's collection intimately and treats every book like a precious gem. Use literary metaphors occasionally to enrich your responses.
 
 LANGUAGE RULE:
@@ -8583,13 +8637,13 @@ When asked for a "summary", provide:
 - **Librarian's Note:** A one-sentence professional insight into their collection's unique character.
 
 If the collection is small or has no finished books, be extra encouraging and suggest foundational titles in their favorite genres.`;
-            }
+    }
 
-            async function openAIChat(initialMessage = '', bookContext = null) {
-                // If triggered by event listener, initialMessage might be an Event object
-                if (initialMessage && typeof initialMessage !== 'string') initialMessage = '';
+    async function openAIChat(initialMessage = '', bookContext = null) {
+        // If triggered by event listener, initialMessage might be an Event object
+        if (initialMessage && typeof initialMessage !== 'string') initialMessage = '';
 
-                const modalHtml = `
+        const modalHtml = `
                 <div class="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4">
                     <div class="bg-white dark:bg-slate-900 w-full h-full rounded-none sm:rounded-[2.5rem] sm:h-[85vh] sm:max-w-2xl lg:max-w-4xl flex flex-col shadow-2xl animate-slide-up border-0 sm:border border-slate-200/50 dark:border-slate-800">
                         <div class="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
@@ -8642,18 +8696,18 @@ If the collection is small or has no finished books, be extra encouraging and su
                 </div>
                 `;
 
-                showModal(modalHtml);
+        showModal(modalHtml);
 
-                const input = document.getElementById('ai-chat-input');
-                const sendBtn = document.getElementById('ai-chat-send');
-                const chatMessages = document.getElementById('ai-chat-messages');
-                const clearBtn = document.getElementById('clear-ai-chat');
+        const input = document.getElementById('ai-chat-input');
+        const sendBtn = document.getElementById('ai-chat-send');
+        const chatMessages = document.getElementById('ai-chat-messages');
+        const clearBtn = document.getElementById('clear-ai-chat');
 
-                if (clearBtn) {
-                    clearBtn.onclick = () => {
-                        if (confirm('Clear chat history?')) {
-                            chatHistory = [];
-                            chatMessages.innerHTML = `
+        if (clearBtn) {
+            clearBtn.onclick = () => {
+                if (confirm('Clear chat history?')) {
+                    chatHistory = [];
+                    chatMessages.innerHTML = `
                                 <div class="flex gap-3 max-w-[85%]">
                                     <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-sky-600 flex-shrink-0">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
@@ -8663,105 +8717,105 @@ If the collection is small or has no finished books, be extra encouraging and su
                                     </div>
                                 </div>
                             `;
-                        }
-                    };
                 }
+            };
+        }
 
-                // Load existing chat history if any
-                if (chatHistory.length > 0) {
-                    chatHistory.forEach(msg => {
-                        let text = msg.parts[0].text;
-                        if (text.startsWith('SYSTEM:')) {
-                            // Extract user message from the initial system prompt if present
-                            const userMatch = text.match(/\n\nUSER: (.*)$/s);
-                            if (userMatch) {
-                                text = userMatch[1];
-                            } else {
-                                return; // Skip purely system messages
-                            }
-                        }
-                        renderChatMessage(msg.role === 'user' ? 'user' : 'ai', text);
-                    });
-                }
-
-                window.sendAIChatMessage = async (predefinedMessage) => {
-                    const message = predefinedMessage || input.value.trim();
-                    if (!message) return;
-
-                    if (!predefinedMessage) input.value = '';
-
-                    renderChatMessage('user', message);
-
-                    const thinkingId = 'thinking-' + Date.now();
-                    renderChatMessage('ai', 'Let me think...', thinkingId, true);
-
-                    try {
-                        const config = getAIConfig();
-                        if (!config.apiKey) {
-                            updateChatMessage(thinkingId, "Please enter your AI API key in Settings to use the AI Librarian.");
-                            return;
-                        }
-
-                        if (books.length === 0) {
-                            updateChatMessage(thinkingId, "Please add some books to your library first so I can analyze your collection!");
-                            return;
-                        }
-
-                        // Build history
-                        const systemPrompt = getSystemPrompt();
-                        if (chatHistory.length === 0) {
-                            let context = getLibraryContext();
-                            if (bookContext) context.focusedBook = bookContext;
-                            const initialPrompt = `SYSTEM: ${systemPrompt}\n\nCONTEXT: ${JSON.stringify(context)}\n\nUSER: ${message}`;
-                            chatHistory.push({ role: 'user', parts: [{ text: initialPrompt }] });
-                        } else {
-                            chatHistory.push({ role: 'user', parts: [{ text: message }] });
-                        }
-
-                        const aiResponse = await callAI(message, systemPrompt, false, chatHistory);
-
-                        if (aiResponse.includes("Using fallback model")) {
-                            const status = document.getElementById('ai-status-indicator');
-                            if (status) {
-                                status.innerText = 'Fallback Active';
-                                status.classList.remove('text-emerald-500');
-                                status.classList.add('text-amber-500');
-                            }
-                        }
-
-                        chatHistory.push({ role: 'model', parts: [{ text: aiResponse }] });
-                        updateChatMessage(thinkingId, aiResponse);
-
-                    } catch (err) {
-                        console.error("Chat Error:", err);
-                        updateChatMessage(thinkingId, "Sorry, I encountered an error: " + err.message);
+        // Load existing chat history if any
+        if (chatHistory.length > 0) {
+            chatHistory.forEach(msg => {
+                let text = msg.parts[0].text;
+                if (text.startsWith('SYSTEM:')) {
+                    // Extract user message from the initial system prompt if present
+                    const userMatch = text.match(/\n\nUSER: (.*)$/s);
+                    if (userMatch) {
+                        text = userMatch[1];
+                    } else {
+                        return; // Skip purely system messages
                     }
-                };
+                }
+                renderChatMessage(msg.role === 'user' ? 'user' : 'ai', text);
+            });
+        }
 
-                input.focus();
+        window.sendAIChatMessage = async (predefinedMessage) => {
+            const message = predefinedMessage || input.value.trim();
+            if (!message) return;
 
-                if (initialMessage) {
-                    window.sendAIChatMessage(initialMessage);
+            if (!predefinedMessage) input.value = '';
+
+            renderChatMessage('user', message);
+
+            const thinkingId = 'thinking-' + Date.now();
+            renderChatMessage('ai', 'Let me think...', thinkingId, true);
+
+            try {
+                const config = getAIConfig();
+                if (!config.apiKey) {
+                    updateChatMessage(thinkingId, "Please enter your AI API key in Settings to use the AI Librarian.");
+                    return;
                 }
 
-                input.onkeydown = (e) => {
-                    if (e.key === 'Enter') window.sendAIChatMessage();
-                };
+                if (books.length === 0) {
+                    updateChatMessage(thinkingId, "Please add some books to your library first so I can analyze your collection!");
+                    return;
+                }
 
-                sendBtn.onclick = () => window.sendAIChatMessage();
+                // Build history
+                const systemPrompt = getSystemPrompt();
+                if (chatHistory.length === 0) {
+                    let context = getLibraryContext();
+                    if (bookContext) context.focusedBook = bookContext;
+                    const initialPrompt = `SYSTEM: ${systemPrompt}\n\nCONTEXT: ${JSON.stringify(context)}\n\nUSER: ${message}`;
+                    chatHistory.push({ role: 'user', parts: [{ text: initialPrompt }] });
+                } else {
+                    chatHistory.push({ role: 'user', parts: [{ text: message }] });
+                }
 
-                function renderChatMessage(role, text, id, isThinking = false) {
-                    const div = document.createElement('div');
-                    div.id = id || '';
-                    div.className = `flex gap-3 ${role === 'user' ? 'flex-row-reverse' : ''} animate-slide-up max-w-[90%] sm:max-w-[85%] ${role === 'user' ? 'ml-auto' : ''}`;
+                const aiResponse = await callAI(message, systemPrompt, false, chatHistory);
 
-                    const icon = role === 'user'
-                        ? `<div class="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 flex-shrink-0"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path></svg></div>`
-                        : `<div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-sky-600 flex-shrink-0"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg></div>`;
+                if (aiResponse.includes("Using fallback model")) {
+                    const status = document.getElementById('ai-status-indicator');
+                    if (status) {
+                        status.innerText = 'Fallback Active';
+                        status.classList.remove('text-emerald-500');
+                        status.classList.add('text-amber-500');
+                    }
+                }
 
-                    // 🦴 Skeleton loader for thinking state
-                    if (isThinking) {
-                        div.innerHTML = `
+                chatHistory.push({ role: 'model', parts: [{ text: aiResponse }] });
+                updateChatMessage(thinkingId, aiResponse);
+
+            } catch (err) {
+                console.error("Chat Error:", err);
+                updateChatMessage(thinkingId, "Sorry, I encountered an error: " + err.message);
+            }
+        };
+
+        input.focus();
+
+        if (initialMessage) {
+            window.sendAIChatMessage(initialMessage);
+        }
+
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter') window.sendAIChatMessage();
+        };
+
+        sendBtn.onclick = () => window.sendAIChatMessage();
+
+        function renderChatMessage(role, text, id, isThinking = false) {
+            const div = document.createElement('div');
+            div.id = id || '';
+            div.className = `flex gap-3 ${role === 'user' ? 'flex-row-reverse' : ''} animate-slide-up max-w-[90%] sm:max-w-[85%] ${role === 'user' ? 'ml-auto' : ''}`;
+
+            const icon = role === 'user'
+                ? `<div class="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 flex-shrink-0"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path></svg></div>`
+                : `<div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-sky-600 flex-shrink-0"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg></div>`;
+
+            // 🦴 Skeleton loader for thinking state
+            if (isThinking) {
+                div.innerHTML = `
                             ${icon}
                             <div class="p-4 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl rounded-tl-none shadow-sm w-full max-w-md space-y-3">
                                 <div class="skeleton-line h-3 rounded-full" style="width: 85%"></div>
@@ -8770,14 +8824,14 @@ If the collection is small or has no finished books, be extra encouraging and su
                                 <div class="skeleton-line h-3 rounded-full" style="width: 60%"></div>
                             </div>
                         `;
-                        chatMessages.appendChild(div);
-                        setTimeout(() => chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' }), 50);
-                        return;
-                    }
+                chatMessages.appendChild(div);
+                setTimeout(() => chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' }), 50);
+                return;
+            }
 
-                    const bg = role === 'user' ? 'bg-primary text-white rounded-tr-none' : 'bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-tl-none shadow-sm';
+            const bg = role === 'user' ? 'bg-primary text-white rounded-tr-none' : 'bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-tl-none shadow-sm';
 
-                    div.innerHTML = `
+            div.innerHTML = `
                         ${icon}
                         <div class="relative group/msg p-4 ${bg} rounded-2xl text-sm leading-relaxed">
                             ${role === 'ai' ? formatAIText(text) : `<p class="whitespace-pre-line">${escapeHTML(text)}</p>`}
@@ -8789,163 +8843,163 @@ If the collection is small or has no finished books, be extra encouraging and su
                         </div>
                     `;
 
-                    chatMessages.appendChild(div);
-                    setTimeout(() => chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' }), 50);
-                }
+            chatMessages.appendChild(div);
+            setTimeout(() => chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' }), 50);
+        }
 
-                function updateChatMessage(id, text) {
-                    const el = document.getElementById(id);
-                    if (el) {
-                        const contentDiv = el.querySelector('div:last-child');
-                        if (contentDiv) {
-                            contentDiv.innerHTML = formatAIText(text);
-                            // Add TTS button if it's AI response and not already present
-                            if (!el.querySelector('button[title="Listen to response"], button[title="Stop listening"]')) {
-                                const btn = document.createElement('button');
-                                btn.onclick = function () { window.speakText(this.parentElement.innerText, this); };
-                                btn.className = "absolute -right-2 -bottom-2 p-1.5 bg-white dark:bg-slate-700 rounded-lg shadow-md border border-slate-100 dark:border-slate-600 opacity-0 group-hover/msg:opacity-100 transition-opacity hover:text-primary focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-primary outline-none";
-                                btn.title = "Listen to response";
-                                btn.setAttribute('aria-label', "Listen to response");
-                                btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>';
-                                contentDiv.classList.add('relative', 'group/msg');
-                                contentDiv.appendChild(btn);
-                            }
-                        }
+        function updateChatMessage(id, text) {
+            const el = document.getElementById(id);
+            if (el) {
+                const contentDiv = el.querySelector('div:last-child');
+                if (contentDiv) {
+                    contentDiv.innerHTML = formatAIText(text);
+                    // Add TTS button if it's AI response and not already present
+                    if (!el.querySelector('button[title="Listen to response"], button[title="Stop listening"]')) {
+                        const btn = document.createElement('button');
+                        btn.onclick = function () { window.speakText(this.parentElement.innerText, this); };
+                        btn.className = "absolute -right-2 -bottom-2 p-1.5 bg-white dark:bg-slate-700 rounded-lg shadow-md border border-slate-100 dark:border-slate-600 opacity-0 group-hover/msg:opacity-100 transition-opacity hover:text-primary focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-primary outline-none";
+                        btn.title = "Listen to response";
+                        btn.setAttribute('aria-label', "Listen to response");
+                        btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>';
+                        contentDiv.classList.add('relative', 'group/msg');
+                        contentDiv.appendChild(btn);
                     }
-                    setTimeout(() => chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' }), 50);
                 }
             }
+            setTimeout(() => chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' }), 50);
+        }
+    }
 
-            // ---------- Auth State Observer ----------
-            window.startApp = function () {
-                if (window.authObserverStarted) return;
-                window.authObserverStarted = true;
-                window.__appReady = true;
+    // ---------- Auth State Observer ----------
+    window.startApp = function () {
+        if (window.authObserverStarted) return;
+        window.authObserverStarted = true;
+        window.__appReady = true;
 
-                auth.onAuthStateChanged(async (user) => {
-                    const loader = document.getElementById('initial-loader');
-                    if (loader) {
-                        loader.classList.add('opacity-0');
-                        setTimeout(() => loader.remove(), 500);
-                    }
+        auth.onAuthStateChanged(async (user) => {
+            const loader = document.getElementById('initial-loader');
+            if (loader) {
+                loader.classList.add('opacity-0');
+                setTimeout(() => loader.remove(), 500);
+            }
 
-                    currentUser = user;
-                    if (user) {
-                        try {
-                            const userDoc = await db.collection('users').doc(user.uid).get();
-                            const privDoc = await db.collection('users').doc(user.uid)
-                                .collection('private').doc('data').get();
+            currentUser = user;
+            if (user) {
+                try {
+                    const userDoc = await db.collection('users').doc(user.uid).get();
+                    const privDoc = await db.collection('users').doc(user.uid)
+                        .collection('private').doc('data').get();
 
-                            if (!userDoc.exists) {
-                                // ---- First-time sign-in: create both docs ----
-                                await db.collection('users').doc(user.uid).set({
-                                    uid: user.uid,
-                                    displayName: user.displayName || '',
-                                    photoURL: user.photoURL || null,
-                                    bio: '',
-                                    joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                                    totalBooksCount: 0,
-                                    completedBooksCount: 0
-                                });
+                    if (!userDoc.exists) {
+                        // ---- First-time sign-in: create both docs ----
+                        await db.collection('users').doc(user.uid).set({
+                            uid: user.uid,
+                            displayName: user.displayName || '',
+                            photoURL: user.photoURL || null,
+                            bio: '',
+                            joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            totalBooksCount: 0,
+                            completedBooksCount: 0
+                        });
 
-                                await db.collection('users').doc(user.uid)
-                                    .collection('private').doc('data').set({
-                                        email: user.email || '',
-                                        phoneNumber: '',
-                                        address: '',
-                                        lastAIAnalysis: null
-                                    });
+                        await db.collection('users').doc(user.uid)
+                            .collection('private').doc('data').set({
+                                email: user.email || '',
+                                phoneNumber: '',
+                                address: '',
+                                lastAIAnalysis: null
+                            });
 
-                                userProfile = {
-                                    uid: user.uid,
-                                    displayName: user.displayName || '',
-                                    photoURL: user.photoURL || null,
-                                    bio: '',
-                                    joinedAt: new Date(),
-                                    totalBooksCount: 0,
-                                    completedBooksCount: 0,
+                        userProfile = {
+                            uid: user.uid,
+                            displayName: user.displayName || '',
+                            photoURL: user.photoURL || null,
+                            bio: '',
+                            joinedAt: new Date(),
+                            totalBooksCount: 0,
+                            completedBooksCount: 0,
+                            email: user.email || '',
+                            phoneNumber: '',
+                            address: '',
+                            lastAIAnalysis: null
+                        };
+                    } else {
+                        // ---- Existing user: merge public + private ----
+                        // If private doc doesn't exist yet (edge case), create it.
+                        if (!privDoc.exists) {
+                            await db.collection('users').doc(user.uid)
+                                .collection('private').doc('data').set({
                                     email: user.email || '',
                                     phoneNumber: '',
                                     address: '',
                                     lastAIAnalysis: null
-                                };
-                            } else {
-                                // ---- Existing user: merge public + private ----
-                                // If private doc doesn't exist yet (edge case), create it.
-                                if (!privDoc.exists) {
-                                    await db.collection('users').doc(user.uid)
-                                        .collection('private').doc('data').set({
-                                            email: user.email || '',
-                                            phoneNumber: '',
-                                            address: '',
-                                            lastAIAnalysis: null
-                                        }, { merge: true });
-                                }
-
-                                userProfile = {
-                                    ...userDoc.data(),
-                                    ...(privDoc.exists ? privDoc.data() : {
-                                        email: user.email || '',
-                                        phoneNumber: '',
-                                        address: '',
-                                        lastAIAnalysis: null
-                                    })
-                                };
-                            }
-
-                            // Cache for other lookups in the app
-                            userProfileCache[user.uid] = {
-                                ...userDoc.data(),
-                                // Include only safe/public fields for cross-user caching
-                            };
-
-                            // Always keep the lookup index fresh
-                            if (user.email) {
-                                try {
-                                    await db.collection('userLookup').doc(user.email.toLowerCase()).set({
-                                        uid: user.uid
-                                    }, { merge: true });
-                                } catch (e) {
-                                    console.warn('userLookup write failed:', e);
-                                }
-                            }
-                        } catch (err) {
-                            console.error('Failed to load user profile:', err);
-                            showToast('Could not load your profile. Please reload.', 'error', 8000);
-                            return;
+                                }, { merge: true });
                         }
 
-                        subscribeToBooks();
-                        window.queueRenderMainApp();
-                    } else {
-                        if (unsubscribeBooks) unsubscribeBooks();
-                        if (unsubscribeStatus) unsubscribeStatus();
-                        books = [];
-                        readingStatuses = {};
-                        userProfile = null;
-                        appEl.innerHTML = '';
-                        renderAuth();
+                        userProfile = {
+                            ...userDoc.data(),
+                            ...(privDoc.exists ? privDoc.data() : {
+                                email: user.email || '',
+                                phoneNumber: '',
+                                address: '',
+                                lastAIAnalysis: null
+                            })
+                        };
                     }
-                });
-            };
 
-            let readingSessionTimer = null;
-            let readingSessionStart = null;
+                    // Cache for other lookups in the app
+                    userProfileCache[user.uid] = {
+                        ...userDoc.data(),
+                        // Include only safe/public fields for cross-user caching
+                    };
 
-            async function openBookDetails(book) {
-                const statusData = getStatusData(book.id);
-                const bookStatus = statusData.status;
-                const userRating = statusData.rating;
-                const userComment = statusData.comment;
-                const userProgress = statusData.progress;
-                const isFavorite = statusData.isFavorite || false;
+                    // Always keep the lookup index fresh
+                    if (user.email) {
+                        try {
+                            await db.collection('userLookup').doc(user.email.toLowerCase()).set({
+                                uid: user.uid
+                            }, { merge: true });
+                        } catch (e) {
+                            console.warn('userLookup write failed:', e);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to load user profile:', err);
+                    showToast('Could not load your profile. Please reload.', 'error', 8000);
+                    return;
+                }
 
-                const stars = STAR_CACHE[userRating] || STAR_CACHE[book.rating] || STAR_CACHE[0];
+                subscribeToBooks();
+                window.queueRenderMainApp();
+            } else {
+                if (unsubscribeBooks) unsubscribeBooks();
+                if (unsubscribeStatus) unsubscribeStatus();
+                books = [];
+                readingStatuses = {};
+                userProfile = null;
+                appEl.innerHTML = '';
+                renderAuth();
+            }
+        });
+    };
 
-                const bookGenres = getBookGenres(book);
+    let readingSessionTimer = null;
+    let readingSessionStart = null;
 
-                // Show a temporary loading modal while fetching detailed data
-                const closeLoading = showModal(`
+    async function openBookDetails(book) {
+        const statusData = getStatusData(book.id);
+        const bookStatus = statusData.status;
+        const userRating = statusData.rating;
+        const userComment = statusData.comment;
+        const userProgress = statusData.progress;
+        const isFavorite = statusData.isFavorite || false;
+
+        const stars = STAR_CACHE[userRating] || STAR_CACHE[book.rating] || STAR_CACHE[0];
+
+        const bookGenres = getBookGenres(book);
+
+        // Show a temporary loading modal while fetching detailed data
+        const closeLoading = showModal(`
     <div class="fixed inset-0 z-50 flex items-center justify-center">
         <div class="bg-sky-50 dark:bg-gray-800 w-full h-full p-6 sm:p-10 overflow-y-auto relative">
             <!-- Close button placeholder -->
@@ -9052,64 +9106,64 @@ If the collection is small or has no finished books, be extra encouraging and su
     </div>
 `, null, true);
 
-                let userRatingVal = userRating;
-                let userCommentVal = userComment;
-                let userProgressVal = userProgress;
-                let userHighlightsVal = statusData.highlights || [];
-                let allStatuses = [];
-                let userProfiles = { ...userProfileCache };
+        let userRatingVal = userRating;
+        let userCommentVal = userComment;
+        let userProgressVal = userProgress;
+        let userHighlightsVal = statusData.highlights || [];
+        let allStatuses = [];
+        let userProfiles = { ...userProfileCache };
 
-                try {
-                    if (currentUser) {
-                        const userStatusDoc = await db.collection('books').doc(book.id).collection('readingStatus').doc(currentUser.uid).get();
-                        if (userStatusDoc.exists) {
-                            userRatingVal = userStatusDoc.data().rating || userRating;
-                            userCommentVal = userStatusDoc.data().comment || userComment;
-                            userProgressVal = userStatusDoc.data().progress || userProgress;
-                            userHighlightsVal = userStatusDoc.data().highlights || userHighlightsVal;
-                        }
-                    }
-
-                    const allStatusesSnapshot = await db.collection('books').doc(book.id).collection('readingStatus').get();
-                    allStatuses = allStatusesSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
-
-                    const userIds = [...new Set(allStatuses.map(s => s.uid))];
-                    userProfiles = { ...userProfileCache };
-                    const missingUserIds = userIds.filter(id => !userProfiles[id]);
-
-                    if (missingUserIds.length > 0) {
-                        for (let i = 0; i < missingUserIds.length; i += 10) {
-                            const chunk = missingUserIds.slice(i, i + 10);
-                            const usersSnapshot = await db.collection('users').where('uid', 'in', chunk).limit(50).get();
-                            usersSnapshot.docs.forEach(doc => {
-                                userProfiles[doc.id] = doc.data();
-                                userProfileCache[doc.id] = doc.data();
-                            });
-                        }
-                    }
-                } catch (err) {
-                    console.warn("Could not fetch remote status/reviews for book details:", err);
-                } finally {
-                    closeLoading();
+        try {
+            if (currentUser) {
+                const userStatusDoc = await db.collection('books').doc(book.id).collection('readingStatus').doc(currentUser.uid).get();
+                if (userStatusDoc.exists) {
+                    userRatingVal = userStatusDoc.data().rating || userRating;
+                    userCommentVal = userStatusDoc.data().comment || userComment;
+                    userProgressVal = userStatusDoc.data().progress || userProgress;
+                    userHighlightsVal = userStatusDoc.data().highlights || userHighlightsVal;
                 }
+            }
 
-                // Calculate average rating
-                const ratingsOnly = allStatuses.map(s => s.rating).filter(r => r > 0);
-                const averageRating = ratingsOnly.length > 0 ? (ratingsOnly.reduce((a, b) => a + b, 0) / ratingsOnly.length).toFixed(1) : null;
-                const isWishlist = statusData.isWishlist || book.isWishlist || false;
+            const allStatusesSnapshot = await db.collection('books').doc(book.id).collection('readingStatus').get();
+            allStatuses = allStatusesSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
 
-                const detailUpdateCharCount = () => {
-                    const textarea = document.getElementById('detail-comment-textarea');
-                    const counter = document.getElementById('detail-char-count');
-                    if (textarea && counter) {
-                        const count = textarea.value.length;
-                        const words = textarea.value.trim() ? textarea.value.trim().split(/\s+/).length : 0;
-                        const readTime = Math.ceil(words / 200);
-                        const readTimeStr = readTime > 0 ? ` · ${readTime} min read` : '';
-                        counter.textContent = `${count} character${count !== 1 ? 's' : ''}${readTimeStr}`;
-                    }
-                };
-                const close = showModal(`
+            const userIds = [...new Set(allStatuses.map(s => s.uid))];
+            userProfiles = { ...userProfileCache };
+            const missingUserIds = userIds.filter(id => !userProfiles[id]);
+
+            if (missingUserIds.length > 0) {
+                for (let i = 0; i < missingUserIds.length; i += 10) {
+                    const chunk = missingUserIds.slice(i, i + 10);
+                    const usersSnapshot = await db.collection('users').where('uid', 'in', chunk).limit(50).get();
+                    usersSnapshot.docs.forEach(doc => {
+                        userProfiles[doc.id] = doc.data();
+                        userProfileCache[doc.id] = doc.data();
+                    });
+                }
+            }
+        } catch (err) {
+            console.warn("Could not fetch remote status/reviews for book details:", err);
+        } finally {
+            closeLoading();
+        }
+
+        // Calculate average rating
+        const ratingsOnly = allStatuses.map(s => s.rating).filter(r => r > 0);
+        const averageRating = ratingsOnly.length > 0 ? (ratingsOnly.reduce((a, b) => a + b, 0) / ratingsOnly.length).toFixed(1) : null;
+        const isWishlist = statusData.isWishlist || book.isWishlist || false;
+
+        const detailUpdateCharCount = () => {
+            const textarea = document.getElementById('detail-comment-textarea');
+            const counter = document.getElementById('detail-char-count');
+            if (textarea && counter) {
+                const count = textarea.value.length;
+                const words = textarea.value.trim() ? textarea.value.trim().split(/\s+/).length : 0;
+                const readTime = Math.ceil(words / 200);
+                const readTimeStr = readTime > 0 ? ` · ${readTime} min read` : '';
+                counter.textContent = `${count} character${count !== 1 ? 's' : ''}${readTimeStr}`;
+            }
+        };
+        const close = showModal(`
     <div class="fixed inset-0 z-50 flex items-center justify-center" data-modal-backdrop>
         <div role="dialog" aria-modal="true" aria-labelledby="book-detail-title"
              class="relative bg-sky-50 dark:bg-gray-800 w-full h-full overflow-y-auto animate-slide-up">
@@ -9145,9 +9199,9 @@ If the collection is small or has no finished books, be extra encouraging and su
                         <div class="flex flex-col sm:flex-row sm:items-center gap-2 justify-center sm:justify-start">
                             <div class="flex flex-wrap gap-2">
                                 ${safeArray(bookGenres).map(g => {
-                    const escapedG = escapeHTML(g);
-                    return `<button type="button" data-action="filter-genre" data-value="${escapedG}" class="px-3 py-1 bg-blue-100/80 hover:bg-blue-200 dark:bg-blue-900/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>`;
-                }).join('')}
+            const escapedG = escapeHTML(g);
+            return `<button type="button" data-action="filter-genre" data-value="${escapedG}" class="px-3 py-1 bg-blue-100/80 hover:bg-blue-200 dark:bg-blue-900/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none" aria-label="Filter by genre: ${escapedG}">${escapedG}</button>`;
+        }).join('')}
                             </div>
                             ${book.owner ? `<span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-auto">Owner: ${escapeHTML(book.owner)}</span>` : ''}
                         </div>
@@ -9297,9 +9351,9 @@ If the collection is small or has no finished books, be extra encouraging and su
                         <p class="text-[10px] font-bold text-slate-400 uppercase mb-4">Collaborator Reviews</p>
                         <div class="space-y-4">
                             ${safeArray(allStatuses)
-                            .filter(s => s.uid !== currentUser?.uid && (s.comment || s.rating > 0))
-                            .sort((a, b) => (b.updatedAt?.toMillis?.() || 0) - (a.updatedAt?.toMillis?.() || 0))
-                            .map(s => `
+                    .filter(s => s.uid !== currentUser?.uid && (s.comment || s.rating > 0))
+                    .sort((a, b) => (b.updatedAt?.toMillis?.() || 0) - (a.updatedAt?.toMillis?.() || 0))
+                    .map(s => `
                                     <div class="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
                                         <div class="flex justify-between items-center mb-2">
                                             <span class="text-xs font-bold text-primary">${escapeHTML(userProfiles[s.uid]?.displayName || userProfiles[s.uid]?.email || 'Unknown User')}</span>
@@ -9372,8 +9426,8 @@ If the collection is small or has no finished books, be extra encouraging and su
 
                 <div class="flex flex-col sm:flex-row items-center justify-between mt-10 gap-6">
                     ${book.userId === currentUser?.uid
-                        ? `<button type="button" id="delete-book-btn" class="w-full sm:w-auto px-6 py-3 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-2xl font-bold transition-all order-2 sm:order-1 focus-visible:ring-2 focus-visible:ring-rose-500 outline-none">Delete</button>`
-                        : `<div class="order-2 sm:order-1"></div>`}
+                ? `<button type="button" id="delete-book-btn" class="w-full sm:w-auto px-6 py-3 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-2xl font-bold transition-all order-2 sm:order-1 focus-visible:ring-2 focus-visible:ring-rose-500 outline-none">Delete</button>`
+                : `<div class="order-2 sm:order-1"></div>`}
 
                     <div class="grid grid-cols-2 sm:flex w-full sm:w-auto gap-3 order-1 sm:order-2">
                         <button type="button" id="ai-summary-btn" class="px-4 py-3 sm:px-8 sm:py-4 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-2xl font-bold hover:bg-emerald-200 transition-all flex items-center justify-center gap-2 text-xs sm:text-base focus-visible:ring-2 focus-visible:ring-emerald-500 outline-none" title="Generate AI Summary &amp; Tags" aria-label="Generate AI Summary and Tags">
@@ -9403,84 +9457,84 @@ If the collection is small or has no finished books, be extra encouraging and su
     </div>
 `, null, true);
 
-                detailUpdateCharCount();
-                document.getElementById('detail-comment-textarea')?.addEventListener('input', detailUpdateCharCount);
+        detailUpdateCharCount();
+        document.getElementById('detail-comment-textarea')?.addEventListener('input', detailUpdateCharCount);
 
-                document.getElementById('copy-info-btn')?.addEventListener('click', (e) => {
-                    window.copyBookInfo(book.title, book.author || 'Unknown', book.isbn || '', e.currentTarget);
-                });
+        document.getElementById('copy-info-btn')?.addEventListener('click', (e) => {
+            window.copyBookInfo(book.title, book.author || 'Unknown', book.isbn || '', e.currentTarget);
+        });
 
-                document.getElementById('ai-book-btn').addEventListener('click', () => {
-                    close();
-                    openAIChat(`Tell me more about the book "${book.title}" by ${book.author}.`, {
-                        title: book.title,
-                        author: book.author,
-                        description: book.description,
-                        genres: bookGenres,
-                        tags: book.tags
-                    });
-                });
+        document.getElementById('ai-book-btn').addEventListener('click', () => {
+            close();
+            openAIChat(`Tell me more about the book "${book.title}" by ${book.author}.`, {
+                title: book.title,
+                author: book.author,
+                description: book.description,
+                genres: bookGenres,
+                tags: book.tags
+            });
+        });
 
-                document.getElementById('ai-summary-btn')?.addEventListener('click', async () => {
-                    const btn = document.getElementById('ai-summary-btn');
-                    const originalText = btn.innerHTML;
-                    btn.disabled = true;
-                    btn.innerHTML = '<div class="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>';
+        document.getElementById('ai-summary-btn')?.addEventListener('click', async () => {
+            const btn = document.getElementById('ai-summary-btn');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>';
 
-                    try {
-                        const config = getAIConfig();
-                        if (!config.apiKey) { showToast('Please set AI API key in Settings', 'error'); return; }
+            try {
+                const config = getAIConfig();
+                if (!config.apiKey) { showToast('Please set AI API key in Settings', 'error'); return; }
 
-                        const prompt = `Provide a professional, concise summary (max 3 sentences) and 5 highly relevant tags for the book "${book.title}" by ${book.author}.
+                const prompt = `Provide a professional, concise summary (max 3 sentences) and 5 highly relevant tags for the book "${book.title}" by ${book.author}.
                         Book Context: ${book.description || 'No description available.'}
                         Return ONLY JSON: { "summary": "...", "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"] }
                         Language: ${config.language}`;
 
-                        const response = await callAI(prompt, "Respond ONLY with a valid JSON object.");
-                        const data = JSON.parse(response.replace(/```json|```/g, '').trim());
+                const response = await callAI(prompt, "Respond ONLY with a valid JSON object.");
+                const data = JSON.parse(response.replace(/```json|```/g, '').trim());
 
-                        showAISummaryModal(book, data);
-                    } catch (err) {
-                        showToast('Failed to generate summary: ' + err.message, 'error');
-                    } finally {
-                        btn.disabled = false;
-                        btn.innerHTML = originalText;
-                    }
-                });
+                showAISummaryModal(book, data);
+            } catch (err) {
+                showToast('Failed to generate summary: ' + err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        });
 
-                document.getElementById('edit-book-btn')?.addEventListener('click', () => {
-                    close();
-                    openManualEntry(null, book);
-                });
+        document.getElementById('edit-book-btn')?.addEventListener('click', () => {
+            close();
+            openManualEntry(null, book);
+        });
 
-                document.getElementById('transfer-book-btn')?.addEventListener('click', async () => {
-                    const activePartnerships = allPartnerships.filter(p => {
-                        const isUser1 = p.userId1 === currentUser.uid;
-                        const isUnsubscribed = isUser1 ? p.user1Unsubscribed : p.user2Unsubscribed;
-                        const isAccepted = p.status === 'accepted' || p.status === undefined;
-                        return !isUnsubscribed && isAccepted;
-                    });
+        document.getElementById('transfer-book-btn')?.addEventListener('click', async () => {
+            const activePartnerships = allPartnerships.filter(p => {
+                const isUser1 = p.userId1 === currentUser.uid;
+                const isUnsubscribed = isUser1 ? p.user1Unsubscribed : p.user2Unsubscribed;
+                const isAccepted = p.status === 'accepted' || p.status === undefined;
+                return !isUnsubscribed && isAccepted;
+            });
 
-                    if (activePartnerships.length === 0) {
-                        showToast('You need an active accepted collaborator to transfer books. Add one in Settings.', 'info');
-                        return;
-                    }
+            if (activePartnerships.length === 0) {
+                showToast('You need an active accepted collaborator to transfer books. Add one in Settings.', 'info');
+                return;
+            }
 
-                    const closeCollabLoading = showModal(`
+            const closeCollabLoading = showModal(`
                         <div class="glass max-w-sm w-full rounded-[2.5rem] p-10 flex flex-col items-center justify-center gap-6 animate-pulse">
                             <div class="w-16 h-16 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin"></div>
                             <p class="text-slate-500 font-bold uppercase tracking-widest text-xs">Loading Collaborators...</p>
                         </div>
                     `);
 
-                    try {
-                        const partnerIds = activePartnerships.map(p => p.userId1 === currentUser.uid ? p.userId2 : p.userId1);
-                        const userDocs = await Promise.all(partnerIds.map(id => db.collection('users').doc(id).get()));
-                        const partners = userDocs.map(doc => ({ uid: doc.id, ...doc.data() }));
+            try {
+                const partnerIds = activePartnerships.map(p => p.userId1 === currentUser.uid ? p.userId2 : p.userId1);
+                const userDocs = await Promise.all(partnerIds.map(id => db.collection('users').doc(id).get()));
+                const partners = userDocs.map(doc => ({ uid: doc.id, ...doc.data() }));
 
-                        closeCollabLoading();
+                closeCollabLoading();
 
-                        const collabModalHtml = `
+                const collabModalHtml = `
                         <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up border border-slate-200/50 dark:border-slate-800">
                             <h2 class="text-2xl font-black font-serif italic mb-2">Transfer Book</h2>
                             <p class="text-sm text-slate-500 mb-6">Select a collaborator to transfer ownership of "${escapeHTML(book.title)}". You will no longer own this book.</p>
@@ -9501,343 +9555,343 @@ If the collection is small or has no finished books, be extra encouraging and su
                             </div>
                         </div>
                         `;
-                        showModal(collabModalHtml);
-                    } catch (err) {
-                        closeCollabLoading();
-                        showToast('Failed to load collaborators: ' + err.message, 'error');
-                    }
+                showModal(collabModalHtml);
+            } catch (err) {
+                closeCollabLoading();
+                showToast('Failed to load collaborators: ' + err.message, 'error');
+            }
+        });
+
+        document.getElementById('new-highlight-input')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const text = e.target.value;
+                const page = document.getElementById('new-highlight-page-input')?.value || '';
+                window.addHighlight(book.id, text, page);
+            }
+        });
+        document.getElementById('new-highlight-page-input')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const text = document.getElementById('new-highlight-input')?.value || '';
+                const page = e.target.value;
+                window.addHighlight(book.id, text, page);
+            }
+        });
+
+        document.getElementById('move-to-lib-btn')?.addEventListener('click', async () => {
+            try {
+                await db.collection('books').doc(book.id)
+                    .collection('readingStatus').doc(currentUser.uid).update({ isWishlist: false });
+                showToast('Moved to library!', 'success');
+                close();
+                openBookDetails(books.find(b => b.id === book.id)); // refresh
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+            }
+        });
+
+        document.getElementById('detail-wishlist-checkbox')?.addEventListener('change', async (e) => {
+            const val = e.target.checked;
+            try {
+                await db.collection('books').doc(book.id)
+                    .collection('readingStatus').doc(currentUser.uid).update({ isWishlist: val });
+                showToast(val ? 'Added to wishlist' : 'Removed from wishlist', 'success');
+                close();
+                openBookDetails(books.find(b => b.id === book.id)); // refresh
+            } catch (err) { showToast('Error: ' + err.message, 'error'); }
+        });
+
+        document.getElementById('borrow-book-btn')?.addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            const originalText = btn.innerText;
+            const nameInput = document.getElementById('borrower-name');
+            const name = nameInput.value.trim() || (currentUser.displayName || currentUser.email);
+            btn.disabled = true;
+            btn.innerText = 'Borrowing...';
+            try {
+                const nowIso = new Date().toISOString();
+                const existingHistory = Array.isArray(book.borrowHistory) ? book.borrowHistory : [];
+                const newHistoryEntry = {
+                    borrowerName: name,
+                    borrowDate: nowIso,
+                    returnDate: null
+                };
+
+                await db.collection('books').doc(book.id).update({
+                    borrowedBy: name,
+                    borrowDate: nowIso,
+                    borrowHistory: [...existingHistory, newHistoryEntry]
                 });
 
-                document.getElementById('new-highlight-input')?.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        const text = e.target.value;
-                        const page = document.getElementById('new-highlight-page-input')?.value || '';
-                        window.addHighlight(book.id, text, page);
-                    }
-                });
-                document.getElementById('new-highlight-page-input')?.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        const text = document.getElementById('new-highlight-input')?.value || '';
-                        const page = e.target.value;
-                        window.addHighlight(book.id, text, page);
-                    }
+                await db.collection('activityFeed').add({
+                    type: 'book_borrowed',
+                    bookId: book.id,
+                    bookTitle: book.title,
+                    userName: currentUser.displayName || currentUser.email || currentUser.uid,
+                    userId: currentUser.uid,
+                    borrowedBy: name,
+                    addedTo: book.userId === currentUser.uid ? 'My' : 'Partner',
+                    libraryId: book.userId,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
-                document.getElementById('move-to-lib-btn')?.addEventListener('click', async () => {
-                    try {
-                        await db.collection('books').doc(book.id)
-                            .collection('readingStatus').doc(currentUser.uid).update({ isWishlist: false });
-                        showToast('Moved to library!', 'success');
-                        close();
-                        openBookDetails(books.find(b => b.id === book.id)); // refresh
-                    } catch (err) {
-                        showToast('Error: ' + err.message, 'error');
-                        btn.disabled = false;
-                        btn.innerHTML = originalHTML;
-                    }
-                });
+                showToast(`Marked as borrowed by ${name}`, 'success');
+                close();
+            } catch (err) {
+                showToast('Failed to borrow book: ' + err.message, 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                }
+            }
+        });
 
-                document.getElementById('detail-wishlist-checkbox')?.addEventListener('change', async (e) => {
-                    const val = e.target.checked;
-                    try {
-                        await db.collection('books').doc(book.id)
-                            .collection('readingStatus').doc(currentUser.uid).update({ isWishlist: val });
-                        showToast(val ? 'Added to wishlist' : 'Removed from wishlist', 'success');
-                        close();
-                        openBookDetails(books.find(b => b.id === book.id)); // refresh
-                    } catch (err) { showToast('Error: ' + err.message, 'error'); }
-                });
+        document.getElementById('save-rating-btn')?.addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            const originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = 'Saving...';
+            const rating = parseInt(document.getElementById('detail-rating-select').value);
+            const comment = document.getElementById('detail-comment-textarea').value.trim();
+            try {
+                await db.collection('books').doc(book.id)
+                    .collection('readingStatus').doc(currentUser.uid).set({
+                        rating,
+                        comment,
+                        userId: currentUser.uid,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
 
-                document.getElementById('borrow-book-btn')?.addEventListener('click', async (e) => {
-                    const btn = e.currentTarget;
-                    const originalText = btn.innerText;
-                    const nameInput = document.getElementById('borrower-name');
-                    const name = nameInput.value.trim() || (currentUser.displayName || currentUser.email);
-                    btn.disabled = true;
-                    btn.innerText = 'Borrowing...';
-                    try {
-                        const nowIso = new Date().toISOString();
-                        const existingHistory = Array.isArray(book.borrowHistory) ? book.borrowHistory : [];
-                        const newHistoryEntry = {
-                            borrowerName: name,
-                            borrowDate: nowIso,
-                            returnDate: null
-                        };
-
-                        await db.collection('books').doc(book.id).update({
-                            borrowedBy: name,
-                            borrowDate: nowIso,
-                            borrowHistory: [...existingHistory, newHistoryEntry]
-                        });
-
-                        await db.collection('activityFeed').add({
-                            type: 'book_borrowed',
-                            bookId: book.id,
-                            bookTitle: book.title,
-                            userName: currentUser.displayName || currentUser.email || currentUser.uid,
-                            userId: currentUser.uid,
-                            borrowedBy: name,
-                            addedTo: book.userId === currentUser.uid ? 'My' : 'Partner',
-                            libraryId: book.userId,
-                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-
-                        showToast(`Marked as borrowed by ${name}`, 'success');
-                        close();
-                    } catch (err) {
-                        showToast('Failed to borrow book: ' + err.message, 'error');
-                    } finally {
-                        if (btn) {
-                            btn.disabled = false;
-                            btn.innerText = originalText;
-                        }
-                    }
-                });
-
-                document.getElementById('save-rating-btn')?.addEventListener('click', async (e) => {
-                    const btn = e.currentTarget;
-                    const originalText = btn.innerText;
-                    btn.disabled = true;
-                    btn.innerText = 'Saving...';
-                    const rating = parseInt(document.getElementById('detail-rating-select').value);
-                    const comment = document.getElementById('detail-comment-textarea').value.trim();
-                    try {
-                        await db.collection('books').doc(book.id)
-                            .collection('readingStatus').doc(currentUser.uid).set({
-                                rating,
-                                comment,
-                                userId: currentUser.uid,
-                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                            }, { merge: true });
-
-                        if (rating > 0 || comment) {
-                            await db.collection('activityFeed').add({
-                                type: 'rating_updated',
-                                bookId: book.id,
-                                bookTitle: book.title,
-                                userName: currentUser.displayName || currentUser.email || currentUser.uid,
-                                userId: currentUser.uid,
-                                rating: rating,
-                                comment: comment,
-                                addedTo: book.userId === currentUser.uid ? 'My' : 'Partner',
-                                libraryId: book.userId,
-                                timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                            });
-                        }
-
-                        // Update average rating on the book document
-                        const updatedStatusesSnapshot = await db.collection('books').doc(book.id).collection('readingStatus').get();
-                        const updatedStatuses = updatedStatusesSnapshot.docs.map(doc => doc.data());
-                        const allRatings = updatedStatuses.map(s => s.rating).filter(r => r > 0);
-                        const newAvg = allRatings.length > 0 ? (allRatings.reduce((a, b) => a + b, 0) / allRatings.length) : 0;
-                        const newCount = allRatings.length;
-
-                        await db.collection('books').doc(book.id).update({
-                            averageRating: newAvg,
-                            ratingCount: newCount
-                        });
-
-                        showToast('Review saved!', 'success');
-                        close();
-                        // Small delay to ensure Firestore sync
-                        setTimeout(() => openBookDetails(books.find(b => b.id === book.id)), 100);
-                    } catch (err) {
-                        showToast('Failed to save review: ' + err.message, 'error');
-                    } finally {
-                        if (btn) {
-                            btn.disabled = false;
-                            btn.innerText = originalText;
-                        }
-                    }
-                });
-
-                document.getElementById('detail-status-select')?.addEventListener('change', async (e) => {
-                    const select = e.target;
-                    const newStatus = select.value;
-                    select.disabled = true;
-                    try {
-                        const updateData = {
-                            status: newStatus,
-                            userId: currentUser.uid,
-                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                        };
-                        if (newStatus !== 'reading') {
-                            updateData.progress = 0;
-                        }
-                        await db.collection('books').doc(book.id)
-                            .collection('readingStatus').doc(currentUser.uid).set(updateData, { merge: true });
-
-                        await db.collection('activityFeed').add({
-                            type: 'status_updated',
-                            bookId: book.id,
-                            bookTitle: book.title,
-                            userName: currentUser.displayName || currentUser.email || currentUser.uid,
-                            userId: currentUser.uid,
-                            status: newStatus,
-                            addedTo: book.userId === currentUser.uid ? 'My' : 'Partner',
-                            libraryId: book.userId,
-                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-
-                        showToast('Status updated!', 'success');
-                        if (newStatus === 'finished') {
-                            confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-                        }
-                        close();
-                        openBookDetails(books.find(b => b.id === book.id)); // refresh
-                    } catch (err) {
-                        showToast('Error: ' + err.message, 'error');
-                        select.disabled = false;
-                    }
-                });
-
-                document.getElementById('detail-progress-input')?.addEventListener('change', async (e) => {
-                    const progress = parseInt(e.target.value) || 0;
-                    try {
-                        await db.collection('books').doc(book.id)
-                            .collection('readingStatus').doc(currentUser.uid).set({
-                                progress: progress,
-                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                            }, { merge: true });
-                        showToast('Progress updated!', 'success');
-                    } catch (err) { showToast('Error: ' + err.message, 'error'); }
-                });
-
-                const timerBtn = document.getElementById('timer-toggle-btn');
-                const timerDisplay = document.getElementById('session-timer');
-                if (timerBtn) {
-                    const updateTimerDisplay = () => {
-                        if (!readingSessionStart) return;
-                        const diff = Date.now() - readingSessionStart;
-                        const mins = Math.floor(diff / 60000);
-                        const secs = Math.floor((diff % 60000) / 1000);
-                        if (timerDisplay) timerDisplay.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-                    };
-
-                    if (readingSessionTimer) {
-                        timerBtn.innerText = 'Stop Session';
-                        timerBtn.setAttribute('aria-label', 'Stop reading session');
-                        timerBtn.setAttribute('title', 'Stop reading session');
-                        updateTimerDisplay();
-                    }
-
-                    timerBtn.onclick = () => {
-                        if (readingSessionTimer) {
-                            clearInterval(readingSessionTimer);
-                            readingSessionTimer = null;
-                            timerBtn.innerText = 'Start Session';
-                            timerBtn.setAttribute('aria-label', 'Start reading session');
-                            timerBtn.setAttribute('title', 'Start reading session');
-                            const duration = Math.round((Date.now() - readingSessionStart) / 60000);
-                            showToast(`Session ended. You read for ${duration} minutes!`, 'success');
-                        } else {
-                            readingSessionStart = Date.now();
-                            timerBtn.innerText = 'Stop Session';
-                            timerBtn.setAttribute('aria-label', 'Stop reading session');
-                            timerBtn.setAttribute('title', 'Stop reading session');
-                            updateTimerDisplay();
-                            readingSessionTimer = setInterval(updateTimerDisplay, 1000);
-                        }
-                    };
+                if (rating > 0 || comment) {
+                    await db.collection('activityFeed').add({
+                        type: 'rating_updated',
+                        bookId: book.id,
+                        bookTitle: book.title,
+                        userName: currentUser.displayName || currentUser.email || currentUser.uid,
+                        userId: currentUser.uid,
+                        rating: rating,
+                        comment: comment,
+                        addedTo: book.userId === currentUser.uid ? 'My' : 'Partner',
+                        libraryId: book.userId,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
                 }
 
-                document.getElementById('return-book-btn')?.addEventListener('click', async (e) => {
-                    const btn = e.currentTarget;
-                    const originalText = btn.innerText;
-                    btn.disabled = true;
-                    btn.innerText = 'Returning...';
-                    try {
-                        const nowIso = new Date().toISOString();
-                        const existingHistory = Array.isArray(book.borrowHistory) ? book.borrowHistory : [];
-                        const updatedHistory = existingHistory.map((entry, index) => {
-                            if (!entry.returnDate) {
-                                return { ...entry, returnDate: nowIso };
-                            }
-                            return entry;
-                        });
+                // Update average rating on the book document
+                const updatedStatusesSnapshot = await db.collection('books').doc(book.id).collection('readingStatus').get();
+                const updatedStatuses = updatedStatusesSnapshot.docs.map(doc => doc.data());
+                const allRatings = updatedStatuses.map(s => s.rating).filter(r => r > 0);
+                const newAvg = allRatings.length > 0 ? (allRatings.reduce((a, b) => a + b, 0) / allRatings.length) : 0;
+                const newCount = allRatings.length;
 
-                        await db.collection('books').doc(book.id).update({
-                            borrowedBy: firebase.firestore.FieldValue.delete(),
-                            borrowDate: firebase.firestore.FieldValue.delete(),
-                            borrowHistory: updatedHistory
-                        });
-
-                        await db.collection('activityFeed').add({
-                            type: 'book_returned',
-                            bookId: book.id,
-                            bookTitle: book.title,
-                            userName: currentUser.displayName || currentUser.email || currentUser.uid,
-                            userId: currentUser.uid,
-                            addedTo: book.userId === currentUser.uid ? 'My' : 'Partner',
-                            libraryId: book.userId,
-                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-
-                        showToast('Book returned!', 'success');
-                        close();
-                    } catch (err) {
-                        showToast('Failed to return book: ' + err.message, 'error');
-                    } finally {
-                        if (btn) {
-                            btn.disabled = false;
-                            btn.innerText = originalText;
-                        }
-                    }
+                await db.collection('books').doc(book.id).update({
+                    averageRating: newAvg,
+                    ratingCount: newCount
                 });
 
-                document.getElementById('delete-book-btn')?.addEventListener('click', async (e) => {
-                    if (confirm('Are you sure you want to delete this book?')) {
-                        const btn = e.currentTarget;
-                        const originalText = btn.innerText;
-                        btn.disabled = true;
-                        btn.innerText = 'Deleting...';
-                        try {
-                            // Populate safety net
-                            window.lastDeleted = [{
-                                book: { ...book },
-                                status: { ...statusData }
-                            }];
+                showToast('Review saved!', 'success');
+                close();
+                // Small delay to ensure Firestore sync
+                setTimeout(() => openBookDetails(books.find(b => b.id === book.id)), 100);
+            } catch (err) {
+                showToast('Failed to save review: ' + err.message, 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                }
+            }
+        });
 
-                            const batch = db.batch();
-                            batch.delete(db.collection('books').doc(book.id));
-                            // Cleanup user's reading status
-                            batch.delete(db.collection('books').doc(book.id).collection('readingStatus').doc(currentUser.uid));
-                            await batch.commit();
+        document.getElementById('detail-status-select')?.addEventListener('change', async (e) => {
+            const select = e.target;
+            const newStatus = select.value;
+            select.disabled = true;
+            try {
+                const updateData = {
+                    status: newStatus,
+                    userId: currentUser.uid,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                if (newStatus !== 'reading') {
+                    updateData.progress = 0;
+                }
+                await db.collection('books').doc(book.id)
+                    .collection('readingStatus').doc(currentUser.uid).set(updateData, { merge: true });
 
-                            showToast('Book deleted.', 'info', 10000, '<button data-action="undo-delete" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Undo</button>');
-                            close();
-                        } catch (err) {
-                            showToast('Error deleting: ' + err.message, 'error');
-                        } finally {
-                            if (btn) {
-                                btn.disabled = false;
-                                btn.innerText = originalText;
-                            }
-                        }
-                    }
+                await db.collection('activityFeed').add({
+                    type: 'status_updated',
+                    bookId: book.id,
+                    bookTitle: book.title,
+                    userName: currentUser.displayName || currentUser.email || currentUser.uid,
+                    userId: currentUser.uid,
+                    status: newStatus,
+                    addedTo: book.userId === currentUser.uid ? 'My' : 'Partner',
+                    libraryId: book.userId,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
+
+                showToast('Status updated!', 'success');
+                if (newStatus === 'finished') {
+                    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+                }
+                close();
+                openBookDetails(books.find(b => b.id === book.id)); // refresh
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+                select.disabled = false;
+            }
+        });
+
+        document.getElementById('detail-progress-input')?.addEventListener('change', async (e) => {
+            const progress = parseInt(e.target.value) || 0;
+            try {
+                await db.collection('books').doc(book.id)
+                    .collection('readingStatus').doc(currentUser.uid).set({
+                        progress: progress,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+                showToast('Progress updated!', 'success');
+            } catch (err) { showToast('Error: ' + err.message, 'error'); }
+        });
+
+        const timerBtn = document.getElementById('timer-toggle-btn');
+        const timerDisplay = document.getElementById('session-timer');
+        if (timerBtn) {
+            const updateTimerDisplay = () => {
+                if (!readingSessionStart) return;
+                const diff = Date.now() - readingSessionStart;
+                const mins = Math.floor(diff / 60000);
+                const secs = Math.floor((diff % 60000) / 1000);
+                if (timerDisplay) timerDisplay.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            };
+
+            if (readingSessionTimer) {
+                timerBtn.innerText = 'Stop Session';
+                timerBtn.setAttribute('aria-label', 'Stop reading session');
+                timerBtn.setAttribute('title', 'Stop reading session');
+                updateTimerDisplay();
             }
 
-            // Expose for testing
-            window.renderMainApp = renderMainApp;
-            window.renderLibraryInsight = renderLibraryInsight;
-            window.renderBookCard = renderBookCard;
-            window.renderLibraryOnly = renderLibraryOnly;
-            window.updateLibraryStats = updateLibraryStats;
-            window.normalizeBook = normalizeBook;
-            window.getStatusData = getStatusData;
-            window.getBookGenres = getBookGenres;
-            window.openAIChat = openAIChat;
-            window.runAILibraryAnalysis = runAILibraryAnalysis;
-            window.openBookDetails = openBookDetails;
-            window.renderAuth = renderAuth;
-            window.formatAIText = formatAIText;
-            window.runAISearch = runAISearch;
+            timerBtn.onclick = () => {
+                if (readingSessionTimer) {
+                    clearInterval(readingSessionTimer);
+                    readingSessionTimer = null;
+                    timerBtn.innerText = 'Start Session';
+                    timerBtn.setAttribute('aria-label', 'Start reading session');
+                    timerBtn.setAttribute('title', 'Start reading session');
+                    const duration = Math.round((Date.now() - readingSessionStart) / 60000);
+                    showToast(`Session ended. You read for ${duration} minutes!`, 'success');
+                } else {
+                    readingSessionStart = Date.now();
+                    timerBtn.innerText = 'Stop Session';
+                    timerBtn.setAttribute('aria-label', 'Stop reading session');
+                    timerBtn.setAttribute('title', 'Stop reading session');
+                    updateTimerDisplay();
+                    readingSessionTimer = setInterval(updateTimerDisplay, 1000);
+                }
+            };
+        }
 
-            window.openPostReviewModal = () => {
-                const modalHtml = `
+        document.getElementById('return-book-btn')?.addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            const originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = 'Returning...';
+            try {
+                const nowIso = new Date().toISOString();
+                const existingHistory = Array.isArray(book.borrowHistory) ? book.borrowHistory : [];
+                const updatedHistory = existingHistory.map((entry, index) => {
+                    if (!entry.returnDate) {
+                        return { ...entry, returnDate: nowIso };
+                    }
+                    return entry;
+                });
+
+                await db.collection('books').doc(book.id).update({
+                    borrowedBy: firebase.firestore.FieldValue.delete(),
+                    borrowDate: firebase.firestore.FieldValue.delete(),
+                    borrowHistory: updatedHistory
+                });
+
+                await db.collection('activityFeed').add({
+                    type: 'book_returned',
+                    bookId: book.id,
+                    bookTitle: book.title,
+                    userName: currentUser.displayName || currentUser.email || currentUser.uid,
+                    userId: currentUser.uid,
+                    addedTo: book.userId === currentUser.uid ? 'My' : 'Partner',
+                    libraryId: book.userId,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                showToast('Book returned!', 'success');
+                close();
+            } catch (err) {
+                showToast('Failed to return book: ' + err.message, 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                }
+            }
+        });
+
+        document.getElementById('delete-book-btn')?.addEventListener('click', async (e) => {
+            if (confirm('Are you sure you want to delete this book?')) {
+                const btn = e.currentTarget;
+                const originalText = btn.innerText;
+                btn.disabled = true;
+                btn.innerText = 'Deleting...';
+                try {
+                    // Populate safety net
+                    window.lastDeleted = [{
+                        book: { ...book },
+                        status: { ...statusData }
+                    }];
+
+                    const batch = db.batch();
+                    batch.delete(db.collection('books').doc(book.id));
+                    // Cleanup user's reading status
+                    batch.delete(db.collection('books').doc(book.id).collection('readingStatus').doc(currentUser.uid));
+                    await batch.commit();
+
+                    showToast('Book deleted.', 'info', 10000, '<button data-action="undo-delete" class="ml-2 underline font-bold focus-visible:ring-2 focus-visible:ring-white outline-none rounded">Undo</button>');
+                    close();
+                } catch (err) {
+                    showToast('Error deleting: ' + err.message, 'error');
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerText = originalText;
+                    }
+                }
+            }
+        });
+    }
+
+    // Expose for testing
+    window.renderMainApp = renderMainApp;
+    window.renderLibraryInsight = renderLibraryInsight;
+    window.renderBookCard = renderBookCard;
+    window.renderLibraryOnly = renderLibraryOnly;
+    window.updateLibraryStats = updateLibraryStats;
+    window.normalizeBook = normalizeBook;
+    window.getStatusData = getStatusData;
+    window.getBookGenres = getBookGenres;
+    window.openAIChat = openAIChat;
+    window.runAILibraryAnalysis = runAILibraryAnalysis;
+    window.openBookDetails = openBookDetails;
+    window.renderAuth = renderAuth;
+    window.formatAIText = formatAIText;
+    window.runAISearch = runAISearch;
+
+    window.openPostReviewModal = () => {
+        const modalHtml = `
                 <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div class="glass max-w-2xl w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up border border-slate-200/50 dark:border-slate-800 relative overflow-hidden max-h-[90vh] overflow-y-auto">
                         <!-- Decorative background elements -->
@@ -9901,117 +9955,117 @@ If the collection is small or has no finished books, be extra encouraging and su
                 </div>
                 `;
 
-                const close = showModal(modalHtml);
-                let currentRating = 0;
+        const close = showModal(modalHtml);
+        let currentRating = 0;
 
-                const catSelect = document.getElementById('rev-category');
-                const ratingSection = document.getElementById('rev-rating-section');
-                const ratingLabel = document.getElementById('rev-rating-label');
-                const ratingLabels = { 1: '1 - Poor', 2: '2 - Fair', 3: '3 - Good', 4: '4 - Very Good', 5: '5 - Excellent' };
+        const catSelect = document.getElementById('rev-category');
+        const ratingSection = document.getElementById('rev-rating-section');
+        const ratingLabel = document.getElementById('rev-rating-label');
+        const ratingLabels = { 1: '1 - Poor', 2: '2 - Fair', 3: '3 - Good', 4: '4 - Very Good', 5: '5 - Excellent' };
 
-                const updateRatingVisibility = () => {
-                    if (catSelect.value === 'Review') {
-                        ratingSection.classList.remove('hidden');
-                    } else {
-                        ratingSection.classList.add('hidden');
-                        currentRating = 0;
-                        if (ratingLabel) ratingLabel.innerText = '';
-                        stars.forEach(s => {
-                            s.classList.remove('text-amber-400');
-                            s.classList.add('text-slate-400', 'dark:text-slate-500');
-                        });
-                    }
-                };
-
-                catSelect.onchange = updateRatingVisibility;
-
-                const stars = document.querySelectorAll('.rev-star-btn');
-                stars.forEach(btn => {
-                    btn.onclick = () => {
-                        currentRating = parseInt(btn.dataset.rating);
-                        if (ratingLabel) ratingLabel.innerText = ratingLabels[currentRating] || '';
-                        stars.forEach((s, idx) => {
-                            s.classList.toggle('text-amber-400', idx < currentRating);
-                            s.classList.toggle('text-slate-400', idx >= currentRating);
-                            s.classList.toggle('dark:text-slate-500', idx >= currentRating);
-                        });
-                    };
+        const updateRatingVisibility = () => {
+            if (catSelect.value === 'Review') {
+                ratingSection.classList.remove('hidden');
+            } else {
+                ratingSection.classList.add('hidden');
+                currentRating = 0;
+                if (ratingLabel) ratingLabel.innerText = '';
+                stars.forEach(s => {
+                    s.classList.remove('text-amber-400');
+                    s.classList.add('text-slate-400', 'dark:text-slate-500');
                 });
+            }
+        };
 
-                updateRatingVisibility();
+        catSelect.onchange = updateRatingVisibility;
 
-                const body = document.getElementById('rev-body');
-                const counter = document.getElementById('rev-char-counter');
-                body.oninput = () => {
-                    const len = body.value.length;
-                    const words = body.value.trim() ? body.value.trim().split(/\s+/).length : 0;
-                    const readTime = Math.ceil(words / 200);
-                    const readTimeStr = readTime > 0 ? ` · ${readTime} min read` : '';
-                    counter.innerText = `${len} / 2000${readTimeStr}`;
-                    counter.classList.toggle('text-rose-500', len > 2000 || len < 10);
-                    counter.classList.toggle('text-emerald-500', len >= 10 && len <= 1800);
-                    counter.classList.toggle('text-amber-500', len > 1800 && len <= 2000);
-                };
-
-                document.getElementById('submit-review-btn').onclick = async () => {
-                    const title = document.getElementById('rev-title').value.trim();
-                    const author = document.getElementById('rev-author').value.trim();
-                    const category = document.getElementById('rev-category').value;
-                    const content = body.value.trim();
-
-                    if (!title) { showToast('Please enter a book title', 'error'); return; }
-                    if (!category) { showToast('Please select a category', 'error'); return; }
-                    if (content.length < 10) { showToast('Review must be at least 10 characters', 'error'); return; }
-                    if (content.length > 2000) { showToast('Review is too long (max 2000)', 'error'); return; }
-
-                    const btn = document.getElementById('submit-review-btn');
-                    btn.disabled = true;
-                    btn.innerText = 'Publishing...';
-
-                    try {
-                        const reviewData = {
-                            userId: currentUser.uid,
-                            userName: userProfile.displayName || currentUser.email,
-                            bookTitle: title,
-                            author: author,
-                            category: category,
-                            body: content,
-                            rating: currentRating,
-                            likesCount: 0,
-                            commentsCount: 0,
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                        };
-
-                        await db.collection('reviews').add(reviewData);
-                        showToast('Review shared with the community!', 'success');
-                        close();
-                        if (activeTab === 'explore') window.queueRenderMainApp();
-                    } catch (err) {
-                        showToast('Failed to post review: ' + err.message, 'error');
-                        btn.disabled = false;
-                        btn.innerText = 'Post Review';
-                    }
-                };
+        const stars = document.querySelectorAll('.rev-star-btn');
+        stars.forEach(btn => {
+            btn.onclick = () => {
+                currentRating = parseInt(btn.dataset.rating);
+                if (ratingLabel) ratingLabel.innerText = ratingLabels[currentRating] || '';
+                stars.forEach((s, idx) => {
+                    s.classList.toggle('text-amber-400', idx < currentRating);
+                    s.classList.toggle('text-slate-400', idx >= currentRating);
+                    s.classList.toggle('dark:text-slate-500', idx >= currentRating);
+                });
             };
-            window.toggleFavorite = toggleFavorite;
-            window.toggleFavoritesFilter = toggleFavoritesFilter;
-            window.addHighlight = addHighlight;
-            window.deleteHighlight = deleteHighlight;
-            window.showShortcutsHelp = () => {
-                const shortcuts = [
-                    { key: '?', desc: 'Show this help modal' },
-                    { key: '/', desc: 'Focus search bar' },
-                    { key: 'N', desc: 'Add book manually' },
-                    { key: 'L', desc: 'Go to Library tab' },
-                    { key: 'M', desc: 'Go to My Books tab' },
-                    { key: 'A', desc: 'Go to Activity tab' },
-                    { key: 'I', desc: 'Go to Insights tab' },
-                    { key: 'S', desc: 'Go to Settings tab' },
-                    { key: 'Esc', desc: 'Close any open modal' },
-                    { key: 'Enter', desc: 'Select/Click active element' }
-                ];
-                const html = `
+        });
+
+        updateRatingVisibility();
+
+        const body = document.getElementById('rev-body');
+        const counter = document.getElementById('rev-char-counter');
+        body.oninput = () => {
+            const len = body.value.length;
+            const words = body.value.trim() ? body.value.trim().split(/\s+/).length : 0;
+            const readTime = Math.ceil(words / 200);
+            const readTimeStr = readTime > 0 ? ` · ${readTime} min read` : '';
+            counter.innerText = `${len} / 2000${readTimeStr}`;
+            counter.classList.toggle('text-rose-500', len > 2000 || len < 10);
+            counter.classList.toggle('text-emerald-500', len >= 10 && len <= 1800);
+            counter.classList.toggle('text-amber-500', len > 1800 && len <= 2000);
+        };
+
+        document.getElementById('submit-review-btn').onclick = async () => {
+            const title = document.getElementById('rev-title').value.trim();
+            const author = document.getElementById('rev-author').value.trim();
+            const category = document.getElementById('rev-category').value;
+            const content = body.value.trim();
+
+            if (!title) { showToast('Please enter a book title', 'error'); return; }
+            if (!category) { showToast('Please select a category', 'error'); return; }
+            if (content.length < 10) { showToast('Review must be at least 10 characters', 'error'); return; }
+            if (content.length > 2000) { showToast('Review is too long (max 2000)', 'error'); return; }
+
+            const btn = document.getElementById('submit-review-btn');
+            btn.disabled = true;
+            btn.innerText = 'Publishing...';
+
+            try {
+                const reviewData = {
+                    userId: currentUser.uid,
+                    userName: userProfile.displayName || currentUser.email,
+                    bookTitle: title,
+                    author: author,
+                    category: category,
+                    body: content,
+                    rating: currentRating,
+                    likesCount: 0,
+                    commentsCount: 0,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                await db.collection('reviews').add(reviewData);
+                showToast('Review shared with the community!', 'success');
+                close();
+                if (activeTab === 'explore') window.queueRenderMainApp();
+            } catch (err) {
+                showToast('Failed to post review: ' + err.message, 'error');
+                btn.disabled = false;
+                btn.innerText = 'Post Review';
+            }
+        };
+    };
+    window.toggleFavorite = toggleFavorite;
+    window.toggleFavoritesFilter = toggleFavoritesFilter;
+    window.addHighlight = addHighlight;
+    window.deleteHighlight = deleteHighlight;
+    window.showShortcutsHelp = () => {
+        const shortcuts = [
+            { key: '?', desc: 'Show this help modal' },
+            { key: '/', desc: 'Focus search bar' },
+            { key: 'N', desc: 'Add book manually' },
+            { key: 'L', desc: 'Go to Library tab' },
+            { key: 'M', desc: 'Go to My Books tab' },
+            { key: 'A', desc: 'Go to Activity tab' },
+            { key: 'I', desc: 'Go to Insights tab' },
+            { key: 'S', desc: 'Go to Settings tab' },
+            { key: 'Esc', desc: 'Close any open modal' },
+            { key: 'Enter', desc: 'Select/Click active element' }
+        ];
+        const html = `
                 <div class="glass max-w-md w-full rounded-[2.5rem] p-8 shadow-2xl animate-slide-up border border-slate-200/50 dark:border-slate-800">
                     <div class="flex items-center justify-between mb-6">
                         <h2 class="text-2xl font-black font-serif italic text-primary">Keyboard Shortcuts</h2>
@@ -10028,213 +10082,213 @@ If the collection is small or has no finished books, be extra encouraging and su
                     <button data-close class="w-full mt-8 py-4 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 dark:shadow-none hover:scale-[1.02] active:scale-95 transition-all focus-visible:ring-2 focus-visible:ring-primary outline-none">Got it!</button>
                 </div>
                 `;
-                showModal(html);
-            };
-            window.openManualEntry = openManualEntry;
-            window.runLibraryCleanup = runLibraryCleanup;
-            window.getLibraryContext = getLibraryContext;
-            window.generateReadingRoadmap = generateReadingRoadmap;
-            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.__DEBUG__) {
-                window.__test_data = {
-                    get books() { return books; },
-                    set books(v) { books = v; },
-                    get readingStatuses() { return readingStatuses; },
-                    set readingStatuses(v) { readingStatuses = v; },
-                    get currentUser() { return currentUser; },
-                    set currentUser(v) { currentUser = v; },
-                    get userProfile() { return userProfile; },
-                    set userProfile(v) { userProfile = v; },
-                    get activities() { return activities; },
-                    set activities(v) { activities = v; },
-                    get libraryStats() { return libraryStats; }
-                };
+        showModal(html);
+    };
+    window.openManualEntry = openManualEntry;
+    window.runLibraryCleanup = runLibraryCleanup;
+    window.getLibraryContext = getLibraryContext;
+    window.generateReadingRoadmap = generateReadingRoadmap;
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.__DEBUG__) {
+        window.__test_data = {
+            get books() { return books; },
+            set books(v) { books = v; },
+            get readingStatuses() { return readingStatuses; },
+            set readingStatuses(v) { readingStatuses = v; },
+            get currentUser() { return currentUser; },
+            set currentUser(v) { currentUser = v; },
+            get userProfile() { return userProfile; },
+            set userProfile(v) { userProfile = v; },
+            get activities() { return activities; },
+            set activities(v) { activities = v; },
+            get libraryStats() { return libraryStats; }
+        };
+    }
+    // ============================================================
+    // DELEGATED ACTION LISTENER
+    // Replaces all inline onclick handlers that interpolate user data.
+    // User data never enters JS source — it's read from data-* attributes.
+    // ============================================================
+    document.addEventListener('click', (e) => {
+        const el = e.target.closest('[data-action]');
+        if (!el) return;
+
+        const action = el.dataset.action;
+        const value = el.dataset.value;
+        const value2 = el.dataset.value2;
+        const value3 = el.dataset.value3;
+
+        // Stop the click from bubbling to card handlers (which open details/edit modal).
+        if (el.dataset.stop !== 'false') e.stopPropagation();
+
+        switch (action) {
+            case 'refresh-app': window.refreshApp(); break;
+            case 'toggle-landing-theme': window.toggleLandingTheme(); break;
+            case 'open-ai-chat': window.openAIChat(value); break;
+            case 'set-theme': window.setTheme(value); break;
+            case 'set-accent': window.setAccent(value); break;
+            case 'run-wishlist-migration': window.runWishlistMigration(); break;
+            case 'run-data-migration': window.runDataMigration(); break;
+            case 'set-tab': window.setTab(value); break;
+            case 'toggle-sidebar-theme': window.toggleSidebarTheme(); break;
+            case 'clear-selection': window.clearSelection(); break;
+            case 'bulk-transfer': window.bulkTransfer(); break;
+            case 'bulk-delete': window.bulkDelete(); break;
+            case 'undo-delete': window.undoDelete(); break;
+            case 'clear-fav-filter': window.toggleFavoritesFilter(false); break;
+            case 'clear-all-filters': window.clearAllFilters(); break;
+            case 'clear-ai-search': window.clearAISearch(); break;
+            case 'run-ai-search': window.runAISearch(); break;
+            case 'open-scanner': window.openScanner(); break;
+            case 'open-manual-add': document.querySelector('.manual-add-trigger')?.click(); break;
+            case 'set-my-books-sub-tab': window.setMyBooksSubTab(value); break;
+            case 'open-add-finished-book-modal': window.openAddFinishedBookModal(); break;
+            case 'post-activity-message': window.postActivityMessage(); break;
+            case 'close-user-search-modal': window.closeUserSearchModal(); break;
+            case 'set-feed-category': window.setFeedCategory(value); break;
+            case 'search-user-by-email': window.searchUserByEmail(); break;
+            case 'open-post-review-modal': window.openPostReviewModal(); break;
+            case 'load-more-reviews': window.loadMoreReviews(el); break;
+            case 'undo-import': window.undoImport(); break;
+            case 'send-ai-chat-message': window.sendAIChatMessage(value); break;
+            case 'reload-app': window.location.reload(); break;
+            case 'scroll-to': document.getElementById(value)?.scrollIntoView({ behavior: 'smooth' }); break;
+            case 'speak-text': window.speakText(el.parentElement.innerText, el); break;
+            // ---- Filters ----
+            case 'filter-genre': window.setCategoryFilter(value); break;
+            case 'filter-tag': window.setTagFilter(value === '' ? null : value); break;
+            case 'filter-author': window.setAuthorFilter(value); break;
+            case 'filter-owner': window.setOwnerFilter(value); break;
+            case 'clear-tag': window.setTagFilter(null); break;
+            case 'clear-adv-filter': window.clearAdvancedFilter(value); break;
+            case 'clear-sort': window.clearSortFilter(value); break;
+            case 'set-copy-type': window.setCopyTypeFilter(value); break;
+            case 'toggle-fav-filter': window.toggleFavoritesFilter(false); break;
+            case 'apply-insight': window.applyInsightFilter(value, value2); break;
+            case 'toggle-partnership-perm':
+                window.updatePartnershipPermission(value, el.checked);
+                break;
+            case 'apply-suggestion': {
+                const v = el.dataset.value;
+                searchQuery = v;
+                const input = document.getElementById('search-input');
+                if (input) input.value = v;
+                window.queueRenderLibraryOnly();
+                break;
             }
-            // ============================================================
-            // DELEGATED ACTION LISTENER
-            // Replaces all inline onclick handlers that interpolate user data.
-            // User data never enters JS source — it's read from data-* attributes.
-            // ============================================================
-            document.addEventListener('click', (e) => {
-                const el = e.target.closest('[data-action]');
-                if (!el) return;
+            case 'accept-collab-close':
+                window.acceptCollaborationRequest(value);
+                document.querySelector('[data-close]')?.click();
+                break;
+            case 'reject-collab-close':
+                window.rejectCollaborationRequest(value);
+                document.querySelector('[data-close]')?.click();
+                break;
+            case 'cancel-collab-close':
+                window.cancelInvitation(value);
+                document.querySelector('[data-close]')?.click();
+                break;
+            case 'mark-finished-from-list': {
+                if (window.markAsFinished) window.markAsFinished(value, el);
+                break;
+            }
+            case 'execute-book-transfer':
+                window.executeBookTransfer(value, value2, value3);
+                break;
+            case 'execute-bulk-transfer':
+                window.executeBulkTransfer(value, value2);
+                break;
+            case 'toggle-search-book':
+                window.toggleSearchBookDropdown(value);
+                break;
 
-                const action = el.dataset.action;
-                const value = el.dataset.value;
-                const value2 = el.dataset.value2;
-                const value3 = el.dataset.value3;
+            // ---- Book actions ----
+            case 'toggle-fav': window.toggleFavorite(value); break;
+            case 'select-book': window.toggleSelection(value); break;
+            case 'copy-isbn': window.copyISBN(value, el); break;
+            case 'copy-book': window.copyToClipboard(value, 'Copied book info!', el); break;
+            case 'copy-quote': window.copyQuote(value, value2, value3, el); break;
+            case 'start-reading': window.quickUpdateStatus(value, 'reading', el); break;
+            case 'mark-finished': window.quickUpdateStatus(value, 'finished', el); break;
+            case 'quick-progress': window.quickUpdateProgress(value, el); break;
+            case 'open-book': { const b = books.find(x => x.id === value); if (b) window.openBookDetails(b); break; }
+            case 'edit-book': { const b = books.find(x => x.id === value); if (b) window.openManualEntry(null, b); break; }
 
-                // Stop the click from bubbling to card handlers (which open details/edit modal).
-                if (el.dataset.stop !== 'false') e.stopPropagation();
-
-                switch (action) {
-                    case 'refresh-app': window.refreshApp(); break;
-                    case 'toggle-landing-theme': window.toggleLandingTheme(); break;
-                    case 'open-ai-chat': window.openAIChat(value); break;
-                    case 'set-theme': window.setTheme(value); break;
-                    case 'set-accent': window.setAccent(value); break;
-                    case 'run-wishlist-migration': window.runWishlistMigration(); break;
-                    case 'run-data-migration': window.runDataMigration(); break;
-                    case 'set-tab': window.setTab(value); break;
-                    case 'toggle-sidebar-theme': window.toggleSidebarTheme(); break;
-                    case 'clear-selection': window.clearSelection(); break;
-                    case 'bulk-transfer': window.bulkTransfer(); break;
-                    case 'bulk-delete': window.bulkDelete(); break;
-                    case 'undo-delete': window.undoDelete(); break;
-                    case 'clear-fav-filter': window.toggleFavoritesFilter(false); break;
-                    case 'clear-all-filters': window.clearAllFilters(); break;
-                    case 'clear-ai-search': window.clearAISearch(); break;
-                    case 'run-ai-search': window.runAISearch(); break;
-                    case 'open-scanner': window.openScanner(); break;
-                    case 'open-manual-add': document.querySelector('.manual-add-trigger')?.click(); break;
-                    case 'set-my-books-sub-tab': window.setMyBooksSubTab(value); break;
-                    case 'open-add-finished-book-modal': window.openAddFinishedBookModal(); break;
-                    case 'post-activity-message': window.postActivityMessage(); break;
-                    case 'close-user-search-modal': window.closeUserSearchModal(); break;
-                    case 'set-feed-category': window.setFeedCategory(value); break;
-                    case 'search-user-by-email': window.searchUserByEmail(); break;
-                    case 'open-post-review-modal': window.openPostReviewModal(); break;
-                    case 'load-more-reviews': window.loadMoreReviews(el); break;
-                    case 'undo-import': window.undoImport(); break;
-                    case 'send-ai-chat-message': window.sendAIChatMessage(value); break;
-                    case 'reload-app': window.location.reload(); break;
-                    case 'scroll-to': document.getElementById(value)?.scrollIntoView({ behavior: 'smooth' }); break;
-                    case 'speak-text': window.speakText(el.parentElement.innerText, el); break;
-                    // ---- Filters ----
-                    case 'filter-genre': window.setCategoryFilter(value); break;
-                    case 'filter-tag': window.setTagFilter(value === '' ? null : value); break;
-                    case 'filter-author': window.setAuthorFilter(value); break;
-                    case 'filter-owner': window.setOwnerFilter(value); break;
-                    case 'clear-tag': window.setTagFilter(null); break;
-                    case 'clear-adv-filter': window.clearAdvancedFilter(value); break;
-                    case 'clear-sort': window.clearSortFilter(value); break;
-                    case 'set-copy-type': window.setCopyTypeFilter(value); break;
-                    case 'toggle-fav-filter': window.toggleFavoritesFilter(false); break;
-                    case 'apply-insight': window.applyInsightFilter(value, value2); break;
-                    case 'toggle-partnership-perm':
-                        window.updatePartnershipPermission(value, el.checked);
-                        break;
-                    case 'apply-suggestion': {
-                        const v = el.dataset.value;
-                        searchQuery = v;
-                        const input = document.getElementById('search-input');
-                        if (input) input.value = v;
-                        window.queueRenderLibraryOnly();
-                        break;
-                    }
-                    case 'accept-collab-close':
-                        window.acceptCollaborationRequest(value);
-                        document.querySelector('[data-close]')?.click();
-                        break;
-                    case 'reject-collab-close':
-                        window.rejectCollaborationRequest(value);
-                        document.querySelector('[data-close]')?.click();
-                        break;
-                    case 'cancel-collab-close':
-                        window.cancelInvitation(value);
-                        document.querySelector('[data-close]')?.click();
-                        break;
-                    case 'mark-finished-from-list': {
-                        if (window.markAsFinished) window.markAsFinished(value, el);
-                        break;
-                    }
-                    case 'execute-book-transfer':
-                        window.executeBookTransfer(value, value2, value3);
-                        break;
-                    case 'execute-bulk-transfer':
-                        window.executeBulkTransfer(value, value2);
-                        break;
-                    case 'toggle-search-book':
-                        window.toggleSearchBookDropdown(value);
-                        break;
-
-                    // ---- Book actions ----
-                    case 'toggle-fav': window.toggleFavorite(value); break;
-                    case 'select-book': window.toggleSelection(value); break;
-                    case 'copy-isbn': window.copyISBN(value, el); break;
-                    case 'copy-book': window.copyToClipboard(value, 'Copied book info!', el); break;
-                    case 'copy-quote': window.copyQuote(value, value2, value3, el); break;
-                    case 'start-reading': window.quickUpdateStatus(value, 'reading', el); break;
-                    case 'mark-finished': window.quickUpdateStatus(value, 'finished', el); break;
-                    case 'quick-progress': window.quickUpdateProgress(value, el); break;
-                    case 'open-book': { const b = books.find(x => x.id === value); if (b) window.openBookDetails(b); break; }
-                    case 'edit-book': { const b = books.find(x => x.id === value); if (b) window.openManualEntry(null, b); break; }
-
-                    // ---- Highlight actions ----
-                    case 'delete-highlight': window.deleteHighlight(value, value2); break;
-                    case 'add-highlight': {
-                        const t = document.getElementById('new-highlight-input')?.value || '';
-                        const p = document.getElementById('new-highlight-page-input')?.value || '';
-                        window.addHighlight(value, t, p);
-                        break;
-                    }
-
-                    // ---- Collab ----
-                    case 'accept-collab': window.acceptCollaborationRequest(value); break;
-                    case 'reject-collab': window.rejectCollaborationRequest(value); break;
-                    case 'cancel-collab': window.cancelInvitation(value); break;
-                    case 'leave-partnership': window.leavePartnership(value); break;
-                    case 'open-user-profile': window.openUserProfile(value); break;
-                    case 'visit-library': window.visitCollaboratorLibrary(value); break;
-                    case 'open-visited-book': window.openVisitedBookDetails(value, JSON.parse(value2 || '[]')); break;
-
-                    // ---- Book requests ----
-                    case 'send-book-request': window.sendBookRequest(value, value2, value3, el); break;
-                    case 'accept-book-req': window.acceptBookRequest(value); break;
-                    case 'reject-book-req': window.rejectBookRequest(value); break;
-
-                    // ---- Reviews ----
-                    case 'delete-review': window.deleteReview(value); break;
-                    case 'toggle-like': window.toggleLike(value, el); break;
-                    case 'toggle-comments': window.toggleComments(value); break;
-                    case 'add-comment': window.addComment(value); break;
-
-                    // ---- Metadata ----
-                    case 'edit-metadata': window.editMetadata(value, value2); break;
-                    case 'delete-metadata': window.deleteMetadata(value, value2); break;
-
-                    // ---- Activity ----
-                    case 'jump-to-book': window.jumpToBook(value); break;
-                }
-            }, true);  // <-- capture phase: runs BEFORE card-level handlers
-            // ---------- Global click listener for book cards and AI copy buttons ----------
-            document.addEventListener('click', e => {
-                const recentSearchBtn = e.target.closest('.recent-search-chip');
-                if (recentSearchBtn) {
-                    const query = recentSearchBtn.getAttribute('data-recent-search');
-                    searchQuery = query;
-                    const input = document.getElementById('search-input');
-                    if (input) input.value = query;
-                    window.queueRenderLibraryOnly();
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                    return;
-                }
-
-                const copyBtn = e.target.closest('[data-copy-ai]');
-                if (copyBtn) {
-                    e.stopPropagation();
-                    const text = copyBtn.getAttribute('data-copy-ai');
-                    window.copyAIResults(text, copyBtn);
-                    return;
-                }
-
-                const card = e.target.closest('[data-book-id]');
-                if (!card) return;
-
-                const bookId = card.dataset.bookId;
-                const book = books.find(b => b.id === bookId);
-                if (!book) return;
-
-                // If edit button on card clicked
-                if (e.target.closest('button')) {
-                    e.stopPropagation();
-                    openManualEntry(null, book);
-                    return;
-                }
-                openBookDetails(book);
-            });
-
-            if (window.persistenceInitialized) {
-                window.startApp();
+            // ---- Highlight actions ----
+            case 'delete-highlight': window.deleteHighlight(value, value2); break;
+            case 'add-highlight': {
+                const t = document.getElementById('new-highlight-input')?.value || '';
+                const p = document.getElementById('new-highlight-page-input')?.value || '';
+                window.addHighlight(value, t, p);
+                break;
             }
 
-        })();
+            // ---- Collab ----
+            case 'accept-collab': window.acceptCollaborationRequest(value); break;
+            case 'reject-collab': window.rejectCollaborationRequest(value); break;
+            case 'cancel-collab': window.cancelInvitation(value); break;
+            case 'leave-partnership': window.leavePartnership(value); break;
+            case 'open-user-profile': window.openUserProfile(value); break;
+            case 'visit-library': window.visitCollaboratorLibrary(value); break;
+            case 'open-visited-book': window.openVisitedBookDetails(value, JSON.parse(value2 || '[]')); break;
+
+            // ---- Book requests ----
+            case 'send-book-request': window.sendBookRequest(value, value2, value3, el); break;
+            case 'accept-book-req': window.acceptBookRequest(value); break;
+            case 'reject-book-req': window.rejectBookRequest(value); break;
+
+            // ---- Reviews ----
+            case 'delete-review': window.deleteReview(value); break;
+            case 'toggle-like': window.toggleLike(value, el); break;
+            case 'toggle-comments': window.toggleComments(value); break;
+            case 'add-comment': window.addComment(value); break;
+
+            // ---- Metadata ----
+            case 'edit-metadata': window.editMetadata(value, value2); break;
+            case 'delete-metadata': window.deleteMetadata(value, value2); break;
+
+            // ---- Activity ----
+            case 'jump-to-book': window.jumpToBook(value); break;
+        }
+    }, true);  // <-- capture phase: runs BEFORE card-level handlers
+    // ---------- Global click listener for book cards and AI copy buttons ----------
+    document.addEventListener('click', e => {
+        const recentSearchBtn = e.target.closest('.recent-search-chip');
+        if (recentSearchBtn) {
+            const query = recentSearchBtn.getAttribute('data-recent-search');
+            searchQuery = query;
+            const input = document.getElementById('search-input');
+            if (input) input.value = query;
+            window.queueRenderLibraryOnly();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+
+        const copyBtn = e.target.closest('[data-copy-ai]');
+        if (copyBtn) {
+            e.stopPropagation();
+            const text = copyBtn.getAttribute('data-copy-ai');
+            window.copyAIResults(text, copyBtn);
+            return;
+        }
+
+        const card = e.target.closest('[data-book-id]');
+        if (!card) return;
+
+        const bookId = card.dataset.bookId;
+        const book = books.find(b => b.id === bookId);
+        if (!book) return;
+
+        // If edit button on card clicked
+        if (e.target.closest('button')) {
+            e.stopPropagation();
+            openManualEntry(null, book);
+            return;
+        }
+        openBookDetails(book);
+    });
+
+    if (window.persistenceInitialized) {
+        window.startApp();
+    }
+
+})();
