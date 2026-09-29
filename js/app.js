@@ -1,3 +1,5 @@
+let booksLimit = 50;
+
 // Initialize theme immediately to prevent flash
 const savedTheme = localStorage.getItem('mylib_theme');
 if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -664,8 +666,8 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-s
     <!-- ==================== AMBIENT FLOATING ORBS ==================== -->
     <div class="fixed inset-0 pointer-events-none overflow-hidden -z-10" aria-hidden="true">
         <div class="animate-float-orb absolute top-20 -left-20 w-72 h-72 rounded-full bg-primary/10 blur-3xl"></div>
-        <div class="animate-float-orb absolute top-1/3 -right-20 w-96 h-96 rounded-full bg-accent/10 blur-3xl" style="animation-delay: 3s;"></div>
-        <div class="animate-float-orb absolute bottom-1/4 left-1/3 w-80 h-80 rounded-full bg-primary/5 blur-3xl" style="animation-delay: 6s;"></div>
+        <div class="animate-float-orb absolute top-1/3 -right-20 w-96 h-96 rounded-full bg-accent/10 blur-3xl delay-3s"></div>
+        <div class="animate-float-orb absolute bottom-1/4 left-1/3 w-80 h-80 rounded-full bg-primary/5 blur-3xl delay-6s"></div>
     </div>
     
     <!-- ==================== STICKY NAVIGATION ==================== -->
@@ -704,7 +706,7 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-s
     <main class="flex-1 flex flex-col lg:flex-row relative animate-gradient bg-gradient-to-br from-secondary/60 via-background to-secondary/40">
         <div class="flex-1 flex flex-col justify-center px-6 lg:px-24 py-16 lg:py-24 z-10">
             <div class="max-w-xl">
-                <div style="BORDER: NONE;" class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold mb-8 motion-safe:animate-slide-up" style="animation-delay: 0ms">
+                <div class="delay-0 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold mb-8 motion-safe:animate-slide-up">
                     <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
                     New: AI-Powered Library Analysis
                 </div>
@@ -713,11 +715,11 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-s
                     Your personal sanctuary for <span class="text-shimmer">every story.</span>
                 </h1>
 
-                <p class="text-lg text-muted-foreground mb-10 leading-relaxed motion-safe:animate-slide-up" style="animation-delay: 100ms">
+                <p class="text-lg text-muted-foreground mb-10 leading-relaxed motion-safe:animate-slide-up delay-100">
                     Stop losing track of your books. Catalog your collection, track your reading journey, and connect with fellow readers—all in one beautifully organized space.
                 </p>
 
-                <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center motion-safe:animate-slide-up" style="animation-delay: 200ms">
+                <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center motion-safe:animate-slide-up delay-200">
                     <button id="google-signin" class="btn-shimmer w-full sm:w-auto bg-primary text-primary-foreground px-8 py-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:opacity-95 transition-all duration-300 hover:scale-105 active:scale-95 shadow-terra hover:shadow-terra-lg focus-visible:ring-2 focus-visible:ring-ring outline-none">
                         <svg class="w-5 h-5" viewBox="0 0 24 24">
                             <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -733,7 +735,7 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-s
                 </div>
 
                 <!-- Social Proof -->
-                <div class="mt-8 flex items-center gap-3 text-xs text-muted-foreground motion-safe:animate-slide-up" style="animation-delay: 300ms">
+                <div class="mt-8 flex items-center gap-3 text-xs text-muted-foreground motion-safe:animate-slide-up delay-300">
                     <div class="flex -space-x-2 flex-shrink-0">
                         <div class="hover-rotate w-6 h-6 rounded-full bg-primary/20 border border-background flex items-center justify-center text-[8px] font-bold text-primary cursor-pointer">A</div>
                         <div class="hover-rotate w-6 h-6 rounded-full bg-accent/20 border border-background flex items-center justify-center text-[8px] font-bold text-accent cursor-pointer">M</div>
@@ -742,7 +744,7 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-s
                     <span class="font-medium">Trusted by <strong>5,000+</strong> readers worldwide</span>
                 </div>
 
-                <div class="mt-12 pt-8 border-t border-slate-200 dark:border-slate-700 motion-safe:animate-slide-up" style="animation-delay: 400ms">
+                <div class="mt-12 pt-8 border-t border-slate-200 dark:border-slate-700 motion-safe:animate-slide-up delay-400">
                     <p class="text-sm text-muted-foreground italic">
                         Crafted with care by <a href="https://github.com/towfikahmed0" class="text-primary font-bold hover:underline focus-visible:ring-2 focus-visible:ring-ring outline-none rounded">Towfik Ahmed</a>
                     </p>
@@ -755,7 +757,7 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-s
             <div class="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent z-10"></div>
             <div class="relative z-20 w-full max-w-xl">
                 <div class="animate-pulse-glow absolute -inset-4 bg-gradient-to-r from-primary/40 to-accent/40 blur-4xl rounded-[2rem]"></div>
-                <div style="BACKGROUND: NONE;BORDER: NONE;" class="relative rounded-2xl overflow-hidden shadow-terra-lg dark:border-slate-700">
+                <div class="relative rounded-2xl overflow-hidden shadow-terra-lg dark:border-slate-700">
                     <img src="/img/hero.png" class="w-full h-auto object-cover rounded-2xl" alt="MyLib Interface Preview">
                     <div class="absolute inset-0 bg-accent/10 pointer-events-none mix-blend-overlay"></div>
                 </div>
@@ -764,7 +766,7 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-s
     </main>
 
     <!-- ==================== FEATURES SECTION (BENTO GRID) ==================== -->
-    <section style="background-color: #dddddd2e;" id="features" class="bg-background py-24 px-6 lg:px-24 border-t border-slate-200 dark:border-slate-700 scroll-mt-20">
+    <section id="features" class="section-muted bg-background py-24 px-6 lg:px-24 border-t border-slate-200 dark:border-slate-700 scroll-mt-20">
         <div class="max-w-6xl mx-auto">
             <div class="text-center mb-16 scroll-reveal">
                 <h2 class="text-4xl lg:text-5xl font-serif font-black text-foreground mb-4">A Better Way to Live With Your Books</h2>
@@ -931,7 +933,7 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-s
     </section>
 
     <!-- ==================== COMMUNITY SECTION ==================== -->
-    <section id="community" style="background-color: #dddddd2e;" class="bg-muted/30 dark:bg-muted/10 py-24 px-6 lg:px-24 border-t border-slate-200 dark:border-slate-700 scroll-mt-20">
+    <section id="community" class="section-muted bg-muted/30 dark:bg-muted/10 py-24 px-6 lg:px-24 border-t border-slate-200 dark:border-slate-700 scroll-mt-20">
         <div class="max-w-6xl mx-auto text-center">
             <div class="scroll-reveal">
                 <p class="text-accent text-xs font-bold uppercase tracking-[0.2em] mb-4">THE READING COMMUNITY</p>
@@ -989,7 +991,7 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-s
     </section>
 
     <!-- ==================== FINAL CTA SECTION ==================== -->
-    <section style="background-color: #dddddd2e;" class="bg-primary/5 dark:bg-primary/10 py-24 px-6 lg:px-24 border-t border-slate-200 dark:border-slate-700">
+    <section class="section-muted bg-primary/5 dark:bg-primary/10 py-24 px-6 lg:px-24 border-t border-slate-200 dark:border-slate-700">
         <div class="scroll-reveal max-w-3xl mx-auto text-center">
             <h2 class="text-4xl lg:text-5xl font-serif font-black text-foreground mb-6">Ready to build your sanctuary?</h2>
             <p class="text-lg text-muted-foreground mb-10 max-w-xl mx-auto">Join thousands of readers who have transformed their reading lives with MyLib.</p>
@@ -1442,8 +1444,8 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-s
 
                     <!-- ============ SECTION: DANGER ZONE ============ -->
                     <section class="pt-6 border-t border-slate-100 dark:border-slate-800">
-                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4" style="display: flex;flex-direction: column;align-content: center;align-items: center;">
-                            <button id="logout-btn" style="width: 100%;" class="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-6 py-4 bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 rounded-2xl font-bold hover:bg-rose-100 dark:hover:bg-rose-900/20 transition focus-visible:ring-2 focus-visible:ring-rose-500 outline-none">
+                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                            <button id="logout-btn" class="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-6 py-4 bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 rounded-2xl font-bold hover:bg-rose-100 dark:hover:bg-rose-900/20 transition focus-visible:ring-2 focus-visible:ring-rose-500 outline-none">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
                                 Sign Out
                             </button>
@@ -1923,14 +1925,29 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-s
             mainContentEl.querySelectorAll('[data-bar-width]').forEach(el => {
                 window.setDynamicStyle(el, { width: parseFloat(el.dataset.barWidth) || 0 });
             });
+            // NEW: Handle dynamic styles for My Books stats
+            mainContentEl.querySelectorAll('[data-dyn-width]').forEach(el => {
+                window.setDynamicStyle(el, { width: parseFloat(el.dataset.dynWidth) || 0 });
+            });
+            mainContentEl.querySelectorAll('[data-dyn-color]').forEach(el => {
+                window.setDynamicStyle(el, { color: el.dataset.dynColor });
+            });
         } else if (activeTab === 'insight') {
             mainContentEl.innerHTML = renderLibraryInsight();
             loadLastAIAnalysis();
             document.getElementById('run-ai-analysis-btn')?.addEventListener('click', runAILibraryAnalysis);
             document.getElementById('run-ai-roadmap-btn')?.addEventListener('click', generateReadingRoadmap);
+            // NEW: Handle dynamic styles for Insights
+            mainContentEl.querySelectorAll('[data-dyn-width]').forEach(el => {
+                window.setDynamicStyle(el, { width: parseFloat(el.dataset.dynWidth) || 0 });
+            });
             attachActivityListeners();
         } else if (activeTab === 'activity') {
             mainContentEl.innerHTML = renderActivity();
+            // NEW: Handle dynamic styles for Activity
+            mainContentEl.querySelectorAll('[data-stagger]').forEach(el => {
+                window.setDynamicStyle(el, { delay: (parseInt(el.dataset.stagger) || 0) * 50 });
+            });
         } else {
             if (!document.getElementById('search-input')) {
                 mainContentEl.innerHTML = `
@@ -2123,7 +2140,7 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-s
                 userName: currentUser.displayName || currentUser.email || 'A collaborator',
                 userId: currentUser.uid,
                 recipientId: targetUserId,
-                libraryId: targetUserId,
+                libraryId: currentUser.uid,
                 message: `${currentUser.displayName || currentUser.email || 'A collaborator'} transferred the book "${book.title}" to you.`,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
@@ -2217,6 +2234,7 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-s
                     }
                 });
                 window.lastDeleted = deletedItems;
+                setTimeout(() => { window.lastDeleted = []; }, 5 * 60 * 1000); // Clear after 5 mins
 
                 // Firestore batches are limited to 500 operations. Each delete is 2 operations here.
                 // 200 * 2 = 400 operations, which is within the 500 limit.
@@ -2387,7 +2405,7 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-s
 
             // Fetch books belonging to collaborators
             let visitedBooks = [];
-            const booksSnapshot = await db.collection('books').where('userId', '==', profileUserId).get();
+            const booksSnapshot = await db.collection('books').where('userId', '==', profileUserId).limit(500).get();
             booksSnapshot.docs.forEach(doc => {
                 visitedBooks.push({ id: doc.id, ...doc.data() });
             });
@@ -3106,15 +3124,35 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-s
                             </div>
                         </div>
                         `;
+            } else if (books.length >= booksLimit) {
+                // Add Load More button if we hit the limit
+                html += `
+                    <div class="flex justify-center mt-8 pt-8 border-t border-slate-200 dark:border-slate-800">
+                        <button id="load-more-books-btn" class="px-8 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-md hover:scale-105 active:scale-95 transition-all">
+                            Load More Books
+                        </button>
+                    </div>
+                `;
             }
 
             libraryWrapper.innerHTML = `<div>${html}</div>`;
-            // Apply CSP-safe dynamic styles from data-* attributes
-            libraryWrapper.querySelectorAll('[data-stagger]').forEach(el => {
-                window.setDynamicStyle(el, { delay: (parseInt(el.dataset.stagger) || 0) * 50 });
+
+            // Add listener for Load More
+            document.getElementById('load-more-books-btn')?.addEventListener('click', () => {
+                booksLimit = Math.min(booksLimit + 50, 500);
+                subscribeToBooks();
+                window.queueRenderMainApp();
             });
+
             libraryWrapper.querySelectorAll('[data-bar-width]').forEach(el => {
                 window.setDynamicStyle(el, { width: parseFloat(el.dataset.barWidth) || 0 });
+            });
+            // NEW: Handle the fixes for inline styles
+            libraryWrapper.querySelectorAll('[data-dyn-width]').forEach(el => {
+                window.setDynamicStyle(el, { width: parseFloat(el.dataset.dynWidth) || 0 });
+            });
+            libraryWrapper.querySelectorAll('[data-dyn-color]').forEach(el => {
+                window.setDynamicStyle(el, { color: el.dataset.dynColor });
             });
 
             // Fetch owner names for partner libraries
@@ -3365,7 +3403,7 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-s
         showToast(`Updating ${type}...`, 'info');
 
         if (type === 'Genre') {
-            const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).get();
+             const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).limit(500).get();
             const batch = db.batch();
             let count = 0;
             snapshot.docs.forEach(doc => {
@@ -3383,7 +3421,7 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-s
             showToast(`Updated ${count} books`, 'success');
         } else {
             const field = type.toLowerCase();
-            const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).where(field, '==', oldVal).get();
+            const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).where(field, '==', oldVal).limit(500).get();
             const batch = db.batch();
             snapshot.docs.forEach(doc => {
                 batch.update(doc.ref, { [field]: newVal });
@@ -3400,7 +3438,7 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-s
 
         showToast(`Updating books...`, 'info');
         if (type === 'Genre') {
-            const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).get();
+            const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).limit(500).get();
             const batch = db.batch();
             let count = 0;
             snapshot.docs.forEach(doc => {
@@ -3417,7 +3455,7 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-s
             showToast(`Updated ${count} books`, 'success');
         } else {
             const field = type.toLowerCase();
-            const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).where(field, '==', val).get();
+            const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).where(field, '==', val).limit(500).get();
             const batch = db.batch();
             snapshot.docs.forEach(doc => {
                 batch.update(doc.ref, { [field]: fallback });
@@ -3474,6 +3512,8 @@ if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-s
 
         try {
             await db.collection('books').doc(bookId).collection('readingStatus').doc(currentUser.uid).set({
+                userId: currentUser.uid,
+                status: statusData.status || 'want_to_read',
                 isFavorite: newVal,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
@@ -4661,7 +4701,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
         let collabReqs1 = [];
         let collabReqs2 = [];
 
-        // Query collaboration requests where current user is fromUserId
+        // Query collaboration requests where current user is fromUserId db.collection('books').where('userId', '==', uid).limit(500).onSnapshot(
         unsubscribeCollabReq1 = db.collection('collaborationRequests')
             .where('fromUserId', '==', currentUser.uid)
             .onSnapshot(snapshot => {
@@ -4744,6 +4784,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
 
                 const unsub = db.collection('books')
                     .where('userId', '==', uid)
+                    .limit(booksLimit)
                     .onSnapshot(snapshot => {
                         snapshot.docChanges().forEach(change => {
                             if (change.type === 'removed') {
@@ -4779,6 +4820,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     .orderBy('timestamp', 'desc')
                     .limit(30)
                     .onSnapshot(snapshot => {
+
                         snapshot.docChanges().forEach(change => {
                             if (change.type === 'removed') {
                                 map.delete(change.doc.id);
@@ -6120,7 +6162,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
             return `
                                 <div class="flex items-center justify-between text-sm py-1 border-b border-slate-50 dark:border-slate-800/50 ${filterType ? 'cursor-pointer group' : ''}" ${clickHandler}>
                                     <div class="flex items-center gap-2 truncate">
-                                        <div class="w-2 h-2 rounded-full" style="background-color: ${palette[i % palette.length]}"></div>
+                                        <div class="w-2 h-2 rounded-full" data-dyn-color="${palette[i % palette.length]}"></div>
                                         <span class="font-medium truncate ${filterType ? 'group-hover:text-primary transition-colors' : ''}">${label}</span>
                                     </div>
                                     <span class="font-bold text-primary">${displayCount}</span>
@@ -6219,12 +6261,12 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
             return `
                                         <button data-action="apply-insight" data-value="genre" data-value2="${escapeHTML(label)}" class="flex items-center justify-between gap-3 text-sm py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg px-2 -mx-2 transition-colors focus-visible:ring-2 focus-visible:ring-primary outline-none group">
                                             <div class="flex items-center gap-2 min-w-0">
-                                                <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: ${color}"></span>
+                                                <span class="w-2 h-2 rounded-full flex-shrink-0" data-dyn-color="${color}"></span>
                                                 <span class="font-medium truncate group-hover:text-primary transition-colors">${escapeHTML(label)}</span>
                                             </div>
                                             <div class="flex items-center gap-3 flex-shrink-0">
                                                 <div class="w-16 h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden hidden sm:block">
-                                                    <div class="h-full rounded-full transition-all" style="width: ${pct}%; background-color: ${color}"></div>
+                                                    <div class="h-full rounded-full transition-all" data-dyn-width="${pct}" data-dyn-color="${color}"></div>
                                                 </div>
                                                 <span class="font-bold text-primary tabular-nums w-8 text-right">${count}</span>
                                             </div>
@@ -6261,30 +6303,31 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
         const containerId = `collab-stats-${Math.random().toString(36).substr(2, 9)}`;
         const partnerIds = partnerships.map(p => p.userId1 === currentUser.uid ? p.userId2 : p.userId1);
 
-        Promise.all(partnerIds.map(id => db.collection('users').doc(id).get())).then(docs => {
-            const el = document.getElementById(containerId);
-            if (!el) return;
-            el.classList.remove('animate-pulse');
+        Promise.all(partnerIds.map(id => db.collection('users').doc(id).get()))
+            .then(docs => {
+                const el = document.getElementById(containerId);
+                if (!el) return;
+                el.classList.remove('animate-pulse');
 
-            const stats = docs.map((doc, idx) => {
-                if (!doc.exists) return null;
-                const data = doc.data();
-                return {
-                    uid: partnerIds[idx],
-                    name: data.displayName || 'Partner',
-                    count: data.completedBooksCount || 0
-                };
-            }).filter(Boolean).sort((a, b) => b.count - a.count);
+                const stats = docs.map((doc, idx) => {
+                    if (!doc.exists) return null;
+                    const data = doc.data();
+                    return {
+                        uid: partnerIds[idx],
+                        name: data.displayName || 'Partner',
+                        count: data.completedBooksCount || 0
+                    };
+                }).filter(Boolean).sort((a, b) => b.count - a.count);
 
-            el.innerHTML = `
+                el.innerHTML = `
                         <div class="glass p-6 rounded-3xl border border-slate-200/50 dark:border-slate-800">
                             <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Collaborator Activity</h3>
                             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                 ${stats.map((s, idx) => {
-                const initials = s.name.trim().substring(0, 2).toUpperCase();
-                const isZero = s.count === 0;
-                const isLeader = idx === 0 && s.count > 0;
-                return `
+                    const initials = s.name.trim().substring(0, 2).toUpperCase();
+                    const isZero = s.count === 0;
+                    const isLeader = idx === 0 && s.count > 0;
+                    return `
                                     <div role="button" tabindex="0" data-action="open-user-profile" data-value="${escapeHTML(s.uid)}" class="flex items-center gap-3 p-3 rounded-2xl border cursor-pointer ${isLeader ? 'border-amber-200 dark:border-amber-900/40 bg-amber-50/40 dark:bg-amber-950/10' : 'border-slate-100 dark:border-slate-800'} hover:bg-slate-50 dark:hover:bg-slate-800/50 text-left focus-visible:ring-2 focus-visible:ring-primary outline-none">
                                         <div class="relative flex-shrink-0">
                                             <div class="w-10 h-10 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center font-black text-xs">${escapeHTML(initials)}</div>
@@ -6303,11 +6346,17 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                         </div>
                                     </div>
                                     `;
-            }).join('')}
+                }).join('')}
                             </div>
                         </div>
                     `;
-        });
+            }).catch(err => {
+                console.error("Failed to fetch partner stats:", err);
+                const el = document.getElementById(containerId);
+                if (el) {
+                    el.innerHTML = '<p class="text-xs text-rose-500 italic">Failed to load collaborator activity.</p>';
+                }
+            });
 
         return `
                 <div id="${containerId}" class="glass p-6 rounded-3xl border border-slate-200/50 dark:border-slate-800">
@@ -6466,7 +6515,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                                     <div class="text-xs font-bold text-amber-600 mb-1">${goalPercent}%</div>
                                 </div>
                                 <div class="mt-3 h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden relative z-10">
-                                    <div class="h-full bg-amber-500 transition-all duration-1000" style="width: ${goalPercent}%"></div>
+                                    <div class="h-full bg-amber-500 transition-all duration-1000" data-dyn-width="${goalPercent}"></div>
                                 </div>
                             </div>
                             <div class="glass p-3 sm:p-6 rounded-3xl border border-slate-200/50 dark:border-slate-700 relative overflow-hidden group shadow-sm">
@@ -7230,7 +7279,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
             }
 
             return `
-                            <div class="glass p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 staggered-fade-in" style="animation-delay: ${i * 50}ms">
+                            <div class="glass p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 staggered-fade-in" data-stagger="${i}">
                                 <div class="w-10 h-10 rounded-xl ${color} flex items-center justify-center flex-shrink-0">
                                     ${icon}
                                 </div>
@@ -7538,7 +7587,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
 
             if (isCollaborator) {
                 try {
-                    const booksSnapshot = await db.collection('books').where('userId', '==', foundUserId).get();
+                    const booksSnapshot = await db.collection('books').where('userId', '==', foundUserId).limit(500).get();
 
                     booksSnapshot.docs.forEach(doc => {
                         const data = doc.data();
@@ -7806,8 +7855,11 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
             element.classList.add('animate-pulse');
         }
         try {
+            const _qs = getStatusData(bookId);
             await db.collection('books').doc(bookId)
                 .collection('readingStatus').doc(currentUser.uid).set({
+                    userId: currentUser.uid,
+                    status: _qs.status || 'reading',
                     progress: firebase.firestore.FieldValue.increment(5),
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
@@ -7849,14 +7901,14 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
 
             const book = books.find(b => b.id === bookId);
             await db.collection('activityFeed').add({
-                type: 'book_transfer',
-                bookId,
-                bookTitle: book.title || 'Unknown Book',
-                userName: currentUser.displayName || currentUser.email || 'A collaborator',
+                type: 'status_updated',
+                bookId: bookId,
+                bookTitle: book?.title || 'Unknown Book',
+                userName: currentUser.displayName || currentUser.email || currentUser.uid,
                 userId: currentUser.uid,
-                recipientId: targetUserId,
-                libraryId: currentUser.uid,      // ✅ write to YOUR feed (always allowed)
-                message: `${currentUser.displayName || currentUser.email || 'A collaborator'} transferred the book "${book.title}" to you.`,
+                status: newStatus,
+                addedTo: book?.userId === currentUser.uid ? 'My' : 'Partner',
+                libraryId: book?.userId || currentUser.uid,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
 
@@ -7953,7 +8005,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
 
         showToast('Starting wishlist migration...', 'info');
         try {
-            const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).where('isWishlist', '==', true).get();
+            const snapshot = await db.collection('books').where('userId', '==', currentUser.uid).where('isWishlist', '==', true).limit(500).get();
             if (snapshot.empty) {
                 showToast('No wishlist items found to migrate.', 'info');
                 return;
@@ -7982,7 +8034,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
         try {
             let migratedCount = 0;
             // 1. Migrate books with libraryId: 'default'
-            const defaultSnapshot = await db.collection('books').where('libraryId', '==', 'default').get();
+            const defaultSnapshot = await db.collection('books').where('libraryId', '==', 'default').limit(500).get();
             const batch1 = db.batch();
             defaultSnapshot.docs.forEach(doc => {
                 batch1.update(doc.ref, { userId: currentUser.uid, libraryId: firebase.firestore.FieldValue.delete() });
@@ -8038,6 +8090,7 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
             Papa.parse(file, {
                 header: true,
                 skipEmptyLines: true,
+                worker: true,
                 complete: async (results) => {
                     let importedCount = 0;
                     let updatedCount = 0;
@@ -8260,107 +8313,174 @@ ${book.owner ? `<button data-action="filter-owner" data-value="${book._escapedOw
                     throw new Error("Invalid format: Top-level JSON must be an array of book objects.");
                 }
 
-                // We can process books in chunks/batches
-                for (let i = 0; i < data.length; i++) {
-                    const item = data[i];
-                    const title = (item.title || "Untitled").trim();
-                    const author = (item.author || (item.authors && item.authors[0]) || "Unknown").trim();
-                    const genres = item.genres || item.categories || ["Other"];
-                    const tags = item.tags || [];
-                    const isbn = item.isbn || "";
-                    const coverUrl = item.coverUrl || item.thumbnail || null;
-                    const description = item.description || "";
-                    const price = item.price || (item.prices && item.prices[0]) || null;
-                    const purchaseDate = item.purchaseDate || item.purchasedDate || new Date().toISOString();
-                    const highlights = item.highlights || [];
+                // 2 writes per book (book doc + readingStatus doc) => 200 books = 400 writes,
+                // safely under Firestore's 500-operation batch limit.
+                const CHUNK_SIZE = 200;
 
-                    const bookData = {
-                        title,
-                        author,
-                        genres,
-                        categories: genres,
-                        isbn,
-                        coverUrl,
-                        description,
-                        price,
-                        purchaseDate,
-                        highlights,
-                        source: 'imported_json',
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        userId: currentUser.uid
-                    };
+                // Tracks books created during THIS import so duplicates inside the same
+                // file get merged into one document instead of creating two.
+                const bookIdByKey = new Map();        // "title||author" -> bookId
+                const highlightsByBookId = new Map(); // bookId -> merged highlights so far
 
-                    // Check duplicate
-                    const duplicate = findDuplicateBook(bookData, currentUser.uid);
-                    let bookId;
+                // Reviews need a query to dedupe, so they're queued and handled after commit.
+                const pendingReviews = [];
 
-                    if (duplicate) {
-                        bookId = duplicate.id;
+                // Process in chunks to stay under Firestore's 500-write batch limit
+                for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+                    const chunk = data.slice(i, i + CHUNK_SIZE);
+                    const batch = db.batch();
+
+                    for (const item of chunk) {
+                        const title = (item.title || "Untitled").trim();
+                        const author = (item.author || (item.authors && item.authors[0]) || "Unknown").trim();
+                        const genres = item.genres || item.categories || ["Other"];
+                        const tags = item.tags || [];
+                        const isbn = item.isbn || "";
+                        const coverUrl = item.coverUrl || item.thumbnail || null;
+                        const description = item.description || "";
+                        const price = item.price || (item.prices && item.prices[0]) || null;
+                        const purchaseDate = item.purchaseDate || item.purchasedDate || new Date().toISOString();
+                        const highlights = item.highlights || [];
+
+                        const bookData = {
+                            title,
+                            author,
+                            genres,
+                            categories: genres,
+                            isbn,
+                            coverUrl,
+                            description,
+                            price,
+                            purchaseDate,
+                            highlights,
+                            source: 'imported_json',
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            userId: currentUser.uid
+                        };
+
+                        // Check duplicate (existing library, or already created in this import run)
+                        const dupKey = `${title.toLowerCase()}||${author.toLowerCase()}`;
+                        const duplicate = findDuplicateBook(bookData, currentUser.uid);
+
+                        let docRef;
+                        let bookId;
+                        let existingHighlights;
+
+                        if (duplicate) {
+                            // Existing book in the library -> merge into it
+                            bookId = duplicate.id;
+                            docRef = db.collection('books').doc(bookId);
+                            existingHighlights = highlightsByBookId.has(bookId)
+                                ? highlightsByBookId.get(bookId)
+                                : (duplicate.highlights || []);
+                        } else if (bookIdByKey.has(dupKey)) {
+                            // Same book appeared earlier in this same import file
+                            bookId = bookIdByKey.get(dupKey);
+                            docRef = db.collection('books').doc(bookId);
+                            existingHighlights = highlightsByBookId.get(bookId) || [];
+                        } else {
+                            // Brand new book -> auto-generate ID
+                            docRef = db.collection('books').doc();
+                            bookId = docRef.id;
+                            bookIdByKey.set(dupKey, bookId);
+                            bookData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                            existingHighlights = [];
+                        }
+
                         // Merge highlights
-                        const existingHighlights = duplicate.highlights || [];
                         const mergedHighlights = [...existingHighlights];
                         highlights.forEach(ih => {
                             if (!mergedHighlights.some(eh => eh.text === ih.text)) {
                                 mergedHighlights.push(ih);
                             }
                         });
+                        highlightsByBookId.set(bookId, mergedHighlights);
 
-                        await db.collection('books').doc(bookId).update({
-                            ...bookData,
-                            highlights: mergedHighlights
-                        });
-                    } else {
-                        bookData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-                        const docRef = await db.collection('books').add(bookData);
-                        bookId = docRef.id;
-                    }
+                        // Queue the book write (merge:true covers both create and update)
+                        batch.set(docRef, { ...bookData, highlights: mergedHighlights }, { merge: true });
 
-                    // Write reading status
-                    const status = item.status || "want_to_read";
-                    const rating = item.rating || (item.ratings && item.ratings[0]) || 0;
-                    const progress = item.progress || 0;
-                    const comment = item.comment || (item.reviews && item.reviews[0] && item.reviews[0].body) || "";
+                        // Queue the reading status write
+                        const status = item.status || "want_to_read";
+                        const rating = item.rating || (item.ratings && item.ratings[0]) || 0;
+                        const progress = item.progress || 0;
+                        const comment = item.comment || (item.reviews && item.reviews[0] && item.reviews[0].body) || "";
 
-                    await db.collection('books').doc(bookId).collection('readingStatus').doc(currentUser.uid).set({
-                        status,
-                        rating,
-                        progress,
-                        comment,
-                        isWishlist: item.isWishlist || false,
-                        userId: currentUser.uid,
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    }, { merge: true });
+                        const statusRef = docRef.collection('readingStatus').doc(currentUser.uid);
+                        batch.set(statusRef, {
+                            status,
+                            rating,
+                            progress,
+                            comment,
+                            isWishlist: item.isWishlist || false,
+                            userId: currentUser.uid,
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }, { merge: true });
 
-                    // Import community reviews if any
-                    if (item.reviews && Array.isArray(item.reviews)) {
-                        for (const rev of item.reviews) {
-                            const bodyText = typeof rev === 'string' ? rev : rev.body;
-                            const revRating = typeof rev === 'string' ? rating : (rev.rating || rating);
-                            if (bodyText) {
-                                const dupReview = await db.collection('reviews')
-                                    .where('userId', '==', currentUser.uid)
-                                    .where('bookTitle', '==', title)
-                                    .where('body', '==', bodyText)
-                                    .limit(1)
-                                    .get();
-                                if (dupReview.empty) {
-                                    await db.collection('reviews').add({
-                                        userId: currentUser.uid,
-                                        userName: userProfile.displayName || currentUser.email,
-                                        bookTitle: title,
-                                        author: author,
+                        // Queue community reviews (dedupe needs a query, so done after commit)
+                        if (item.reviews && Array.isArray(item.reviews)) {
+                            for (const rev of item.reviews) {
+                                const bodyText = typeof rev === 'string' ? rev : rev.body;
+                                const revRating = typeof rev === 'string' ? rating : (rev.rating || rating);
+                                if (bodyText) {
+                                    pendingReviews.push({
+                                        title,
+                                        author,
                                         category: genres[0] || "Other",
                                         body: bodyText,
-                                        rating: revRating,
-                                        likesCount: 0,
-                                        commentsCount: 0,
-                                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                        rating: revRating
                                     });
                                 }
                             }
                         }
                     }
+
+                    await batch.commit(); // Commit the chunk
+                }
+
+                // ---- Second pass: community reviews ----
+                // Dedupe requires a query, so collect the writes and batch them.
+                const seenReviews = new Set();
+                const reviewsToAdd = [];
+
+                for (const rev of pendingReviews) {
+                    const key = `${rev.title}||${rev.body}`;
+                    if (seenReviews.has(key)) continue;
+                    seenReviews.add(key);
+
+                    const dupReview = await db.collection('reviews')
+                        .where('userId', '==', currentUser.uid)
+                        .where('bookTitle', '==', rev.title)
+                        .where('body', '==', rev.body)
+                        .limit(1)
+                        .get();
+
+                    if (dupReview.empty) {
+                        reviewsToAdd.push(rev);
+                    }
+                }
+
+                for (let i = 0; i < reviewsToAdd.length; i += 400) {
+                    const chunk = reviewsToAdd.slice(i, i + 400);
+                    const batch = db.batch();
+
+                    for (const rev of chunk) {
+                        const reviewRef = db.collection('reviews').doc();
+                        batch.set(reviewRef, {
+                            userId: currentUser.uid,
+                            userName: userProfile.displayName || currentUser.email,
+                            bookTitle: rev.title,
+                            author: rev.author,
+                            category: rev.category,
+                            body: rev.body,
+                            rating: rev.rating,
+                            likesCount: 0,
+                            commentsCount: 0,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
+
+                    await batch.commit();
                 }
 
                 closeOverlay();
@@ -8818,12 +8938,16 @@ If the collection is small or has no finished books, be extra encouraging and su
                 div.innerHTML = `
                             ${icon}
                             <div class="p-4 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl rounded-tl-none shadow-sm w-full max-w-md space-y-3">
-                                <div class="skeleton-line h-3 rounded-full" style="width: 85%"></div>
-                                <div class="skeleton-line h-3 rounded-full" style="width: 100%"></div>
-                                <div class="skeleton-line h-3 rounded-full" style="width: 92%"></div>
-                                <div class="skeleton-line h-3 rounded-full" style="width: 60%"></div>
+    <div class="skeleton-line h-3 rounded-full" data-dyn-width="85"></div>
+    <div class="skeleton-line h-3 rounded-full" data-dyn-width="100"></div>
+    <div class="skeleton-line h-3 rounded-full" data-dyn-width="92"></div>
+    <div class="skeleton-line h-3 rounded-full" data-dyn-width="60"></div>
                             </div>
                         `;
+                // ⚡ Apply CSP-safe dynamic widths to the skeleton bars
+                div.querySelectorAll('[data-dyn-width]').forEach(el => {
+                    window.setDynamicStyle(el, { width: parseFloat(el.dataset.dynWidth) || 0 });
+                });
                 chatMessages.appendChild(div);
                 setTimeout(() => chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' }), 50);
                 return;
@@ -9752,6 +9876,8 @@ If the collection is small or has no finished books, be extra encouraging and su
             try {
                 await db.collection('books').doc(book.id)
                     .collection('readingStatus').doc(currentUser.uid).set({
+                        userId: currentUser.uid,
+                        status: 'reading',
                         progress: progress,
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                     }, { merge: true });
@@ -9849,10 +9975,8 @@ If the collection is small or has no finished books, be extra encouraging and su
                 btn.innerText = 'Deleting...';
                 try {
                     // Populate safety net
-                    window.lastDeleted = [{
-                        book: { ...book },
-                        status: { ...statusData }
-                    }];
+                    window.lastDeleted = [{ book: { ...book }, status: { ...statusData } }];
+                    setTimeout(() => { window.lastDeleted = []; }, 5 * 60 * 1000);
 
                     const batch = db.batch();
                     batch.delete(db.collection('books').doc(book.id));
@@ -9922,7 +10046,7 @@ If the collection is small or has no finished books, be extra encouraging and su
 
                             <div>
                                 <label for="rev-category" class="text-[10px] font-bold text-slate-400 uppercase ml-1 block mb-1.5">Category *</label>
-                                <select id="rev-category" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all appearance-none" style="background-image: url('data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%2394a3b8\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right 1rem center; background-size: 1.5em;">
+                               <select id="rev-category" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all appearance-none">
                                     <option value="Review">Review</option>
                                     <option value="Help">Help</option>
                                     <option value="Others">Others</option>
@@ -10143,7 +10267,9 @@ If the collection is small or has no finished books, be extra encouraging and su
             case 'set-my-books-sub-tab': window.setMyBooksSubTab(value); break;
             case 'open-add-finished-book-modal': window.openAddFinishedBookModal(); break;
             case 'post-activity-message': window.postActivityMessage(); break;
-            case 'close-user-search-modal': window.closeUserSearchModal(); break;
+                        case 'close-user-search-modal':
+                if (typeof window.closeUserSearchModal === 'function') window.closeUserSearchModal();
+                break;
             case 'set-feed-category': window.setFeedCategory(value); break;
             case 'search-user-by-email': window.searchUserByEmail(); break;
             case 'open-post-review-modal': window.openPostReviewModal(); break;

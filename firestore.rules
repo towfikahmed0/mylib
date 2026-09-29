@@ -163,7 +163,7 @@ service cloud.firestore {
     // Profile field validation — shared between create and update
     function validProfilePayload(d) {
       return d.displayName is string
-        && d.displayName.size() > 0 
+        && d.displayName.size() > 0
         && d.displayName.size() <= 100
         && (!('bio' in d) || d.bio == null
             || (d.bio is string && d.bio.size() <= 500))
@@ -371,6 +371,7 @@ service cloud.firestore {
       allow read: if isSignedIn() && request.auth.uid == resource.data.userId;
       allow read: if isSignedIn()
         && activePartnership(request.auth.uid, resource.data.userId);
+      allow list: if isSignedIn() && request.query.limit <= 500;
 
       allow create: if isSignedIn()
         && validBookData(request.resource.data)
@@ -499,6 +500,12 @@ service cloud.firestore {
         && request.resource.data.get('likesCount', 0) == 0
         && request.resource.data.get('commentsCount', 0) == 0;
 
+      // NOTE: commentsCount can be forged by any signed-in user.
+      // Firestore rules cannot reference randomly-generated document IDs,
+      // so we cannot require that a comment was actually created in the
+      // same write. Impact is cosmetic only — the displayed count can be
+      // inflated, but no data is exposed and no privilege is gained.
+      // The correct fix requires a Cloud Function; deferred as out of scope.
       allow update: if isSignedIn() && (
         (resource.data.userId == request.auth.uid
          && request.resource.data.diff(resource.data).affectedKeys()
@@ -519,16 +526,6 @@ service cloud.firestore {
         ||
         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentsCount'])
          && request.resource.data.get('commentsCount', 0) == resource.data.get('commentsCount', 0) + 1)
-         
-  // NOTE: commentsCount can be forged by any signed-in user.
-  // Firestore rules cannot reference randomly-generated document IDs,
-  // so we cannot require that a comment was actually created in the
-  // same write. Impact is cosmetic only — the displayed count can be
-  // inflated, but no data is exposed and no privilege is gained.
-  // The correct fix requires a Cloud Function; deferred as out of scope.
-  (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentsCount'])
-   && request.resource.data.get('commentsCount', 0) == resource.data.get('commentsCount', 0) + 1)
-);
       );
 
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
