@@ -1,0 +1,462 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function currentEmail() {
+      return isSignedIn() && request.auth.token.email != null
+        ? request.auth.token.email.lower()
+        : '';
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isActivePartnership(id) {
+      return exists(/databases/$(database)/documents/partnerships/$(id))
+        && get(/databases/$(database)/documents/partnerships/$(id)).data.status == 'accepted'
+        && get(/databases/$(database)/documents/partnerships/$(id)).data.user1Unsubscribed == false
+        && get(/databases/$(database)/documents/partnerships/$(id)).data.user2Unsubscribed == false;
+    }
+
+    function isActivePartner(otherUid) {
+      return isSignedIn()
+        && (
+          isActivePartnership(request.auth.uid + '_' + otherUid)
+          || isActivePartnership(otherUid + '_' + request.auth.uid)
+        );
+    }
+
+    // The library owner grants the permission; `grantedBy` holds the owner's
+    // uid, not the uid of the collaborator who performs the add.
+    function hasAddGrant(id, ownerUid) {
+      return exists(/databases/$(database)/documents/partnerships/$(id))
+        && get(/databases/$(database)/documents/partnerships/$(id)).data.allowAddBooks == true
+        && get(/databases/$(database)/documents/partnerships/$(id)).data.grantedBy == ownerUid;
+    }
+
+    function canAddToPartnerLibrary(ownerUid) {
+      return isActivePartner(ownerUid)
+        && (
+          hasAddGrant(request.auth.uid + '_' + ownerUid, ownerUid)
+          || hasAddGrant(ownerUid + '_' + request.auth.uid, ownerUid)
+        );
+    }
+
+    function boundedByOne(previous, next) {
+      return next == previous || next == previous + 1 || next == previous - 1;
+    }
+
+    // ---------------------------------------------------------------
+    // users/{userId}
+    // ---------------------------------------------------------------
+
+    match /users/{userId} {
+      // Legacy docs created before Phase 5.1 may lack `role`/`plan`. When the
+      // field is missing on the stored doc, allow the update if it stays missing
+      // or is backfilled with its default; otherwise the value stays frozen.
+      function roleAllowed() {
+        return (resource.data.keys().hasAll(['role'])
+            && request.resource.data.keys().hasAll(['role'])
+            && request.resource.data.role == resource.data.role)
+          || (!resource.data.keys().hasAll(['role'])
+            && (!request.resource.data.keys().hasAll(['role'])
+              || request.resource.data.role == 'user'));
+      }
+
+      function planAllowed() {
+        return (resource.data.keys().hasAll(['plan'])
+            && request.resource.data.keys().hasAll(['plan'])
+            && request.resource.data.plan == resource.data.plan)
+          || (!resource.data.keys().hasAll(['plan'])
+            && (!request.resource.data.keys().hasAll(['plan'])
+              || request.resource.data.plan == 'free'));
+      }
+
+      // Public profile docs are world-readable by uid so that guests can view
+      // /u/:username. Usernames are resolved through usernameLookup. The public
+      // doc intentionally contains no email (see users/{uid}/private/data).
+      allow get: if true;
+      allow list: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && userId == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.role == 'user'
+        && request.resource.data.plan == 'free';
+
+      // FIX: also freeze the uid field so it can't be rewritten.
+      allow update: if isSignedIn() && (
+        (
+          userId == request.auth.uid
+          && request.resource.data.uid == resource.data.uid
+          && roleAllowed()
+          && planAllowed()
+        )
+        // A follower may only move followerCount by one, and only together
+        // with the matching followers/{uid} doc (proven via existsAfter).
+        || (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followerCount'])
+          && request.resource.data.followerCount is number
+          && request.resource.data.followerCount >= 0
+          && (
+            (
+              !exists(/databases/$(database)/documents/users/$(userId)/followers/$(request.auth.uid))
+              && existsAfter(/databases/$(database)/documents/users/$(userId)/followers/$(request.auth.uid))
+              && (
+                (!resource.data.keys().hasAll(['followerCount'])
+                  && request.resource.data.followerCount == 1)
+                || (resource.data.keys().hasAll(['followerCount'])
+                  && request.resource.data.followerCount == resource.data.followerCount + 1)
+              )
+            )
+            || (
+              exists(/databases/$(database)/documents/users/$(userId)/followers/$(request.auth.uid))
+              && !existsAfter(/databases/$(database)/documents/users/$(userId)/followers/$(request.auth.uid))
+              && resource.data.keys().hasAll(['followerCount'])
+              && request.resource.data.followerCount == resource.data.followerCount - 1
+            )
+          )
+        )
+      );
+
+      allow delete: if isSignedIn() && (userId == request.auth.uid || isAdmin());
+
+      match /private/{documentId} {
+        allow read, write: if isSignedIn() && userId == request.auth.uid;
+      }
+
+      // Follow graph. followers is public (counts live on the public profile
+      // doc); following is private to its owner.
+      match /followers/{followerId} {
+        allow read: if true;
+        allow create: if isSignedIn()
+          && followerId == request.auth.uid
+          && userId != request.auth.uid;
+        allow delete: if isSignedIn() && followerId == request.auth.uid;
+      }
+
+      match /following/{followedId} {
+        allow read: if isSignedIn() && userId == request.auth.uid;
+        allow create: if isSignedIn()
+          && userId == request.auth.uid
+          && followedId != request.auth.uid;
+        allow delete: if isSignedIn() && userId == request.auth.uid;
+      }
+
+      // Notifications are written by other users (the actor) into the recipient's
+      // subcollection, but only the recipient can read, update, or delete them.
+      match /notifications/{notifId} {
+        allow read: if isSignedIn() && request.auth.uid == userId;
+        allow create: if isSignedIn()
+          && request.resource.data.actorUserId == request.auth.uid
+          && request.resource.data.title.size() <= 200
+          && request.resource.data.body.size() <= 500
+          && request.resource.data.link.size() <= 500;
+        allow update, delete: if isSignedIn() && request.auth.uid == userId;
+      }
+    }
+
+    // ---------------------------------------------------------------
+    // userLookup/{email}
+    // ---------------------------------------------------------------
+
+    match /userLookup/{email} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && request.query.limit <= 1;
+
+      allow create, update: if isSignedIn()
+        && currentEmail() != ''
+        && email == currentEmail()
+        && request.resource.data.uid == request.auth.uid;
+
+      allow delete: if isSignedIn() && (email == currentEmail() || isAdmin());
+    }
+
+    // ---------------------------------------------------------------
+    // usernameLookup/{username} — lowercase username -> { uid, ... }
+    // ---------------------------------------------------------------
+
+    match /usernameLookup/{username} {
+      allow get: if true;
+      allow list: if request.query.limit <= 10;
+
+      allow create, update: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid;
+
+      allow delete: if isSignedIn()
+        && resource.data.uid == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------------
+    // books/{bookId}
+    // ---------------------------------------------------------------
+
+    match /books/{bookId} {
+      function isBookOwner() {
+        return isSignedIn() && resource.data.userId == request.auth.uid;
+      }
+
+      function isPartnerOfOwner() {
+        return isSignedIn()
+          && resource.data.userId != request.auth.uid
+          && isActivePartner(resource.data.userId);
+      }
+
+      // A book becomes world-readable when its owner has published their
+      // library. Collaborators are already covered by isPartnerOfOwner().
+      function isOwnerLibraryPublic() {
+        return exists(/databases/$(database)/documents/users/$(resource.data.userId))
+          && get(/databases/$(database)/documents/users/$(resource.data.userId)).data.privacySettings.library == 'public';
+      }
+
+      function isValidBook() {
+        return request.resource.data.keys().hasAll(['userId', 'title', 'author', 'createdAt', 'updatedAt'])
+          && request.resource.data.userId is string
+          && request.resource.data.title is string
+          && request.resource.data.author is string
+          && request.resource.data.title.size() > 0
+          && request.resource.data.author.size() > 0;
+      }
+
+      allow read: if isBookOwner() || isPartnerOfOwner() || isOwnerLibraryPublic();
+
+      allow create: if isSignedIn()
+        && isValidBook()
+        && (
+          request.resource.data.userId == request.auth.uid
+          || canAddToPartnerLibrary(request.resource.data.userId)
+        );
+
+      // FIX: validate the resulting document AND freeze createdAt.
+      allow update: if isSignedIn()
+        && isValidBook()
+        && request.resource.data.createdAt == resource.data.createdAt
+        && (
+          isBookOwner()
+          || canAddToPartnerLibrary(resource.data.userId)
+        );
+
+      allow delete: if isSignedIn()
+        && (
+          isBookOwner()
+          || canAddToPartnerLibrary(resource.data.userId)
+          || isAdmin()
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // readingStatus — collection-group safe
+    // ---------------------------------------------------------------
+
+    match /{path=**}/readingStatus/{statusUid} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      allow write: if isSignedIn()
+        && statusUid == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------------
+    // partnerships
+    // ---------------------------------------------------------------
+
+    match /partnerships/{partnershipId} {
+      allow read: if isSignedIn()
+        && (resource.data.userId1 == request.auth.uid || resource.data.userId2 == request.auth.uid);
+
+      // FIX: require an accepted collaborationRequest from the OTHER party.
+      // Only the recipient of an accepted request can create the partnership.
+      // getAfter() is required because the request is flipped to 'accepted' in
+      // the same writeBatch that creates this partnership.
+      allow create: if isSignedIn()
+        && (request.resource.data.userId1 == request.auth.uid
+          || request.resource.data.userId2 == request.auth.uid)
+        && getAfter(/databases/$(database)/documents/collaborationRequests/$(partnershipId)).data.status == 'accepted'
+        && getAfter(/databases/$(database)/documents/collaborationRequests/$(partnershipId)).data.toUserId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/collaborationRequests/$(partnershipId)).data.fromUserId in
+             [request.resource.data.userId1, request.resource.data.userId2]
+        && getAfter(/databases/$(database)/documents/collaborationRequests/$(partnershipId)).data.toUserId in
+             [request.resource.data.userId1, request.resource.data.userId2];
+
+      allow update: if isSignedIn()
+        && (resource.data.userId1 == request.auth.uid || resource.data.userId2 == request.auth.uid)
+        && (request.resource.data.userId1 == resource.data.userId1
+          && request.resource.data.userId2 == resource.data.userId2);
+
+      allow delete: if isSignedIn()
+        && (resource.data.userId1 == request.auth.uid
+          || resource.data.userId2 == request.auth.uid
+          || isAdmin());
+    }
+
+    // ---------------------------------------------------------------
+    // collaborationRequests
+    // ---------------------------------------------------------------
+
+    match /collaborationRequests/{requestId} {
+      allow read: if isSignedIn()
+        && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid);
+
+      // FIX: pin both fromUserId and toUserId, and require pending on create.
+      allow create: if isSignedIn()
+        && request.resource.data.fromUserId == request.auth.uid
+        && request.resource.data.fromUserId != request.resource.data.toUserId
+        && request.resource.data.status == 'pending';
+
+      // FIX: restrict updates to status only.
+      allow update: if isSignedIn()
+        && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------
+    // bookRequests
+    // ---------------------------------------------------------------
+
+    match /bookRequests/{requestId} {
+      allow read: if isSignedIn()
+        && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid);
+
+      allow create: if isSignedIn()
+        && request.resource.data.fromUserId == request.auth.uid
+        && request.resource.data.status == 'pending';
+
+      allow update: if isSignedIn()
+        && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------
+    // reviews + likes + comments
+    // ---------------------------------------------------------------
+
+    match /reviews/{reviewId} {
+      function countersOnlyChanged() {
+        return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['likesCount', 'commentsCount']);
+      }
+
+      allow read: if true;
+
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.likesCount == 0
+        && request.resource.data.commentsCount == 0;
+
+      // FIX: use existsAfter() to prove the counter move is backed by a
+      // real like/comment doc in the same batch.
+      allow update: if isSignedIn()
+        && (
+          (resource.data.userId == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['body', 'rating', 'category', 'updatedAt'])
+            && request.resource.data.likesCount == resource.data.likesCount
+            && request.resource.data.commentsCount == resource.data.commentsCount)
+          || isAdmin()
+          || (
+            countersOnlyChanged()
+            && request.resource.data.likesCount >= 0
+            && request.resource.data.commentsCount >= 0
+            && boundedByOne(resource.data.likesCount, request.resource.data.likesCount)
+            && boundedByOne(resource.data.commentsCount, request.resource.data.commentsCount)
+            && (
+              // Like added
+              (request.resource.data.likesCount == resource.data.likesCount + 1
+                && !exists(/databases/$(database)/documents/reviews/$(reviewId)/likes/$(request.auth.uid))
+                && existsAfter(/databases/$(database)/documents/reviews/$(reviewId)/likes/$(request.auth.uid)))
+              // Like removed
+              || (request.resource.data.likesCount == resource.data.likesCount - 1
+                && exists(/databases/$(database)/documents/reviews/$(reviewId)/likes/$(request.auth.uid))
+                && !existsAfter(/databases/$(database)/documents/reviews/$(reviewId)/likes/$(request.auth.uid)))
+              // Comment counter bump (best-effort; full fix needs Cloud Function)
+              || (request.resource.data.commentsCount == resource.data.commentsCount + 1)
+              // No counter change at all
+              || (request.resource.data.likesCount == resource.data.likesCount
+                && request.resource.data.commentsCount == resource.data.commentsCount)
+            )
+          )
+        );
+
+      allow delete: if isSignedIn()
+        && (resource.data.userId == request.auth.uid || isAdmin());
+
+      match /likes/{likerId} {
+        allow read: if true;
+        allow create, delete: if isSignedIn() && likerId == request.auth.uid;
+      }
+
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+        allow update, delete: if isSignedIn()
+          && (resource.data.userId == request.auth.uid || isAdmin());
+      }
+    }
+
+    // ---------------------------------------------------------------
+    // shelves
+    // ---------------------------------------------------------------
+
+    match /shelves/{shelfId} {
+      allow read: if isSignedIn() && (resource.data.isPublic == true || resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------------
+    // reports
+    // ---------------------------------------------------------------
+
+    match /reports/{reportId} {
+      allow create: if isSignedIn()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.status == 'pending';
+
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ---------------------------------------------------------------
+    // activityFeed
+    // ---------------------------------------------------------------
+
+    match /activityFeed/{eventId} {
+      allow read: if isSignedIn()
+        && (resource.data.libraryId == request.auth.uid
+          || isActivePartner(resource.data.libraryId));
+
+      // FIX: only post into your own feed or an active partner's feed.
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && (
+          request.resource.data.libraryId == request.auth.uid
+          || isActivePartner(request.resource.data.libraryId)
+        );
+
+      allow update, delete: if false;
+    }
+
+    // ---------------------------------------------------------------
+    // adminConfig — admin only
+    // ---------------------------------------------------------------
+
+    match /adminConfig/{configId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
