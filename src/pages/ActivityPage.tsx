@@ -1,5 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Activity, ArrowRightLeft, BookOpen, CheckCircle2, Inbox, XCircle } from 'lucide-react'
+import {
+  Activity,
+  ArrowRightLeft,
+  BookOpen,
+  BookPlus,
+  CheckCircle2,
+  CircleCheck,
+  Inbox,
+  Pencil,
+  Star,
+  Trash2,
+  XCircle,
+} from 'lucide-react'
 import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { useAuth } from '../features/auth/useAuth'
@@ -11,6 +23,11 @@ import type { ActivityEvent } from '../types'
 const FEED_LIMIT = 30
 
 function EventIcon({ type }: { type: ActivityEvent['type'] }) {
+  if (type === 'book_added') return <BookPlus size={16} />
+  if (type === 'book_edited') return <Pencil size={16} />
+  if (type === 'book_deleted') return <Trash2 size={16} />
+  if (type === 'status_updated') return <CircleCheck size={16} />
+  if (type === 'rating_updated') return <Star size={16} />
   if (type === 'transfer') return <ArrowRightLeft size={16} />
   if (type === 'request_rejected') return <XCircle size={16} />
   if (type === 'request_accepted' || type === 'borrowed') return <CheckCircle2 size={16} />
@@ -20,6 +37,16 @@ function EventIcon({ type }: { type: ActivityEvent['type'] }) {
 function describeEvent(event: ActivityEvent): string {
   const title = event.bookTitle ?? 'a book'
   switch (event.type) {
+    case 'book_added':
+      return `${event.userName} added "${title}" to ${event.addedTo ?? 'their'} library.`
+    case 'book_edited':
+      return `${event.userName} edited the details for "${title}".`
+    case 'book_deleted':
+      return `${event.userName} removed "${title}" from the library.`
+    case 'status_updated':
+      return `${event.userName} marked "${title}" as ${(event.status ?? 'updated').replace(/_/g, ' ')}.`
+    case 'rating_updated':
+      return `${event.userName} reviewed "${title}" with ${event.rating ?? 0} stars.`
     case 'borrowed':
       return `${event.userName} lent "${title}"`
     case 'request_rejected':
@@ -79,7 +106,7 @@ export function ActivityPage() {
         </span>
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Activity</h1>
-          <p className="text-sm text-muted">Book requests and recent collaboration events.</p>
+          <p className="text-sm text-muted">Recent changes and updates across your library.</p>
         </div>
       </header>
 

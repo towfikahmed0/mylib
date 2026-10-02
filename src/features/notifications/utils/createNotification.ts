@@ -1,5 +1,6 @@
 import { addDoc, collection, doc, serverTimestamp, writeBatch } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
+import { sanitizeFirestoreData } from '../../../lib/firestore'
 import type { NotificationType } from '../../../types'
 
 export interface ActorInfo {
@@ -47,7 +48,10 @@ export async function sendNotification(
   actor: ActorInfo,
 ): Promise<void> {
   if (!actor.uid || !input.toUserId || input.toUserId === actor.uid) return
-  await addDoc(collection(db, 'users', input.toUserId, 'notifications'), buildNotification(input, actor))
+  await addDoc(
+    collection(db, 'users', input.toUserId, 'notifications'),
+    sanitizeFirestoreData(buildNotification(input, actor)),
+  )
 }
 
 /** Writes many notifications (e.g. follower fan-out) in chunked writeBatches. */
@@ -64,7 +68,7 @@ export async function sendNotificationBatch(
     for (const item of chunk) {
       batch.set(
         doc(collection(db, 'users', item.toUserId, 'notifications')),
-        buildNotification(item, actor),
+        sanitizeFirestoreData(buildNotification(item, actor)),
       )
     }
     await batch.commit()

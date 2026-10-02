@@ -116,7 +116,7 @@ export function CollaborationSection() {
             incoming.requests.map((request) => (
               <div
                 key={request.id}
-                className="glass flex items-center justify-between gap-3 rounded-2xl p-3"
+                className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800"
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{request.fromName || request.fromEmail}</p>
@@ -157,7 +157,7 @@ export function CollaborationSection() {
             outgoing.requests.map((request) => (
               <div
                 key={request.id}
-                className="glass flex items-center justify-between gap-3 rounded-2xl p-3"
+                className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800"
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{request.toEmail}</p>

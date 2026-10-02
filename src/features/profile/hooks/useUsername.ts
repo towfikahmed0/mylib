@@ -10,6 +10,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
+import { sanitizeFirestoreData } from '../../../lib/firestore'
 
 export const USERNAME_MIN_LENGTH = 3
 export const USERNAME_MAX_LENGTH = 20
@@ -123,11 +124,11 @@ async function updateUsername({
   const oldSnapshot = oldRef ? await getDoc(oldRef) : null
 
   const batch = writeBatch(db)
-  batch.update(doc(db, 'users', uid), { username })
+  batch.update(doc(db, 'users', uid), sanitizeFirestoreData({ username }))
   if (oldRef && oldSnapshot?.exists() && oldRef.path !== newRef.path) {
     batch.delete(oldRef)
   }
-  batch.set(newRef, { uid, displayName, avatarUrl })
+  batch.set(newRef, sanitizeFirestoreData({ uid, displayName, avatarUrl }))
   await batch.commit()
 }
 

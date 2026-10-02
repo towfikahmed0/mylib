@@ -13,6 +13,7 @@ export interface BookImportRecord {
   purchaseDate: Date | null
   readingStatus: ReadingStatusValue | null
   isWishlist: boolean
+  isInLibrary: boolean
 }
 
 const STATUS_ALIASES: Record<string, ReadingStatusValue> = {
@@ -95,6 +96,7 @@ export function recordToBookFormInput(record: BookImportRecord): BookFormInput {
     copyType: 'new',
     gifterName: null,
     isWishlist: record.isWishlist,
+    isInLibrary: record.isInLibrary,
     genres: record.genres,
     tags: record.tags,
   }

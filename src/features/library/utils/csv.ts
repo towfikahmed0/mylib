@@ -21,6 +21,7 @@ const CSV_COLUMNS = [
   'Price',
   'Purchase Date',
   'Copy Type',
+  'In Library',
   'Added On',
 ]
 
@@ -45,6 +46,7 @@ export function exportToCSV(books: Book[]): void {
     Price: book.price,
     'Purchase Date': toDayString(book.purchaseDate),
     'Copy Type': book.copyType,
+    'In Library': book.isInLibrary !== false,
     'Added On': toDayString(book.createdAt),
   }))
 
@@ -68,6 +70,7 @@ function normalizeRow(row: Record<string, string>): BookImportRecord {
     purchaseDate: parseDate(pickField(row, ['Date', 'Purchase Date', 'Purchased'])),
     readingStatus: normalizeStatus(pickField(row, ['Status', 'Reading Status'])),
     isWishlist: /^(true|1|yes|y)$/i.test(pickField(row, ['Wishlist', 'Is Wishlist'])),
+    isInLibrary: !/^(false|0|no|n)$/i.test(pickField(row, ['In Library', 'Is In Library'])),
   }
 }
 

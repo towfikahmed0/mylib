@@ -13,10 +13,12 @@ export function BookShareCard({ book, status }: BookShareCardProps) {
   const roundedRating = Math.max(0, Math.min(5, Math.round(rating)))
   const review = status?.comment?.trim()
   const isReading = status?.status === 'reading'
+  const highlights = status?.highlights?.length ? status.highlights : book.highlights ?? []
+  const highlight = highlights[highlights.length - 1]
 
   return (
     <div
-      style={{ width: 500, height: 700 }}
+      style={{ width: 500, height: 740 }}
       className="flex flex-col overflow-hidden bg-white text-slate-900"
     >
       <header className="flex items-center gap-2 px-8 pt-8">
@@ -28,7 +30,7 @@ export function BookShareCard({ book, status }: BookShareCardProps) {
       </header>
 
       <div className="flex flex-1 flex-col items-center justify-center gap-5 px-8">
-        <div className="h-64 w-44 overflow-hidden rounded-2xl bg-slate-100 shadow-xl">
+        <div className="h-52 w-36 overflow-hidden rounded-2xl bg-slate-100 shadow-xl">
           {cover ? (
             <img src={cover} alt="" className="h-full w-full object-cover" />
           ) : (
@@ -77,6 +79,22 @@ export function BookShareCard({ book, status }: BookShareCardProps) {
           <p className="line-clamp-3 w-full text-center text-sm leading-relaxed text-slate-600">
             “{review}”
           </p>
+        ) : null}
+
+        {highlight ? (
+          <blockquote className="w-full border-l-2 border-accent/70 bg-slate-50 px-4 py-3 text-left">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              A saved highlight
+            </p>
+            <p className="line-clamp-3 font-serif text-sm italic leading-relaxed text-slate-700">
+              “{highlight.text}”
+            </p>
+            {highlight.page != null ? (
+              <cite className="mt-1 block text-[11px] not-italic text-slate-400">
+                Page {highlight.page}
+              </cite>
+            ) : null}
+          </blockquote>
         ) : null}
       </div>
 

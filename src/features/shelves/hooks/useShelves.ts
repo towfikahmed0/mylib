@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   collection,
-  documentId,
   getDocs,
   addDoc,
   deleteDoc,
@@ -15,6 +14,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
+import { sanitizeFirestoreData } from '../../../lib/firestore'
 import type { Book, ReadingStatusValue, Shelf, ShelfRule, ShelfRuleOperator } from '../../../types'
 import { useAuth } from '../../auth/useAuth'
 import {
@@ -74,14 +74,10 @@ async function fetchBooksByIds(ids: string[]): Promise<Book[]> {
 
   const results = await Promise.all(
     chunks.map(async (chunk) => {
-      try {
-        const snapshot = await getDocs(
-          query(collection(db, 'books'), where(documentId(), 'in', chunk)),
-        )
-        return snapshot.docs.map((document) => ({ id: document.id, ...document.data() }) as Book)
-      } catch {
-        return []
-      }
+      const snapshots = await Promise.all(chunk.map((id) => getDoc(doc(db, 'books', id))))
+      return snapshots
+        .filter((snapshot) => snapshot.exists())
+        .map((snapshot) => ({ id: snapshot.id, ...snapshot.data() }) as Book)
     }),
   )
 
@@ -89,12 +85,8 @@ async function fetchBooksByIds(ids: string[]): Promise<Book[]> {
 }
 
 async function fetchUserBooks(uid: string): Promise<Book[]> {
-  try {
-    const snapshot = await getDocs(query(collection(db, 'books'), where('userId', '==', uid)))
-    return snapshot.docs.map((document) => ({ id: document.id, ...document.data() }) as Book)
-  } catch {
-    return []
-  }
+  const snapshot = await getDocs(query(collection(db, 'books'), where('userId', '==', uid)))
+  return snapshot.docs.map((document) => ({ id: document.id, ...document.data() }) as Book)
 }
 
 export function parseSmartRule(rule: string | undefined): ShelfRule | null {
@@ -184,13 +176,15 @@ export function useCreateShelf() {
   return useMutation({
     mutationFn: async (values: ShelfFormValues) => {
       if (!user) throw new Error('You must be signed in to create a shelf.')
-      const reference = await addDoc(collection(db, 'shelves'), {
-        ...values,
+      const { smartRule, ...shelfValues } = values
+      const reference = await addDoc(collection(db, 'shelves'), sanitizeFirestoreData({
+        ...shelfValues,
+        ...(values.isSmart && smartRule ? { smartRule } : {}),
         userId: user.uid,
         bookIds: [],
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      })
+      }))
       return reference.id
     },
     onSuccess: () => {
@@ -204,10 +198,10 @@ export function useUpdateShelf() {
 
   return useMutation({
     mutationFn: async ({ shelfId, ...values }: Partial<ShelfFormValues> & { shelfId: string }) => {
-      await updateDoc(doc(db, 'shelves', shelfId), {
+      await updateDoc(doc(db, 'shelves', shelfId), sanitizeFirestoreData({
         ...values,
         updatedAt: serverTimestamp(),
-      })
+      }))
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: shelfKeys.all })
@@ -249,10 +243,10 @@ export function useAddBooksToShelf() {
       for (const shelf of shelves) {
         if (!shelf) continue
         const merged = Array.from(new Set([...shelf.existing, ...bookIds]))
-        batch.update(doc(db, 'shelves', shelf.shelfId), {
+        batch.update(doc(db, 'shelves', shelf.shelfId), sanitizeFirestoreData({
           bookIds: merged,
           updatedAt: serverTimestamp(),
-        })
+        }))
       }
       await batch.commit()
     },
@@ -271,10 +265,10 @@ export function useRemoveBooksFromShelf() {
       if (!snapshot.exists()) return
       const existing = (snapshot.data() as { bookIds?: string[] }).bookIds ?? []
       const remove = new Set(bookIds)
-      await updateDoc(doc(db, 'shelves', shelfId), {
+      await updateDoc(doc(db, 'shelves', shelfId), sanitizeFirestoreData({
         bookIds: existing.filter((id) => !remove.has(id)),
         updatedAt: serverTimestamp(),
-      })
+      }))
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: shelfKeys.all })
@@ -313,5 +307,8 @@ export function useShelfBooks(shelfId: string | undefined) {
     shelf,
     books: booksQuery.data ?? [],
     isLoading: shelfQuery.isPending || (Boolean(shelf) && booksQuery.isPending),
+    isBooksError: booksQuery.isError,
+    booksError: booksQuery.error,
+    refetchBooks: booksQuery.refetch,
   }
 }

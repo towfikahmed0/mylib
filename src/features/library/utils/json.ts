@@ -102,6 +102,7 @@ function normalizeRecord(item: unknown): BookImportRecord {
       typeof row.isWishlist === 'boolean'
         ? row.isWishlist
         : /^(true|1|yes|y)$/i.test(pickField(row, ['isWishlist', 'wishlist', 'Wishlist'])),
+    isInLibrary: typeof row.isInLibrary === 'boolean' ? row.isInLibrary : true,
   }
 }
 

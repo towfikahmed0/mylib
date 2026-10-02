@@ -43,7 +43,7 @@ export function ReadingChallenges({
   ]
 
   return (
-    <div className="glass space-y-4 rounded-3xl p-5">
+    <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <h3 className="flex items-center gap-2 text-sm font-semibold">
         <Trophy size={16} className="text-accent" />
         Challenges

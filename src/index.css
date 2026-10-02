@@ -144,7 +144,21 @@
 
 @layer components {
   .glass {
-    @apply border border-border/60 bg-glass/70 backdrop-blur-xl;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  }
+
+  .dark .glass,
+  [data-theme='dark'] .glass {
+    background: #1e293b;
+    border-color: #334155;
+  }
+
+  .sepia .glass,
+  [data-theme='sepia'] .glass {
+    background: #fbf4e3;
+    border-color: #d9c9a8;
   }
 
   .card-surface {
@@ -216,6 +230,32 @@
     transform: translateY(-6px);
     box-shadow: 0 25px 50px -12px rgba(59, 130, 246, 0.25);
     border-color: rgba(59, 130, 246, 0.4);
+  }
+
+  .book-card-container {
+    container-type: inline-size;
+  }
+
+  @container (max-width: 18rem) {
+    .book-card-container .book-card-responsive-layout {
+      align-items: center;
+      flex-direction: column;
+      gap: 0.75rem;
+      min-height: 0;
+      padding: 1rem;
+    }
+
+    .book-card-container .book-card-responsive-cover {
+      width: 6rem;
+      height: 9rem;
+      border-radius: 1rem;
+    }
+
+    .book-card-container .book-card-responsive-info {
+      align-self: stretch;
+      width: 100%;
+      min-width: 0;
+    }
   }
 
   .density-relaxed {

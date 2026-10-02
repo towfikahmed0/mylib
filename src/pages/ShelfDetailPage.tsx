@@ -24,7 +24,14 @@ export function ShelfDetailPage() {
   const { shelfId } = useParams<{ shelfId: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { shelf, books, isLoading } = useShelfBooks(shelfId)
+  const {
+    shelf,
+    books,
+    isLoading,
+    isBooksError,
+    booksError,
+    refetchBooks,
+  } = useShelfBooks(shelfId)
   const { statuses } = useReadingStatus()
   const deleteShelf = useDeleteShelf()
   const removeBooks = useRemoveBooksFromShelf()
@@ -37,6 +44,7 @@ export function ShelfDetailPage() {
 
   const handleDelete = async () => {
     if (!shelf) return
+    if (!window.confirm(`Delete the "${shelf.name}" shelf? This cannot be undone.`)) return
     try {
       await deleteShelf.mutateAsync(shelf.id)
       toast.success('Shelf deleted.')
@@ -140,7 +148,21 @@ export function ShelfDetailPage() {
         ) : null}
       </header>
 
-      {books.length === 0 ? (
+      {isBooksError ? (
+        <div className="card-surface flex flex-col items-center gap-3 px-6 py-12 text-center">
+          <p className="text-sm font-medium">Could not load books for this shelf</p>
+          <p className="max-w-sm text-xs text-muted">
+            {booksError instanceof Error ? booksError.message : 'Please try again.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => void refetchBooks()}
+            className="rounded-2xl bg-accent px-4 py-2 text-xs font-medium text-accent-foreground transition hover:opacity-90"
+          >
+            Try again
+          </button>
+        </div>
+      ) : books.length === 0 ? (
         <div className="card-surface px-6 py-16 text-center text-sm text-muted">
           {shelf.isSmart
             ? 'No books match this smart rule yet.'
@@ -283,7 +305,7 @@ function AddBooksContent({
                 key={book.id}
                 type="button"
                 onClick={() => toggle(book.id)}
-                className="glass flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition hover:-translate-y-0.5"
+                className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:-translate-y-0.5 dark:border-slate-700 dark:bg-slate-800"
               >
                 <span className="flex min-w-0 flex-1 items-center gap-3">
                   <span className="min-w-0">

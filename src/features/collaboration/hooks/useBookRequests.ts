@@ -13,6 +13,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
+import { sanitizeFirestoreData } from '../../../lib/firestore'
 import type { BookRequest, UserPrivateData } from '../../../types'
 import { useAuth } from '../../auth/useAuth'
 import { bookKeys } from '../../library/hooks/useBooks'
@@ -106,7 +107,7 @@ export function useSendBookRequest() {
       const requesterName =
         appUser?.displayName || appUser?.username || user.displayName || 'A reader'
 
-      const requestRef = await addDoc(collection(db, 'bookRequests'), {
+      const requestRef = await addDoc(collection(db, 'bookRequests'), sanitizeFirestoreData({
         fromUserId: user.uid,
         fromEmail: privateData?.email ?? user.email ?? '',
         toUserId,
@@ -118,7 +119,7 @@ export function useSendBookRequest() {
         status: 'pending',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      })
+      }))
 
       const actor: ActorInfo = {
         uid: user.uid,
@@ -162,11 +163,11 @@ export function useAcceptBookRequest() {
       const userName = appUser?.username ?? user.displayName ?? 'Reader'
 
       const batch = writeBatch(db)
-      batch.update(doc(db, 'bookRequests', requestId), {
+      batch.update(doc(db, 'bookRequests', requestId), sanitizeFirestoreData({
         status: 'accepted',
         updatedAt: serverTimestamp(),
-      })
-      batch.update(doc(db, 'books', request.bookId), {
+      }))
+      batch.update(doc(db, 'books', request.bookId), sanitizeFirestoreData({
         borrowedBy: request.fromUserId,
         borrowDate: serverTimestamp(),
         borrowHistory: arrayUnion({
@@ -175,8 +176,8 @@ export function useAcceptBookRequest() {
           returnedAt: null,
         }),
         updatedAt: serverTimestamp(),
-      })
-      batch.set(doc(collection(db, 'activityFeed')), {
+      }))
+      batch.set(doc(collection(db, 'activityFeed')), sanitizeFirestoreData({
         type: 'borrowed',
         userId: user.uid,
         userName,
@@ -185,7 +186,7 @@ export function useAcceptBookRequest() {
         bookTitle: request.bookTitle,
         borrowedBy: request.fromUserId,
         timestamp: serverTimestamp(),
-      })
+      }))
       await batch.commit()
 
       try {
@@ -212,6 +213,7 @@ export function useAcceptBookRequest() {
       void queryClient.invalidateQueries({ queryKey: bookRequestKeys.all })
       void queryClient.invalidateQueries({ queryKey: bookKeys.all })
       void queryClient.invalidateQueries({ queryKey: publicLibraryKeys.all })
+      void queryClient.invalidateQueries({ queryKey: ['collaborationStats'] })
     },
   })
 }
@@ -231,11 +233,11 @@ export function useDeclineBookRequest() {
       const userName = appUser?.username ?? user.displayName ?? 'Reader'
 
       const batch = writeBatch(db)
-      batch.update(doc(db, 'bookRequests', requestId), {
+      batch.update(doc(db, 'bookRequests', requestId), sanitizeFirestoreData({
         status: 'rejected',
         updatedAt: serverTimestamp(),
-      })
-      batch.set(doc(collection(db, 'activityFeed')), {
+      }))
+      batch.set(doc(collection(db, 'activityFeed')), sanitizeFirestoreData({
         type: 'request_rejected',
         userId: user.uid,
         userName,
@@ -244,7 +246,7 @@ export function useDeclineBookRequest() {
         bookTitle: request.bookTitle,
         recipientId: request.fromUserId,
         timestamp: serverTimestamp(),
-      })
+      }))
       await batch.commit()
 
       try {
@@ -292,11 +294,11 @@ export function useTransferBook() {
       const userName = appUser?.username ?? user.displayName ?? 'Reader'
 
       const batch = writeBatch(db)
-      batch.update(doc(db, 'books', bookId), {
+      batch.update(doc(db, 'books', bookId), sanitizeFirestoreData({
         userId: toUserId,
         updatedAt: serverTimestamp(),
-      })
-      batch.set(doc(collection(db, 'activityFeed')), {
+      }))
+      batch.set(doc(collection(db, 'activityFeed')), sanitizeFirestoreData({
         type: 'transfer',
         userId: user.uid,
         userName,
@@ -305,7 +307,7 @@ export function useTransferBook() {
         bookTitle,
         targetUserId: toUserId,
         timestamp: serverTimestamp(),
-      })
+      }))
       await batch.commit()
     },
     onSuccess: () => {

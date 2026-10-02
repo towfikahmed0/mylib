@@ -227,7 +227,9 @@ service cloud.firestore {
           && request.resource.data.title is string
           && request.resource.data.author is string
           && request.resource.data.title.size() > 0
-          && request.resource.data.author.size() > 0;
+          && request.resource.data.author.size() > 0
+          && (!request.resource.data.keys().hasAny(['isInLibrary'])
+            || request.resource.data.isInLibrary is bool);
       }
 
       allow read: if isBookOwner() || isPartnerOfOwner() || isOwnerLibraryPublic();

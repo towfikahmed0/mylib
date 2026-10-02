@@ -82,6 +82,44 @@ export function RatingDistributionChart({ counts }: { counts: number[] }) {
   )
 }
 
+export function FinishedBooksByMonthChart({ counts }: { counts: number[] }) {
+  const data = {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    datasets: [
+      {
+        label: 'Finished books',
+        data: counts,
+        backgroundColor: CHART_PALETTE[0],
+        borderRadius: 6,
+        maxBarThickness: 36,
+      },
+    ],
+  }
+
+  const options: ChartOptions<'bar'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: {
+        ticks: { color: TEXT_COLOR },
+        grid: { display: false },
+      },
+      y: {
+        beginAtZero: true,
+        ticks: { precision: 0, color: TEXT_COLOR },
+        grid: { color: GRID_COLOR },
+      },
+    },
+  }
+
+  return (
+    <div className="h-56 min-w-0">
+      <Bar data={data} options={options} />
+    </div>
+  )
+}
+
 export function DistributionDoughnut({
   items,
   className,

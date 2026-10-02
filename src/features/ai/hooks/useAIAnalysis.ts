@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
+import { sanitizeFirestoreData } from '../../../lib/firestore'
 import type { FirestoreDate } from '../../../types'
 import { useAuth } from '../../auth/useAuth'
 
@@ -44,7 +45,7 @@ export function useAIAnalysis() {
       if (!uid) throw new Error('You must be signed in to save your analysis.')
       await setDoc(
         doc(db, 'users', uid, 'private', 'data'),
-        { lastAIAnalysis: text, lastAIAnalysisDate: serverTimestamp() },
+        sanitizeFirestoreData({ lastAIAnalysis: text, lastAIAnalysisDate: serverTimestamp() }),
         { merge: true },
       )
     },

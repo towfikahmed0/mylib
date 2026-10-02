@@ -34,6 +34,7 @@ interface FormState {
   copyType: CopyType
   gifterName: string
   isWishlist: boolean
+  isNotInLibrary: boolean
   genres: string[]
   tags: string
 }
@@ -49,6 +50,7 @@ const INITIAL_FORM: FormState = {
   copyType: 'new',
   gifterName: '',
   isWishlist: false,
+  isNotInLibrary: false,
   genres: [],
   tags: '',
 }
@@ -92,6 +94,7 @@ function buildInitialForm(prefill?: BookPrefill | null, existingBook?: Book | nu
       copyType: existingBook.copyType ?? 'new',
       gifterName: existingBook.gifterName ?? '',
       isWishlist: false,
+      isNotInLibrary: existingBook.isInLibrary === false,
       genres: existingBook.genres ?? [],
       tags: (existingBook.tags ?? []).join(', '),
     }
@@ -201,6 +204,7 @@ function AddBookForm({
     copyType: form.copyType,
     gifterName: form.gifterName,
     isWishlist: form.isWishlist,
+    isInLibrary: !form.isNotInLibrary,
     genres: form.genres,
     tags: form.tags
       .split(',')
@@ -311,7 +315,7 @@ function AddBookForm({
                     'rounded-full px-4 py-2 text-xs font-medium transition',
                     destination === 'self'
                       ? 'bg-accent text-accent-foreground'
-                      : 'glass text-muted hover:text-foreground',
+                      : 'border border-slate-200 bg-white text-muted hover:text-foreground dark:border-slate-700 dark:bg-slate-800',
                   )}
                 >
                   My Library
@@ -322,12 +326,15 @@ function AddBookForm({
                     type="button"
                     role="radio"
                     aria-checked={destination === partner.uid}
-                    onClick={() => setDestination(partner.uid)}
+                    onClick={() => {
+                      setDestination(partner.uid)
+                      setForm((previous) => ({ ...previous, isNotInLibrary: false }))
+                    }}
                     className={cn(
                       'rounded-full px-4 py-2 text-xs font-medium transition',
                       destination === partner.uid
                         ? 'bg-accent text-accent-foreground'
-                        : 'glass text-muted hover:text-foreground',
+                        : 'border border-slate-200 bg-white text-muted hover:text-foreground dark:border-slate-700 dark:bg-slate-800',
                     )}
                   >
                     {partner.displayName}&apos;s Library
@@ -430,7 +437,7 @@ function AddBookForm({
                       'rounded-full px-4 py-2 text-xs font-medium transition',
                       selected
                         ? 'bg-accent text-accent-foreground'
-                        : 'glass text-muted hover:text-foreground',
+                        : 'border border-slate-200 bg-white text-muted hover:text-foreground dark:border-slate-700 dark:bg-slate-800',
                     )}
                   >
                     {option.label}
@@ -462,6 +469,24 @@ function AddBookForm({
             <span className="text-sm">Add to wishlist</span>
           </label>
 
+          {!isPartnerDestination ? (
+            <label className="flex cursor-pointer items-center gap-2.5">
+              <input
+                type="checkbox"
+                checked={form.isNotInLibrary}
+                onChange={(event) => {
+                  const isNotInLibrary = event.target.checked
+                  setForm((previous) => ({
+                    ...previous,
+                    isNotInLibrary,
+                  }))
+                }}
+                className="h-4 w-4 rounded border-border accent-[rgb(var(--accent))]"
+              />
+              <span className="text-sm">Book not in library</span>
+            </label>
+          ) : null}
+
           <div className="space-y-2">
             <span className={LABEL_CLASS}>Genres</span>
             <div className="flex flex-wrap gap-2">
@@ -477,7 +502,7 @@ function AddBookForm({
                       'rounded-full px-3 py-1.5 text-xs font-medium transition',
                       selected
                         ? 'bg-accent text-accent-foreground'
-                        : 'glass text-muted hover:text-foreground',
+                        : 'border border-slate-200 bg-white text-muted hover:text-foreground dark:border-slate-700 dark:bg-slate-800',
                     )}
                   >
                     {genre}

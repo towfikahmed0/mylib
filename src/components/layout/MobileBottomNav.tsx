@@ -6,7 +6,7 @@ export function MobileBottomNav() {
   return (
     <nav
       aria-label="Primary"
-      className="glass safe-bottom fixed inset-x-0 bottom-0 z-40 rounded-none border-x-0 border-b-0 lg:hidden"
+      className="safe-bottom fixed inset-x-0 bottom-0 z-40 rounded-none border-x-0 border-t border-b-0 border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800 lg:hidden"
     >
       <ul className="grid grid-cols-4">
         {MOBILE_NAV_ITEMS.map(({ label, to, icon: Icon }) => (

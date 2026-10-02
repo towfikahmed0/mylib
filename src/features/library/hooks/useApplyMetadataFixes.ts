@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { doc, serverTimestamp, writeBatch } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
+import { sanitizeFirestoreData } from '../../../lib/firestore'
 import { splitList } from '../utils/importTypes'
 import { bookKeys } from './useBooks'
 
@@ -32,7 +33,7 @@ export function useApplyMetadataFixes() {
 
       const batch = writeBatch(db)
       for (const [bookId, fields] of grouped) {
-        batch.update(doc(db, 'books', bookId), fields)
+        batch.update(doc(db, 'books', bookId), sanitizeFirestoreData(fields))
       }
       await batch.commit()
     },

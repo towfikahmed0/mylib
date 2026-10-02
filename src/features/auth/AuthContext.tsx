@@ -7,6 +7,7 @@ import {
 } from 'firebase/auth'
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
 import { auth, db, googleProvider } from '../../lib/firebase'
+import { sanitizeFirestoreData } from '../../lib/firestore'
 import type { AppUser, PrivacySettings } from '../../types'
 import { AuthContext, type AuthContextValue } from './useAuth'
 
@@ -48,7 +49,7 @@ async function createUserProfile(user: User): Promise<AppUser> {
   const userRef = doc(db, 'users', user.uid)
   const username = buildUsername(user)
 
-  await setDoc(userRef, {
+  await setDoc(userRef, sanitizeFirestoreData({
     uid: user.uid,
     username,
     displayName: user.displayName ?? username,
@@ -62,24 +63,27 @@ async function createUserProfile(user: User): Promise<AppUser> {
     followerCount: 0,
     followingCount: 0,
     joinedAt: serverTimestamp(),
-  })
+  }))
 
-  await setDoc(doc(db, 'users', user.uid, 'private', 'data'), {
+  await setDoc(doc(db, 'users', user.uid, 'private', 'data'), sanitizeFirestoreData({
     email: user.email ?? '',
     phoneNumber: '',
     address: '',
     lastAIAnalysis: '',
     lastAIAnalysisDate: null,
-  })
+  }))
 
-  await setDoc(doc(db, 'usernameLookup', username.toLowerCase()), {
+  await setDoc(doc(db, 'usernameLookup', username.toLowerCase()), sanitizeFirestoreData({
     uid: user.uid,
     displayName: user.displayName ?? username,
     avatarUrl: user.photoURL ?? '',
-  })
+  }))
 
   if (user.email) {
-    await setDoc(doc(db, 'userLookup', user.email.toLowerCase()), { uid: user.uid })
+    await setDoc(
+      doc(db, 'userLookup', user.email.toLowerCase()),
+      sanitizeFirestoreData({ uid: user.uid }),
+    )
   }
 
   const created = await getDoc(userRef)

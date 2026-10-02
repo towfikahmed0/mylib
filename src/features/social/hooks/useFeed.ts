@@ -15,6 +15,7 @@ import {
   type QueryDocumentSnapshot,
 } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
+import { sanitizeFirestoreData } from '../../../lib/firestore'
 import type { Review, ReviewCategory } from '../../../types'
 import { useAuth } from '../../auth/useAuth'
 import { sendNotificationBatch } from '../../notifications/utils/createNotification'
@@ -127,6 +128,7 @@ export function useFollowingFeed() {
 export interface WriteReviewInput {
   bookTitle: string
   author: string
+  coverUrl?: string
   category: ReviewCategory
   rating: number
   body: string
@@ -142,11 +144,12 @@ export function useWriteReview() {
       const userName = appUser?.username ?? user.displayName ?? 'Reader'
       const bookTitle = input.bookTitle.trim()
 
-      await addDoc(collection(db, 'reviews'), {
+      await addDoc(collection(db, 'reviews'), sanitizeFirestoreData({
         userId: user.uid,
         userName,
         bookTitle,
         author: input.author.trim(),
+        coverUrl: input.coverUrl?.trim() ?? '',
         category: input.category,
         rating: input.rating,
         body: input.body.trim(),
@@ -155,7 +158,7 @@ export function useWriteReview() {
         reported: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      })
+      }))
 
       // Fan out a notification to followers (capped to avoid write storms).
       try {

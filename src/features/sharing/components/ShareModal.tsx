@@ -4,6 +4,7 @@ import { Modal } from '../../../components/ui/Modal'
 import { toast } from '../../../store/toastStore'
 import type { Book, ReadingStatus } from '../../../types'
 import { BookShareCard } from './BookShareCard'
+import { LibraryCoversShareCard, type BookCoversShareData } from './LibraryCoversShareCard'
 import { LibraryInsightsShareCard, type InsightsShareData } from './LibraryInsightsShareCard'
 import {
   generateShareImage,
@@ -17,6 +18,7 @@ export type ShareModalProps = {
 } & (
   | { variant: 'book'; book: Book; status?: ReadingStatus; username?: string }
   | { variant: 'insights'; insights: InsightsShareData }
+  | { variant: 'covers'; covers: BookCoversShareData; filename?: string }
 )
 
 function slugify(value: string): string {
@@ -36,11 +38,15 @@ function ShareContent(props: ShareModalProps) {
   const { onClose } = props
   const cardRef = useRef<HTMLDivElement>(null)
   const [isWorking, setIsWorking] = useState(false)
+  const [insightsLayout, setInsightsLayout] = useState<'stats' | 'covers'>('stats')
+  const isCoversLayout = props.variant === 'insights' && insightsLayout === 'covers'
 
   const filename =
     props.variant === 'book'
       ? `mylib-${slugify(props.book.title) || 'book'}`
-      : `mylib-insights-${slugify(props.insights.username) || 'profile'}`
+      : props.variant === 'covers'
+        ? props.filename ?? 'mylib-finished-books'
+        : `mylib-insights-${slugify(props.insights.username) || 'profile'}${isCoversLayout ? '-covers' : ''}`
 
   const handleDownload = async () => {
     if (!cardRef.current) return
@@ -106,10 +112,48 @@ function ShareContent(props: ShareModalProps) {
         </div>
       }
     >
+      {props.variant === 'insights' ? (
+        <div className="mb-4 flex justify-center">
+          <div
+            role="radiogroup"
+            aria-label="Share image layout"
+            className="relative grid w-full max-w-sm grid-cols-2 rounded-2xl bg-surface-muted p-1"
+          >
+            <span
+              aria-hidden="true"
+              className={`absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-xl bg-surface shadow-sm transition-transform ${
+                insightsLayout === 'covers' ? 'translate-x-full' : ''
+              }`}
+            />
+            <button
+              type="button"
+              role="radio"
+              aria-checked={insightsLayout === 'stats'}
+              onClick={() => setInsightsLayout('stats')}
+              className="relative z-10 rounded-xl px-3 py-2 text-sm font-medium text-foreground"
+            >
+              Insights
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={insightsLayout === 'covers'}
+              onClick={() => setInsightsLayout('covers')}
+              className="relative z-10 rounded-xl px-3 py-2 text-sm font-medium text-foreground"
+            >
+              Book Covers
+            </button>
+          </div>
+        </div>
+      ) : null}
       <div className="flex justify-center overflow-x-auto">
         <div ref={cardRef} className="shrink-0">
           {props.variant === 'book' ? (
             <BookShareCard book={props.book} status={props.status} />
+          ) : props.variant === 'covers' ? (
+            <LibraryCoversShareCard data={props.covers} />
+          ) : isCoversLayout ? (
+            <LibraryCoversShareCard data={props.insights} />
           ) : (
             <LibraryInsightsShareCard data={props.insights} />
           )}

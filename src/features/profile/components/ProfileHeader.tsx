@@ -16,7 +16,7 @@ function formatJoined(value: PublicProfile['joinedAt']): string | null {
 
 function Stat({ icon, label, value }: { icon: ReactNode; label: string; value: ReactNode }) {
   return (
-    <div className="glass rounded-2xl px-3 py-2.5">
+    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <dt className="flex items-center gap-1.5 text-xs text-muted">
         {icon}
         {label}
@@ -44,7 +44,18 @@ export function ProfileHeader({
   const [isReportOpen, setIsReportOpen] = useState(false)
 
   return (
-    <div className="card-surface space-y-5 p-5 sm:p-6">
+    <div className="card-surface relative space-y-5 p-5 sm:p-6">
+      {!isOwnProfile ? (
+        <button
+          type="button"
+          onClick={() => setIsReportOpen(true)}
+          aria-label="Report this profile"
+          title="Report this profile"
+          className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-xl bg-surface-muted text-muted transition hover:text-rose-500 focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          <Flag size={14} />
+        </button>
+      ) : null}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-4">
           {profile.avatarUrl ? (
@@ -60,7 +71,10 @@ export function ProfileHeader({
             </span>
           )}
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-semibold tracking-tight">@{profile.username}</h1>
+            <h1 className="truncate text-xl font-semibold tracking-tight">
+              {profile.displayName || profile.username}
+            </h1>
+            <p className="truncate text-sm text-muted">@{profile.username}</p>
             {joined ? (
               <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
                 <CalendarDays size={13} />
@@ -79,7 +93,7 @@ export function ProfileHeader({
             Edit Profile
           </Link>
         ) : (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-2 sm:pr-10">
             <FollowButton targetUid={profile.uid} />
             {isPartner ? (
               <Link
@@ -90,14 +104,6 @@ export function ProfileHeader({
                 Visit Library
               </Link>
             ) : null}
-            <button
-              type="button"
-              onClick={() => setIsReportOpen(true)}
-              className="flex shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-surface-muted px-4 py-2.5 text-sm font-semibold text-muted transition hover:text-rose-500"
-            >
-              <Flag size={16} />
-              Report
-            </button>
           </div>
         )}
       </div>

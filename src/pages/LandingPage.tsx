@@ -211,7 +211,7 @@ export function LandingPage() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <ThemeToggle />
+          <ThemeToggle variant="light-dark" />
           <button
             type="button"
             onClick={() => void signInWithGoogle()}
@@ -298,30 +298,13 @@ export function LandingPage() {
           </div>
         </div>
 
-        {/* Hero mockup with glow */}
-        <div className="relative hidden flex-1 items-center justify-center overflow-hidden bg-secondary/30 p-12 lg:flex">
-          <div className="absolute inset-0 z-10 bg-gradient-to-r from-background via-background/80 to-transparent" />
-          <div className="relative z-20 w-full max-w-xl">
-            <div className="animate-pulse-glow absolute -inset-4 rounded-[2rem] bg-gradient-to-r from-primary/40 to-accent/40 blur-3xl" />
-            <div className="glass relative overflow-hidden rounded-2xl p-6 shadow-terra-lg">
-              <div className="mb-4 flex items-center gap-2">
-                <Search size={16} className="text-muted-foreground" />
-                <div className="h-8 flex-1 rounded-xl bg-surface-muted" />
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                {Array.from({ length: 6 }, (_, index) => (
-                  <div key={index} className="glass flex gap-3 rounded-2xl p-3">
-                    <div className="h-16 w-11 flex-shrink-0 rounded-xl bg-gradient-to-br from-primary/30 to-accent/20" />
-                    <div className="flex flex-1 flex-col gap-2 py-1">
-                      <div className="h-2.5 w-4/5 rounded-full bg-surface-muted" />
-                      <div className="h-2 w-1/2 rounded-full bg-surface-muted" />
-                      <div className="mt-auto h-2 w-2/3 rounded-full bg-surface-muted" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+        {/* Transparent hero artwork */}
+        <div className="relative hidden flex-1 items-center justify-center overflow-hidden lg:flex">
+          <img
+            src="/img/hero.png"
+            alt="A colorful collection of classic books"
+            className="max-h-[82vh] w-full max-w-[48rem] object-contain"
+          />
         </div>
       </main>
 

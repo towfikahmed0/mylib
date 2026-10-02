@@ -104,6 +104,7 @@ export interface Book {
   description: string
   price: number
   purchaseDate: FirestoreDate | null
+  isInLibrary?: boolean
   tags: string[]
   genres: string[]
   categories: string[]
@@ -224,6 +225,8 @@ export interface BookRequest {
 
 export type ActivityType =
   | 'book_added'
+  | 'book_edited'
+  | 'book_deleted'
   | 'status_updated'
   | 'rating_updated'
   | 'borrowed'
@@ -297,6 +300,7 @@ export interface Review {
   userName: string
   bookTitle: string
   author: string
+  coverUrl?: string
   category: ReviewCategory
   body: string
   rating: number

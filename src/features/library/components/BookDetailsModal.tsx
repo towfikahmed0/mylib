@@ -18,6 +18,7 @@ import {
   Square,
   Star,
   Trash2,
+  X,
 } from 'lucide-react'
 import { Timestamp } from 'firebase/firestore'
 import { cn } from '../../../lib/utils'
@@ -35,6 +36,7 @@ import { ReviewCard } from '../../social/components/ReviewCard'
 import { useReviewsForBook } from '../../social/hooks/useFeed'
 import { READING_STATUS_OPTIONS } from '../constants'
 import { useDeleteBook, useLendBook, useReturnBook } from '../hooks/useBookActions'
+import { useBooks } from '../hooks/useBooks'
 import { useUpdateBook } from '../hooks/useUpdateBook'
 import { useUpdateReadingStatus } from '../hooks/useUpdateReadingStatus'
 
@@ -63,6 +65,22 @@ function formatCurrency(value: number): string {
   }).format(value)
 }
 
+function toDateInputValue(value: Book['purchaseDate']): string {
+  if (!value) return new Date().toISOString().slice(0, 10)
+  try {
+    const date = value.toDate()
+    return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10)
+  } catch {
+    return new Date().toISOString().slice(0, 10)
+  }
+}
+
+function fromDateInputValue(value: string): Date | null {
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return null
+  return new Date(year, month - 1, day, 12)
+}
+
 interface BookDetailsModalProps {
   book: Book | null
   status?: ReadingStatus
@@ -71,11 +89,13 @@ interface BookDetailsModalProps {
 }
 
 export function BookDetailsModal({ book, status, onClose, onRemoveFromShelf }: BookDetailsModalProps) {
+  const { books } = useBooks()
   if (!book) return null
+  const currentBook = books.find((item) => item.id === book.id) ?? book
   return (
     <BookDetailsContent
-      key={book.id}
-      book={book}
+      key={currentBook.id}
+      book={currentBook}
       status={status}
       onClose={onClose}
       onRemoveFromShelf={onRemoveFromShelf}
@@ -85,9 +105,16 @@ export function BookDetailsModal({ book, status, onClose, onRemoveFromShelf }: B
 
 function StatBox({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-slate-200/50 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-800/40">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{label}</p>
-      <p className="mt-1 truncate text-sm font-black">{value}</p>
+    <div className="rounded-xl border border-border/60 bg-surface-muted/30 px-3 py-2.5">
+      <p className="text-[9px] font-bold uppercase tracking-widest text-muted">{label}</p>
+      <p
+        className={cn(
+          'mt-0.5 truncate text-base font-bold',
+          (label === 'Price' || label === 'Copy Type') && 'text-accent',
+        )}
+      >
+        {value}
+      </p>
     </div>
   )
 }
@@ -122,6 +149,9 @@ function BookDetailsContent({
   const [rating, setRating] = useState(status?.rating ?? 0)
   const [progress, setProgress] = useState(status?.progress ?? 0)
   const [comment, setComment] = useState(status?.comment ?? '')
+  const [finishedDate, setFinishedDate] = useState(() =>
+    toDateInputValue(status?.finishedAt ?? (status?.status === 'finished' ? status.updatedAt : null)),
+  )
   const [isExpanded, setIsExpanded] = useState(false)
 
   const [quote, setQuote] = useState('')
@@ -166,12 +196,28 @@ function BookDetailsContent({
     const previous = selected
     setSelected(value)
     try {
-      await updateStatus.mutateAsync({ bookId: book.id, status: value })
+      await updateStatus.mutateAsync({
+        bookId: book.id,
+        status: value,
+        ...(value === 'finished' ? { finishedAt: fromDateInputValue(finishedDate) } : {}),
+      })
       toast.success('Reading status updated.')
     } catch (error) {
       setSelected(previous)
       toast.error(error instanceof Error ? error.message : 'Could not update reading status.')
     }
+  }
+
+  const handleFinishedDateSave = () => {
+    const date = fromDateInputValue(finishedDate)
+    if (!date) {
+      toast.error('Choose a valid finished date.')
+      return
+    }
+    void runStatusUpdate(
+      { bookId: book.id, status: 'finished', finishedAt: date },
+      'Finished date updated.',
+    )
   }
 
   const handleFavorite = () => {
@@ -200,6 +246,18 @@ function BookDetailsContent({
       { bookId: book.id, rating, comment: comment.trim() },
       'Review saved.',
     )
+  }
+
+  const handleRatingChange = async (nextRating: number) => {
+    const previous = rating
+    setRating(nextRating)
+    try {
+      await updateStatus.mutateAsync({ bookId: book.id, rating: nextRating })
+      toast.success(nextRating === 0 ? 'Rating cleared.' : 'Rating updated.')
+    } catch (error) {
+      setRating(previous)
+      toast.error(error instanceof Error ? error.message : 'Could not update your rating.')
+    }
   }
 
   const handleProgressCommit = () => {
@@ -244,6 +302,18 @@ function BookDetailsContent({
     )
   }
 
+  const handleRemoveHighlight = (index: number) => {
+    if (!window.confirm('Delete this saved highlight? This cannot be undone.')) return
+    updateBook.mutate(
+      { bookId: book.id, highlights: highlights.filter((_, highlightIndex) => highlightIndex !== index) },
+      {
+        onSuccess: () => toast.success('Highlight removed.'),
+        onError: (error) =>
+          toast.error(error instanceof Error ? error.message : 'Could not remove the highlight.'),
+      },
+    )
+  }
+
   const handleCopyInfo = async () => {
     const info = [
       `${book.title} — ${book.author}`,
@@ -263,6 +333,7 @@ function BookDetailsContent({
   }
 
   const handleDelete = async () => {
+    if (!window.confirm(`Delete "${book.title}" from your library? This cannot be undone.`)) return
     try {
       await deleteBook.mutateAsync(book.id)
       toast.success('Book deleted.')
@@ -283,13 +354,13 @@ function BookDetailsContent({
       open
       onClose={onClose}
       title={<span className="sr-only">Book details</span>}
-      size="lg"
+      fullScreen
     >
-      <div className="-mx-5 -mb-4 bg-sky-50 px-5 pb-4 dark:bg-gray-800">
-        <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
+      <div className="flex min-h-0 flex-1 flex-col bg-background px-4 pb-3 pt-16 sm:px-8">
+        <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-3 sm:grid-cols-[7rem_minmax(0,1fr)] sm:grid-rows-1 sm:gap-5">
           {/* Left column */}
-          <div className="flex flex-col items-center gap-3">
-            <div className="relative h-64 w-44 shrink-0 overflow-hidden rounded-3xl bg-surface-muted shadow-2xl">
+          <div className="flex flex-col items-center gap-3 sm:sticky sm:top-0 sm:self-start">
+            <div className="relative aspect-[2/3] h-40 w-28 shrink-0 overflow-hidden rounded-xl bg-surface-muted shadow-md">
               {cover ? (
                 <img src={cover} alt="" className="h-full w-full object-cover" />
               ) : (
@@ -298,20 +369,10 @@ function BookDetailsContent({
                 </div>
               )}
             </div>
-            {isWishlist ? (
-              <button
-                type="button"
-                onClick={handleMoveToLibrary}
-                className="flex items-center gap-1.5 rounded-full bg-emerald-500 px-4 py-2 text-xs font-semibold text-white shadow-lg transition hover:bg-emerald-600"
-              >
-                <BookOpen size={14} />
-                Move to Library
-              </button>
-            ) : null}
           </div>
 
           {/* Right column */}
-          <div className="min-w-0 space-y-5">
+          <div className="min-h-0 min-w-0 space-y-3 overflow-y-auto overscroll-contain py-2 pr-1">
             <div className="space-y-2">
               {book.genres.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
@@ -332,7 +393,7 @@ function BookDetailsContent({
               ) : null}
 
               <div className="flex items-start justify-between gap-3">
-                <h2 className="font-serif text-3xl font-black leading-tight">{book.title}</h2>
+                <h2 className="font-serif text-2xl font-black leading-tight">{book.title}</h2>
                 <button
                   type="button"
                   onClick={handleFavorite}
@@ -346,34 +407,43 @@ function BookDetailsContent({
                 </button>
               </div>
 
-              <p className="text-xl italic text-slate-500 dark:text-slate-400">{book.author}</p>
+              <p className="text-base italic text-muted">{book.author}</p>
             </div>
+
+            {isWishlist ? (
+              <button
+                type="button"
+                onClick={handleMoveToLibrary}
+                className="flex items-center gap-1.5 rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-600"
+              >
+                <BookOpen size={14} />
+                Move to Library
+              </button>
+            ) : null}
 
             {book.description ? (
               <p
                 onClick={() => setIsExpanded((value) => !value)}
                 className={cn(
-                  'cursor-pointer text-sm leading-relaxed text-muted',
+                  'cursor-pointer text-xs leading-relaxed text-muted',
                   !isExpanded && 'line-clamp-4',
                 )}
               >
                 {book.description}
               </p>
             ) : (
-              <p className="text-sm italic text-muted">No description added yet.</p>
+              <p className="text-xs italic text-muted">No description added yet.</p>
             )}
 
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="flex items-center gap-0.5 text-amber-500">
-                {Array.from({ length: 5 }, (_, index) => (
-                  <Star
-                    key={index}
-                    size={16}
-                    className={index < rating ? 'fill-current' : 'text-slate-300 dark:text-slate-600'}
-                  />
-                ))}
-              </span>
-              <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-600 dark:text-amber-300">
+            <div className="flex flex-wrap items-center gap-1 text-amber-500">
+              {Array.from({ length: 5 }, (_, index) => (
+                <Star
+                  key={index}
+                  size={14}
+                  className={index < rating ? 'fill-current' : 'text-slate-300 dark:text-slate-600'}
+                />
+              ))}
+              <span className="ml-1.5 text-[10px] font-semibold text-muted">
                 Avg {book.averageRating > 0 ? book.averageRating.toFixed(1) : '—'}
                 {book.ratingCount > 0 ? ` · ${book.ratingCount}` : ''}
               </span>
@@ -389,7 +459,7 @@ function BookDetailsContent({
               <div className="space-y-1.5">
                 <p className={SECTION_LABEL}>ISBN</p>
                 <div className="flex items-center gap-2">
-                  <span className="glass flex-1 truncate rounded-2xl px-3 py-2 font-mono text-xs">
+                  <span className="flex-1 truncate rounded-2xl border border-slate-200 bg-white px-3 py-2 font-mono text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800">
                     {book.isbn}
                   </span>
                   <button
@@ -408,7 +478,7 @@ function BookDetailsContent({
               </div>
             ) : null}
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
               <div className="space-y-1.5">
                 <label htmlFor="detail-status" className={SECTION_LABEL}>
                   Reading Status
@@ -430,16 +500,41 @@ function BookDetailsContent({
                 </select>
               </div>
 
-              <label className="flex cursor-pointer items-center gap-2.5 self-end pb-3">
+              <label className="mb-2 flex cursor-pointer items-center gap-2 text-[10px] font-semibold uppercase text-muted">
                 <input
                   type="checkbox"
                   checked={isWishlist}
                   onChange={(event) => handleWishlist(event.target.checked)}
                   className="h-4 w-4 rounded border-border accent-[rgb(var(--accent))]"
                 />
-                <span className="text-sm">Add to wishlist</span>
+                <span>Wishlist</span>
               </label>
             </div>
+
+            {selected === 'finished' ? (
+              <div className="flex items-end gap-2">
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <label htmlFor="detail-finished-date" className={SECTION_LABEL}>
+                    Finished On
+                  </label>
+                  <input
+                    id="detail-finished-date"
+                    type="date"
+                    value={finishedDate}
+                    onChange={(event) => setFinishedDate(event.target.value)}
+                    className={FIELD_CLASS}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleFinishedDateSave}
+                  disabled={updateStatus.isPending}
+                  className="mb-px shrink-0 rounded-xl bg-surface-muted px-3 py-2.5 text-xs font-semibold text-foreground transition hover:opacity-80 disabled:opacity-60"
+                >
+                  Save date
+                </button>
+              </div>
+            ) : null}
 
             {selected === 'reading' ? (
               <div className="space-y-1.5">
@@ -461,7 +556,7 @@ function BookDetailsContent({
             ) : null}
 
             {selected === 'reading' ? (
-              <div className="glass flex items-center justify-between gap-3 rounded-2xl px-4 py-3">
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-800">
                 <span className="flex items-center gap-2 text-sm">
                   <Clock size={16} className="text-accent" />
                   <span className="font-mono tabular-nums">{timerDisplay}</span>
@@ -506,59 +601,64 @@ function BookDetailsContent({
               </div>
             ) : null}
 
-            <div className="space-y-3">
-              <div className="grid gap-3 sm:grid-cols-[auto_1fr] sm:items-end">
-                <div className="space-y-1.5">
-                  <label htmlFor="detail-rating" className={SECTION_LABEL}>
-                    Your Rating
-                  </label>
-                  <select
-                    id="detail-rating"
-                    value={rating}
-                    onChange={(event) => setRating(Number(event.target.value))}
-                    className={cn(FIELD_CLASS, 'appearance-none')}
-                  >
-                    <option value={0}>No rating</option>
+            <div className="space-y-2.5 border-t border-border/60 pt-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className={SECTION_LABEL}>My Rating &amp; Review</h3>
+                <div role="group" aria-label="Your rating" className="flex items-center gap-0.5">
                     {[1, 2, 3, 4, 5].map((value) => (
-                      <option key={value} value={value}>
-                        {value} star{value === 1 ? '' : 's'}
-                      </option>
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => void handleRatingChange(value)}
+                        disabled={updateStatus.isPending}
+                        aria-label={`Rate ${value} out of 5 stars`}
+                        aria-pressed={rating === value}
+                        className="rounded-md p-1 text-amber-500 transition hover:scale-110 hover:bg-amber-500/10 focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-wait disabled:opacity-60"
+                      >
+                        <Star size={16} className={value <= rating ? 'fill-current' : 'text-muted/40'} />
+                      </button>
                     ))}
-                  </select>
+                    <button
+                      type="button"
+                      onClick={() => void handleRatingChange(0)}
+                      disabled={rating === 0 || updateStatus.isPending}
+                      aria-label="Clear rating"
+                      className="ml-1 rounded-md px-2 py-1 text-[11px] font-medium text-muted transition hover:bg-surface-muted hover:text-foreground disabled:cursor-default disabled:opacity-50"
+                    >
+                      Clear
+                    </button>
                 </div>
               </div>
               <div className="space-y-1.5">
-                <label htmlFor="detail-review" className={SECTION_LABEL}>
-                  Your Review
-                </label>
                 <textarea
                   id="detail-review"
                   value={comment}
                   onChange={(event) => setComment(event.target.value)}
                   rows={3}
-                  placeholder="Share your thoughts…"
-                  className={cn(FIELD_CLASS, 'resize-none')}
+                  aria-label="Your reading journal entry"
+                  placeholder="What did you think, feel, or want to remember?"
+                  className={cn(FIELD_CLASS, 'resize-y leading-relaxed')}
                 />
               </div>
               <button
                 type="button"
                 onClick={handleSaveReview}
                 disabled={updateStatus.isPending}
-                className="flex items-center gap-2 rounded-2xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90 disabled:opacity-60"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-xs font-bold uppercase text-accent-foreground transition hover:opacity-90 disabled:opacity-60"
               >
                 {updateStatus.isPending ? <Loader2 className="animate-spin" size={15} /> : null}
                 Save Review
               </button>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 border-t border-border/60 pt-3">
               <p className={SECTION_LABEL}>Borrowing</p>
               {book.borrowedBy ? (
-                <div className="glass flex items-center justify-between gap-3 rounded-2xl px-4 py-3">
-                  <span className="min-w-0 text-sm">
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/60 dark:bg-amber-950/20">
+                  <span className="min-w-0 text-sm text-amber-900 dark:text-amber-100">
                     Borrowed by <span className="font-semibold">{book.borrowedBy}</span>
                     {book.borrowDate ? (
-                      <span className="block text-xs text-muted">
+                      <span className="block text-xs text-amber-800/80 dark:text-amber-200/80">
                         since {formatDate(book.borrowDate)}
                       </span>
                     ) : null}
@@ -576,11 +676,13 @@ function BookDetailsContent({
                         )
                     }}
                     disabled={returnBook.isPending}
-                    className="shrink-0 rounded-full bg-surface-muted px-3.5 py-1.5 text-xs font-semibold transition hover:opacity-80 disabled:opacity-60"
+                    className="shrink-0 rounded-full bg-amber-600 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-700 disabled:opacity-60"
                   >
                     Return
                   </button>
                 </div>
+              ) : book.isInLibrary === false ? (
+                <p className="text-xs text-muted">This book is not in your library and can&apos;t be lent.</p>
               ) : (
                 <div className="flex items-center gap-2">
                   <input
@@ -612,8 +714,6 @@ function BookDetailsContent({
                 </div>
               )}
             </div>
-          </div>
-        </div>
 
         {/* Collaborator reviews */}
         {reviews.length > 0 ? (
@@ -631,7 +731,7 @@ function BookDetailsContent({
         ) : null}
 
         {/* Highlights & quotes */}
-        <div className="mt-6 space-y-3">
+        <div className="mt-4 space-y-2.5 border-t border-border/60 pt-4">
           <p className="flex items-center gap-1.5 text-sm font-semibold">
             <Highlighter size={15} className="text-accent" />
             Highlights &amp; Quotes
@@ -641,12 +741,24 @@ function BookDetailsContent({
               {highlights.map((highlight, index) => (
                 <li
                   key={index}
-                  className="glass rounded-2xl px-4 py-3 text-sm leading-relaxed"
+                  className="flex items-start gap-3 rounded-2xl border border-border/60 border-l-2 border-l-accent/50 bg-surface px-4 py-3 text-sm leading-relaxed shadow-sm"
                 >
-                  <span className="block italic">“{highlight.text}”</span>
-                  {highlight.page != null ? (
-                    <span className="mt-1 block text-xs text-muted">Page {highlight.page}</span>
-                  ) : null}
+                  <div className="min-w-0 flex-1">
+                    <span className="block font-serif text-base italic">“{highlight.text}”</span>
+                    {highlight.page != null ? (
+                      <span className="mt-1 block text-xs text-muted">Page {highlight.page}</span>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveHighlight(index)}
+                    disabled={updateBook.isPending}
+                    aria-label={`Delete highlight${highlight.page == null ? '' : ` on page ${highlight.page}`}`}
+                    title="Delete highlight"
+                    className="shrink-0 rounded-lg p-1.5 text-muted transition hover:bg-rose-500/10 hover:text-rose-600 disabled:opacity-50 dark:hover:text-rose-300"
+                  >
+                    <Trash2 size={15} />
+                  </button>
                 </li>
               ))}
             </ul>
@@ -686,29 +798,33 @@ function BookDetailsContent({
         {legacyNotes ? (
           <div className="mt-6 space-y-2">
             <p className={SECTION_LABEL}>Legacy Notes</p>
-            <p className="glass whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed">
+            <p className="whitespace-pre-wrap rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed shadow-sm dark:border-slate-700 dark:bg-slate-800">
               {legacyNotes}
             </p>
           </div>
         ) : null}
 
+        </div>
+        </div>
+
         {/* Bottom action bar */}
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-4">
+        <div className="mt-3 shrink-0 border-t border-border/60 bg-background py-2">
+          <div className="flex items-center justify-between gap-2">
           <button
             type="button"
             onClick={() => void handleDelete()}
             disabled={deleteBook.isPending || !isOwner}
-            className="flex items-center gap-1.5 rounded-2xl bg-rose-500/10 px-3.5 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-500/20 disabled:opacity-50 dark:text-rose-300"
+            className="flex shrink-0 items-center gap-1.5 rounded-xl bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-500/20 disabled:opacity-50 dark:text-rose-300"
           >
             <Trash2 size={15} />
             Delete
           </button>
 
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="no-scrollbar flex min-w-0 items-center gap-1.5 overflow-x-auto py-1">
             <button
               type="button"
               onClick={() => setIsShelfOpen(true)}
-              className="flex items-center gap-1.5 rounded-2xl bg-surface-muted px-3.5 py-2 text-sm font-semibold transition hover:opacity-80"
+              className="flex shrink-0 items-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-xs font-semibold text-accent-foreground transition hover:opacity-90"
             >
               <Layers size={15} />
               Add to Shelf
@@ -717,49 +833,52 @@ function BookDetailsContent({
               <button
                 type="button"
                 onClick={onRemoveFromShelf}
-                className="flex items-center gap-1.5 rounded-2xl bg-rose-500/10 px-3.5 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-500/20 dark:text-rose-300"
+                className="flex shrink-0 items-center gap-1.5 rounded-xl bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-500/20 dark:text-rose-300"
               >
                 <Trash2 size={15} />
                 Remove from Shelf
               </button>
             ) : null}
+            <span aria-hidden="true" className="mx-1 h-6 w-px shrink-0 bg-border" />
             <button
               type="button"
               onClick={() => setIsSummaryOpen(true)}
-              className="flex items-center gap-1.5 rounded-2xl bg-surface-muted px-3.5 py-2 text-sm font-semibold transition hover:opacity-80"
+              className="flex shrink-0 items-center gap-1.5 rounded-xl bg-surface-muted px-3 py-2 text-xs font-semibold transition hover:opacity-80"
             >
               <Sparkles size={15} />
               AI Summary
             </button>
             <button
               type="button"
+              onClick={() => setIsAskOpen(true)}
+              className="flex shrink-0 items-center gap-1.5 rounded-xl bg-surface-muted px-3 py-2 text-xs font-semibold transition hover:opacity-80"
+            >
+              <MessageSquare size={15} />
+              Ask AI
+            </button>
+            <span aria-hidden="true" className="mx-1 h-6 w-px shrink-0 bg-border" />
+            <button
+              type="button"
               onClick={() => void handleCopyInfo()}
-              className="flex items-center gap-1.5 rounded-2xl bg-surface-muted px-3.5 py-2 text-sm font-semibold transition hover:opacity-80"
+              className="flex shrink-0 items-center gap-1.5 rounded-xl bg-surface-muted px-3 py-2 text-xs font-semibold transition hover:opacity-80"
             >
               <Copy size={15} />
               Copy Info
             </button>
             <button
               type="button"
-              onClick={() => setIsAskOpen(true)}
-              className="flex items-center gap-1.5 rounded-2xl bg-surface-muted px-3.5 py-2 text-sm font-semibold transition hover:opacity-80"
-            >
-              <MessageSquare size={15} />
-              Ask AI
-            </button>
-            <button
-              type="button"
               onClick={() => setIsShareOpen(true)}
-              className="flex items-center gap-1.5 rounded-2xl bg-surface-muted px-3.5 py-2 text-sm font-semibold transition hover:opacity-80"
+              className="flex shrink-0 items-center gap-1.5 rounded-xl bg-surface-muted px-3 py-2 text-xs font-semibold transition hover:opacity-80"
             >
               <Share2 size={15} />
               Share
             </button>
+            <span aria-hidden="true" className="mx-1 h-6 w-px shrink-0 bg-border" />
             {isOwner ? (
               <button
                 type="button"
                 onClick={() => setIsTransferOpen(true)}
-                className="flex items-center gap-1.5 rounded-2xl bg-surface-muted px-3.5 py-2 text-sm font-semibold transition hover:opacity-80"
+                className="flex shrink-0 items-center gap-1.5 rounded-xl bg-surface-muted px-3 py-2 text-xs font-semibold transition hover:opacity-80"
               >
                 <ArrowRightLeft size={15} />
                 Transfer
@@ -769,7 +888,7 @@ function BookDetailsContent({
               <button
                 type="button"
                 onClick={() => setIsEditOpen(true)}
-                className="flex items-center gap-1.5 rounded-2xl bg-surface-muted px-3.5 py-2 text-sm font-semibold transition hover:opacity-80"
+                className="flex shrink-0 items-center gap-1.5 rounded-xl bg-surface-muted px-3 py-2 text-xs font-semibold transition hover:opacity-80"
               >
                 <Pencil size={15} />
                 Edit Details
@@ -778,10 +897,12 @@ function BookDetailsContent({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-2xl bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
+              className="flex shrink-0 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-semibold transition hover:bg-surface-muted"
             >
+              <X size={14} />
               Close
             </button>
+          </div>
           </div>
         </div>
       </div>

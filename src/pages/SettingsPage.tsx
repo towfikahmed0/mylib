@@ -63,8 +63,8 @@ function DataAction({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'glass flex items-start gap-3 rounded-2xl px-4 py-3 text-left transition',
-        'hover:-translate-y-0.5 hover:shadow-glass disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0',
+        'flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition dark:border-slate-700 dark:bg-slate-800',
+        'hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0',
       )}
     >
       <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
@@ -186,7 +186,7 @@ export function SettingsPage() {
       const record = records[index]
       try {
         const bookId = await addBook.mutateAsync(recordToBookFormInput(record))
-        if (record.readingStatus) {
+        if (record.isInLibrary && record.readingStatus) {
           await updateStatus.mutateAsync({ bookId, status: record.readingStatus })
         }
         success += 1

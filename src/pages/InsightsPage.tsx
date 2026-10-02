@@ -14,8 +14,10 @@ import { useLibraryStats, type LibraryStats } from '../features/insights/hooks/u
 import { AIInsightsPanel } from '../features/insights/components/AIInsightsPanel'
 import { CollaboratorsCard } from '../features/insights/components/CollaboratorsCard'
 import { ReadingChallenges } from '../features/insights/components/ReadingChallenges'
+import { FinishedBooksByMonth } from '../features/insights/components/FinishedBooksByMonth'
 import { ReadingHeatmap } from '../features/insights/components/ReadingHeatmap'
 import { useAuth } from '../features/auth/useAuth'
+import { useBooks } from '../features/library/hooks/useBooks'
 import { useReadingStatus } from '../features/library/hooks/useReadingStatus'
 import { ShareModal } from '../features/sharing/components/ShareModal'
 
@@ -32,13 +34,29 @@ function StatCard({
   icon,
   label,
   value,
+  onShare,
+  shareDisabled = false,
 }: {
   icon: ReactNode
   label: string
   value: string
+  onShare?: () => void
+  shareDisabled?: boolean
 }) {
   return (
     <div className="group relative overflow-hidden rounded-3xl border border-slate-100 bg-white p-3 shadow-sm sm:p-6 dark:border-slate-700 dark:bg-slate-800">
+      {onShare ? (
+        <button
+          type="button"
+          onClick={onShare}
+          disabled={shareDisabled}
+          aria-label={`Share ${label}`}
+          title={`Share ${label}`}
+          className="absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-lg bg-surface-muted text-muted transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 sm:right-3 sm:top-3"
+        >
+          <Share2 size={15} />
+        </button>
+      ) : null}
       <div className="absolute -bottom-2 -right-2 text-foreground opacity-5 transition-transform duration-500 group-hover:scale-110 dark:opacity-10 [&_svg]:h-16 [&_svg]:w-16 sm:[&_svg]:h-20 sm:[&_svg]:w-20">
         {icon}
       </div>
@@ -65,9 +83,11 @@ function StatCardSkeleton() {
 function InsightsContent({
   stats,
   onSelectTag,
+  onShareMomentum,
 }: {
   stats: LibraryStats
   onSelectTag: (tag: string) => void
+  onShareMomentum: () => void
 }) {
   const composition = [
     { label: 'Want to Read', value: stats.statusCounts.want_to_read },
@@ -211,6 +231,7 @@ function InsightsContent({
       </div>
 
       <ReadingHeatmap />
+      <FinishedBooksByMonth />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard
@@ -222,6 +243,8 @@ function InsightsContent({
           icon={<TrendingUp size={18} />}
           label="Momentum (last 30 days)"
           value={`${stats.momentum} book${stats.momentum === 1 ? '' : 's'}`}
+          onShare={onShareMomentum}
+          shareDisabled={stats.momentum === 0}
         />
         <StatCard
           icon={<Gauge size={18} />}
@@ -246,15 +269,34 @@ function InsightsContent({
 export function InsightsPage() {
   const { stats, isLoading } = useLibraryStats()
   const { appUser } = useAuth()
+  const { books } = useBooks()
   const { statuses } = useReadingStatus()
   const navigate = useNavigate()
   const [isShareOpen, setIsShareOpen] = useState(false)
+  const [isMomentumShareOpen, setIsMomentumShareOpen] = useState(false)
 
   const handleSelectTag = (tag: string) => {
     navigate(`/library?tag=${encodeURIComponent(tag)}`)
   }
 
   const wishlistCount = Object.values(statuses).filter((status) => status.isWishlist).length
+  const periodEnd = new Date()
+  const periodStart = new Date(periodEnd.getTime() - 30 * 24 * 60 * 60 * 1000)
+  const momentumBooks = books.filter((book) => {
+    if (book.isInLibrary === false) return false
+    const status = statuses[book.id]
+    if (status?.status !== 'finished') return false
+    const finishedAt = status.finishedAt ?? status.updatedAt
+    if (!finishedAt) return false
+    try {
+      return finishedAt.toMillis() >= periodStart.getTime()
+    } catch {
+      return false
+    }
+  })
+  const formatPeriodDate = (date: Date) =>
+    date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
+  const momentumPeriodLabel = `${formatPeriodDate(periodStart)} – ${formatPeriodDate(periodEnd)}`
 
   return (
     <section className="animate-fade-in space-y-5">
@@ -300,7 +342,11 @@ export function InsightsPage() {
           </p>
         </div>
       ) : (
-        <InsightsContent stats={stats} onSelectTag={handleSelectTag} />
+        <InsightsContent
+          stats={stats}
+          onSelectTag={handleSelectTag}
+          onShareMomentum={() => setIsMomentumShareOpen(true)}
+        />
       )}
 
       <ShareModal
@@ -315,8 +361,22 @@ export function InsightsPage() {
           wishlist: wishlistCount,
           streak: stats.readingStreak,
           topGenres: stats.genreCounts.slice(0, 3).map((genre) => genre.label),
+          covers: books
+            .filter((book) => book.isInLibrary !== false)
+            .map((book) => book.coverUrl || book.thumbnail || null),
         }}
         onClose={() => setIsShareOpen(false)}
+      />
+      <ShareModal
+        open={isMomentumShareOpen}
+        variant="covers"
+        filename="mylib-momentum-last-30-days"
+        covers={{
+          totalBooks: momentumBooks.length,
+          covers: momentumBooks.map((book) => book.coverUrl || book.thumbnail || null),
+          periodLabel: `Last 30 days · ${momentumPeriodLabel}`,
+        }}
+        onClose={() => setIsMomentumShareOpen(false)}
       />
     </section>
   )

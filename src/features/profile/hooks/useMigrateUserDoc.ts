@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { doc, getDoc, writeBatch } from 'firebase/firestore'
 import { auth, db } from '../../../lib/firebase'
+import { sanitizeFirestoreData } from '../../../lib/firestore'
 import { useAuth } from '../../auth/useAuth'
 
 export interface MigrateUserDocResult {
@@ -27,7 +28,7 @@ async function migrateUserDoc(uid: string): Promise<MigrateUserDocResult> {
   if (Object.keys(patch).length === 0) return { migrated: false, fields: [] }
 
   const batch = writeBatch(db)
-  batch.update(ref, patch)
+  batch.update(ref, sanitizeFirestoreData(patch))
   await batch.commit()
 
   return { migrated: true, fields: Object.keys(patch) }

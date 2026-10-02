@@ -5,10 +5,7 @@ import type { AccentColor, ThemeMode } from '../types'
 const THEME_ORDER: ThemeMode[] = ['light', 'dark', 'sepia']
 
 export function resolveInitialTheme(): ThemeMode {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-    return 'light'
-  }
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  return 'light'
 }
 
 export function applyTheme(theme: ThemeMode, accent: AccentColor): void {

@@ -11,6 +11,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
+import { sanitizeFirestoreData } from '../../../lib/firestore'
 import { useAuth } from '../../auth/useAuth'
 import { sendNotification } from '../../notifications/utils/createNotification'
 import { publicProfileKeys } from '../../profile/hooks/usePublicProfile'
@@ -87,16 +88,16 @@ export function useFollowCounts(uid: string | undefined) {
 
 async function followUser(viewerUid: string, targetUid: string): Promise<void> {
   const batch = writeBatch(db)
-  batch.set(doc(db, 'users', viewerUid, 'following', targetUid), {
+  batch.set(doc(db, 'users', viewerUid, 'following', targetUid), sanitizeFirestoreData({
     userId: viewerUid,
     createdAt: serverTimestamp(),
-  })
-  batch.set(doc(db, 'users', targetUid, 'followers', viewerUid), {
+  }))
+  batch.set(doc(db, 'users', targetUid, 'followers', viewerUid), sanitizeFirestoreData({
     userId: viewerUid,
     createdAt: serverTimestamp(),
-  })
-  batch.update(doc(db, 'users', viewerUid), { followingCount: increment(1) })
-  batch.update(doc(db, 'users', targetUid), { followerCount: increment(1) })
+  }))
+  batch.update(doc(db, 'users', viewerUid), sanitizeFirestoreData({ followingCount: increment(1) }))
+  batch.update(doc(db, 'users', targetUid), sanitizeFirestoreData({ followerCount: increment(1) }))
   await batch.commit()
 }
 
@@ -104,8 +105,8 @@ async function unfollowUser(viewerUid: string, targetUid: string): Promise<void>
   const batch = writeBatch(db)
   batch.delete(doc(db, 'users', viewerUid, 'following', targetUid))
   batch.delete(doc(db, 'users', targetUid, 'followers', viewerUid))
-  batch.update(doc(db, 'users', viewerUid), { followingCount: increment(-1) })
-  batch.update(doc(db, 'users', targetUid), { followerCount: increment(-1) })
+  batch.update(doc(db, 'users', viewerUid), sanitizeFirestoreData({ followingCount: increment(-1) }))
+  batch.update(doc(db, 'users', targetUid), sanitizeFirestoreData({ followerCount: increment(-1) }))
   await batch.commit()
 }
 

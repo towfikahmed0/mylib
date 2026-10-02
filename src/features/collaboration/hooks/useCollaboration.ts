@@ -11,6 +11,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
+import { sanitizeFirestoreData } from '../../../lib/firestore'
 import type { CollaborationRequest, Partnership } from '../../../types'
 import { useAuth } from '../../auth/useAuth'
 import { sendNotification, type ActorInfo } from '../../notifications/utils/createNotification'
@@ -230,13 +231,13 @@ export function useSendCollaborationRequest() {
           throw new Error('A request with this reader already exists.')
         }
         // Re-invite after a decline/cancel by resetting the request to pending.
-        await updateDoc(doc(db, 'collaborationRequests', id), {
+        await updateDoc(doc(db, 'collaborationRequests', id), sanitizeFirestoreData({
           status: 'pending',
           updatedAt: serverTimestamp(),
-        })
+        }))
       } else {
         await writeBatch(db)
-          .set(doc(db, 'collaborationRequests', id), {
+          .set(doc(db, 'collaborationRequests', id), sanitizeFirestoreData({
             fromUserId: user.uid,
             fromEmail: user.email ?? '',
             fromName,
@@ -245,7 +246,7 @@ export function useSendCollaborationRequest() {
             status: 'pending',
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
-          })
+          }))
           .commit()
       }
 
@@ -287,11 +288,11 @@ export function useAcceptCollaboration() {
       const [first, second] = [request.fromUserId, request.toUserId].sort()
 
       const batch = writeBatch(db)
-      batch.update(doc(db, 'collaborationRequests', requestId), {
+      batch.update(doc(db, 'collaborationRequests', requestId), sanitizeFirestoreData({
         status: 'accepted',
         updatedAt: serverTimestamp(),
-      })
-      batch.set(doc(db, 'partnerships', requestId), {
+      }))
+      batch.set(doc(db, 'partnerships', requestId), sanitizeFirestoreData({
         userId1: first,
         userId2: second,
         initiatorId: request.fromUserId,
@@ -302,7 +303,7 @@ export function useAcceptCollaboration() {
         user2Unsubscribed: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      })
+      }))
       await batch.commit()
 
       try {
@@ -334,10 +335,10 @@ function useRequestStatusMutation(status: 'rejected' | 'cancelled') {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (requestId: string) =>
-      updateDoc(doc(db, 'collaborationRequests', requestId), {
+      updateDoc(doc(db, 'collaborationRequests', requestId), sanitizeFirestoreData({
         status,
         updatedAt: serverTimestamp(),
-      }),
+      })),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: collaborationKeys.all })
     },
@@ -359,11 +360,11 @@ export function useSetPartnerAddPermission() {
   return useMutation({
     mutationFn: ({ partnershipId: id, allow }: { partnershipId: string; allow: boolean }) => {
       if (!user) throw new Error('You must be signed in to change permissions.')
-      return updateDoc(doc(db, 'partnerships', id), {
+      return updateDoc(doc(db, 'partnerships', id), sanitizeFirestoreData({
         allowAddBooks: allow,
         grantedBy: allow ? user.uid : '',
         updatedAt: serverTimestamp(),
-      })
+      }))
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: collaborationKeys.all })
@@ -390,10 +391,10 @@ export function useTogglePartnerSubscription() {
         if (!snapshot.exists()) throw new Error('This partnership no longer exists.')
         const data = snapshot.data() as Partnership
         const field = data.userId1 === user.uid ? 'user1Unsubscribed' : 'user2Unsubscribed'
-        return updateDoc(doc(db, 'partnerships', id), {
+        return updateDoc(doc(db, 'partnerships', id), sanitizeFirestoreData({
           [field]: unsubscribed,
           updatedAt: serverTimestamp(),
-        })
+        }))
       })
     },
     onSuccess: () => {

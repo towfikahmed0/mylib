@@ -26,7 +26,7 @@ export function Toaster() {
           <div
             key={toast.id}
             role="status"
-            className="glass pointer-events-auto flex w-full max-w-sm animate-slide-up items-start gap-3 rounded-2xl px-4 py-3 shadow-glass"
+            className="pointer-events-auto flex w-full max-w-sm animate-slide-up items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-800"
           >
             <Icon className={cn('mt-0.5 shrink-0', meta.iconClass)} size={18} />
             <p className="flex-1 text-sm text-foreground">{toast.message}</p>

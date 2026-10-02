@@ -173,7 +173,7 @@ function SearchPanel({ onClose }: { onClose: () => void }) {
                     <span className="block truncate text-sm font-medium">{group.title}</span>
                     <span className="block truncate text-xs text-muted">{group.author}</span>
                   </span>
-                  <span className="shrink-0 rounded-full glass px-2.5 py-1 text-[10px] font-semibold text-muted">
+                  <span className="shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-muted shadow-sm dark:border-slate-700 dark:bg-slate-800">
                     {group.reviews.length}
                   </span>
                 </button>

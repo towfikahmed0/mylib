@@ -10,7 +10,7 @@ export function ShelfCard({
   shelf: Shelf
   onClick?: (shelf: Shelf) => void
 }) {
-  const { books } = useShelfBooks(shelf.id)
+  const { books, isLoading, isBooksError } = useShelfBooks(shelf.id)
   const covers = books.slice(0, 3)
   const count = shelf.isSmart ? books.length : shelf.bookIds?.length ?? 0
 
@@ -18,7 +18,7 @@ export function ShelfCard({
     <button
       type="button"
       onClick={() => onClick?.(shelf)}
-      className="glass group flex flex-col gap-3 rounded-3xl p-4 text-left transition hover:-translate-y-0.5 hover:shadow-glass"
+      className="group flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
     >
       <div className="flex items-start justify-between gap-2">
         <span
@@ -36,13 +36,19 @@ export function ShelfCard({
       <div className="min-w-0">
         <p className="truncate font-serif text-base font-bold">{shelf.name}</p>
         <p className="text-xs text-muted">
-          {count} book{count === 1 ? '' : 's'}
+          {shelf.isSmart && isLoading
+            ? 'Updating…'
+            : isBooksError
+              ? 'Books unavailable'
+              : `${count} book${count === 1 ? '' : 's'}`}
           {shelf.isSmart ? ' · Smart' : ''}
         </p>
       </div>
 
       <div className="mt-auto flex items-end gap-1.5">
-        {covers.length > 0 ? (
+        {isBooksError ? (
+          <span className="text-xs text-muted">Could not load book previews</span>
+        ) : covers.length > 0 ? (
           covers.map((book) => {
             const cover = book.coverUrl || book.thumbnail
             return (

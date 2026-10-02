@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Loader2, Shield } from 'lucide-react'
 import { doc, updateDoc } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
+import { sanitizeFirestoreData } from '../../../lib/firestore'
 import { cn } from '../../../lib/utils'
 import { toast } from '../../../store/toastStore'
 import { useAuth } from '../../auth/useAuth'
@@ -36,7 +37,10 @@ export function PrivacySettings() {
   const handleSave = async () => {
     setIsSaving(true)
     try {
-      await updateDoc(doc(db, 'users', appUser.uid), { privacySettings: settings })
+      await updateDoc(
+        doc(db, 'users', appUser.uid),
+        sanitizeFirestoreData({ privacySettings: settings }),
+      )
       await refreshProfile()
       toast.success('Privacy settings saved.')
     } catch (error) {
@@ -89,7 +93,7 @@ export function PrivacySettings() {
                       'rounded-full px-3 py-1.5 text-xs font-medium transition',
                       selected
                         ? 'bg-accent text-accent-foreground'
-                        : 'glass text-muted hover:text-foreground',
+                        : 'border border-slate-200 bg-white text-muted hover:text-foreground dark:border-slate-700 dark:bg-slate-800',
                     )}
                   >
                     {option.label}

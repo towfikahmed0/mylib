@@ -1,11 +1,11 @@
 import { BookOpen, CheckCircle2, Flame, Heart, Library } from 'lucide-react'
 import type { ReactNode } from 'react'
+import type { BookCoversShareData } from './LibraryCoversShareCard'
 import { ShareLogo } from './ShareLogo'
 
-export interface InsightsShareData {
+export interface InsightsShareData extends BookCoversShareData {
   displayName: string
   username: string
-  totalBooks: number
   finished: number
   reading: number
   wishlist: number

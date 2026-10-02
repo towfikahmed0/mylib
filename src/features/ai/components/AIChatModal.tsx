@@ -15,7 +15,7 @@ const QUICK_ACTIONS = [
 function ChatSkeleton() {
   return (
     <div className="flex justify-start">
-      <div className="glass w-full max-w-[85%] space-y-2 rounded-2xl px-3.5 py-3">
+      <div className="w-full max-w-[85%] space-y-2 rounded-2xl border border-slate-200 bg-white px-3.5 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-800">
         <div className="skeleton-base h-3 w-11/12" />
         <div className="skeleton-base h-3 w-4/5" />
         <div className="skeleton-base h-3 w-3/5" />
@@ -32,7 +32,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       <div
         className={cn(
           'max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed',
-          isUser ? 'bg-accent text-accent-foreground' : 'glass',
+          isUser ? 'bg-accent text-accent-foreground' : 'border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800',
         )}
       >
         {isUser ? (

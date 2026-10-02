@@ -16,6 +16,7 @@ import {
   type QueryDocumentSnapshot,
 } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
+import { sanitizeFirestoreData } from '../../../lib/firestore'
 import type { AppNotification } from '../../../types'
 import { useAuth } from '../../auth/useAuth'
 
@@ -149,9 +150,9 @@ export function useMarkAsRead() {
   return useMutation({
     mutationFn: (notificationId: string) => {
       if (!user) throw new Error('You must be signed in.')
-      return updateDoc(doc(db, 'users', user.uid, 'notifications', notificationId), {
+      return updateDoc(doc(db, 'users', user.uid, 'notifications', notificationId), sanitizeFirestoreData({
         read: true,
-      })
+      }))
     },
   })
 }
@@ -166,7 +167,9 @@ export function useMarkAllAsRead() {
       )
       if (snapshot.empty) return
       const batch = writeBatch(db)
-      snapshot.docs.forEach((document) => batch.update(document.ref, { read: true }))
+      snapshot.docs.forEach((document) =>
+        batch.update(document.ref, sanitizeFirestoreData({ read: true })),
+      )
       await batch.commit()
     },
   })

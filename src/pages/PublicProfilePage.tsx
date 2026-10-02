@@ -169,6 +169,7 @@ export function PublicProfilePage() {
                 <BookCard
                   key={book.id}
                   book={book}
+                  showReadingStatus={Boolean(user)}
                   onRequest={!isOwnProfile ? handleRequest : undefined}
                 />
               ))}

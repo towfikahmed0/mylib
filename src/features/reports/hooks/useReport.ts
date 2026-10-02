@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
+import { sanitizeFirestoreData } from '../../../lib/firestore'
 import type { ReportTargetType } from '../../../types'
 import { useAuth } from '../../auth/useAuth'
 
@@ -18,7 +19,7 @@ export function useSubmitReport() {
     mutationFn: async ({ targetType, targetId, reason, details }: SubmitReportInput) => {
       if (!user) throw new Error('You must be signed in to send a report.')
 
-      await addDoc(collection(db, 'reports'), {
+      await addDoc(collection(db, 'reports'), sanitizeFirestoreData({
         reporterId: user.uid,
         targetType,
         targetId,
@@ -26,7 +27,7 @@ export function useSubmitReport() {
         details: details?.trim() ?? '',
         status: 'pending',
         createdAt: serverTimestamp(),
-      })
+      }))
     },
   })
 }

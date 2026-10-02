@@ -106,7 +106,7 @@ export function ExplorePage() {
                 'rounded-full px-3 py-1.5 text-xs font-medium transition',
                 category === option.value
                   ? 'bg-accent text-accent-foreground'
-                  : 'glass text-muted hover:text-foreground',
+                  : 'border border-slate-200 bg-white text-muted hover:text-foreground dark:border-slate-700 dark:bg-slate-800',
               )}
             >
               {option.label}

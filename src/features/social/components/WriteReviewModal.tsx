@@ -20,6 +20,7 @@ function WriteReviewForm({ onClose }: { onClose: () => void }) {
   const writeReview = useWriteReview()
   const [bookTitle, setBookTitle] = useState('')
   const [author, setAuthor] = useState('')
+  const [coverUrl, setCoverUrl] = useState('')
   const [category, setCategory] = useState<ReviewCategory>('review')
   const [rating, setRating] = useState(0)
   const [body, setBody] = useState('')
@@ -31,7 +32,7 @@ function WriteReviewForm({ onClose }: { onClose: () => void }) {
     event.preventDefault()
     if (!canSubmit) return
     try {
-      await writeReview.mutateAsync({ bookTitle, author, category, rating, body })
+      await writeReview.mutateAsync({ bookTitle, author, coverUrl, category, rating, body })
       toast.success('Review posted.')
       onClose()
     } catch (error) {
@@ -96,6 +97,20 @@ function WriteReviewForm({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="space-y-1.5">
+          <label htmlFor="review-cover-url" className={LABEL_CLASS}>
+            Book cover link
+          </label>
+          <input
+            id="review-cover-url"
+            type="url"
+            value={coverUrl}
+            onChange={(event) => setCoverUrl(event.target.value)}
+            placeholder="https://…"
+            className={FIELD_CLASS}
+          />
+        </div>
+
+        <div className="space-y-1.5">
           <span className={LABEL_CLASS}>Rating</span>
           <div className="flex items-center gap-1">
             {[1, 2, 3, 4, 5].map((value) => (
@@ -128,7 +143,7 @@ function WriteReviewForm({ onClose }: { onClose: () => void }) {
                     'rounded-full px-3 py-1.5 text-xs font-medium transition',
                     selected
                       ? 'bg-accent text-accent-foreground'
-                      : 'glass text-muted hover:text-foreground',
+                      : 'border border-slate-200 bg-white text-muted hover:text-foreground dark:border-slate-700 dark:bg-slate-800',
                   )}
                 >
                   {option.label}

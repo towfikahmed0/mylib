@@ -64,7 +64,8 @@ function toSortedItems(counts: Map<string, number>, limit: number): CountedItem[
 }
 
 function computeStats(books: Book[], statuses: ReadingStatusMap): LibraryStats {
-  const totalBooks = books.length
+  const libraryBooks = books.filter((book) => book.isInLibrary !== false)
+  const totalBooks = libraryBooks.length
 
   const statusCounts: Record<ReadingStatusValue, number> = {
     want_to_read: 0,
@@ -94,7 +95,7 @@ function computeStats(books: Book[], statuses: ReadingStatusMap): LibraryStats {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
   const yearStart = new Date(now.getFullYear(), 0, 1).getTime()
 
-  for (const book of books) {
+  for (const book of libraryBooks) {
     const status = statuses[book.id]
     const statusValue: ReadingStatusValue = status?.status ?? 'want_to_read'
     statusCounts[statusValue] += 1

@@ -26,7 +26,7 @@ import { NotificationBell } from '../features/notifications/components/Notificat
 import type { Book } from '../types'
 
 const SKELETON_COUNT = 10
-const GRID_CLASS = 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
+const GRID_CLASS = 'grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3'
 const COMPACT_CLASS = 'grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
 const VIEW_STORAGE_KEY = 'mylib-library-view'
 
@@ -34,6 +34,17 @@ const VIEW_OPTIONS: { value: BookCardView; label: string; icon: typeof LayoutGri
   { value: 'grid', label: 'Grid view', icon: LayoutGrid },
   { value: 'list', label: 'List view', icon: List },
   { value: 'compact', label: 'Compact view', icon: AlignJustify },
+]
+
+type LibrarySort = 'recent' | 'favorites' | 'title' | 'author' | 'genre'
+type LendingFilter = 'all' | 'lent' | 'available'
+
+const SORT_OPTIONS: { value: LibrarySort; label: string }[] = [
+  { value: 'recent', label: 'Recently added' },
+  { value: 'favorites', label: 'Favorites only' },
+  { value: 'title', label: 'Name A–Z' },
+  { value: 'author', label: 'Author A–Z' },
+  { value: 'genre', label: 'Genre A–Z' },
 ]
 
 function readStoredView(): BookCardView {
@@ -54,6 +65,11 @@ export function LibraryPage() {
   const [editingBook, setEditingBook] = useState<Book | null>(null)
   const [view, setView] = useState<BookCardView>(() => readStoredView())
   const [searchParams, setSearchParams] = useSearchParams()
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortBy, setSortBy] = useState<LibrarySort>('recent')
+  const [lendingFilter, setLendingFilter] = useState<LendingFilter>('all')
+  const [authorFilter, setAuthorFilter] = useState('')
+  const [selectedGenre, setSelectedGenre] = useState('')
 
   const selectView = (next: BookCardView) => {
     setView(next)
@@ -69,17 +85,55 @@ export function LibraryPage() {
 
   const tagFilter = searchParams.get('tag')
   const genreFilter = searchParams.get('genre')
-  const visibleBooks = books.filter((book) => {
+  const libraryBooks = books.filter((book) => book.isInLibrary !== false)
+  const authorOptions = Array.from(new Set(libraryBooks.map((book) => book.author.trim()).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b))
+  const genreOptions = Array.from(new Set(libraryBooks.flatMap((book) => book.genres ?? [])))
+    .sort((a, b) => a.localeCompare(b))
+  const effectiveGenre = genreFilter || selectedGenre
+  const query = searchQuery.trim().toLocaleLowerCase()
+  const visibleBooks = libraryBooks.filter((book) => {
     if (tagFilter && !(book.tags ?? []).includes(tagFilter)) return false
-    if (genreFilter && !(book.genres ?? []).includes(genreFilter)) return false
+    if (effectiveGenre && !(book.genres ?? []).includes(effectiveGenre)) return false
+    if (authorFilter && book.author !== authorFilter) return false
+    if (lendingFilter === 'lent' && !book.borrowedBy) return false
+    if (lendingFilter === 'available' && book.borrowedBy) return false
+    if (sortBy === 'favorites' && !statuses[book.id]?.isFavorite) return false
+    if (
+      query &&
+      ![book.title, book.author, ...(book.genres ?? []), ...(book.tags ?? [])]
+        .join(' ')
+        .toLocaleLowerCase()
+        .includes(query)
+    ) {
+      return false
+    }
     return true
   })
+  visibleBooks.sort((a, b) => {
+    if (sortBy === 'favorites') return b.createdAt.toMillis() - a.createdAt.toMillis()
+    if (sortBy === 'title') return a.title.localeCompare(b.title)
+    if (sortBy === 'author') return a.author.localeCompare(b.author) || a.title.localeCompare(b.title)
+    if (sortBy === 'genre') {
+      return (a.genres[0] ?? '').localeCompare(b.genres[0] ?? '') || a.title.localeCompare(b.title)
+    }
+    return b.createdAt.toMillis() - a.createdAt.toMillis()
+  })
+  const hasFilters = Boolean(
+    tagFilter || genreFilter || searchQuery.trim() || selectedGenre || authorFilter ||
+      lendingFilter !== 'all' || sortBy === 'favorites',
+  )
 
   const clearFilters = () => {
     const next = new URLSearchParams(searchParams)
     next.delete('tag')
     next.delete('genre')
     setSearchParams(next, { replace: true })
+    setSearchQuery('')
+    setSelectedGenre('')
+    setAuthorFilter('')
+    setLendingFilter('all')
+    setSortBy('recent')
   }
 
   const openManual = () => {
@@ -102,11 +156,9 @@ export function LibraryPage() {
           <p className="text-sm text-muted">
             {isLoading
               ? 'Loading your books…'
-              : tagFilter
-                ? `${visibleBooks.length} of ${books.length} books tagged #${tagFilter}`
-                : genreFilter
-                  ? `${visibleBooks.length} of ${books.length} books in ${genreFilter}`
-                  : `${books.length} book${books.length === 1 ? '' : 's'} in your catalog`}
+              : hasFilters
+                ? `${visibleBooks.length} of ${libraryBooks.length} books`
+                : `${libraryBooks.length} book${libraryBooks.length === 1 ? '' : 's'} in your catalog`}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
@@ -114,7 +166,7 @@ export function LibraryPage() {
           <button
             type="button"
             onClick={() => setIsChooserOpen(true)}
-            className="flex shrink-0 items-center gap-1.5 rounded-2xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
+            className="hidden shrink-0 items-center gap-1.5 rounded-2xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90 sm:flex"
           >
             <Plus size={16} />
             Add Book
@@ -132,13 +184,15 @@ export function LibraryPage() {
             type="search"
             placeholder="Search by title, author, genre…"
             aria-label="Search your library"
-            className="glass w-full rounded-2xl py-3 pl-11 pr-4 text-sm outline-none placeholder:text-muted"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm outline-none placeholder:text-muted dark:border-slate-700 dark:bg-slate-800"
           />
         </div>
         <div
           role="group"
           aria-label="View mode"
-          className="glass flex shrink-0 items-center gap-1 rounded-2xl p-1"
+          className="flex shrink-0 items-center gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-800"
         >
           {VIEW_OPTIONS.map(({ value, label, icon: Icon }) => (
             <button
@@ -161,10 +215,66 @@ export function LibraryPage() {
         </div>
       </div>
 
-      {tagFilter || genreFilter ? (
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <label className="sr-only" htmlFor="library-sort">Sort books</label>
+        <select
+          id="library-sort"
+          aria-label="Sort books"
+          value={sortBy}
+          onChange={(event) => setSortBy(event.target.value as LibrarySort)}
+          className="min-w-0 rounded-xl border border-border bg-surface px-3 py-2.5 text-xs font-medium text-foreground outline-none focus:border-accent"
+        >
+          {SORT_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+        <label className="sr-only" htmlFor="library-lending-filter">Filter by lending status</label>
+        <select
+          id="library-lending-filter"
+          aria-label="Filter by lending status"
+          value={lendingFilter}
+          onChange={(event) => setLendingFilter(event.target.value as LendingFilter)}
+          className="min-w-0 rounded-xl border border-border bg-surface px-3 py-2.5 text-xs font-medium text-foreground outline-none focus:border-accent"
+        >
+          <option value="all">All loan statuses</option>
+          <option value="lent">Lent out</option>
+          <option value="available">Not lent</option>
+        </select>
+        <label className="sr-only" htmlFor="library-author-filter">Filter by author</label>
+        <select
+          id="library-author-filter"
+          aria-label="Filter by author"
+          value={authorFilter}
+          onChange={(event) => setAuthorFilter(event.target.value)}
+          className="min-w-0 rounded-xl border border-border bg-surface px-3 py-2.5 text-xs font-medium text-foreground outline-none focus:border-accent"
+        >
+          <option value="">All authors</option>
+          {authorOptions.map((author) => <option key={author} value={author}>{author}</option>)}
+        </select>
+        <label className="sr-only" htmlFor="library-genre-filter">Filter by genre</label>
+        <select
+          id="library-genre-filter"
+          aria-label="Filter by genre"
+          value={effectiveGenre}
+          onChange={(event) => {
+            setSelectedGenre(event.target.value)
+            if (genreFilter) {
+              const next = new URLSearchParams(searchParams)
+              next.delete('genre')
+              setSearchParams(next, { replace: true })
+            }
+          }}
+          className="min-w-0 rounded-xl border border-border bg-surface px-3 py-2.5 text-xs font-medium text-foreground outline-none focus:border-accent"
+        >
+          <option value="">All genres</option>
+          {genreOptions.map((genre) => <option key={genre} value={genre}>{genre}</option>)}
+        </select>
+      </div>
+
+      {hasFilters ? (
         <div>
-          <span className="glass inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium">
-            {tagFilter ? `Tag: ${tagFilter}` : `Genre: ${genreFilter}`}
+          <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium shadow-sm dark:border-slate-700 dark:bg-slate-800">
+            Filters applied
             <button
               type="button"
               onClick={clearFilters}
@@ -198,12 +308,12 @@ export function LibraryPage() {
             <SkeletonBookCard key={index} />
           ))}
         </div>
-      ) : books.length === 0 ? (
+      ) : libraryBooks.length === 0 ? (
         <div className="card-surface flex flex-col items-center gap-3 px-6 py-16 text-center">
           <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
             <BookOpen size={22} />
           </span>
-          <p className="text-sm font-medium">No books yet. Add your first book!</p>
+          <p className="text-sm font-medium">No books in your library yet. Add your first book!</p>
           <p className="max-w-sm text-xs text-muted">
             Everything you add will appear here as a cover grid.
           </p>
@@ -221,9 +331,7 @@ export function LibraryPage() {
           <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
             <Search size={22} />
           </span>
-          <p className="text-sm font-medium">
-            No books {tagFilter ? `tagged #${tagFilter}` : `in ${genreFilter}`}
-          </p>
+          <p className="text-sm font-medium">No books match these filters.</p>
           <button
             type="button"
             onClick={clearFilters}
@@ -336,7 +444,7 @@ function AddBookChooser({
               key={option.label}
               type="button"
               onClick={handlers[index]}
-              className="glass flex w-full items-start gap-3 rounded-2xl px-4 py-3 text-left transition hover:-translate-y-0.5 hover:shadow-glass"
+              className="flex w-full items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
             >
               <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
                 <Icon size={18} />

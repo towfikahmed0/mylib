@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { doc, writeBatch } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
+import { sanitizeFirestoreData } from '../../../lib/firestore'
 import { publicProfileKeys } from './usePublicProfile'
 import { usernameKeys } from './useUsername'
 import { privateProfileKeys } from './usePrivateProfile'
@@ -20,19 +21,19 @@ async function updateProfile(variables: UpdateProfileVariables): Promise<void> {
   const { uid, username, avatarUrl, email, displayName, bio, phoneNumber, address } = variables
 
   const batch = writeBatch(db)
-  batch.update(doc(db, 'users', uid), {
+  batch.update(doc(db, 'users', uid), sanitizeFirestoreData({
     displayName: displayName.trim(),
     bio: bio.trim(),
-  })
+  }))
   batch.set(
     doc(db, 'users', uid, 'private', 'data'),
-    { email, phoneNumber: phoneNumber.trim(), address: address.trim() },
+    sanitizeFirestoreData({ email, phoneNumber: phoneNumber.trim(), address: address.trim() }),
     { merge: true },
   )
   if (username) {
     batch.set(
       doc(db, 'usernameLookup', username.toLowerCase()),
-      { uid, displayName: displayName.trim(), avatarUrl },
+      sanitizeFirestoreData({ uid, displayName: displayName.trim(), avatarUrl }),
       { merge: true },
     )
   }

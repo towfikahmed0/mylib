@@ -95,7 +95,7 @@ function AddToShelfContent({ bookIds, onClose }: { bookIds: string[]; onClose: (
                 disabled={shelf.isSmart}
                 onClick={() => toggle(shelf.id)}
                 className={cn(
-                  'glass flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition',
+                  'flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition dark:border-slate-700 dark:bg-slate-800',
                   shelf.isSmart ? 'cursor-not-allowed opacity-50' : 'hover:-translate-y-0.5',
                 )}
               >

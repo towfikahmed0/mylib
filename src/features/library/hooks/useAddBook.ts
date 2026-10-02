@@ -10,8 +10,10 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
+import { sanitizeFirestoreData } from '../../../lib/firestore'
 import type { Book, CopyType } from '../../../types'
 import { useAuth } from '../../auth/useAuth'
+import { createActivityEvent } from '../../collaboration/utils/activity'
 import { sendNotification } from '../../notifications/utils/createNotification'
 import { publicLibraryKeys } from '../../profile/hooks/usePublicLibrary'
 import { bookKeys } from './useBooks'
@@ -28,6 +30,7 @@ export interface BookFormInput {
   copyType: CopyType
   gifterName: string | null
   isWishlist: boolean
+  isInLibrary: boolean
   genres: string[]
   tags: string[]
 }
@@ -52,22 +55,28 @@ async function persistBook(uid: string, input: AddBookVariables): Promise<string
     purchaseDate: input.purchaseDate ? Timestamp.fromDate(input.purchaseDate) : null,
     copyType: input.copyType,
     gifterName: input.copyType === 'gifted' ? input.gifterName?.trim() || null : null,
+    isInLibrary: input.isInLibrary,
     genres: input.genres,
     tags: input.tags,
     updatedAt: now,
   }
 
-  const statusFields = {
+  const statusFields: Record<string, unknown> = {
     userId: uid,
     isWishlist: input.isWishlist,
     updatedAt: now,
+  }
+  if (!input.isInLibrary) {
+    statusFields.status = 'finished'
+    statusFields.progress = 100
+    statusFields.finishedAt = now
   }
 
   const batch = writeBatch(db)
 
   if (input.existingBookId) {
-    batch.set(doc(db, 'books', input.existingBookId), bookFields, { merge: true })
-    batch.set(doc(db, 'books', input.existingBookId, 'readingStatus', uid), statusFields, {
+    batch.set(doc(db, 'books', input.existingBookId), sanitizeFirestoreData(bookFields), { merge: true })
+    batch.set(doc(db, 'books', input.existingBookId, 'readingStatus', uid), sanitizeFirestoreData(statusFields), {
       merge: true,
     })
     await batch.commit()
@@ -75,7 +84,7 @@ async function persistBook(uid: string, input: AddBookVariables): Promise<string
   }
 
   const bookRef = doc(collection(db, 'books'))
-  batch.set(bookRef, {
+  batch.set(bookRef, sanitizeFirestoreData({
     ...bookFields,
     userId: ownerUid,
     thumbnail: '',
@@ -90,18 +99,18 @@ async function persistBook(uid: string, input: AddBookVariables): Promise<string
     ratingCount: 0,
     createdAt: now,
     addedBy: uid,
-  })
-  batch.set(doc(db, 'books', bookRef.id, 'readingStatus', uid), {
+  }))
+  batch.set(doc(db, 'books', bookRef.id, 'readingStatus', uid), sanitizeFirestoreData({
     ...statusFields,
-    status: 'want_to_read',
+    status: input.isInLibrary ? 'want_to_read' : 'finished',
     rating: 0,
-    progress: 0,
+    progress: input.isInLibrary ? 0 : 100,
     comment: '',
     isFavorite: false,
     readingTimeMinutes: 0,
-    finishedAt: null,
+    finishedAt: input.isInLibrary ? null : now,
     highlights: [],
-  })
+  }))
   await batch.commit()
   return bookRef.id
 }
@@ -144,6 +153,20 @@ export function useAddBook() {
       const bookId = await persistBook(uid, input)
 
       const ownerUid = input.targetUserId ?? uid
+      try {
+        await createActivityEvent({
+          type: input.existingBookId ? 'book_edited' : 'book_added',
+          userId: uid,
+          userName: appUser?.username ?? user?.displayName ?? 'Reader',
+          libraryId: ownerUid,
+          bookId,
+          bookTitle: input.title.trim(),
+          addedTo: ownerUid === uid ? 'My' : 'Partner',
+        })
+      } catch {
+        // The book has already been added.
+      }
+
       if (ownerUid !== uid) {
         try {
           const actorName = appUser?.username ?? user?.displayName ?? 'A reader'

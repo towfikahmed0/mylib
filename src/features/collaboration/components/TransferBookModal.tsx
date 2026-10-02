@@ -60,7 +60,7 @@ export function TransferBookModal({
                 type="button"
                 onClick={() => void handleTransfer(partner)}
                 disabled={transfer.isPending}
-                className="glass flex w-full items-center gap-3 rounded-2xl p-3 text-left transition hover:-translate-y-0.5 hover:shadow-glass disabled:opacity-50"
+                className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800"
               >
                 {partner.avatarUrl ? (
                   <img

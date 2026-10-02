@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { doc, writeBatch } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
+import { sanitizeFirestoreData } from '../../../lib/firestore'
 import { useAuth } from '../../auth/useAuth'
 import { useBooks } from './useBooks'
 import { useReadingStatus } from './useReadingStatus'
@@ -15,7 +16,7 @@ export function useSyncLibraryStats() {
   const { statuses, isLoading: statusLoading } = useReadingStatus()
   const queryClient = useQueryClient()
 
-  const totalBooks = books.length
+  const totalBooks = books.filter((book) => book.isInLibrary !== false).length
   const completedBooks = useMemo(
     () => books.filter((book) => statuses[book.id]?.status === 'finished').length,
     [books, statuses],
@@ -30,10 +31,10 @@ export function useSyncLibraryStats() {
 
     const timer = setTimeout(() => {
       const batch = writeBatch(db)
-      batch.update(doc(db, 'users', user.uid), {
+      batch.update(doc(db, 'users', user.uid), sanitizeFirestoreData({
         totalBooksCount: totalBooks,
         completedBooksCount: completedBooks,
-      })
+      }))
       void batch
         .commit()
         .then(() => {

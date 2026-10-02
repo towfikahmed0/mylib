@@ -31,6 +31,7 @@ const STATUS_META: Record<
 interface BookCardProps {
   book: Book
   status?: ReadingStatus
+  showReadingStatus?: boolean
   view?: BookCardView
   onClick?: (book: Book) => void
   onRequest?: (book: Book) => void
@@ -54,6 +55,7 @@ function formatDate(value: Book['createdAt']): string {
 export function BookCard({
   book,
   status,
+  showReadingStatus = true,
   view = 'grid',
   onClick,
   onRequest,
@@ -141,7 +143,7 @@ export function BookCard({
     </button>
   )
 
-  const statusBadge = (
+  const statusBadge = showReadingStatus ? (
     <span
       className={cn(
         'inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold',
@@ -155,7 +157,7 @@ export function BookCard({
           ? `Reading (${progress}%)`
           : statusMeta.label}
     </span>
-  )
+  ) : null
 
   const actionPill = onRequest ? (
     <button
@@ -244,7 +246,8 @@ export function BookCard({
               </span>
             </div>
           )}
-          <div className="absolute bottom-2 right-2 flex flex-col items-end gap-1">
+          {showReadingStatus ? (
+            <div className="absolute bottom-2 right-2 flex flex-col items-end gap-1">
             <span
               className={cn(
                 'rounded-lg px-1.5 py-0.5 text-[7px] font-black uppercase text-white',
@@ -258,7 +261,8 @@ export function BookCard({
                   ? `Reading (${progress}%)`
                   : statusMeta.label}
             </span>
-          </div>
+            </div>
+          ) : null}
           <div className="absolute left-2 top-2 flex flex-col gap-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
             {favoriteButton('h-5 w-5', 14)}
             {copyButton('h-5 w-5', 14)}
@@ -282,7 +286,7 @@ export function BookCard({
         onClick={activate}
         onKeyDown={handleKeyDown}
         aria-label={`${book.title} by ${book.author}`}
-        className="book-card glass group relative flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200/50 px-3 py-3 outline-none transition-all hover:bg-white focus-visible:ring-4 focus-visible:ring-primary/30 sm:gap-4 sm:px-6 sm:py-4 dark:border-slate-800 dark:hover:bg-slate-800"
+        className="book-card group relative flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 outline-none shadow-sm transition-all hover:bg-slate-50 focus-visible:ring-4 focus-visible:ring-primary/30 sm:gap-4 sm:px-6 sm:py-4 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
       >
         <div className="h-14 w-10 flex-shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100 sm:h-16 sm:w-12 dark:border-slate-700 dark:bg-slate-800">
           {cover ? (
@@ -334,21 +338,22 @@ export function BookCard({
   }
 
   return (
-    <article
-      role="button"
-      tabIndex={0}
-      onClick={activate}
-      onKeyDown={handleKeyDown}
-      aria-label={`${book.title} by ${book.author}`}
-      className="book-card glass group relative flex cursor-pointer animate-slide-up gap-5 rounded-[2.5rem] border border-slate-200/50 p-5 outline-none focus-visible:ring-4 focus-visible:ring-primary/30 dark:border-slate-800"
-    >
+    <div className="book-card-container min-w-0">
+      <article
+        role="button"
+        tabIndex={0}
+        onClick={activate}
+        onKeyDown={handleKeyDown}
+        aria-label={`${book.title} by ${book.author}`}
+        className="book-card book-card-responsive-layout group relative flex min-h-[13rem] cursor-pointer animate-slide-up gap-6 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm outline-none focus-visible:ring-4 focus-visible:ring-primary/30 dark:border-slate-700 dark:bg-slate-800"
+      >
       <div className="absolute left-4 top-4 z-20 flex flex-col gap-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
         {favoriteButton('h-6 w-6', 16)}
         {copyButton('h-6 w-6', 16)}
       </div>
 
-      <div className="relative h-40 w-28 flex-shrink-0 overflow-hidden rounded-3xl border border-slate-200 bg-slate-100 shadow-lg dark:border-slate-700 dark:bg-slate-800">
-        {statusValue === 'reading' ? (
+      <div className="book-card-responsive-cover relative h-40 w-28 flex-shrink-0 overflow-hidden rounded-3xl border border-slate-200 bg-slate-100 shadow-lg dark:border-slate-700 dark:bg-slate-800">
+        {showReadingStatus && statusValue === 'reading' ? (
           <div className="absolute bottom-0 left-0 right-0 z-10 flex h-3.5 items-center bg-slate-900/40 backdrop-blur-sm">
             <div
               className="h-full bg-gradient-to-r from-blue-500 to-indigo-400 transition-all duration-500"
@@ -373,7 +378,7 @@ export function BookCard({
         )}
       </div>
 
-      <div className="flex flex-1 flex-col justify-between overflow-hidden py-1">
+      <div className="book-card-responsive-info flex flex-1 flex-col justify-between overflow-hidden py-1">
         <div>
           <div className="flex items-start justify-between gap-2">
             <div className="flex max-h-[20px] max-w-[160px] flex-wrap gap-1 overflow-hidden">
@@ -414,6 +419,7 @@ export function BookCard({
           </div>
         </div>
       </div>
-    </article>
+      </article>
+    </div>
   )
 }

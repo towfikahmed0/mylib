@@ -10,7 +10,7 @@ const GRID_CLASS = 'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3'
 
 export function ShelvesPage() {
   const navigate = useNavigate()
-  const { shelves, isLoading } = useShelves()
+  const { shelves, isLoading, isError, error, refetch } = useShelves()
   const [isFormOpen, setIsFormOpen] = useState(false)
 
   const customShelves = shelves.filter((shelf) => !shelf.isSmart)
@@ -40,6 +40,18 @@ export function ShelvesPage() {
           {Array.from({ length: 6 }, (_, index) => (
             <div key={index} className="skeleton-base h-40 w-full" />
           ))}
+        </div>
+      ) : isError ? (
+        <div className="card-surface flex flex-col items-center gap-3 px-6 py-12 text-center">
+          <p className="text-sm font-medium">Could not load your shelves</p>
+          <p className="max-w-sm text-xs text-muted">{error?.message ?? 'Please try again.'}</p>
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            className="rounded-2xl bg-accent px-4 py-2 text-xs font-medium text-accent-foreground transition hover:opacity-90"
+          >
+            Try again
+          </button>
         </div>
       ) : shelves.length === 0 ? (
         <div className="card-surface flex flex-col items-center gap-3 px-6 py-16 text-center">

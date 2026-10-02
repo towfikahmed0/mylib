@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react'
-import { BookMarked, Heart, Library, Sparkles, Wallet } from 'lucide-react'
+import { useState } from 'react'
+import { Award, BookMarked, Heart, Share2 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { toast } from '../store/toastStore'
 import { BookCard } from '../features/library/components/BookCard'
@@ -10,12 +10,14 @@ import { useReadingStatus } from '../features/library/hooks/useReadingStatus'
 import { useUpdateReadingStatus } from '../features/library/hooks/useUpdateReadingStatus'
 import { DistributionDoughnut } from '../features/insights/components/InsightsCharts'
 import { CHART_PALETTE } from '../features/insights/chartPalette'
+import { useActivePartners } from '../features/collaboration/hooks/useCollaboration'
+import { ShareModal } from '../features/sharing/components/ShareModal'
 import type { CountedItem } from '../features/insights/hooks/useLibraryStats'
 import type { Book, FirestoreDate } from '../types'
 
 type MyBooksTab = 'finished' | 'wishlist'
 const TAB_STORAGE_KEY = 'mylib-mybooks-tab'
-const GRID_CLASS = 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
+const GRID_CLASS = 'grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3'
 const SKELETON_COUNT = 10
 
 function readStoredTab(): MyBooksTab {
@@ -51,40 +53,14 @@ function genreCounts(books: Book[]): CountedItem[] {
     .map(([label, value]) => ({ label, value }))
 }
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value)
-}
-
-function StatTile({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode
-  label: string
-  value: string
-}) {
-  return (
-    <div className="card-surface space-y-2 p-4">
-      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 text-accent">
-        {icon}
-      </span>
-      <p className="text-lg font-semibold tabular-nums">{value}</p>
-      <p className="text-xs text-muted">{label}</p>
-    </div>
-  )
-}
-
 export function MyBooksPage() {
   const { books, isLoading } = useBooks()
+  const { partners } = useActivePartners()
   const { statuses } = useReadingStatus()
   const updateStatus = useUpdateReadingStatus()
   const [tab, setTab] = useState<MyBooksTab>(() => readStoredTab())
   const [selectedBook, setSelectedBook] = useState<Book | null>(null)
+  const [isFinishedShareOpen, setIsFinishedShareOpen] = useState(false)
 
   const selectTab = (next: MyBooksTab) => {
     setTab(next)
@@ -101,18 +77,6 @@ export function MyBooksPage() {
 
   const wishlistBooks = books.filter((book) => statuses[book.id]?.isWishlist)
 
-  const currentYear = new Date().getFullYear()
-  const finishedThisYear = finishedBooks.filter((book) => {
-    const finishedAt = statuses[book.id]?.finishedAt
-    if (!finishedAt) return false
-    try {
-      return finishedAt.toDate().getFullYear() === currentYear
-    } catch {
-      return false
-    }
-  }).length
-
-  const wishlistValue = wishlistBooks.reduce((total, book) => total + (book.price || 0), 0)
   const genres = genreCounts(finishedBooks)
 
   const handleMoveToLibrary = (book: Book) => {
@@ -125,19 +89,34 @@ export function MyBooksPage() {
   }
 
   const activeBooks = tab === 'finished' ? finishedBooks : wishlistBooks
+  const activePartners = partners
+    .filter((partner) => !partner.unsubscribed)
+    .sort((a, b) => b.totalBooksCount - a.totalBooksCount)
+  const bestReaderCount = activePartners[0]?.totalBooksCount ?? 0
+  const genreTotal = genres.reduce((total, item) => total + item.value, 0)
 
   return (
     <section className="animate-fade-in space-y-5">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">My Books</h1>
-        <p className="text-sm text-muted">Your finished reads and wishlist</p>
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">My Books</h1>
+          <p className="text-sm text-muted">Your finished reads and wishlist</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsFinishedShareOpen(true)}
+          disabled={isLoading || finishedBooks.length === 0}
+          className="flex shrink-0 items-center gap-1.5 rounded-2xl bg-accent px-3.5 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90 disabled:opacity-50"
+        >
+          <Share2 size={16} />
+          Share finished books
+        </button>
       </header>
 
-      {tab === 'finished' ? (
-        <div className="space-y-3">
-          <div className="glass rounded-3xl border border-slate-200/50 p-6 dark:border-slate-800">
+      <div className="space-y-3">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
             <div className="flex flex-col items-center gap-8 sm:flex-row">
-              <div className="relative h-40 w-40 flex-shrink-0">
+                <div className="relative h-48 w-48 flex-shrink-0">
                 {genres.length > 0 ? (
                   <DistributionDoughnut items={genres} legend={false} className="h-full" />
                 ) : null}
@@ -158,8 +137,8 @@ export function MyBooksPage() {
                   <div className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
                     {genres.map((item, index) => {
                       const pct =
-                        finishedBooks.length > 0
-                          ? Math.round((item.value / finishedBooks.length) * 100)
+                        genreTotal > 0
+                          ? Math.round((item.value / genreTotal) * 100)
                           : 0
                       const color = CHART_PALETTE[index % CHART_PALETTE.length]
                       return (
@@ -181,8 +160,8 @@ export function MyBooksPage() {
                                 style={{ width: `${pct}%`, backgroundColor: color }}
                               />
                             </div>
-                            <span className="w-8 text-right font-bold tabular-nums text-primary">
-                              {item.value}
+                            <span className="w-12 text-right text-xs font-bold tabular-nums text-primary">
+                              {pct}% · {item.value}
                             </span>
                           </div>
                         </div>
@@ -195,33 +174,50 @@ export function MyBooksPage() {
               </div>
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <StatTile
-              icon={<Library size={18} />}
-              label="Finished books"
-              value={String(finishedBooks.length)}
-            />
-            <StatTile
-              icon={<Sparkles size={18} />}
-              label={`Finished in ${currentYear}`}
-              value={String(finishedThisYear)}
-            />
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+            <h3 className="mb-4 text-xs font-black uppercase tracking-widest text-slate-400">
+              Collaborator Activity
+            </h3>
+            {activePartners.length > 0 ? (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {activePartners.map((partner, index) => {
+                  const isBestReader = index === 0 && partner.totalBooksCount > 0 && partner.totalBooksCount === bestReaderCount
+                    return (
+                      <div
+                        key={partner.uid}
+                        className={`flex min-w-0 items-center gap-3 rounded-2xl border p-4 ${isBestReader ? 'border-amber-200 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/20' : 'border-slate-200 dark:border-slate-700'}`}
+                      >
+                        <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-900 text-xs font-bold text-white dark:bg-white dark:text-slate-900">
+                          {partner.avatarUrl ? (
+                            <img src={partner.avatarUrl} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            partner.displayName.slice(0, 2).toUpperCase()
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate text-sm font-bold">{partner.displayName}</p>
+                            {isBestReader ? (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-amber-400 px-1.5 py-0.5 text-[9px] font-black uppercase text-amber-950">
+                                <Award size={11} /> Best Reader
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="mt-0.5 text-xs text-muted">
+                            {partner.totalBooksCount} {partner.totalBooksCount === 1 ? 'book' : 'books'}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })}
+              </div>
+            ) : (
+              <p className="text-sm italic text-muted">
+                No collaborators yet. Add one from Settings to see shared reading activity here.
+              </p>
+            )}
           </div>
-        </div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <StatTile
-            icon={<Heart size={18} />}
-            label="Wishlist books"
-            value={String(wishlistBooks.length)}
-          />
-          <StatTile
-            icon={<Wallet size={18} />}
-            label="Estimated cost"
-            value={formatCurrency(wishlistValue)}
-          />
-        </div>
-      )}
+      </div>
 
       <div
         role="tablist"
@@ -230,7 +226,7 @@ export function MyBooksPage() {
       >
         {(
           [
-            { value: 'finished', label: 'Finished' },
+            { value: 'finished', label: 'Finished Books' },
             { value: 'wishlist', label: 'Wishlist' },
           ] as { value: MyBooksTab; label: string }[]
         ).map((option) => (
@@ -287,6 +283,16 @@ export function MyBooksPage() {
         book={selectedBook}
         status={selectedBook ? statuses[selectedBook.id] : undefined}
         onClose={() => setSelectedBook(null)}
+      />
+      <ShareModal
+        open={isFinishedShareOpen}
+        variant="covers"
+        filename="mylib-finished-books"
+        covers={{
+          totalBooks: finishedBooks.length,
+          covers: finishedBooks.map((book) => book.coverUrl || book.thumbnail || null),
+        }}
+        onClose={() => setIsFinishedShareOpen(false)}
       />
     </section>
   )

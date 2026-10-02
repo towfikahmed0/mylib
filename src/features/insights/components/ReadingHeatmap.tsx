@@ -92,7 +92,7 @@ export function ReadingHeatmap() {
   )
 
   return (
-    <div className="glass space-y-4 rounded-3xl p-5">
+    <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <CalendarDays size={16} className="text-accent" />
@@ -176,7 +176,7 @@ export function ReadingHeatmap() {
 
       {tooltip ? (
         <div
-          className="pointer-events-none fixed z-[80] rounded-lg bg-foreground px-2.5 py-1.5 text-[11px] font-medium text-background shadow-glass"
+          className="pointer-events-none fixed z-[80] rounded-lg bg-foreground px-2.5 py-1.5 text-[11px] font-medium text-background shadow-md"
           style={{ left: tooltip.x + 12, top: tooltip.y + 12 }}
         >
           {tooltip.label}

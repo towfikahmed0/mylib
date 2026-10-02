@@ -46,7 +46,7 @@ export function BookRequestsPanel() {
         <div className="skeleton-base h-20 w-full" />
       ) : (
         requests.map((request) => (
-          <div key={request.id} className="glass space-y-3 rounded-2xl p-4">
+          <div key={request.id} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold">{request.bookTitle}</p>

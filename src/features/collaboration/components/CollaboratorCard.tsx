@@ -37,7 +37,7 @@ export function CollaboratorCard({ partner }: { partner: PartnerSummary }) {
   }
 
   return (
-    <div className="glass flex flex-col gap-3 rounded-2xl p-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-3">
         {partner.avatarUrl ? (
           <img

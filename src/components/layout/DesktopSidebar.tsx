@@ -1,5 +1,5 @@
 import { Activity, LogOut, Settings } from 'lucide-react'
-import { NavLink } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../../features/auth/useAuth'
 import { useUnreadCount } from '../../features/notifications/hooks/useNotifications'
 import { cn } from '../../lib/utils'
@@ -30,12 +30,12 @@ export function DesktopSidebar() {
     )
 
   return (
-    <aside className="glass fixed inset-y-0 left-0 z-40 hidden w-60 flex-col rounded-none border-y-0 border-l-0 lg:flex">
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col rounded-none border-y-0 border-l-0 border-r border-border bg-surface shadow-sm lg:flex">
       <div className="flex h-16 items-center gap-3 px-5">
         <img
           src="/logo.png"
           alt="MyLib"
-          className="h-10 w-10 rounded-xl object-cover shadow-lg shadow-primary/20"
+          className="h-10 w-10 shrink-0 object-contain"
         />
         <div className="leading-tight">
           <p className="font-serif text-base font-black tracking-tight">My Lib</p>
@@ -82,22 +82,32 @@ export function DesktopSidebar() {
         <ThemeToggle />
 
         <div className="flex items-center gap-2 rounded-md bg-secondary/60 p-2">
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt=""
-              className="h-8 w-8 rounded-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/15 text-xs font-semibold text-accent">
-              {displayName.slice(0, 2).toUpperCase()}
-            </span>
-          )}
-          <span className="min-w-0 flex-1 truncate text-xs font-medium">{displayName}</span>
+          <Link
+            to={appUser?.username ? `/u/${encodeURIComponent(appUser.username)}` : '/settings'}
+            aria-label={`View profile for ${displayName}`}
+            className="group flex min-w-0 flex-1 items-center gap-2 rounded-md text-left transition hover:text-accent focus-visible:outline-none"
+          >
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt=""
+                className="h-8 w-8 shrink-0 rounded-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-semibold text-accent">
+                {displayName.slice(0, 2).toUpperCase()}
+              </span>
+            )}
+            <span className="min-w-0 truncate text-xs font-medium group-hover:underline">{displayName}</span>
+          </Link>
           <button
             type="button"
-            onClick={() => void signOutUser()}
+            onClick={() => {
+              if (window.confirm('Are you sure you want to sign out?')) {
+                void signOutUser()
+              }
+            }}
             title="Sign out"
             aria-label="Sign out"
             className="rounded-md p-1.5 text-muted-foreground transition hover:bg-surface hover:text-foreground"

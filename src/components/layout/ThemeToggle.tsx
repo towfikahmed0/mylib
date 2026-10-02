@@ -11,9 +11,35 @@ const THEME_META: Record<ThemeMode, { label: string; icon: LucideIcon }> = {
 
 const THEME_MODES = Object.keys(THEME_META) as ThemeMode[]
 
-export function ThemeToggle({ className }: { className?: string }) {
+interface ThemeToggleProps {
+  className?: string
+  variant?: 'all' | 'light-dark'
+}
+
+export function ThemeToggle({ className, variant = 'all' }: ThemeToggleProps) {
   const theme = useThemeStore((state) => state.theme)
   const setTheme = useThemeStore((state) => state.setTheme)
+
+  if (variant === 'light-dark') {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark'
+    const Icon = nextTheme === 'dark' ? Moon : Sun
+    const label = `Switch to ${nextTheme} mode`
+
+    return (
+      <button
+        type="button"
+        onClick={() => setTheme(nextTheme)}
+        aria-label={label}
+        title={label}
+        className={cn(
+          'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border bg-surface-muted/70 text-foreground transition hover:bg-surface-muted',
+          className,
+        )}
+      >
+        <Icon size={17} />
+      </button>
+    )
+  }
 
   return (
     <div
