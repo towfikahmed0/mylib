@@ -1,12 +1,17 @@
 import { useState } from 'react'
 import { Loader2, Shield } from 'lucide-react'
-import { doc, updateDoc } from 'firebase/firestore'
+import { collection, doc, getDocs, query, updateDoc, where, writeBatch } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
 import { sanitizeFirestoreData } from '../../../lib/firestore'
 import { cn } from '../../../lib/utils'
 import { toast } from '../../../store/toastStore'
 import { useAuth } from '../../auth/useAuth'
-import type { PrivacySettings as PrivacySettingsValue, Visibility } from '../../../types'
+import type {
+  BorrowRequestPermission,
+  PostVisibility,
+  PrivacySettings as PrivacySettingsValue,
+  Visibility,
+} from '../../../types'
 
 const FIELDS: { key: keyof PrivacySettingsValue; label: string; description: string }[] = [
   { key: 'library', label: 'Library', description: 'Your book collection.' },
@@ -22,29 +27,92 @@ const OPTIONS: { value: Visibility; label: string }[] = [
   { value: 'private', label: 'Private' },
 ]
 
+const POST_OPTIONS: { value: PostVisibility; label: string }[] = [
+  { value: 'followers_collaborators', label: 'Followers & collaborators only' },
+  { value: 'signed_in', label: 'Signed-in users' },
+  { value: 'public', label: 'Public' },
+]
+
+const BORROW_REQUEST_OPTIONS: { value: BorrowRequestPermission; label: string }[] = [
+  { value: 'none', label: 'None' },
+  { value: 'collaborators', label: 'Collaborators' },
+  { value: 'collaborators_followers', label: 'Collaborators & Followers' },
+  { value: 'anyone', label: 'Any User' },
+]
+
 export function PrivacySettings() {
   const { appUser, refreshProfile } = useAuth()
   const [draft, setDraft] = useState<PrivacySettingsValue | null>(
-    appUser?.privacySettings ?? null,
+    appUser
+      ? {
+          ...appUser.privacySettings,
+          posts: appUser.privacySettings.posts ?? 'public',
+          borrowRequestPermission:
+            appUser.privacySettings.borrowRequestPermission ?? 'collaborators',
+        }
+      : null,
   )
   const [isSaving, setIsSaving] = useState(false)
 
   if (!appUser || !draft) return null
 
   const settings = draft
-  const isDirty = FIELDS.some(({ key }) => settings[key] !== appUser.privacySettings[key])
+  const isDirty =
+    FIELDS.some(({ key }) => settings[key] !== appUser.privacySettings[key]) ||
+    settings.posts !== (appUser.privacySettings.posts ?? 'public') ||
+    settings.borrowRequestPermission !==
+      (appUser.privacySettings.borrowRequestPermission ?? 'collaborators') ||
+    !appUser.privacySettings.posts
 
   const handleSave = async () => {
     setIsSaving(true)
+    let isMigratingPosts = false
     try {
-      await updateDoc(
-        doc(db, 'users', appUser.uid),
-        sanitizeFirestoreData({ privacySettings: settings }),
-      )
+      const userRef = doc(db, 'users', appUser.uid)
+      let postsToMigrate: Awaited<ReturnType<typeof getDocs>> | null = null
+      if (
+        settings.posts !== (appUser.privacySettings.posts ?? 'public') ||
+        !appUser.privacySettings.posts
+      ) {
+        postsToMigrate = await getDocs(
+          query(collection(db, 'reviews'), where('userId', '==', appUser.uid)),
+        )
+        isMigratingPosts = true
+      }
+
+      const settingsUpdate = sanitizeFirestoreData({ privacySettings: settings })
+      if (postsToMigrate && postsToMigrate.docs.length > 0 && postsToMigrate.docs.length <= 499) {
+        const batch = writeBatch(db)
+        batch.update(userRef, settingsUpdate)
+        for (const post of postsToMigrate.docs) {
+          batch.update(post.ref, { visibility: settings.posts })
+        }
+        await batch.commit()
+      } else {
+        await updateDoc(userRef, settingsUpdate)
+      }
+
+      if (postsToMigrate && postsToMigrate.docs.length > 499) {
+        const documents = postsToMigrate.docs
+        for (let offset = 0; offset < documents.length; offset += 450) {
+          const batch = writeBatch(db)
+          for (const post of documents.slice(offset, offset + 450)) {
+            batch.update(post.ref, { visibility: settings.posts })
+          }
+          await batch.commit()
+        }
+      }
+
+      isMigratingPosts = false
       await refreshProfile()
       toast.success('Privacy settings saved.')
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not save privacy settings.')
+      const message = error instanceof Error ? error.message : 'Could not save privacy settings.'
+      toast.error(
+        isMigratingPosts
+          ? `Could not finish updating the audience for all existing posts. Save again to retry. ${message}`
+          : message,
+      )
     } finally {
       setIsSaving(false)
     }
@@ -103,6 +171,82 @@ export function PrivacySettings() {
             </div>
           </div>
         ))}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Posts</p>
+            <p className="text-xs text-muted">Who can see the reviews and posts you share.</p>
+          </div>
+          <div
+            role="radiogroup"
+            aria-label="Posts visibility"
+            className="flex shrink-0 flex-wrap gap-1"
+          >
+            {POST_OPTIONS.map((option) => {
+              const selected = settings.posts === option.value
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() =>
+                    setDraft((previous) =>
+                      previous ? { ...previous, posts: option.value } : previous,
+                    )
+                  }
+                  className={cn(
+                    'rounded-full px-3 py-1.5 text-xs font-medium transition',
+                    selected
+                      ? 'bg-accent text-accent-foreground'
+                      : 'border border-slate-200 bg-white text-muted hover:text-foreground dark:border-slate-700 dark:bg-slate-800',
+                  )}
+                >
+                  {option.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Who can send me lend requests?</p>
+            <p className="text-xs text-muted">
+              Choose who can request to borrow books from your library.
+            </p>
+          </div>
+          <div
+            role="radiogroup"
+            aria-label="Who can send me lend requests?"
+            className="flex shrink-0 flex-wrap gap-1"
+          >
+            {BORROW_REQUEST_OPTIONS.map((option) => {
+              const selected = settings.borrowRequestPermission === option.value
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() =>
+                    setDraft((previous) =>
+                      previous
+                        ? { ...previous, borrowRequestPermission: option.value }
+                        : previous,
+                    )
+                  }
+                  className={cn(
+                    'rounded-full px-3 py-1.5 text-xs font-medium transition',
+                    selected
+                      ? 'bg-accent text-accent-foreground'
+                      : 'border border-slate-200 bg-white text-muted hover:text-foreground dark:border-slate-700 dark:bg-slate-800',
+                  )}
+                >
+                  {option.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
       </div>
 
       <div className="flex justify-end">

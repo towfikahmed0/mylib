@@ -37,7 +37,7 @@ const VIEW_OPTIONS: { value: BookCardView; label: string; icon: typeof LayoutGri
 ]
 
 type LibrarySort = 'recent' | 'favorites' | 'title' | 'author' | 'genre'
-type LendingFilter = 'all' | 'lent' | 'available'
+type LendingFilter = 'all' | 'lent' | 'waiting' | 'available'
 
 const SORT_OPTIONS: { value: LibrarySort; label: string }[] = [
   { value: 'recent', label: 'Recently added' },
@@ -96,8 +96,18 @@ export function LibraryPage() {
     if (tagFilter && !(book.tags ?? []).includes(tagFilter)) return false
     if (effectiveGenre && !(book.genres ?? []).includes(effectiveGenre)) return false
     if (authorFilter && book.author !== authorFilter) return false
-    if (lendingFilter === 'lent' && !book.borrowedBy) return false
-    if (lendingFilter === 'available' && book.borrowedBy) return false
+    const borrowStatus = book.borrowStatus ?? (book.borrowedBy ? 'on_loan' : 'available')
+    if (
+      lendingFilter === 'lent' &&
+      borrowStatus !== 'on_loan' &&
+      borrowStatus !== 'return_pending_confirmation'
+    ) return false
+    if (
+      lendingFilter === 'waiting' &&
+      borrowStatus !== 'pending_request' &&
+      borrowStatus !== 'accepted_waiting_confirmation'
+    ) return false
+    if (lendingFilter === 'available' && borrowStatus !== 'available') return false
     if (sortBy === 'favorites' && !statuses[book.id]?.isFavorite) return false
     if (
       query &&
@@ -238,7 +248,8 @@ export function LibraryPage() {
         >
           <option value="all">All loan statuses</option>
           <option value="lent">Lent out</option>
-          <option value="available">Not lent</option>
+          <option value="waiting">Request / handover pending</option>
+          <option value="available">Available</option>
         </select>
         <label className="sr-only" htmlFor="library-author-filter">Filter by author</label>
         <select

@@ -18,6 +18,7 @@ import { db } from '../../../lib/firebase'
 import { sanitizeFirestoreData } from '../../../lib/firestore'
 import type { Review, ReviewCategory } from '../../../types'
 import { useAuth } from '../../auth/useAuth'
+import { useActivePartners } from '../../collaboration/hooks/useCollaboration'
 import { sendNotificationBatch } from '../../notifications/utils/createNotification'
 import {
   BOOK_REVIEWS_LIMIT,
@@ -30,10 +31,14 @@ import { useFollowingUids } from './useFollow'
 
 export const reviewKeys = {
   all: ['reviews'] as const,
-  community: (category: FeedCategory) => [...reviewKeys.all, 'community', category] as const,
+  community: (category: FeedCategory, viewerId: string) =>
+    [...reviewKeys.all, 'community', category, viewerId] as const,
   following: (uid: string, uidsKey: string) => [...reviewKeys.all, 'following', uid, uidsKey] as const,
-  book: (title: string) => [...reviewKeys.all, 'book', title] as const,
-  bookSearch: (term: string) => [...reviewKeys.all, 'bookSearch', term] as const,
+  book: (title: string, viewerId: string) =>
+    [...reviewKeys.all, 'book', title, viewerId] as const,
+  bookSearch: (term: string, viewerId: string) =>
+    [...reviewKeys.all, 'bookSearch', term, viewerId] as const,
+  user: (uid: string, viewerId: string) => [...reviewKeys.all, 'user', uid, viewerId] as const,
 }
 
 const MAX_FOLLOWER_NOTIFICATIONS = 100
@@ -96,19 +101,38 @@ function useReviewPagination(
 }
 
 export function useCommunityFeed(category: FeedCategory) {
+  const { user } = useAuth()
   const constraints: QueryConstraint[] =
     category === 'all'
-      ? [orderBy('createdAt', 'desc')]
-      : [where('category', '==', category), orderBy('createdAt', 'desc')]
+      ? [
+          where('visibility', 'in', user ? ['public', 'signed_in'] : ['public']),
+          orderBy('createdAt', 'desc'),
+        ]
+      : [
+          where('visibility', 'in', user ? ['public', 'signed_in'] : ['public']),
+          where('category', '==', category),
+          orderBy('createdAt', 'desc'),
+        ]
 
-  return useReviewPagination(reviewKeys.community(category), constraints, true)
+  return useReviewPagination(
+    reviewKeys.community(category, user?.uid ?? 'anonymous'),
+    constraints,
+    true,
+  )
 }
 
 export function useFollowingFeed() {
   const { user } = useAuth()
-  const { uids, isLoading: uidsLoading } = useFollowingUids()
+  const { uids: followingUids, isLoading: uidsLoading } = useFollowingUids()
+  const { partners, isLoading: partnersLoading } = useActivePartners()
+  const uids = Array.from(
+    new Set([
+      ...followingUids,
+      ...partners.filter((partner) => partner.isActive).map((partner) => partner.uid),
+    ]),
+  ).slice(0, 30)
   const uidsKey = [...uids].sort().join(',')
-  const enabled = Boolean(user) && !uidsLoading && uids.length > 0
+  const enabled = Boolean(user) && !uidsLoading && !partnersLoading && uids.length > 0
 
   const constraints: QueryConstraint[] = [where('userId', 'in', uids), orderBy('createdAt', 'desc')]
 
@@ -120,8 +144,8 @@ export function useFollowingFeed() {
 
   return {
     ...query,
-    isLoading: Boolean(user) && (uidsLoading || query.isLoading),
-    isEmptyFollowing: Boolean(user) && !uidsLoading && uids.length === 0,
+    isLoading: Boolean(user) && (uidsLoading || partnersLoading || query.isLoading),
+    isEmptyFollowing: Boolean(user) && !uidsLoading && !partnersLoading && uids.length === 0,
   }
 }
 
@@ -153,6 +177,7 @@ export function useWriteReview() {
         category: input.category,
         rating: input.rating,
         body: input.body.trim(),
+        visibility: appUser?.privacySettings.posts ?? 'public',
         likesCount: 0,
         commentsCount: 0,
         reported: false,
@@ -191,16 +216,18 @@ export function useWriteReview() {
 }
 
 export function useReviewsForBook(bookTitle: string | undefined) {
+  const { user } = useAuth()
   const title = bookTitle?.trim() ?? ''
 
   const { data, isPending } = useQuery({
-    queryKey: reviewKeys.book(title),
+    queryKey: reviewKeys.book(title, user?.uid ?? 'anonymous'),
     queryFn: async () => {
       if (!title) return []
       const snapshot = await getDocs(
         query(
           collection(db, 'reviews'),
           where('bookTitle', '==', title),
+          where('visibility', 'in', user ? ['public', 'signed_in'] : ['public']),
           orderBy('createdAt', 'desc'),
           limit(BOOK_REVIEWS_LIMIT),
         ),
@@ -220,16 +247,18 @@ export interface BookSearchGroup {
 }
 
 export function useBookSearch(term: string) {
+  const { user } = useAuth()
   const normalized = term.trim()
   const enabled = normalized.length >= MIN_SEARCH_LENGTH
 
   const { data, isFetching } = useQuery({
-    queryKey: reviewKeys.bookSearch(normalized),
+    queryKey: reviewKeys.bookSearch(normalized, user?.uid ?? 'anonymous'),
     queryFn: async () => {
       if (!normalized) return []
       const snapshot = await getDocs(
         query(
           collection(db, 'reviews'),
+          where('visibility', 'in', user ? ['public', 'signed_in'] : ['public']),
           where('bookTitle', '>=', normalized),
           where('bookTitle', '<=', normalized + '\uf8ff'),
           orderBy('bookTitle'),
@@ -259,4 +288,25 @@ export function useBookSearch(term: string) {
   }, [data])
 
   return { groups, isSearching: enabled && isFetching }
+}
+
+export function useReviewsForUser(userId: string | undefined, enabled = true) {
+  const { user } = useAuth()
+  const { data, isPending, isError } = useQuery({
+    queryKey: reviewKeys.user(userId ?? 'anonymous', user?.uid ?? 'anonymous'),
+    queryFn: async () => {
+      if (!userId) return []
+      const snapshot = await getDocs(
+        query(
+          collection(db, 'reviews'),
+          where('userId', '==', userId),
+          orderBy('createdAt', 'desc'),
+        ),
+      )
+      return snapshot.docs.map(toReview)
+    },
+    enabled: Boolean(userId) && enabled,
+  })
+
+  return { reviews: data ?? [], isLoading: Boolean(userId) && enabled && isPending, isError }
 }

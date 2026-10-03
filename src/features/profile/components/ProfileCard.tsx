@@ -17,6 +17,7 @@ interface ProfileFormState {
   bio: string
   phoneNumber: string
   address: string
+  contractNumber: string
 }
 
 const EMPTY_FORM: ProfileFormState = {
@@ -24,6 +25,7 @@ const EMPTY_FORM: ProfileFormState = {
   bio: '',
   phoneNumber: '',
   address: '',
+  contractNumber: '',
 }
 
 export function ProfileCard() {
@@ -44,6 +46,7 @@ export function ProfileCard() {
       bio: appUser.bio ?? '',
       phoneNumber: privateProfile?.phoneNumber ?? '',
       address: privateProfile?.address ?? '',
+      contractNumber: privateProfile?.contractNumber ?? '',
     })
   }
 
@@ -86,6 +89,7 @@ export function ProfileCard() {
         bio: form.bio,
         phoneNumber: form.phoneNumber,
         address: form.address,
+        contractNumber: form.contractNumber,
       })
       await refreshProfile()
       toast.success('Profile saved.')
@@ -101,8 +105,9 @@ export function ProfileCard() {
         <h2 className="text-sm font-semibold">Profile</h2>
       </div>
       <p className="text-xs text-muted">
-        Your display name and bio are public. Phone and address are private and shared only when you
-        accept a book request.
+        Your display name and bio are public. Contract number and address stay private and are
+        required to request a book. You may share your phone and address with a borrower when you
+        accept a request and choose to share contact information.
       </p>
 
       <div className="space-y-1.5">
@@ -162,6 +167,18 @@ export function ProfileCard() {
             value={form.address}
             onChange={(event) => update('address', event.target.value)}
             placeholder="Street, city, country"
+            className={FIELD_CLASS}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label htmlFor="profile-contract-number" className={LABEL_CLASS}>
+            Personal Contract Number
+          </label>
+          <input
+            id="profile-contract-number"
+            value={form.contractNumber}
+            onChange={(event) => update('contractNumber', event.target.value)}
+            placeholder="Your contract number"
             className={FIELD_CLASS}
           />
         </div>

@@ -35,6 +35,7 @@ interface BookCardProps {
   view?: BookCardView
   onClick?: (book: Book) => void
   onRequest?: (book: Book) => void
+  requestDisabledReason?: string
   onMoveToLibrary?: (book: Book) => void
   onEdit?: (book: Book) => void
 }
@@ -59,6 +60,7 @@ export function BookCard({
   view = 'grid',
   onClick,
   onRequest,
+  requestDisabledReason,
   onMoveToLibrary,
   onEdit,
 }: BookCardProps) {
@@ -167,10 +169,12 @@ export function BookCard({
         onRequest(book)
       }}
       onKeyDown={(event) => event.stopPropagation()}
-      className="inline-flex items-center gap-1 rounded-full bg-slate-900 px-2 py-0.5 text-[9px] font-bold text-white transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-900"
+      disabled={Boolean(requestDisabledReason)}
+      title={requestDisabledReason}
+      className="inline-flex items-center gap-1 rounded-full bg-slate-900 px-2 py-0.5 text-[9px] font-bold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-900"
     >
       <HandCoins size={11} />
-      Request
+      Request to Borrow
     </button>
   ) : onMoveToLibrary ? (
     <button

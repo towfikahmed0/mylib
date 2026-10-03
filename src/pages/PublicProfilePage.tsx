@@ -9,6 +9,9 @@ import { BookCard } from '../features/library/components/BookCard'
 import { SkeletonBookCard } from '../features/library/components/SkeletonBookCard'
 import { ProfileHeader } from '../features/profile/components/ProfileHeader'
 import { useIsActivePartner } from '../features/profile/hooks/useActivePartner'
+import { useIsFollowing } from '../features/social/hooks/useFollow'
+import { ReviewCard } from '../features/social/components/ReviewCard'
+import { useReviewsForUser } from '../features/social/hooks/useFeed'
 import { usePublicLibrary, usePublicLibraryCount } from '../features/profile/hooks/usePublicLibrary'
 import { usePublicProfile } from '../features/profile/hooks/usePublicProfile'
 import { ShelfCard } from '../features/shelves/components/ShelfCard'
@@ -31,17 +34,20 @@ function CenteredCard({ children }: { children: ReactNode }) {
 
 export function PublicProfilePage() {
   const { username } = useParams<{ username: string }>()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const { user } = useAuth()
   const { profile, isLoading, isError } = usePublicProfile(username)
   const isOwnProfile = Boolean(profile && user && profile.uid === user.uid)
   const isPartner = useIsActivePartner(user?.uid, profile?.uid)
+  const { isFollowing } = useIsFollowing(profile?.uid)
   const forceLibrary = searchParams.get('view') === 'library'
+  const activeTab = searchParams.get('view') === 'posts' ? 'posts' : 'library'
 
   const { partners: addablePartners } = useAddablePartners()
   const sendRequest = useSendBookRequest()
   const [isAddOpen, setIsAddOpen] = useState(false)
+  const [needsLendingInfo, setNeedsLendingInfo] = useState(false)
 
   const libraryVisibility = profile?.privacySettings?.library ?? 'private'
   const canViewLibrary =
@@ -50,6 +56,19 @@ export function PublicProfilePage() {
       libraryVisibility === 'public' ||
       (libraryVisibility === 'collaborators' && isPartner) ||
       (isPartner && forceLibrary))
+
+  const postsVisibility = profile?.privacySettings?.posts ?? 'public'
+  const canViewPosts =
+    Boolean(profile) &&
+    (isOwnProfile ||
+      postsVisibility === 'public' ||
+      (postsVisibility === 'signed_in' && Boolean(user)) ||
+      (postsVisibility === 'followers_collaborators' && Boolean(user) && (isPartner || isFollowing)))
+  const borrowPermission = profile?.privacySettings?.borrowRequestPermission ?? 'collaborators'
+  const canSendBorrowRequest =
+    borrowPermission === 'anyone' ||
+    (borrowPermission === 'collaborators' && isPartner) ||
+    (borrowPermission === 'collaborators_followers' && (isPartner || isFollowing))
 
   const canAddToThisLibrary =
     Boolean(profile) &&
@@ -66,6 +85,10 @@ export function PublicProfilePage() {
   } = usePublicLibrary(profile?.uid, canViewLibrary)
   const libraryCount = usePublicLibraryCount(profile?.uid, canViewLibrary)
   const { shelves, isLoading: isLoadingShelves } = usePublicShelves(profile?.uid)
+  const { reviews, isLoading: isLoadingReviews, isError: isReviewsError } = useReviewsForUser(
+    profile?.uid,
+    activeTab === 'posts' && canViewPosts,
+  )
 
   const handleRequest = async (book: Book) => {
     if (!user || !profile) {
@@ -76,10 +99,13 @@ export function PublicProfilePage() {
       await sendRequest.mutateAsync({
         bookId: book.id,
         toUserId: profile.uid,
-        bookTitle: book.title,
       })
       toast.success('Book request sent.')
     } catch (error) {
+      if (error instanceof Error && error.message === 'LENDING_INFO_REQUIRED') {
+        setNeedsLendingInfo(true)
+        return
+      }
       toast.error(error instanceof Error ? error.message : 'Could not send the request.')
     }
   }
@@ -125,7 +151,32 @@ export function PublicProfilePage() {
         totalBooks={totalBooks}
       />
 
-      <div className="space-y-4">
+      <div
+        role="tablist"
+        aria-label="Profile sections"
+        className="flex w-fit gap-1 rounded-2xl bg-surface-muted/60 p-1"
+      >
+        {(['library', 'posts'] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
+            onClick={() =>
+              setSearchParams(tab === 'library' ? { view: 'library' } : { view: 'posts' })
+            }
+            className={`rounded-xl px-4 py-2 text-sm font-medium capitalize transition ${
+              activeTab === tab
+                ? 'bg-accent text-accent-foreground'
+                : 'text-muted hover:text-foreground'
+            }`}
+          >
+            {tab === 'library' ? 'Library' : 'Posts'}
+          </button>
+        ))}
+      </div>
+
+      <div className={`space-y-4 ${activeTab === 'library' ? '' : 'hidden'}`}>
         <div className="flex items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
             <BookOpen size={16} className="text-accent" />
@@ -171,6 +222,17 @@ export function PublicProfilePage() {
                   book={book}
                   showReadingStatus={Boolean(user)}
                   onRequest={!isOwnProfile ? handleRequest : undefined}
+                  requestDisabledReason={
+                    borrowPermission === 'none'
+                      ? 'This reader is not accepting borrow requests.'
+                      : !user
+                        ? undefined
+                      : !canSendBorrowRequest
+                        ? 'Borrow requests are limited to this reader’s collaborators or followers.'
+                        : (book.borrowStatus ?? (book.borrowedBy ? 'on_loan' : 'available')) !== 'available'
+                          ? 'This book is currently unavailable.'
+                          : undefined
+                  }
                 />
               ))}
             </div>
@@ -191,7 +253,7 @@ export function PublicProfilePage() {
         )}
       </div>
 
-      {!isLoadingShelves && shelves.length > 0 ? (
+      {activeTab === 'library' && !isLoadingShelves && shelves.length > 0 ? (
         <div className="space-y-4">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
             <Layers size={16} className="text-accent" />
@@ -209,11 +271,83 @@ export function PublicProfilePage() {
         </div>
       ) : null}
 
+      {activeTab === 'posts' ? (
+        !canViewPosts ? (
+          <div className="card-surface flex flex-col items-center gap-2 px-6 py-12 text-center">
+            <Lock className="text-muted" size={22} />
+            <p className="text-sm text-muted">
+              {postsVisibility === 'followers_collaborators'
+                ? 'These posts are shared with followers and collaborators only.'
+                : postsVisibility === 'signed_in'
+                  ? 'Sign in to see these posts.'
+                  : 'These posts are private.'}
+            </p>
+          </div>
+        ) : isLoadingReviews ? (
+          <div className="card-surface px-6 py-12 text-center text-sm text-muted">
+            Loading posts...
+          </div>
+        ) : isReviewsError ? (
+          <div className="card-surface px-6 py-12 text-center text-sm text-muted">
+            Couldn&apos;t load posts. Try again later.
+          </div>
+        ) : reviews.length === 0 ? (
+          <div className="card-surface px-6 py-12 text-center text-sm text-muted">
+            No posts to show yet.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {reviews.map((review) => (
+              <ReviewCard key={review.id} review={review} />
+            ))}
+          </div>
+        )
+      ) : null}
+
       <AddBookModal
         open={isAddOpen}
         onClose={() => setIsAddOpen(false)}
         targetUserId={profile.uid}
       />
+      {needsLendingInfo ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4"
+          role="presentation"
+          onClick={() => setNeedsLendingInfo(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="lending-info-title"
+            className="card-surface w-full max-w-md space-y-4 p-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="lending-info-title" className="text-lg font-semibold">
+              Complete your lending information first
+            </h2>
+            <p className="text-sm text-muted">
+              To request books from other users, add your personal contract number and address in
+              Settings.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setNeedsLendingInfo(false)}
+                className="rounded-xl bg-surface-muted px-4 py-2.5 text-sm font-semibold"
+              >
+                Not now
+              </button>
+              <Link
+                to="/settings"
+                onClick={() => setNeedsLendingInfo(false)}
+                className="rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground"
+              >
+                Go to Settings
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   )
 }

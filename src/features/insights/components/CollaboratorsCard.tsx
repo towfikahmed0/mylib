@@ -1,16 +1,18 @@
-import { Users } from 'lucide-react'
 import { useState } from 'react'
+import { Bell, Check, Clock3, Users } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { toast } from '../../../store/toastStore'
-import type { Book } from '../../../types'
-import { useReturnBook } from '../../library/hooks/useBookActions'
+import { useAuth } from '../../auth/useAuth'
+import { useLoanActions } from '../../collaboration/hooks/useBookRequests'
 import { useCollaborationStats } from '../hooks/useCollaborationStats'
+import type { Loan } from '../../../types'
 
-function formatBorrowDate(value: Book['borrowDate']): string {
-  if (!value) return 'Borrow date unavailable'
+function formatDate(value: Loan['confirmedAt'] | Loan['returnedAt']): string {
+  if (!value) return 'Date unavailable'
   try {
-    return `Since ${value.toDate().toLocaleDateString()}`
+    return value.toDate().toLocaleDateString()
   } catch {
-    return 'Borrow date unavailable'
+    return 'Date unavailable'
   }
 }
 
@@ -23,31 +25,94 @@ function Metric({ label, value }: { label: string; value: number }) {
   )
 }
 
-export function CollaboratorsCard() {
-  const { stats, isLoading, borrowedError } = useCollaborationStats()
-  const returnBook = useReturnBook()
-  const [returningBookId, setReturningBookId] = useState<string | null>(null)
+function LoanCard({ loan }: { loan: Loan }) {
+  const { user } = useAuth()
+  const actions = useLoanActions()
+  const [isWorking, setIsWorking] = useState(false)
+  const ownsLoan = user?.uid === loan.ownerId
+  const otherName = ownsLoan ? loan.borrowerUsername : loan.ownerUsername
+  const action =
+    ownsLoan && loan.status === 'return_pending_confirmation'
+      ? 'confirm'
+      : ownsLoan && loan.status !== 'returned'
+        ? 'remind'
+        : !ownsLoan && loan.status === 'active'
+          ? 'return'
+          : null
 
-  const handleReturn = async (bookId: string, title: string) => {
-    setReturningBookId(bookId)
+  const handleAction = async () => {
+    if (action === 'remind' && !window.confirm(`Send a reminder to @${loan.borrowerUsername} to return "${loan.bookTitle}"?`)) {
+      return
+    }
+    setIsWorking(true)
     try {
-      await returnBook.mutateAsync(bookId)
-      toast.success(`"${title}" marked as returned.`)
+      if (action === 'remind') {
+        await actions.sendReminder.mutateAsync(loan.id)
+        toast.success('Return reminder sent.')
+      } else if (action === 'return') {
+        await actions.requestReturn.mutateAsync(loan.id)
+        toast.success('Return confirmation requested from the owner.')
+      } else if (action === 'confirm') {
+        await actions.confirmReturn.mutateAsync(loan.id)
+        toast.success('Book return confirmed.')
+      }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not return the book.')
+      toast.error(error instanceof Error ? error.message : 'Could not update this loan.')
     } finally {
-      setReturningBookId(null)
+      setIsWorking(false)
     }
   }
+
+  return (
+    <li className="space-y-3 rounded-2xl border border-border/60 bg-surface p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <p className="truncate text-sm font-semibold">{loan.bookTitle}</p>
+          <p className="text-xs text-muted">
+            {ownsLoan ? 'Lent to: ' : 'Owner: '}
+            <Link to={`/u/${otherName}`} className="font-medium text-accent hover:underline">
+              @{otherName}
+            </Link>
+          </p>
+          <p className="text-xs font-medium">Loan # {loan.loanNumber}</p>
+          <p className="text-[11px] text-muted">Borrowed: {formatDate(loan.confirmedAt)}</p>
+          <p className="text-[11px] capitalize text-muted">
+            Status: {loan.status.replaceAll('_', ' ')}
+          </p>
+        </div>
+        {action ? (
+          <button
+            type="button"
+            onClick={() => void handleAction()}
+            disabled={isWorking}
+            className="flex shrink-0 items-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-xs font-semibold text-accent-foreground disabled:opacity-50"
+          >
+            {action === 'remind' ? <Bell size={14} /> : action === 'confirm' ? <Check size={14} /> : <Clock3 size={14} />}
+            {isWorking
+              ? 'Updating...'
+              : action === 'remind'
+                ? 'Send Reminder'
+                : action === 'confirm'
+                  ? 'Confirm Return'
+                  : "I've Returned This Book"}
+          </button>
+        ) : null}
+      </div>
+    </li>
+  )
+}
+
+export function CollaboratorsCard() {
+  const { user } = useAuth()
+  const { stats, isLoading, borrowedError } = useCollaborationStats()
 
   return (
     <section className="space-y-4">
       <div className="card-surface space-y-4 p-5">
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <Users size={16} className="text-accent" />
-          Collaborators
+          Collaborators & Loans
         </h3>
-
         {isLoading ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {Array.from({ length: 4 }, (_, index) => (
@@ -58,54 +123,68 @@ export function CollaboratorsCard() {
           <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Metric label="Active partners" value={stats.activePartners} />
             <Metric label="Books shared" value={stats.sharedBooks} />
-            <Metric label="Borrowed to others" value={stats.borrowedToOthers} />
-            <Metric label="Borrowed from others" value={stats.borrowedFromOthers} />
+            <Metric label="Currently lent" value={stats.borrowedToOthers} />
+            <Metric label="Currently borrowed" value={stats.borrowedFromOthers} />
           </dl>
         )}
       </div>
 
       <div className="card-surface space-y-4 p-5">
-        <h4 className="text-sm font-semibold">Currently lent or borrowed</h4>
+        <h4 className="text-sm font-semibold">Loan status</h4>
         {isLoading ? (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="skeleton-base h-20 w-full" />
-            <div className="skeleton-base h-20 w-full" />
-          </div>
+          <div className="skeleton-base h-20 w-full" />
         ) : borrowedError ? (
-          <p className="text-xs text-muted">Could not load borrowed-book details.</p>
-        ) : stats.borrowedBooks.length > 0 ? (
-          <ul className="grid gap-3 sm:grid-cols-2">
-            {stats.borrowedBooks.map((book) => (
-              <li
-                key={`${book.direction}-${book.id}`}
-                className="flex min-w-0 items-start justify-between gap-3 rounded-2xl border border-border/60 bg-surface p-4 shadow-sm"
-              >
-                <div className="min-w-0 space-y-1">
-                  <p className="truncate text-sm font-semibold">{book.title}</p>
-                  <p className="text-xs text-muted">
-                    {book.direction === 'lent'
-                      ? `Borrowed by ${book.borrower}`
-                      : `Borrowed by ${book.borrower} from ${book.otherParty}`}
-                  </p>
-                  <p className="text-[11px] text-muted">
-                    {formatBorrowDate(book.borrowDate)}
-                  </p>
-                </div>
-                {book.direction === 'lent' ? (
-                  <button
-                    type="button"
-                    onClick={() => void handleReturn(book.id, book.title)}
-                    disabled={returningBookId !== null}
-                    className="shrink-0 rounded-xl bg-amber-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-amber-700 disabled:cursor-wait disabled:opacity-60"
-                  >
-                    {returningBookId === book.id ? 'Returning…' : 'Return'}
-                  </button>
-                ) : null}
-              </li>
-            ))}
-          </ul>
+          <p className="text-xs text-muted">Could not load loan details.</p>
         ) : (
-          <p className="text-xs text-muted">No books are currently lent or borrowed.</p>
+          <>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <Metric label="Waiting for handover" value={stats.waitingHandover.length} />
+              <Metric label="Return awaiting confirmation" value={stats.returnPendingLoans.length} />
+              <Metric label="Returned loans" value={stats.returnedLoans.length} />
+            </div>
+            {stats.waitingHandover.length > 0 ? (
+              <div className="space-y-2">
+                <h5 className="text-xs font-semibold">Waiting for handover</h5>
+                {stats.waitingHandover.map((request) => (
+                  <div key={request.id} className="rounded-xl bg-amber-500/10 p-3 text-xs">
+                    <p className="font-semibold">{request.bookTitle}</p>
+                    <p className="text-muted">
+                      {request.toUserId === user?.uid
+                        ? 'Waiting for the borrower to confirm receipt'
+                        : 'Waiting for handover'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {stats.activeLoans.length || stats.returnPendingLoans.length ? (
+              <ul className="grid gap-3 sm:grid-cols-2">
+                {[...stats.activeLoans, ...stats.returnPendingLoans]
+                  .filter((loan, index, list) => list.findIndex((item) => item.id === loan.id) === index)
+                  .map((loan) => <LoanCard key={loan.id} loan={loan} />)}
+              </ul>
+            ) : stats.waitingHandover.length === 0 ? (
+              <p className="text-xs text-muted">No active loans or waiting handovers.</p>
+            ) : null}
+            {stats.returnedLoans.length > 0 ? (
+              <details className="rounded-xl border border-border/60 p-3">
+                <summary className="cursor-pointer text-xs font-semibold">
+                  Borrowing history ({stats.returnedLoans.length})
+                </summary>
+                <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {stats.returnedLoans.map((loan) => (
+                    <li key={loan.id} className="rounded-xl bg-surface-muted/50 p-3 text-xs">
+                      <p className="font-semibold">{loan.bookTitle}</p>
+                      <p>Loan # {loan.loanNumber}</p>
+                      <p className="text-muted">
+                        Returned {formatDate(loan.returnedAt)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+          </>
         )}
       </div>
     </section>

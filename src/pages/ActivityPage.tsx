@@ -2,12 +2,16 @@ import { useEffect, useState } from 'react'
 import {
   Activity,
   ArrowRightLeft,
+  Bell,
   BookOpen,
   BookPlus,
   CheckCircle2,
+  Clock3,
   CircleCheck,
+  HandCoins,
   Inbox,
   Pencil,
+  Share2,
   Star,
   Trash2,
   XCircle,
@@ -29,8 +33,14 @@ function EventIcon({ type }: { type: ActivityEvent['type'] }) {
   if (type === 'status_updated') return <CircleCheck size={16} />
   if (type === 'rating_updated') return <Star size={16} />
   if (type === 'transfer') return <ArrowRightLeft size={16} />
-  if (type === 'request_rejected') return <XCircle size={16} />
-  if (type === 'request_accepted' || type === 'borrowed') return <CheckCircle2 size={16} />
+  if (type === 'request_rejected' || type === 'agreement_cancelled') return <XCircle size={16} />
+  if (type === 'borrow_request_sent') return <HandCoins size={16} />
+  if (type === 'contact_info_shared') return <Share2 size={16} />
+  if (type === 'return_requested') return <Clock3 size={16} />
+  if (type === 'return_reminder_sent') return <Bell size={16} />
+  if (type === 'request_accepted' || type === 'borrowed' || type === 'return_confirmed') {
+    return <CheckCircle2 size={16} />
+  }
   return <BookOpen size={16} />
 }
 
@@ -48,11 +58,18 @@ function describeEvent(event: ActivityEvent): string {
     case 'rating_updated':
       return `${event.userName} reviewed "${title}" with ${event.rating ?? 0} stars.`
     case 'borrowed':
-      return `${event.userName} lent "${title}"`
+      return event.message ?? `${event.userName} confirmed receipt of "${title}".`
     case 'request_rejected':
       return `Request for "${title}" was declined`
     case 'request_accepted':
-      return `Request for "${title}" was accepted`
+      return event.message ?? `Request for "${title}" was accepted`
+    case 'borrow_request_sent':
+    case 'contact_info_shared':
+    case 'return_requested':
+    case 'return_confirmed':
+    case 'agreement_cancelled':
+    case 'return_reminder_sent':
+      return event.message ?? 'Borrowing update'
     case 'transfer':
       return `${event.userName} transferred "${title}"`
     case 'returned':

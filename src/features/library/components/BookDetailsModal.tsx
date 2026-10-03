@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRightLeft,
+  Bell,
   BookOpen,
   Clock,
   Copy,
@@ -35,10 +36,11 @@ import { ShareModal } from '../../sharing/components/ShareModal'
 import { ReviewCard } from '../../social/components/ReviewCard'
 import { useReviewsForBook } from '../../social/hooks/useFeed'
 import { READING_STATUS_OPTIONS } from '../constants'
-import { useDeleteBook, useLendBook, useReturnBook } from '../hooks/useBookActions'
+import { useDeleteBook } from '../hooks/useBookActions'
 import { useBooks } from '../hooks/useBooks'
 import { useUpdateBook } from '../hooks/useUpdateBook'
 import { useUpdateReadingStatus } from '../hooks/useUpdateReadingStatus'
+import { useLoanActions, useLoanList } from '../../collaboration/hooks/useBookRequests'
 
 const SECTION_LABEL = 'text-[10px] font-bold uppercase tracking-widest text-slate-400'
 const FIELD_CLASS =
@@ -135,8 +137,10 @@ function BookDetailsContent({
   const updateStatus = useUpdateReadingStatus()
   const updateBook = useUpdateBook()
   const deleteBook = useDeleteBook()
-  const returnBook = useReturnBook()
-  const lendBook = useLendBook()
+  const loansQuery = useLoanList()
+  const loanActions = useLoanActions()
+  const activeLoan = loansQuery.loans.find((loan) => loan.id === book.activeLoanId)
+  const borrowAvailability = book.borrowStatus ?? (book.borrowedBy ? 'on_loan' : 'available')
   const { reviews } = useReviewsForBook(book.title)
 
   const cover = book.coverUrl || book.thumbnail
@@ -156,7 +160,7 @@ function BookDetailsContent({
 
   const [quote, setQuote] = useState('')
   const [quotePage, setQuotePage] = useState('')
-  const [borrower, setBorrower] = useState('')
+  const [isLoanActionPending, setIsLoanActionPending] = useState(false)
 
   const [isSummaryOpen, setIsSummaryOpen] = useState(false)
   const [isTransferOpen, setIsTransferOpen] = useState(false)
@@ -653,65 +657,100 @@ function BookDetailsContent({
 
             <div className="space-y-2 border-t border-border/60 pt-3">
               <p className={SECTION_LABEL}>Borrowing</p>
-              {book.borrowedBy ? (
-                <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/60 dark:bg-amber-950/20">
-                  <span className="min-w-0 text-sm text-amber-900 dark:text-amber-100">
-                    Borrowed by <span className="font-semibold">{book.borrowedBy}</span>
-                    {book.borrowDate ? (
-                      <span className="block text-xs text-amber-800/80 dark:text-amber-200/80">
-                        since {formatDate(book.borrowDate)}
-                      </span>
-                    ) : null}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void returnBook
-                        .mutateAsync(book.id)
-                        .then(() => toast.success('Book marked as returned.'))
-                        .catch((error) =>
-                          toast.error(
-                            error instanceof Error ? error.message : 'Could not return the book.',
-                          ),
-                        )
-                    }}
-                    disabled={returnBook.isPending}
-                    className="shrink-0 rounded-full bg-amber-600 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-700 disabled:opacity-60"
-                  >
-                    Return
-                  </button>
+              {borrowAvailability === 'pending_request' ? (
+                <p className="rounded-2xl bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">
+                  Borrow request pending. The book is reserved while the owner reviews it.
+                </p>
+              ) : borrowAvailability === 'accepted_waiting_confirmation' ? (
+                <p className="rounded-2xl bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">
+                  Accepted; waiting for the borrower to confirm handover. This is not an active loan yet.
+                </p>
+              ) : activeLoan ? (
+                <div className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/60 dark:bg-amber-950/20">
+                  <div className="text-sm text-amber-900 dark:text-amber-100">
+                    <p className="font-semibold">{activeLoan.bookTitle}</p>
+                    <p className="text-xs">
+                      {isOwner ? 'Lent to: ' : 'Owner: '}
+                      <Link
+                        to={`/u/${isOwner ? activeLoan.borrowerUsername : activeLoan.ownerUsername}`}
+                        className="font-semibold underline"
+                      >
+                        @{isOwner ? activeLoan.borrowerUsername : activeLoan.ownerUsername}
+                      </Link>
+                    </p>
+                    <p className="text-xs">Loan # {activeLoan.loanNumber}</p>
+                    <p className="text-xs">Borrowed {formatDate(activeLoan.confirmedAt)}</p>
+                    <p className="text-xs capitalize">Status: {activeLoan.status.replaceAll('_', ' ')}</p>
+                  </div>
+                  {isOwner && activeLoan.status === 'return_pending_confirmation' ? (
+                    <button
+                      type="button"
+                      disabled={isLoanActionPending}
+                      onClick={() => {
+                        setIsLoanActionPending(true)
+                        void loanActions.confirmReturn.mutateAsync(activeLoan.id)
+                          .then(() => toast.success('Book return confirmed.'))
+                          .catch((error) => toast.error(error instanceof Error ? error.message : 'Could not confirm the return.'))
+                          .finally(() => setIsLoanActionPending(false))
+                      }}
+                      className="rounded-xl bg-accent px-3 py-2 text-xs font-semibold text-accent-foreground disabled:opacity-50"
+                    >
+                      Confirm Return
+                    </button>
+                  ) : isOwner && activeLoan.status === 'active' ? (
+                    <button
+                      type="button"
+                      disabled={isLoanActionPending}
+                      onClick={() => {
+                        if (!window.confirm(
+                          `Send a reminder to @${activeLoan.borrowerUsername} to return "${activeLoan.bookTitle}"?`,
+                        )) return
+                        setIsLoanActionPending(true)
+                        void loanActions.sendReminder.mutateAsync(activeLoan.id)
+                          .then(() => toast.success('Return reminder sent.'))
+                          .catch((error) => toast.error(error instanceof Error ? error.message : 'Could not send the reminder.'))
+                          .finally(() => setIsLoanActionPending(false))
+                      }}
+                      className="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-xs font-semibold text-accent-foreground disabled:opacity-50"
+                    >
+                      <Bell size={14} />
+                      Send Reminder
+                    </button>
+                  ) : !isOwner && activeLoan.status === 'active' ? (
+                    <button
+                      type="button"
+                      disabled={isLoanActionPending}
+                      onClick={() => {
+                        setIsLoanActionPending(true)
+                        void loanActions.requestReturn.mutateAsync(activeLoan.id)
+                          .then(() => toast.success('Return confirmation requested from the owner.'))
+                          .catch((error) => toast.error(error instanceof Error ? error.message : 'Could not request return confirmation.'))
+                          .finally(() => setIsLoanActionPending(false))
+                      }}
+                      className="rounded-xl bg-accent px-3 py-2 text-xs font-semibold text-accent-foreground disabled:opacity-50"
+                    >
+                      I&apos;ve Returned This Book
+                    </button>
+                  ) : activeLoan.status === 'return_pending_confirmation' ? (
+                    <p className="text-xs text-amber-800 dark:text-amber-200">
+                      Waiting for the owner to confirm return.
+                    </p>
+                  ) : null}
                 </div>
+              ) : borrowAvailability === 'on_loan' ? (
+                <p className="rounded-2xl bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">
+                  This book has a legacy lending record without a linked loan. Its availability is blocked until the record is reconciled.
+                </p>
+              ) : borrowAvailability === 'return_pending_confirmation' ? (
+                <p className="rounded-2xl bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">
+                  A legacy return confirmation is pending. Its availability is blocked until the record is reconciled.
+                </p>
               ) : book.isInLibrary === false ? (
                 <p className="text-xs text-muted">This book is not in your library and can&apos;t be lent.</p>
               ) : (
-                <div className="flex items-center gap-2">
-                  <input
-                    value={borrower}
-                    onChange={(event) => setBorrower(event.target.value)}
-                    placeholder="Who is borrowing this book?"
-                    className={cn(FIELD_CLASS, 'flex-1')}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void lendBook
-                        .mutateAsync({ bookId: book.id, borrowedBy: borrower })
-                        .then(() => {
-                          setBorrower('')
-                          toast.success('Book marked as lent.')
-                        })
-                        .catch((error) =>
-                          toast.error(
-                            error instanceof Error ? error.message : 'Could not lend the book.',
-                          ),
-                        )
-                    }}
-                    disabled={lendBook.isPending}
-                    className="shrink-0 rounded-2xl bg-surface-muted px-4 py-2.5 text-sm font-semibold transition hover:opacity-80 disabled:opacity-60"
-                  >
-                    Lend
-                  </button>
-                </div>
+                <p className="text-xs text-muted">
+                  Available for a borrow request. The owner will confirm before any loan begins.
+                </p>
               )}
             </div>
 

@@ -28,6 +28,7 @@ export interface PartnerSummary {
   allowAddBooks: boolean
   grantedBy: string
   unsubscribed: boolean
+  isActive: boolean
 }
 
 export const collaborationKeys = {
@@ -98,6 +99,9 @@ async function fetchPartners(uid: string): Promise<PartnerSummary[]> {
       const unsubscribed = isUser1
         ? partnership.user1Unsubscribed
         : partnership.user2Unsubscribed
+      const partnerUnsubscribed = isUser1
+        ? partnership.user2Unsubscribed
+        : partnership.user1Unsubscribed
 
       let username = ''
       let displayName = ''
@@ -131,6 +135,7 @@ async function fetchPartners(uid: string): Promise<PartnerSummary[]> {
         allowAddBooks: partnership.allowAddBooks,
         grantedBy: partnership.grantedBy,
         unsubscribed,
+        isActive: !unsubscribed && !partnerUnsubscribed,
       }
     }),
   )

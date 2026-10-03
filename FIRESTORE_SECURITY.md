@@ -14,7 +14,7 @@ This document describes the checked-in [Firestore rules](firestore.rules), clien
 | Path | Data / ownership | Checked-in access boundary |
 | --- | --- | --- |
 | `users/{uid}` | Public profile fields, role/plan, privacy preferences, aggregate counts | `get` is public; `list` requires sign-in. Self-create is constrained to own UID, role `user`, plan `free`. Self-update freezes UID/role/plan, but does not allowlist all other fields. Admin or owner can delete. |
-| `users/{uid}/private/{documentId}` | Private profile data such as email, phone, address, and AI analysis fields | Read/write only by the matching signed-in UID. |
+| `users/{uid}/private/{documentId}` | Private profile data such as email, phone, address, contract number, and AI analysis fields | Read/write only by the matching signed-in UID. |
 | `users/{uid}/followers/{followerUid}` | Public follower graph | Read is public; a signed-in user can create/delete their own follower edge, subject to the target not being self. Profile count updates have a corresponding rule check. |
 | `users/{uid}/following/{followedUid}` | Owner's following graph | Read/write only by the matching signed-in owner (create/delete checks). |
 | `users/{uid}/notifications/{id}` | In-app notifications | Recipient can read/update/delete; any signed-in actor can create under a recipient path if `actorUserId` matches and text/link lengths fit. |
@@ -24,10 +24,12 @@ This document describes the checked-in [Firestore rules](firestore.rules), clien
 | `books/{bookId}/readingStatus/{uid}` | Per-user status, rating, progress, wishlist/favorite, timer, highlights | Read if `resource.data.userId` is caller. Write if path UID and resulting `userId` are caller. |
 | `partnerships/{id}` | Collaboration state and add-book permission | Read/update/delete by either participant. Create requires an accepted request in the same batch and a recipient check. Update field restrictions are insufficient; see finding F-03. |
 | `collaborationRequests/{id}` | Invite request | Read by either participant; create requires caller as sender and pending status; participant updates are restricted to `status`/`updatedAt`, but valid transitions are not checked. |
-| `bookRequests/{id}` | Borrow request, including requester contact fields | Read by sender or recipient; create requires sender and pending status; either participant can update status/updatedAt. Book ownership, target, and status transitions are not verified by the rule. |
-| `reviews/{id}` | Public review/post and counters | Public read. Create requires caller's `userId` and zero counters. Author edits are field-limited; counter updates have a separate counter branch. |
-| `reviews/{id}/likes/{uid}` | Review likes | Public read; signed-in user can create/delete only their own UID path. |
-| `reviews/{id}/comments/{id}` | Review comments | Public read; create requires caller `userId`. Author/admin update/delete; updates do not freeze the author UID or restrict changed fields. |
+| `bookRequests/{id}` | Borrow request and handover state; owner contact fields only after explicit sharing | Read by requester or owner. Creation requires an eligible signed-in requester, private contract number/address, permitted owner relationship, an available owner book, and the paired pending-request book lock in the same atomic write. Owner decision, cancellation, and borrower receipt confirmation are actor- and state-checked against the book/loan transition. |
+| `loans/{requestId}` | Active/return-pending/returned lending relationship; request ID is the loan document ID | Read only by the owner and borrower. Create is tied to the matching accepted request, confirmed receipt, book state, and yearly counter. Updates are limited to borrower return requests, owner return confirmation, and owner reminders. Delete is denied. |
+| `loanCounters/{year}` | Monotonic Loan # allocation | Signed-in get only; create/update must be linked atomically to the borrower's active loan. List/delete are denied. |
+| `reviews/{id}` | Review/post and counters | Reads use the post's audience field (`visibility`); missing values on legacy posts default to public. Create pins author and audience to the profile setting. Saving a changed Posts setting migrates existing records (atomically when there are at most 499; larger sets are batched). |
+| `reviews/{id}/likes/{uid}` | Review likes | Read and create/delete require access to the parent post; writes are restricted to the signed-in user's UID path. |
+| `reviews/{id}/comments/{id}` | Review comments | Read and create require access to the parent post; author/admin update/delete also require parent-post access. |
 | `shelves/{id}` | User shelf and smart-shelf metadata | Read if `isPublic` or owner; create/update/delete by owner. |
 | `reports/{id}` | User-submitted reports | Signed-in create requires caller reporter ID and pending status; read/update/delete admin-only. |
 | `activityFeed/{id}` | Library event, keyed by `libraryId` | Read by library owner or active partner. Create requires caller as actor and own/active-partner library. No update/delete. |
@@ -35,9 +37,16 @@ This document describes the checked-in [Firestore rules](firestore.rules), clien
 
 `readingStatus` is also matched using a collection-group wildcard rule. The project has composite indexes in [firestore.indexes.json](firestore.indexes.json). The PRD describes additional schema fields; only fields and access above are supported by current rules/code evidence.
 
+## Borrowing Workflow
+
+- **Implemented in checked-in client and rules:** A request and `pending_request` book lock are atomic. The owner can accept (which only changes the state to waiting for handover), explicitly share their phone/address, or decline. The borrower must confirm receipt before a loan is created and `borrowedBy`/`borrowDate` are synchronized. A borrower can request return confirmation; only the owner can close the loan and release the book. Reminders are limited to the lender and have a 24-hour cooldown.
+- **Privacy boundary:** Contract number and address are read from the requester's private document only for server-rule eligibility and are not copied to a borrow request. Owner contact is copied only following the owner's explicit share action; request reads are limited to the two parties. Private profile documents remain owner-only.
+- **Race control:** The request lock, request transitions, loan record, yearly Loan # counter, and book denormalized state are cross-checked with `getAfter`/`existsAfter` rules and client Firestore transactions. A standalone request without the paired lock is denied. Books with a request/loan lock cannot be transferred or deleted.
+- **Repository boundary:** There is no Cloud Functions source/deploy target in this repository. Rules constrain client writes, but the workflow currently relies on Firestore client transactions rather than trusted server orchestration. Legacy arbitrary-text `borrowedBy` values cannot safely be converted to borrower UIDs without a verifiable accepted request; they require explicit data reconciliation before they can be represented as participant-visible loans.
+
 ## Security and Privacy Findings
 
-Severity is a repository-based risk assessment, not a statement that an exploit has occurred. Recommended fixes are documentation guidance only; no rules or app code were changed.
+Severity is a repository-based risk assessment, not a statement that an exploit has occurred. Findings describe remaining issues in the checked-in rules and app.
 
 ### F-01 — High: Add-book grants also authorize edits, deletes, and ownership changes
 
@@ -49,9 +58,9 @@ Severity is a repository-based risk assessment, not a statement that an exploit 
 
 ### F-02 — High: Library privacy settings are not consistently enforced
 
-**Evidence:** Book reads allow every active partner regardless of `privacySettings.library`; the public-profile page also allows an active partner through its forced-library view even when the setting is private. `privacySettings` exposes library, wishlist, progress, reviews, and feed choices. Reviews are globally readable, while reading-status reads are owner-only. Activity access is owner/active-partner based and does not check the feed setting.
+**Evidence:** Book reads allow every active partner regardless of `privacySettings.library`; the public-profile page also allows an active partner through its forced-library view even when the setting is private. Other legacy `privacySettings` choices (library, wishlist, progress, reviews, and feed) remain inconsistently enforced. Posts now have a separate `privacySettings.posts` audience, copied onto review records and enforced by review rules; changed settings migrate existing reviews, with large histories processed in multiple batches.
 
-**Risk:** A user's selected visibility may not match actual access. In particular, a private library can still be read by collaborators; review and feed visibility choices are not enforced by their rules. Other settings may be ineffective or unsupported rather than reliably private/shared.
+**Risk:** A user's selected visibility may not match actual access for library, reading status, and activity data. For users with more than 499 posts, the audience migration is multi-batch, so a failed batch can leave some existing posts with their prior audience until the user retries saving. Legacy controls may be ineffective or unsupported rather than reliably private/shared.
 
 **Recommended fix:** Define the intended access matrix per data type, then enforce it in rules and align UI queries. Do not depend on hiding controls or client-side profile checks. For per-user status/reviews where rule evaluation is impractical, use a carefully scoped server-side read path or a schema that rules can safely evaluate.
 
@@ -71,14 +80,6 @@ Severity is a repository-based risk assessment, not a statement that an exploit 
 
 **Recommended fix:** Keep private data only in the private subcollection and enforce an explicit public-profile field allowlist/type constraints on create and update. Consider separating public profile data from authorization/account metadata.
 
-### F-05 — High: Book-request contact details are shared automatically
-
-**Evidence:** `useSendBookRequest` reads the requester's private profile and copies phone and address into `bookRequests`. Rules allow both requester and recipient to read the request. The PRD itself calls for opt-in or clear disclosure, but the inspected flow writes these fields without a consent step.
-
-**Risk:** Personal contact information is disclosed to a book owner whenever a request is created, even if the requester did not intend to share it for that request.
-
-**Recommended fix:** Make each field explicitly optional/consented at request time, explain who receives it, and write only the selected fields. Validate the intended recipient and consider separating contact data from broadly readable request metadata.
-
 ### F-06 — High: Comment counters can be incremented without a comment
 
 **Evidence:** Review counter updates allow a `commentsCount` increase of one without checking `existsAfter()` for a new comment. The rule comment calls this best-effort and notes a full fix needs a Cloud Function. No Functions implementation is present in this repository.
@@ -86,14 +87,6 @@ Severity is a repository-based risk assessment, not a statement that an exploit 
 **Risk:** Any signed-in client can forge comment counts, potentially repeatedly, causing misleading engagement data. The like counter does have a like-document existence check.
 
 **Recommended fix:** Make counter changes provably atomic with comment create/delete, or move counter maintenance to a trusted backend transaction/trigger and deny direct client counter writes. Verify that any proposed backend is actually deployed before relying on it.
-
-### F-07 — Medium: Request status transitions are not bound to actor intent
-
-**Evidence:** Collaboration and book-request updates allow either participant to change `status`/`updatedAt` without validating the previous status, the requested transition, or the actor's role in that transition. The app performs some extra recipient checks, but direct Firestore writes bypass those checks. Partnership creation has additional accepted-request checks; book requests do not have a comparable state machine.
-
-**Risk:** Participants can create inconsistent request states, including marking a request accepted/rejected/cancelled outside the intended flow. Client-only checks do not prevent direct SDK writes.
-
-**Recommended fix:** Encode allowed state transitions and actor-specific fields in rules. For multi-document acceptance (status, book loan state, activity), validate the required state and affected documents atomically; use a trusted backend only if it is present and deployed.
 
 ### F-08 — Medium: Any signed-in user can create notifications for arbitrary recipients
 
@@ -144,7 +137,7 @@ Severity is a repository-based risk assessment, not a statement that an exploit 
 | Role-based admin boundary | Partially implemented | Rules use the profile role and admin-only collections; role provisioning and deployed configuration are unknown, and the UI is a placeholder. |
 | Like counter integrity | Partially implemented | Like docs are tied to caller UID and likes count checks doc existence in a batch. No runtime rules test was run as part of this documentation task. |
 | Comment counter integrity | Planned / not present | Rules permit increments without a comment document; no repository Cloud Function is present (F-06). |
-| Granular library/wishlist/progress/review/feed privacy | Partially implemented | UI preferences exist, but enforcement is incomplete/inconsistent (F-02). |
+| Granular privacy | Partially implemented | Posts visibility (public, signed-in users, followers/active collaborators) is enforced in review rules and reflected on profiles/Explore. Legacy library/wishlist/progress/review/feed controls remain inconsistent (F-02). |
 | Opt-in contact sharing for book requests | Planned / not present | Phone/address are copied automatically into a request (F-05). |
 | Cloud Functions / FCM / push security | Unknown / cannot verify from repo | No corresponding source or Firebase deployment target is checked in. Do not assume deployed services exist. |
 

@@ -17,6 +17,8 @@ const DEFAULT_PRIVACY_SETTINGS: PrivacySettings = {
   progress: 'collaborators',
   reviews: 'public',
   feed: 'collaborators',
+  posts: 'public',
+  borrowRequestPermission: 'collaborators',
 }
 
 const SILENT_AUTH_CODES = new Set([
@@ -71,6 +73,7 @@ async function createUserProfile(user: User): Promise<AppUser> {
     address: '',
     lastAIAnalysis: '',
     lastAIAnalysisDate: null,
+    contractNumber: '',
   }))
 
   await setDoc(doc(db, 'usernameLookup', username.toLowerCase()), sanitizeFirestoreData({

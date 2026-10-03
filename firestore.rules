@@ -38,6 +38,54 @@ service cloud.firestore {
         );
     }
 
+    function areActivePartners(userA, userB) {
+      let directId = userA + '_' + userB;
+      let reverseId = userB + '_' + userA;
+      return (
+        isActivePartnership(directId)
+        && get(/databases/$(database)/documents/partnerships/$(directId)).data.userId1
+          in [userA, userB]
+        && get(/databases/$(database)/documents/partnerships/$(directId)).data.userId2
+          in [userA, userB]
+      ) || (
+        isActivePartnership(reverseId)
+        && get(/databases/$(database)/documents/partnerships/$(reverseId)).data.userId1
+          in [userA, userB]
+        && get(/databases/$(database)/documents/partnerships/$(reverseId)).data.userId2
+          in [userA, userB]
+      );
+    }
+    function postVisibility(userId) {
+      return existsAfter(/databases/$(database)/documents/users/$(userId))
+        ? getAfter(/databases/$(database)/documents/users/$(userId))
+            .data.privacySettings.get('posts', 'public')
+        : 'private';
+    }
+
+    function canReadPosts(post) {
+      return isAdmin()
+        || post.get('visibility', 'public') == 'public'
+        || (isSignedIn() && post.get('visibility', 'public') == 'signed_in')
+        || (isSignedIn()
+          && post.get('visibility', 'public') == 'followers_collaborators'
+          && (
+            exists(/databases/$(database)/documents/users/$(post.userId)/followers/$(request.auth.uid))
+            || isActivePartner(post.userId)
+          ));
+    }
+
+    function canReadReview(reviewId) {
+      return exists(/databases/$(database)/documents/reviews/$(reviewId))
+        && canReadPosts(get(/databases/$(database)/documents/reviews/$(reviewId)).data);
+    }
+
+    function hasCurrentPostVisibility(userId, data) {
+      return (data.keys().hasAny(['visibility'])
+          && data.visibility == postVisibility(userId))
+        || (!data.keys().hasAny(['visibility'])
+          && postVisibility(userId) == 'public');
+    }
+
     // The library owner grants the permission; `grantedBy` holds the owner's
     // uid, not the uid of the collaborator who performs the add.
     function hasAddGrant(id, ownerUid) {
@@ -56,6 +104,62 @@ service cloud.firestore {
 
     function boundedByOne(previous, next) {
       return next == previous || next == previous + 1 || next == previous - 1;
+    }
+
+    function borrowPermission(ownerUid) {
+      return get(/databases/$(database)/documents/users/$(ownerUid))
+        .data.privacySettings.get('borrowRequestPermission', 'collaborators');
+    }
+
+    function mayRequestBorrow(ownerUid) {
+      return isSignedIn()
+        && request.auth.uid != ownerUid
+        && exists(/databases/$(database)/documents/users/$(ownerUid))
+        && (
+          borrowPermission(ownerUid) == 'anyone'
+          || (borrowPermission(ownerUid) == 'collaborators'
+            && isActivePartner(ownerUid))
+          || (borrowPermission(ownerUid) == 'collaborators_followers'
+            && (
+              isActivePartner(ownerUid)
+              || exists(/databases/$(database)/documents/users/$(ownerUid)/followers/$(request.auth.uid))
+            ))
+        );
+    }
+
+    function requesterHasLendingInfo() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)/private/data)
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)/private/data)
+          .data.get('contractNumber', '') is string
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)/private/data)
+          .data.get('contractNumber', '').size() > 0
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)/private/data)
+          .data.get('contractNumber', '').matches('.*\\S.*')
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)/private/data)
+          .data.get('address', '') is string
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)/private/data)
+          .data.get('address', '').size() > 0
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)/private/data)
+          .data.get('address', '').matches('.*\\S.*');
+    }
+
+    function bookIsAvailable(book) {
+      return book.get('borrowStatus', 'available') == 'available'
+        && book.get('borrowRequestId', null) == null
+        && book.get('activeLoanId', null) == null
+        && book.get('borrowedBy', null) == null;
+    }
+
+    function requestInAfter(requestId, expectedStatus) {
+      return existsAfter(/databases/$(database)/documents/bookRequests/$(requestId))
+        && getAfter(/databases/$(database)/documents/bookRequests/$(requestId)).data.status
+          == expectedStatus;
+    }
+
+    function loanInAfter(loanId, expectedStatus) {
+      return existsAfter(/databases/$(database)/documents/loans/$(loanId))
+        && getAfter(/databases/$(database)/documents/loans/$(loanId)).data.status
+          == expectedStatus;
     }
 
     // ---------------------------------------------------------------
@@ -232,25 +336,181 @@ service cloud.firestore {
             || request.resource.data.isInLibrary is bool);
       }
 
+      function changesLoanManagedFields() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'borrowedBy',
+          'borrowDate',
+          'borrowHistory',
+          'borrowStatus',
+          'borrowRequestId',
+          'activeLoanId'
+        ]);
+      }
+
+      function requestBookLock() {
+        let requestId = request.resource.data.borrowRequestId;
+        let requestData = getAfter(
+          /databases/$(database)/documents/bookRequests/$(requestId)
+        ).data;
+        return isSignedIn()
+          && resource.data.userId == requestData.toUserId
+          && request.auth.uid == requestData.fromUserId
+          && bookIsAvailable(resource.data)
+          && requestData.status == 'pending'
+          && requestData.bookId == bookId
+          && request.resource.data.borrowStatus == 'pending_request'
+          && request.resource.data.borrowRequestId == requestId
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['borrowStatus', 'borrowRequestId', 'updatedAt']);
+      }
+
+      function updatePendingRequestBookState() {
+        let requestId = resource.data.borrowRequestId;
+        let afterRequest = getAfter(
+          /databases/$(database)/documents/bookRequests/$(requestId)
+        ).data;
+        return request.auth.uid == resource.data.userId
+          && afterRequest.toUserId == request.auth.uid
+          && afterRequest.bookId == bookId
+          && (
+            (afterRequest.status == 'accepted_waiting_confirmation'
+              && request.resource.data.borrowStatus == 'accepted_waiting_confirmation'
+              && request.resource.data.borrowRequestId == requestId)
+            || (afterRequest.status == 'rejected'
+              && request.resource.data.borrowStatus == 'available'
+              && request.resource.data.borrowRequestId == null)
+          )
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['borrowStatus', 'borrowRequestId', 'updatedAt']);
+      }
+
+      function cancelWaitingBookState() {
+        let requestId = resource.data.borrowRequestId;
+        let afterRequest = getAfter(
+          /databases/$(database)/documents/bookRequests/$(requestId)
+        ).data;
+        return afterRequest.status == 'cancelled'
+          && request.auth.uid in [afterRequest.fromUserId, afterRequest.toUserId]
+          && request.resource.data.borrowStatus == 'available'
+          && request.resource.data.borrowRequestId == null
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['borrowStatus', 'borrowRequestId', 'updatedAt']);
+      }
+
+      function activateLoan() {
+        let requestId = resource.data.borrowRequestId;
+        let afterRequest = getAfter(
+          /databases/$(database)/documents/bookRequests/$(requestId)
+        ).data;
+        let afterLoan = getAfter(
+          /databases/$(database)/documents/loans/$(requestId)
+        ).data;
+        return request.auth.uid == afterRequest.fromUserId
+          && afterRequest.status == 'active'
+          && afterLoan.status == 'active'
+          && afterLoan.ownerId == resource.data.userId
+          && afterLoan.borrowerId == request.auth.uid
+          && afterLoan.bookId == bookId
+          && request.resource.data.borrowStatus == 'on_loan'
+          && request.resource.data.borrowRequestId == requestId
+          && request.resource.data.activeLoanId == requestId
+          && request.resource.data.borrowedBy == request.auth.uid
+          && request.resource.data.borrowDate == request.time
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly([
+              'borrowStatus',
+              'borrowRequestId',
+              'activeLoanId',
+              'borrowedBy',
+              'borrowDate',
+              'borrowHistory',
+              'updatedAt'
+            ]);
+      }
+
+      function requestLoanReturn() {
+        let loanId = resource.data.activeLoanId;
+        let afterLoan = getAfter(
+          /databases/$(database)/documents/loans/$(loanId)
+        ).data;
+        return request.auth.uid == afterLoan.borrowerId
+          && afterLoan.status == 'return_pending_confirmation'
+          && afterLoan.bookId == bookId
+          && request.resource.data.borrowStatus == 'return_pending_confirmation'
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['borrowStatus', 'updatedAt']);
+      }
+
+      function confirmLoanReturn() {
+        let loanId = resource.data.activeLoanId;
+        let afterLoan = getAfter(
+          /databases/$(database)/documents/loans/$(loanId)
+        ).data;
+        return request.auth.uid == resource.data.userId
+          && afterLoan.ownerId == request.auth.uid
+          && afterLoan.status == 'returned'
+          && request.resource.data.borrowStatus == 'available'
+          && request.resource.data.borrowRequestId == null
+          && request.resource.data.activeLoanId == null
+          && request.resource.data.borrowedBy == null
+          && request.resource.data.borrowDate == null
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly([
+              'borrowStatus',
+              'borrowRequestId',
+              'activeLoanId',
+              'borrowedBy',
+              'borrowDate',
+              'borrowHistory',
+              'updatedAt'
+            ]);
+      }
+
       allow read: if isBookOwner() || isPartnerOfOwner() || isOwnerLibraryPublic();
 
       allow create: if isSignedIn()
         && isValidBook()
+        && request.resource.data.get('borrowedBy', null) == null
+        && request.resource.data.get('borrowDate', null) == null
+        && request.resource.data.get('borrowStatus', 'available') == 'available'
+        && request.resource.data.get('borrowRequestId', null) == null
+        && request.resource.data.get('activeLoanId', null) == null
         && (
           request.resource.data.userId == request.auth.uid
           || canAddToPartnerLibrary(request.resource.data.userId)
         );
 
-      // FIX: validate the resulting document AND freeze createdAt.
+      // Loan state changes are allowed only alongside the matching request/loan transition.
       allow update: if isSignedIn()
         && isValidBook()
         && request.resource.data.createdAt == resource.data.createdAt
         && (
-          isBookOwner()
-          || canAddToPartnerLibrary(resource.data.userId)
+          (requestBookLock())
+          || (resource.data.borrowStatus == 'pending_request'
+            && updatePendingRequestBookState())
+          || (resource.data.borrowStatus == 'accepted_waiting_confirmation'
+            && cancelWaitingBookState())
+          || (resource.data.borrowStatus == 'accepted_waiting_confirmation'
+            && activateLoan())
+          || (resource.data.borrowStatus == 'on_loan' && requestLoanReturn())
+          || (resource.data.borrowStatus == 'return_pending_confirmation'
+            && confirmLoanReturn())
+          || (!changesLoanManagedFields()
+            && request.resource.data.userId == resource.data.userId
+            && (isBookOwner() || canAddToPartnerLibrary(resource.data.userId)))
+          || (isBookOwner()
+            && resource.data.get('borrowRequestId', null) == null
+            && resource.data.get('activeLoanId', null) == null
+            && resource.data.get('borrowedBy', null) == null
+            && request.resource.data.userId != resource.data.userId
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['userId', 'updatedAt']))
         );
 
       allow delete: if isSignedIn()
+        && resource.data.get('borrowRequestId', null) == null
+        && resource.data.get('activeLoanId', null) == null
+        && resource.data.get('borrowedBy', null) == null
         && (
           isBookOwner()
           || canAddToPartnerLibrary(resource.data.userId)
@@ -335,12 +595,240 @@ service cloud.firestore {
 
       allow create: if isSignedIn()
         && request.resource.data.fromUserId == request.auth.uid
-        && request.resource.data.status == 'pending';
+        && request.resource.data.fromUserId != request.resource.data.toUserId
+        && request.resource.data.status == 'pending'
+        && request.resource.data.contactInfoShared == false
+        && request.resource.data.keys().hasAll([
+          'fromUserId',
+          'toUserId',
+          'bookId',
+          'bookTitle',
+          'requesterName',
+          'requesterUsername',
+          'ownerName',
+          'ownerUsername',
+          'status',
+          'contactInfoShared',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'fromUserId',
+          'toUserId',
+          'bookId',
+          'bookTitle',
+          'requesterName',
+          'requesterUsername',
+          'ownerName',
+          'ownerUsername',
+          'status',
+          'contactInfoShared',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.bookId is string
+        && request.resource.data.bookTitle is string
+        && request.resource.data.bookTitle.size() > 0
+        && mayRequestBorrow(request.resource.data.toUserId)
+        && requesterHasLendingInfo()
+        && exists(/databases/$(database)/documents/books/$(request.resource.data.bookId))
+        && get(/databases/$(database)/documents/books/$(request.resource.data.bookId))
+          .data.userId == request.resource.data.toUserId
+        && bookIsAvailable(
+          get(/databases/$(database)/documents/books/$(request.resource.data.bookId)).data
+        )
+        && existsAfter(/databases/$(database)/documents/books/$(request.resource.data.bookId))
+        && getAfter(/databases/$(database)/documents/books/$(request.resource.data.bookId))
+          .data.borrowStatus == 'pending_request'
+        && getAfter(/databases/$(database)/documents/books/$(request.resource.data.bookId))
+          .data.borrowRequestId == requestId;
+
+      function ownerAccepts() {
+        let ownerPrivatePath = /databases/$(database)/documents/users/$(request.auth.uid)/private/data;
+        return request.auth.uid == resource.data.toUserId
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'accepted_waiting_confirmation'
+          && request.resource.data.acceptedAt == request.time
+          && request.resource.data.updatedAt == request.time
+          && exists(/databases/$(database)/documents/books/$(resource.data.bookId))
+          && getAfter(/databases/$(database)/documents/books/$(resource.data.bookId))
+            .data.borrowStatus == 'accepted_waiting_confirmation'
+          && getAfter(/databases/$(database)/documents/books/$(resource.data.bookId))
+            .data.borrowRequestId == requestId
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly([
+              'status',
+              'acceptedAt',
+              'updatedAt',
+              'contactInfoShared',
+              'ownerPhoneNumber',
+              'ownerAddress'
+            ])
+          && (
+            (request.resource.data.contactInfoShared == false
+              && !request.resource.data.keys().hasAny(['ownerPhoneNumber', 'ownerAddress']))
+            || (request.resource.data.contactInfoShared == true
+              && exists(ownerPrivatePath)
+              && request.resource.data.ownerPhoneNumber
+                == get(ownerPrivatePath).data.get('phoneNumber', '')
+              && request.resource.data.ownerAddress
+                == get(ownerPrivatePath).data.get('address', ''))
+          );
+      }
+
+      function ownerRejects() {
+        return request.auth.uid == resource.data.toUserId
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'rejected'
+          && request.resource.data.updatedAt == request.time
+          && getAfter(/databases/$(database)/documents/books/$(resource.data.bookId))
+            .data.borrowStatus == 'available'
+          && getAfter(/databases/$(database)/documents/books/$(resource.data.bookId))
+            .data.borrowRequestId == null
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'updatedAt']);
+      }
+
+      function waitingHandoverCancelled() {
+        return resource.data.status == 'accepted_waiting_confirmation'
+          && request.auth.uid in [resource.data.fromUserId, resource.data.toUserId]
+          && request.resource.data.status == 'cancelled'
+          && request.resource.data.cancelledAt == request.time
+          && request.resource.data.updatedAt == request.time
+          && getAfter(/databases/$(database)/documents/books/$(resource.data.bookId))
+            .data.borrowStatus == 'available'
+          && getAfter(/databases/$(database)/documents/books/$(resource.data.bookId))
+            .data.borrowRequestId == null
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'cancelledAt', 'updatedAt']);
+      }
+
+      function borrowerConfirmsReceipt() {
+        return resource.data.status == 'accepted_waiting_confirmation'
+          && request.auth.uid == resource.data.fromUserId
+          && request.resource.data.status == 'active'
+          && request.resource.data.confirmedAt == request.time
+          && request.resource.data.updatedAt == request.time
+          && existsAfter(/databases/$(database)/documents/loans/$(requestId))
+          && getAfter(/databases/$(database)/documents/loans/$(requestId)).data.status == 'active'
+          && getAfter(/databases/$(database)/documents/books/$(resource.data.bookId))
+            .data.activeLoanId == requestId
+          && getAfter(/databases/$(database)/documents/books/$(resource.data.bookId))
+            .data.borrowStatus == 'on_loan'
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'confirmedAt', 'updatedAt']);
+      }
 
       allow update: if isSignedIn()
-        && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+        && (
+          ownerAccepts()
+          || ownerRejects()
+          || waitingHandoverCancelled()
+          || borrowerConfirmsReceipt()
+        );
 
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------
+    // loans — source of truth for all confirmed lending relationships
+    // ---------------------------------------------------------------
+
+    match /loans/{loanId} {
+      allow read: if isSignedIn()
+        && (resource.data.ownerId == request.auth.uid
+          || resource.data.borrowerId == request.auth.uid);
+
+      allow create: if isSignedIn()
+        && request.resource.data.requestId == loanId
+        && request.resource.data.borrowerId == request.auth.uid
+        && request.resource.data.status == 'active'
+        && request.resource.data.confirmedAt == request.time
+        && request.resource.data.createdAt == request.time
+        && exists(/databases/$(database)/documents/bookRequests/$(loanId))
+        && get(/databases/$(database)/documents/bookRequests/$(loanId)).data.status
+          == 'accepted_waiting_confirmation'
+        && get(/databases/$(database)/documents/bookRequests/$(loanId)).data.fromUserId
+          == request.auth.uid
+        && request.resource.data.bookId
+          == get(/databases/$(database)/documents/bookRequests/$(loanId)).data.bookId
+        && request.resource.data.ownerId
+          == get(/databases/$(database)/documents/bookRequests/$(loanId)).data.toUserId
+        && requestInAfter(loanId, 'active')
+        && existsAfter(/databases/$(database)/documents/books/$(request.resource.data.bookId))
+        && getAfter(/databases/$(database)/documents/books/$(request.resource.data.bookId))
+          .data.activeLoanId == loanId
+        && existsAfter(/databases/$(database)/documents/loanCounters/$(request.time.year()))
+        && getAfter(/databases/$(database)/documents/loanCounters/$(request.time.year()))
+          .data.lastRequestId == loanId
+        && request.resource.data.loanNumber
+          == 'ML-' + string(request.time.year()) + '-'
+            + string(getAfter(
+              /databases/$(database)/documents/loanCounters/$(request.time.year())
+            ).data.sequence);
+
+      allow update: if isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'updatedAt', 'lastReminderAt', 'returnedAt'])
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.borrowerId == resource.data.borrowerId
+        && request.resource.data.bookId == resource.data.bookId
+        && request.resource.data.requestId == resource.data.requestId
+        && (
+          (request.auth.uid == resource.data.borrowerId
+            && resource.data.status == 'active'
+            && request.resource.data.status == 'return_pending_confirmation'
+            && request.resource.data.updatedAt == request.time
+            && getAfter(/databases/$(database)/documents/books/$(resource.data.bookId))
+              .data.borrowStatus == 'return_pending_confirmation')
+          || (request.auth.uid == resource.data.ownerId
+            && resource.data.status == 'return_pending_confirmation'
+            && request.resource.data.status == 'returned'
+            && request.resource.data.returnedAt == request.time
+            && request.resource.data.updatedAt == request.time
+            && getAfter(/databases/$(database)/documents/books/$(resource.data.bookId))
+              .data.borrowStatus == 'available')
+          || (request.auth.uid == resource.data.ownerId
+            && resource.data.status == 'active'
+            && request.resource.data.status == resource.data.status
+            && request.resource.data.lastReminderAt == request.time
+            && request.resource.data.updatedAt == request.time
+            && (!resource.data.keys().hasAny(['lastReminderAt'])
+              || request.time > resource.data.lastReminderAt + duration.value(24, 'h')))
+        );
+
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------
+    // loanCounters — monotonic human-readable Loan # allocator
+    // ---------------------------------------------------------------
+
+    match /loanCounters/{year} {
+      allow get: if isSignedIn();
+      allow list: if false;
+
+      function linkedActiveLoan(next) {
+        return next.lastRequestId is string
+          && requestInAfter(next.lastRequestId, 'active')
+          && existsAfter(/databases/$(database)/documents/loans/$(next.lastRequestId))
+          && getAfter(/databases/$(database)/documents/loans/$(next.lastRequestId)).data.borrowerId
+            == request.auth.uid
+          && getAfter(/databases/$(database)/documents/loans/$(next.lastRequestId)).data.loanNumber
+            == 'ML-' + year + '-' + string(next.sequence);
+      }
+
+      allow create: if isSignedIn()
+        && year == string(request.time.year())
+        && request.resource.data.sequence == 1
+        && linkedActiveLoan(request.resource.data);
+
+      allow update: if isSignedIn()
+        && year == string(request.time.year())
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['sequence', 'lastRequestId', 'updatedAt'])
+        && request.resource.data.sequence == resource.data.sequence + 1
+        && linkedActiveLoan(request.resource.data);
       allow delete: if false;
     }
 
@@ -354,10 +842,12 @@ service cloud.firestore {
           .hasOnly(['likesCount', 'commentsCount']);
       }
 
-      allow read: if true;
+      allow read: if canReadPosts(resource.data);
 
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
+        && request.resource.data.visibility in ['public', 'signed_in', 'followers_collaborators']
+        && request.resource.data.visibility == postVisibility(request.auth.uid)
         && request.resource.data.likesCount == 0
         && request.resource.data.commentsCount == 0;
 
@@ -367,7 +857,8 @@ service cloud.firestore {
         && (
           (resource.data.userId == request.auth.uid
             && request.resource.data.diff(resource.data).affectedKeys()
-                .hasOnly(['body', 'rating', 'category', 'updatedAt'])
+                .hasOnly(['body', 'rating', 'category', 'updatedAt', 'visibility'])
+            && hasCurrentPostVisibility(request.auth.uid, request.resource.data)
             && request.resource.data.likesCount == resource.data.likesCount
             && request.resource.data.commentsCount == resource.data.commentsCount)
           || isAdmin()
@@ -399,14 +890,19 @@ service cloud.firestore {
         && (resource.data.userId == request.auth.uid || isAdmin());
 
       match /likes/{likerId} {
-        allow read: if true;
-        allow create, delete: if isSignedIn() && likerId == request.auth.uid;
+        allow read: if canReadReview(reviewId);
+        allow create, delete: if isSignedIn()
+          && canReadReview(reviewId)
+          && likerId == request.auth.uid;
       }
 
       match /comments/{commentId} {
-        allow read: if true;
-        allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+        allow read: if canReadReview(reviewId);
+        allow create: if isSignedIn()
+          && canReadReview(reviewId)
+          && request.resource.data.userId == request.auth.uid;
         allow update, delete: if isSignedIn()
+          && canReadReview(reviewId)
           && (resource.data.userId == request.auth.uid || isAdmin());
       }
     }

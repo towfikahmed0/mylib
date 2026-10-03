@@ -11,6 +11,12 @@ export type WithId<T> = T & { id: string }
 export type UserRole = 'user' | 'admin'
 export type UserPlan = 'free' | 'pro'
 export type Visibility = 'public' | 'private' | 'collaborators'
+export type PostVisibility = 'public' | 'signed_in' | 'followers_collaborators'
+export type BorrowRequestPermission =
+  | 'none'
+  | 'collaborators'
+  | 'collaborators_followers'
+  | 'anyone'
 
 export interface PrivacySettings {
   library: Visibility
@@ -18,6 +24,8 @@ export interface PrivacySettings {
   progress: Visibility
   reviews: Visibility
   feed: Visibility
+  posts: PostVisibility
+  borrowRequestPermission?: BorrowRequestPermission
 }
 
 /** users/{uid} */
@@ -42,6 +50,7 @@ export interface UserPrivateData {
   email: string
   phoneNumber: string
   address: string
+  contractNumber?: string
   lastAIAnalysis: string
   lastAIAnalysisDate: FirestoreDate | null
 }
@@ -90,6 +99,13 @@ export interface BorrowHistoryEntry {
   borrowedBy: string
   borrowDate: FirestoreDate
   returnedAt: FirestoreDate | null
+  loanId?: string
+  loanNumber?: string
+  ownerId?: string
+  borrowerId?: string
+  requestedAt?: FirestoreDate
+  confirmedAt?: FirestoreDate
+  status?: LoanStatus
 }
 
 /** books/{id} */
@@ -112,6 +128,9 @@ export interface Book {
   borrowedBy: string | null
   borrowDate: FirestoreDate | null
   borrowHistory: BorrowHistoryEntry[]
+  borrowStatus?: BorrowAvailability
+  borrowRequestId?: string | null
+  activeLoanId?: string | null
   highlights: Highlight[]
   copyType: CopyType
   gifterName: string | null
@@ -184,7 +203,21 @@ export interface Partnership {
   updatedAt?: FirestoreDate
 }
 
-export type RequestStatus = 'pending' | 'accepted' | 'rejected' | 'cancelled'
+export type RequestStatus =
+  | 'pending'
+  | 'accepted_waiting_confirmation'
+  | 'rejected'
+  | 'cancelled'
+  | 'active'
+
+export type BorrowAvailability =
+  | 'available'
+  | 'pending_request'
+  | 'accepted_waiting_confirmation'
+  | 'on_loan'
+  | 'return_pending_confirmation'
+
+export type LoanStatus = 'active' | 'return_pending_confirmation' | 'returned'
 
 /** collaborationRequests/{uidA_uidB} */
 export interface CollaborationRequest {
@@ -194,7 +227,7 @@ export interface CollaborationRequest {
   fromName: string
   toUserId: string
   toEmail: string
-  status: RequestStatus
+  status: 'pending' | 'accepted' | 'rejected' | 'cancelled'
   createdAt?: FirestoreDate
   updatedAt?: FirestoreDate
 }
@@ -207,16 +240,43 @@ export interface CollaborationRequest {
 export interface BookRequest {
   id: string
   fromUserId: string
-  fromEmail: string
   toUserId: string
   bookId: string
   bookTitle: string
   requesterName: string
-  phoneNumber: string
-  address: string
+  requesterUsername: string
+  ownerName: string
+  ownerUsername: string
   status: RequestStatus
-  createdAt?: FirestoreDate
-  updatedAt?: FirestoreDate
+  contactInfoShared: boolean
+  ownerPhoneNumber?: string
+  ownerAddress?: string
+  createdAt: FirestoreDate
+  acceptedAt?: FirestoreDate
+  confirmedAt?: FirestoreDate
+  cancelledAt?: FirestoreDate
+  updatedAt: FirestoreDate
+}
+
+/** loans/{requestId}; request ID is the deterministic loan document key. */
+export interface Loan {
+  id: string
+  loanNumber: string
+  bookId: string
+  bookTitle: string
+  ownerId: string
+  ownerName: string
+  ownerUsername: string
+  borrowerId: string
+  borrowerName: string
+  borrowerUsername: string
+  requestId: string
+  status: LoanStatus
+  requestedAt: FirestoreDate
+  acceptedAt: FirestoreDate
+  confirmedAt: FirestoreDate
+  returnedAt?: FirestoreDate
+  lastReminderAt?: FirestoreDate
 }
 
 /* ------------------------------------------------------------------ *
@@ -234,6 +294,12 @@ export type ActivityType =
   | 'transfer'
   | 'request_accepted'
   | 'request_rejected'
+  | 'return_requested'
+  | 'return_confirmed'
+  | 'agreement_cancelled'
+  | 'borrow_request_sent'
+  | 'contact_info_shared'
+  | 'return_reminder_sent'
   | 'message'
 
 /** activityFeed/{id} */
@@ -269,6 +335,11 @@ export type NotificationType =
   | 'book_request'
   | 'book_request_accepted'
   | 'book_request_declined'
+  | 'borrow_receipt_confirmed'
+  | 'borrow_agreement_cancelled'
+  | 'return_confirmation_requested'
+  | 'return_confirmed'
+  | 'book_return_reminder'
   | 'collaboration_request'
   | 'collaboration_accepted'
 
@@ -297,6 +368,7 @@ export type ReviewCategory = 'review' | 'help' | 'others'
 export interface Review {
   id: string
   userId: string
+  visibility?: PostVisibility
   userName: string
   bookTitle: string
   author: string
