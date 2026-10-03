@@ -829,3 +829,19 @@ export function useTransferBook() {
     },
   })
 }
+
+export function useActiveLoans() {
+  const { loans } = useLoanList()
+  return loans.filter((loan) => loan.status === 'active')
+}
+
+export function useMyLoans() {
+  return useLoanList()
+}
+
+export function useBorrowedBooks() {
+  const { loans } = useLoanList()
+  return loans.filter(
+    (loan) => loan.status === 'active' || loan.status === 'return_pending_confirmation',
+  )
+}

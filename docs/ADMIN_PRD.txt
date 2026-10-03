@@ -1,0 +1,621 @@
+# 📘 PRODUCT REQUIREMENTS DOCUMENT — Admin Panel (v2.0 — FINAL)
+
+**Project:** MyLib Admin Command Center
+**Version:** 2.1 (Reconciled Final)
+**Status:** Ready for Development
+**Target Route:** `mylib.softrly.com/admin`
+**Access:** `role: 'admin'` only
+**Tech Stack:** React (Vite) + TypeScript + Tailwind CSS + Firebase Modular SDK + TanStack Query + Zustand
+
+---
+
+## 1. Executive Summary
+
+The **Admin Panel** is the site owner's private command center for MyLib. It provides:
+
+- **Platform Health Monitoring** — real-time stats on users, books, reviews, and activity.
+- **User Management** — search, view, ban, promote, and control user accounts.
+- **Content Moderation** — review reports, delete inappropriate content, ban bad actors.
+- **Custom Messaging** — push notifications to any user or all users, with severity colors.
+- **Platform Configuration** — Push notification providers, email providers, AdSense, AI, feature flags.
+- **Monetization Control** — define Free/Pro plans, pricing, features, and discounts.
+- **Data Management** — backups, exports, and destructive actions.
+
+The Admin Panel is **invisible to non-admins** — hidden from navigation, protected at the route level, and secured by Firestore rules.
+
+---
+
+## 2. Target Audience
+
+- **Primary:** The Site Owner (you). Full control over everything.
+- **Secondary:** Co-Admins (future) — trusted users you promote to help moderate content.
+
+---
+
+## 3. Technical Architecture
+
+- **Admin tab persistence:** Use Zustand to persist the active tab across sessions; validate the stored tab and fall back to Dashboard.
+
+- **Routing:** `/admin/*` wrapped in `<AdminRoute>` which redirects non-admins to `/library`.
+- **Layout:** Reuses the existing `AppLayout` with an added "Admin" sidebar entry (Lucide `Shield`, not `ShieldCheck`) — only visible to admins. Keep the mobile bottom navigation at four slots: replace Insights with Admin for admins only; non-admins retain Insights. Mobile admins can reach Insights through the profile menu.
+- **Tabs:** 6 tabs across the top: Dashboard, Users, Moderation, Messaging, Plans, Settings.
+- **State:** TanStack Query for server state, Zustand for local UI state.
+- **Design:** Matches the rest of MyLib — solid backgrounds (no `.glass`), Light/Dark/Sepia themes, Fraunces + Raleway fonts.
+- **Data Model:** New Firestore collections: `adminConfig` (documents `main` and `public`), `adminAuditLog`, `platformPlans`, `platformDiscounts`, `systemNotifications`.
+
+---
+
+## 4. Notification System Architecture 🆕
+
+### 4.1 Provider Abstraction Layer
+
+The notification system uses a **Provider Abstraction Layer** to support multiple push notification backends. This means you can switch providers at any time from the Admin Panel without touching code.
+
+**Supported Providers:**
+
+| Provider | Type | Default | Cost |
+|---|---|---|---|
+| **Firebase Cloud Messaging (FCM)** | Managed | ✅ Default | Free |
+| **Self-Hosted Web Push** | Self-hosted (VAPID) | Optional | Free |
+| **OneSignal** | Managed | Optional (future) | Free tier available |
+
+**How It Works:**
+
+1.  **Standard Interface:** All providers implement a common `PushProvider` interface:
+    ```typescript
+    interface PushProvider {
+      subscribe(userId: string, subscription: PushSubscriptionJSON): Promise<void>;
+      unsubscribe(userId: string): Promise<void>;
+      send(targetUserIds: string[] | 'all', payload: PushPayload): Promise<SendResult>;
+      test(): Promise<{ ok: boolean; message: string }>;
+    }
+    ```
+2.  **Adapter Pattern:** Each provider is wrapped in an adapter class (e.g., `FCMAdapter`, `WebPushAdapter`).
+3.  **Runtime Selection:** The active provider is read from `adminConfig/main.integrations.push.provider`. Switching providers only requires changing this value and re-registering existing subscriptions (if the browser subscription format differs).
+4.  **Subscription Storage:** Each user's push subscription is stored in `users/{uid}/private/data.pushSubscriptions`, keyed by provider name:
+    ```typescript
+    {
+      pushSubscriptions: {
+        fcm: { token: string, platform: 'web', registeredAt: Timestamp },
+        webpush: { endpoint: string, keys: { p256dh, auth }, registeredAt: Timestamp }
+      }
+    }
+    ```
+
+### 4.2 Default: Firebase Cloud Messaging (FCM)
+
+**Configuration (in Admin Panel → Settings → Integrations → Push Notifications):**
+- **Provider Dropdown:** FCM (default) / Self-Hosted Web Push / (future: OneSignal).
+- **FCM VAPID Key:** Text input (from Firebase Console → Cloud Messaging → Web Push certificates).
+- **Enable FCM:** Toggle.
+- **Service Worker URL:** Auto-configured (`/firebase-messaging-sw.js`).
+- **Test Push Button:** Sends a test notification to the admin's own browser.
+
+**Client Integration:**
+1.  On first load, `firebase-messaging` requests notification permission.
+2.  If granted, generates an FCM token and saves it to `users/{uid}/private/data.pushSubscriptions.fcm`.
+3.  The service worker receives push events and displays notifications.
+4.  Clicking a notification navigates to the appropriate `actionLink`.
+
+**Backend:** Sending uses the FCM HTTP v1 API through the trusted cPanel Node.js backend for v1 (subject to hosting support), using Firebase Admin SDK and server-side credentials. The browser must never send with a server key. Cloud Functions on Blaze are an optional alternative; Firebase Spark does not support deploying Cloud Functions.
+
+### 4.3 Optional: Self-Hosted Web Push
+
+**Configuration:**
+- **VAPID Public Key:** Auto-generated once, displayed for the client to use.
+- **VAPID Private Key:** Password input (never displayed after save).
+- **VAPID Subject:** `mailto:admin@softrly.com` (or similar).
+- **Endpoint URL:** The URL of your self-hosted push server (e.g., `https://push.softrly.com`).
+- **Enable Self-Hosted:** Toggle.
+
+**Backend:**
+- A small Node.js server (can run on cPanel via Node.js Selector, or on a small VPS) using the `web-push` npm package.
+- Listens for admin API calls from the frontend, fetches subscriptions from Firestore, and dispatches pushes.
+- Requires HTTPS (mandatory for Web Push). Your cPanel host already provides this via AutoSSL.
+
+### 4.4 Sending Custom Notifications (Messaging Tab)
+
+The **Messaging Tab** in the Admin Panel allows sending custom notifications to any user or all users:
+
+**Compose Form:**
+- **Target:** All Users / Pro Users / Free Users / Specific User.
+- **Severity:** Info (blue) / Success (green) / Warning (amber) / Danger (red).
+- **Title:** Max 100 chars.
+- **Body:** Max 500 chars.
+- **Action Link (Optional):** URL or route.
+- **Action Label (Optional):** Button text.
+- **Send Now / Schedule:** Date-time picker.
+- **Live Preview:** Renders the notification as it will appear.
+
+**Delivery Logic:**
+1.  Admin submits the form → writes to `systemNotifications` collection.
+2.  The trusted backend worker reads the target filter and fetches matching `pushSubscriptions` from Firestore.
+3.  The active push provider sends to all matching subscriptions.
+4. The notification is also written to each user's `users/{uid}/notifications` subcollection (so they see it in the bell dropdown even if they missed the push). The backend records `deliveryCount` as successfully created inbox records; it is not a read/open count.
+
+**Scheduling:** A cPanel cron job runs every five minutes and calls the authenticated cron-only `POST /admin/process-scheduled` endpoint. It selects due unsent records, claims them transactionally, fans them out idempotently, and records `sent`, `failed`, or retryable processing state. The implementation and runtime contract are defined in the companion Architecture document.
+
+---
+
+## 5. Email System Architecture 🆕
+
+### 5.1 Provider Abstraction Layer
+
+Like push, the email system uses a **Provider Abstraction Layer**:
+
+**Supported Providers:**
+
+| Provider | Type | Default | Free Tier |
+|---|---|---|---|
+| **Resend** | Managed | ✅ Default | 3,000/month (100/day) |
+| **Brevo** (Sendinblue) | Managed | Optional | 300/day |
+| **Mailtrap** | Managed | Optional | 4,000/month |
+| **SendGrid** | Managed | Optional | 100/day (first 60 days) |
+| **SMTP (Custom)** | Self-hosted | Optional | Depends on host |
+| **Custom SMTP via cPanel** | Self-hosted | Optional | Free (uses your cPanel mail) |
+
+**Standard Interface:**
+```typescript
+interface EmailOptions {
+  to: string | string[];
+  subject: string;
+  html: string;
+  from?: string;
+  replyTo?: string;
+  variables?: Record<string, string>;
+}
+interface EmailResult { id: string; ok: boolean; error?: string; }
+interface EmailProvider {
+  sendEmail(options: EmailOptions): Promise<EmailResult>;
+  sendBatch(recipients: string[], subject: string, html: string): Promise<EmailResult[]>;
+  test(): Promise<{ ok: boolean; message: string }>;
+}
+```
+
+### 5.2 Default: Resend
+
+**Why Resend?**
+- Modern, developer-friendly API.
+- Excellent React Email template support.
+- 3,000 emails/month free.
+- Simple API key authentication.
+
+**Configuration (in Admin Panel → Settings → Integrations → Email):**
+- **Provider Dropdown:** Resend (default) / Brevo / Mailtrap / SendGrid / Custom SMTP.
+- **Resend API Key:** Password input (from resend.com dashboard).
+- **From Email:** `noreply@softrly.com`.
+- **From Name:** `MyLib Team`.
+- **Reply-To:** `support@softrly.com`.
+- **Enable Email:** Toggle.
+- **Test Email Button:** Sends a test to the admin's email.
+
+### 5.3 Alternative: Custom SMTP via cPanel
+
+If you want to avoid third-party email providers entirely, you can use your cPanel's built-in mail server:
+
+- **SMTP Host:** `mail.softrly.com`.
+- **SMTP Port:** 587 (TLS).
+- **SMTP User:** `noreply@softrly.com`.
+- **SMTP Password:** Password input.
+- **Enable TLS:** Toggle.
+
+**Limitations:**
+- Deliverability is lower than managed providers (emails may land in spam).
+- Free but requires managing sender reputation.
+- Best for low-volume, non-critical emails.
+
+**Recommendation:** Start with **Resend** for reliability. Switch to Custom SMTP only if you need complete independence and can tolerate deliverability issues.
+
+### 5.4 Email Templates
+
+**Templates managed by the admin:**
+- **Welcome Email** (on signup).
+- **Password Reset** (delegated to Firebase Auth by default).
+- **Weekly Digest** (future).
+- **Custom Email** (one-off sends to a user or all users).
+
+**Template Editor:**
+- Subject line input.
+- Rich-text or Markdown body editor.
+- Variable placeholders: `{{username}}`, `{{displayName}}`, `{{booksCount}}`.
+- **Variable substitution:** Use `{{variableName}}` syntax. The `variables` object replaces matching placeholders in both `subject` and `html` before sending. Missing variables are replaced with an empty string and logged server-side; do not log secrets or full sensitive message content.
+- Live preview.
+- Send test button.
+
+---
+
+## 6. Core Modules & Feature Requirements
+
+### Module 1: Admin Dashboard (Overview Tab)
+
+**Purpose:** At-a-glance view of platform health.
+
+**Stat Cards (6):**
+1. Total Users (+delta this week).
+2. Total Books.
+3. Total Reviews.
+4. Pending Reports (amber if > 0).
+5. Total Shelves.
+6. Active Pro Subscriptions.
+
+**Charts:** Reuse the existing `chart.js` + `react-chartjs-2` setup from Insights. Do not install an additional chart library.
+- User Growth (Line) — signups per day/week/month.
+- Books Added (Bar) — last 30 days.
+- Top 5 Genres (Doughnut).
+- Top 5 Active Users (List).
+
+**Recent Activity Feed:**
+- Last 10 sign-ups.
+- Last 10 book additions.
+- Last 5 reports filed.
+
+---
+
+### Module 2: User Management Tab
+
+**Purpose:** Complete control over user accounts.
+
+**Search & Filter:**
+- Search by username, email, display name (prefix).
+- Filters: All / Admins / Pro / Banned / New.
+
+**User Table Columns:**
+- Avatar + Username.
+- Email.
+- Display Name.
+- Role badge.
+- Plan badge.
+- Book Count.
+- Joined Date.
+- Last Active.
+- Banned status.
+- **Actions Dropdown:** View Profile / Edit Role / Change Plan / Apply Discount / Reset Password / Ban / Delete.
+
+**Pagination:** 20 users per page.
+
+**Bulk Actions:** Bulk ban, bulk upgrade plan.
+
+---
+
+### Module 3: Content Moderation Tab
+
+**Purpose:** Handle reports, enforce standards.
+
+**Reports Queue:**
+- Filters: Pending / Resolved / Dismissed / All.
+- Report card: reporter, target type, reason, preview, timestamp.
+- Actions: View Content / Delete Content & Resolve / Dismiss / Ban Reported User.
+
+**Banned Users List:** Table with unban button.
+
+**Content Browser:** Browse and delete any review, comment, or shelf.
+
+---
+
+### Module 4: Messaging & Notifications Tab
+
+**Purpose:** Send custom notifications AND emails to any user or all users.
+
+**Sub-tabs:** Notifications | Emails | History.
+
+**Notifications Sub-tab:**
+- Compose form: Target, Severity, Title, Body, Action Link, Action Label, Send Now/Schedule.
+- Live preview.
+- Delivery via active push provider.
+
+**Emails Sub-tab:**
+- Compose form: Target, Subject, Body (Markdown or Rich Text), Variables.
+- Live preview.
+- Delivery via active email provider.
+
+**History Sub-tab:**
+- Table of all past notifications and emails. Notification history shows delivery count, not read count; per-user read tracking is deferred to v2.0.
+- Columns: Type (Push/Email), Target, Title/Subject, Sent Date, Delivery Count, Actions (View/Delete).
+
+---
+
+### Module 5: Plans & Pricing Tab
+
+**Purpose:** Define Free/Pro plans, pricing, features, and discounts.
+
+**Plan Cards (2):**
+- Free Plan: Name, Price ($0), Description, Feature Checklist (on/off toggles).
+- Pro Plan: Name, Price, Yearly Discount %, Description, Feature Checklist, Trial Days.
+
+**Feature Toggles (per plan):**
+- Basic Library, Custom Shelves (number), Public Profile, AI BYOK, AI System, PDF Export, Advanced Analytics, Premium Themes.
+
+**Discounts Manager:**
+- List of active discounts (code, type, value, applies-to, validity, uses).
+- Add/Edit/Delete discounts. Codes are stored for future checkout use (billing is out of scope in v1); admins may manually apply a discount to a user through the User Actions dropdown. No automated checkout redemption is implied.
+
+**Landing Page Sync:**
+- Global toggle at `adminConfig/public.landingPage.showPlans`: Show Plans on Landing Page.
+- When ON, adds a Pricing Section to the landing page with Free/Pro cards, comparison table, and discount banner.
+
+---
+
+### Module 6: Platform Settings Tab
+
+**Purpose:** Configure third-party services, feature flags, and AI.
+
+**Sub-sections:**
+
+**6.1 Integrations**
+- **Push Notifications:** Provider dropdown (FCM / Self-Hosted), FCM VAPID key, Self-Hosted endpoint, Test button.
+- **Email:** Provider dropdown (Resend / Brevo / Mailtrap / SendGrid / Custom SMTP), API key, From email, From name, Test button.
+- **Pusher (Real-Time):** Enable, App ID, Key, Secret, Cluster, Test button. Used for real-time collaboration (partner activity, shared library updates).
+- **Google AdSense:** Enable, Publisher ID, Ad Slots (Sidebar, Below Book Grid, Between Reviews), Ad-Free for Pro toggle, Preview placements.
+- **AI Provider:** System AI toggle, Provider (Gemini/Groq/Both), API keys, Models, Rate Limits per plan, BYOK fallback.
+
+**6.2 Feature Flags**
+- Global toggles for every feature (AI Librarian, Magic Fill, Metadata Fixer, Reading Roadmap, Community Feed, Explore Tab, Followers, Collaboration, Book Requests, Notifications, Sharing, Custom Shelves, Smart Shelves, Reading Challenges).
+
+**6.3 Landing Page Content**
+- Hero Title, Subtitle, CTA Text, Reader Count.
+- Feature Cards (6 editable).
+- Live preview.
+
+**6.4 Email Templates**
+- Welcome Email, Weekly Digest, Custom templates.
+- Rich-text editor with variables.
+
+**6.5 Audit & Security**
+- Audit log viewer (all admin actions).
+- Session management.
+- API key rotation reminders.
+
+---
+
+## 7. Data Model (New Firestore Collections)
+
+### `adminConfig/main` (admin-only operational configuration)
+```typescript
+{
+  integrations: {
+    push: {
+      provider: 'fcm' | 'webpush' | 'onesignal',
+      fcm: { enabled, vapidKey },
+      webpush: { enabled, endpoint, vapidPublicKey, vapidPrivateKey, vapidSubject },
+      onesignal: { enabled, appId, apiKey }
+    },
+    email: {
+      provider: 'resend' | 'brevo' | 'mailtrap' | 'sendgrid' | 'smtp',
+      resend: { enabled, apiKey, fromEmail, fromName, replyTo },
+      smtp: { enabled, host, port, user, password, useTLS },
+      ...
+    },
+    pusher: { enabled, appId, key, secret, cluster },
+    adsense: { enabled, publisherId, slots: { sidebar, belowGrid, betweenReviews }, adFreeForPro },
+    ai: { systemAiEnabled, provider, geminiApiKey, geminiModel, groqApiKey, groqModel, rateLimits: { free, pro }, byokFallback }
+  },
+  featureFlags: { ... },
+  emailTemplates: { ... }
+}
+```
+
+### `adminConfig/public` (public landing-page configuration; admin write)
+```typescript
+{
+  landingPage: {
+    showPlans: boolean,
+    heroTitle: string, heroSubtitle: string, ctaText: string, readerCount: number,
+    featureCards: Array<{ icon: string, title: string, description: string }>
+    // icon is a Lucide icon name (e.g. "book-open"), not an emoji.
+  },
+  updatedAt: Timestamp,
+  updatedBy: string
+}
+```
+
+This document contains only content intended for public display. Do not place credentials, private settings, internal feature flags, or email templates here.
+
+### `platformPlans/{planId}` (planId = `free` | `pro`; public read for landing-page pricing)
+```typescript
+{
+  id, name, price, currency, yearlyDiscount, description, trialDays,
+  features: { basicLibrary, customShelves, publicProfile, aiByok, aiSystem, pdfExport, advancedAnalytics, premiumThemes },
+  updatedAt
+}
+```
+
+### `platformDiscounts/{discountId}`
+```typescript
+{
+  code, type: 'percentage' | 'fixed', value, appliesTo, validFrom, validUntil,
+  maxUses, currentUses, status, createdAt
+}
+```
+
+### `systemNotifications/{notificationId}`
+```typescript
+{
+  target: 'all' | 'pro' | 'free' | 'specific',
+  targetUserId?, severity: 'info' | 'success' | 'warning' | 'danger',
+  title, body, actionLink?, actionLabel?,
+  scheduledAt?, sentAt, status: 'scheduled' | 'processing' | 'sent' | 'failed', lastError?, deliveryCount, createdBy, createdAt
+}
+```
+
+### `adminAuditLog/{logId}`
+```typescript
+{
+  adminId, adminEmail, action, targetType, targetId, details, createdAt
+}
+```
+
+### `users/{uid}/private/data` — Extended
+```typescript
+{
+  ...existing fields,
+  pushSubscriptions: {
+    fcm: { token, platform, registeredAt },
+    webpush: { endpoint, keys: { p256dh, auth }, registeredAt }
+  }
+}
+```
+
+---
+
+**Configuration security:** `adminConfig/main` is admin-readable and contains operational configuration; `adminConfig/public` is publicly readable and contains only landing-page content intended for public display. API keys, SMTP passwords, VAPID private keys, service credentials, and other secrets MUST live in server-only environment/secret storage, not in Firestore documents readable by browser clients (including admins). The settings UI may display masked status and submit secret changes to the authenticated backend.
+
+## 7.1 First Admin Bootstrap and Initial Data
+
+**First admin:** Bootstrap the owner's verified Firebase UID out-of-band through Firebase Console (`users/{uid}.role = 'admin'`) or a one-time trusted script using Firebase Admin SDK. Do not use `VITE_ADMIN_EMAIL` or client-side `AuthContext` code to grant admin: Vite variables are public, and Firestore rules must not permit self-promotion. Remove/disable any one-time script after use.
+
+**Initial defaults:** On first authorized admin visit, an idempotent `seedDefaults` routine ensures `adminConfig/main`, `adminConfig/public`, `platformPlans/free`, and `platformPlans/pro` exist. It must create only missing documents, never overwrite existing settings, and handle concurrent visits safely (transaction/create-if-absent). Prefer server-side seeding where practical. Include default field values in implementation constants and test repeat/concurrent execution.
+
+## 8. Firestore Rules (Admin Additions)
+
+```javascript
+function isAdmin() {
+  return isSignedIn()
+    && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+}
+
+match /adminConfig/main {
+  allow read, write: if isAdmin();
+}
+
+match /adminConfig/public {
+  allow read: if true;           // Public landing-page content only
+  allow write: if isAdmin();
+}
+
+match /platformPlans/{planId} {
+  allow read: if true;          // Public read for landing page pricing display
+  allow write: if isAdmin();
+}
+
+match /platformDiscounts/{discountId} {
+  allow read: if true;
+  allow write: if isAdmin();
+}
+
+match /systemNotifications/{notificationId} {
+  allow read, write: if isAdmin();
+}
+
+match /adminAuditLog/{logId} {
+  allow read, create: if isAdmin();
+  allow update, delete: if false;   // immutable
+}
+
+// Users: only admins can change role/plan/banned
+match /users/{userId} {
+  allow update: if isSignedIn()
+    && (
+      (userId == request.auth.uid
+        && resource.data.get('role', 'user') == request.resource.data.get('role', 'user')
+        && resource.data.get('plan', 'free') == request.resource.data.get('plan', 'free')
+        && resource.data.get('banned', false) == request.resource.data.get('banned', false))
+      || isAdmin()
+    );
+}
+```
+
+---
+
+## 9. UI/UX Guidelines
+
+- **Layout:** Same `AppLayout` shell with "Admin" sidebar entry (Shield icon (Lucide `Shield`, not `ShieldCheck`).
+- **Tabs:** Horizontal tab bar at the top of `/admin`.
+- **Styling:** Solid backgrounds (no `.glass`), Light/Dark/Sepia support, Fraunces + Raleway.
+- **Tables:** Responsive (cards on mobile, tables on desktop).
+- **Confirmations:** 2-step confirmation for destructive actions.
+- **Toasts:** Success/error feedback for all actions.
+- **Audit:** Every admin action logged silently with a subtle toast.
+- **Loaders:** Skeleton loaders for all fetches.
+- **Empty States:** Every list/table has a friendly empty state.
+
+---
+
+## 10. Development Roadmap (Phased)
+
+**Phase 6.1 — Admin Foundation & Dashboard**
+- AdminRoute guard.
+- Sidebar entry.
+- Tab layout.
+- Dashboard with stats + charts + recent activity.
+- Idempotent defaults seeding for `adminConfig/main`, `adminConfig/public`, `platformPlans/free`, and `platformPlans/pro`.
+- `adminAudit.ts` implementation is deferred to Phase 6.2, alongside the first destructive/admin-mutating actions.
+
+**Phase 6.2 — User Management & Moderation**
+- User table with search/filter.
+- Action dropdown (ban, promote, reset password, delete).
+- Reports queue.
+- Banned users list.
+
+**Phase 6.3 — Messaging System**
+- Push + Email provider abstraction layers.
+- FCM integration (default).
+- Self-Hosted Web Push integration (optional).
+- Resend email integration (default).
+- Custom SMTP fallback (optional).
+- Compose form + severity colors + target selection.
+- Notification history.
+
+**Phase 6.4 — Plans & Pricing**
+- Free/Pro plan cards.
+- Feature toggles.
+- Discount manager.
+- Landing page sync.
+
+**Phase 6.5 — Platform Settings**
+- Pusher config.
+- AdSense config.
+- AI provider config.
+- Feature flags.
+- Landing page content editor.
+- Email templates editor.
+
+**Phase 6.6 — Data Management & Polish**
+- Backup/export.
+- Danger zone.
+- Audit log viewer.
+- Final testing.
+
+---
+
+## 11. Integration Points with Existing App
+
+| Existing Feature | How Admin Panel Affects It |
+|---|---|
+| BookCard / Library | Feature flags hide shelves if disabled. |
+| AI Chat / Magic Fill | If `systemAiEnabled`, use server keys; else BYOK. Rate limits applied. |
+| Landing Page | Pulls hero content and `showPlans` from public-readable `adminConfig/public`; plan cards from public-readable `platformPlans`; discounts from `platformDiscounts` under its public-read rule. |
+| Notifications Bell | Reads from `users/{uid}/notifications`; receives admin messages + system pushes. |
+| Sidebar / Nav | Admin entry visible only when `role === 'admin'`. |
+| Feature Gating | Every feature checks `featureFlags` + user's plan before rendering. |
+| AdSense | Client script loads dynamically if enabled. Pro users never see ads if `adFreeForPro`. |
+| Email System | All app emails (welcome, digest, resets) route through the active provider. |
+| Push System | All push notifications route through the active provider. |
+
+---
+
+## 12. Success Criteria
+
+- Admin can access `/admin` without errors.
+- Non-admins are redirected away from `/admin`.
+- All 6 tabs functional.
+- Platform health visible at a glance.
+- Admins can ban users, moderate content, send notifications + emails.
+- Plans and pricing editable and reflected on the landing page.
+- Push and Email providers switchable at runtime.
+- Every admin action logged.
+- `npm run build` and `npm run lint` pass cleanly.
+- Works in Light/Dark/Sepia themes.
+
+---
+
+## 13. Non-Goals (Out of Scope for v1.0)
+
+- Billing/payment processing (Stripe) — deferred to v2.0.
+- Multi-tenant admin with permission levels — deferred.
+- Advanced analytics (funnels, cohorts) — deferred.
+- A/B testing — deferred.
+- Email campaign automation (drip sequences) — deferred.
+- Real-time platform map — deferred.
+
+---

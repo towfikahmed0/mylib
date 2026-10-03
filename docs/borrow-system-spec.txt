@@ -1,0 +1,144 @@
+# I've completed the audit. Both checks pass, and I traced every area end-to-end. Here's the report.
+
+  Borrowing System — Completion Audit
+
+  Summary
+
+  - Total checkpoints: 45 (across the 8 requested areas)
+  - Complete: 43
+  - Partial: 1
+  - Missing: 1
+  - Extra finding: the referenced spec file docs/borrow-system-spec.txt does not exist (only docs/PRD.txt,
+  ADMIN_PRD.txt, ADMIN_ARCH.txt, FILE_UPLOAD_SYS.txt, prompt.txt). I audited against the checks in
+  docs/prompt.txt plus the updated lifecycle section of docs/PRD.txt.
+
+  Note: the bulk of this feature landed in the uncommitted/committed WIP 5ce5f29 "WIP: replace borrowing
+  system with loan lifecycle" — 23 files, +2,872 lines. It looks well past "partial"; the client, rules, and
+   PRD already describe the full loan lifecycle coherently.
+
+  1. Data Model — ✅ COMPLETE
+
+  - Loan type + LoanStatus (active | return_pending_confirmation | returned): ✅ src/types/index.ts:262
+  - loans collection typed (loans/{requestId}): ✅ src/types/index.ts:261
+  - BookRequest.status with pending | accepted_waiting_confirmation | rejected | cancelled | active: ✅
+  RequestStatus at src/types/index.ts:206, used at :250
+  - BorrowRequestPermission (none | collaborators | collaborators_followers | anyone): ✅
+  src/types/index.ts:15
+  - users/{uid}/private/data contractNumber + address: ✅ UserPrivateData src/types/index.ts:49-56 (address
+  required, contractNumber optional — matches rules)
+  - Also present: BorrowAvailability (:213), Book.borrowStatus/borrowRequestId/activeLoanId (:131-133),
+  BorrowHistoryEntry with loanId/loanNumber (:98), loanCounters/{year} documented.
+
+  2. Firestore Rules — ✅ RULES PRESENT (comprehensive)
+
+  - loans match: ✅ firestore.rules:737; bookRequests: ✅ :592; borrowRequestPermission helper: ✅ :109
+  - Only owner accepts: ✅ ownerAccepts() requires auth.uid == toUserId :646-677
+  - Only owner rejects: ✅ ownerRejects() :679-690
+  - Only borrower confirms receipt: ✅ borrowerConfirmsReceipt() requires auth.uid == fromUserId :706-720
+  - Only owner sends reminders: ✅ loans lastReminderAt branch requires ownerId + 24h throttle :791-797
+  - Only borrower requests return: ✅ requires borrowerId :778-783
+  - Only owner confirms return: ✅ requires ownerId :784-790
+  - Create requires contractNumber + address: ✅ requesterHasLendingInfo() :130-144, enforced :633
+  - Create blocked when owner's permission disallows: ✅ mayRequestBorrow() :114-128, enforced :632
+  - Cannot have two active loans on same book: ✅ bookIsAvailable() :146-151 gates request-create +
+  requestBookLock() :350, and activateLoan()/loan-create require activeLoanId == loanId (:400-429, :742-768)
+  - Extras: atomic cross-doc getAfter/existsAfter checks, loanCounters monotonic Loan # (:807), delete
+  denied on requests/loans, read restricted to the two parties.
+
+  3. Hooks & Mutations — ⚠️ 8/9 (one naming gap)
+
+  All live in src/features/collaboration/hooks/useBookRequests.ts (no separate loans feature folder):
+
+  - Send request (useSendBookRequest): ✅ :148 (equivalent of useSendBorrowRequest)
+  - Accept (useAcceptBookRequest, with shareContact opt-in): ✅ :266
+  - Reject (useDeclineBookRequest): ✅ :367
+  - Cancel agreement (useCancelBookRequest): ✅ :423
+  - Confirm receipt (useConfirmBookReceived, creates loan + counter + book state): ✅ :482
+  - useLoanList (loans as owner or borrower): ✅ :599
+  - useLoanActions → requestReturn, confirmReturn, cancelWaitingHandover, sendReminder: ✅ :621-788
+  - Transfer (useTransferBook): ✅ :791
+  - ❌ MISSING: dedicated useActiveLoans / useMyLoans / useBorrowedBooks hooks. useLoanList covers the
+  functionality but returns all statuses; callers filter inline.
+
+  4. UI Components — ✅ COMPLETE (2 are buttons, not modals)
+
+  - Borrow Request button on cards/public profile: ✅ BookCard.tsx:164 ("Request to Borrow"), wired from
+  PublicProfilePage.tsx:220-236 with eligibility/disabled reasons.
+  - Owner lending card with Send Reminder: ✅ CollaboratorsCard.tsx LoanCard and
+  BookDetailsModal.tsx:700-718.
+  - Borrower loan card with "I've Returned This Book": ✅ CollaboratorsCard.tsx:97 and
+  BookDetailsModal.tsx:719-733.
+  - Confirm Receipt: ✅ confirms via button "Confirm Book Received" BookRequestsPanel.tsx:193 — no modal.
+  - Confirm Return: ✅ button BookDetailsModal.tsx:698 / CollaboratorsCard.tsx:96 — no modal.
+  - Request-permission control in Settings → Privacy: ✅ PrivacySettings.tsx:210-249 — implemented as a
+  radio group, not a dropdown (functionally equivalent).
+
+  5. Notifications & Activity — ✅ mostly (1 partial)
+
+  All 9 transitions are emitted as activityFeed events, and (except one) as notifications. The literal names
+   differ from the spec's list, and NotificationType/ActivityType use a different vocabulary:
+
+  - borrow_request_sent: ✅ activity borrow_request_sent + notification book_request
+  - borrow_request_accepted: ✅ activity request_accepted + notification book_request_accepted
+  - borrow_request_rejected: ✅ activity request_rejected + notification book_request_declined
+  - contact_info_shared: ⚠️ PARTIAL — activity contact_info_shared exists, but there is no standalone
+  notification; it is folded into the book_request_accepted notification (body + contactInfoShared metadata)
+   and rendered in BookRequestsPanel.
+  - book_receipt_confirmed: ✅ notification borrow_receipt_confirmed + activity borrowed
+  - agreement_cancelled: ✅ activity agreement_cancelled + notification borrow_agreement_cancelled
+  - return_requested: ✅ activity return_requested + notification return_confirmation_requested
+  - return_confirmed: ✅ activity return_confirmed + notification return_confirmed
+  - return_reminder_sent: ✅ activity return_reminder_sent + notification book_return_reminder
+
+  Notification types declared src/types/index.ts:330; activity types :286. ActivityPage.tsx renders all new
+  types.
+
+  6. Insights Tab — ✅ EXISTS
+
+  CollaboratorsCard is mounted in InsightsPage.tsx:262 via useCollaborationStats:
+
+  - "Currently lent" (active, owner): ✅ CollaboratorsCard.tsx:126 / useCollaborationStats.ts:25
+  - "Waiting for handover" (accepted, awaiting receipt): ✅ metric + list :141-159 /
+  useCollaborationStats.ts:16-19
+  - "Returned loans" (historical): ✅ metric + collapsible borrowing history :143,169 / :15
+  - Bonus: "Currently borrowed", "Return awaiting confirmation". Edge case: the whole card only renders when
+   stats.totalBooks > 0 (normal case is fine).
+
+  7. Legacy Cleanup — ✅ LEGACY REMOVED (read-only fallbacks remain)
+
+  - Old book.borrowedBy/borrowDate direct writes: removed as standalone writes. The only writes now are
+  inside the loan-activation transaction (useBookRequests.ts:553-574) and return-confirm reset (:707-719),
+  both backed by matching rules. useAddBook.ts:93-94 only initializes null.
+  - Old bookRequests carrying phoneNumber/address on the request at create: removed — rule hasOnly key
+  whitelist excludes them; owner contact is added only at accept.
+  - Old acceptance immediately setting book.borrowedBy: removed — accept sets accepted_waiting_confirmation
+  only.
+  - Residual (display-only, not writes): BookCard.tsx:307 "Borrowed" badge, LibraryPage.tsx:99 availability
+  fallback, BookDetailsModal.tsx:143,740-747 "legacy lending record" message. FIRESTORE_SECURITY.md:45
+  documents that legacy borrowedBy values need explicit reconciliation — no migration script exists.
+
+  8. Build & Lint
+
+  - npm run build (tsc -b && vite build): PASS ✅ — 2,121 modules, built in ~3.4s.
+
+  - ⚠️ 1 warning: JS bundle dist/assets/index-*.js is 1,832 kB (> 500 kB chunk-size warning). No type
+  errors.
+  - npm run lint (eslint .): PASS, clean ✅ — zero errors, zero warnings.
+
+  Recommended Next Steps
+
+  1. Recover the spec: docs/borrow-system-spec.txt is absent; only docs/PRD.txt exists. Confirm nothing else
+   is unverified against it.
+  2. Add the named hooks (useActiveLoans/useMyLoans/useBorrowedBooks) as thin wrappers over useLoanList, or
+  confirm useLoanList is the agreed API.
+  3. Decide on form factor: Confirm Receipt / Confirm Return are inline buttons and the permission control
+  is a radio group — spec may have asked for modals/dropdown.
+  4. Add a distinct contact_info_shared notification if the spec requires it separately, or document it as
+  merged into the acceptance notification.
+  5. Plan legacy reconciliation for books with borrowedBy but no linked loan — they are currently blocked
+  with a warning message (BookDetailsModal.tsx:740).
+  6. Wire rule-lifecycle-check.mjs (emulator-based rules test, 572 lines) into a package.json script so the
+  rules lifecycle can be validated in CI.
+  7. Optionally code-split to clear the build chunk-size warning.
+
+  No code changed — this is report-only, as requested.

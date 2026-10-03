@@ -1,0 +1,173 @@
+Great choice. Using your own cPanel host for image uploads is a fantastic, professional, and cost-effective solution. It gives you full control and keeps your data on your own infrastructure. Let's break this down into a clear, step-by-step guide.
+
+Here is the complete plan to get image uploads working with your cPanel hosting.
+
+### ⚙️ Part 1: cPanel Configuration (Manual Setup)
+
+First, we need to prepare your hosting environment.
+
+#### Step 1: Create a Dedicated Subdomain
+It's best practice to serve files from a dedicated subdomain like `files.softrly.com`. This isolates your uploaded content from your main application, which is safer.
+
+1.  Log in to your **cPanel**.
+2.  Navigate to **Domains** and click **Create A New Domain**.
+3.  In the **Domain** field, enter `files.softrly.com`.
+4.  **Important:** Uncheck the "Share document root" option. cPanel will suggest a new folder path (e.g., `/home/youruser/files.softrly.com`). Keep this path for now.
+5.  Click **Submit**. cPanel will automatically handle the DNS and set up an SSL certificate for the new subdomain.
+
+#### Step 2: Create an Upload Folder and Set Permissions
+1.  In cPanel, open the **File Manager**.
+2.  Navigate to the document root of your new subdomain (`/home/youruser/files.softrly.com`).
+3.  Inside, create a new folder named `uploads`.
+4.  Right-click the `uploads` folder, select **Change Permissions**, and set the value to **755**. This allows the server to write files but prevents them from being executed as scripts. **Never use 777**.
+
+#### Step 3: Configure CORS in `.htaccess`
+Your React app (on `mylib.softrly.com`) needs permission to send files to your upload endpoint (on `files.softrly.com`).
+
+1.  In the File Manager, navigate to the root folder of your subdomain (the same folder where you created `uploads`).
+2.  Find the `.htaccess` file. If you don't see it, click **Settings** in the top-right corner of File Manager and check **Show Hidden Files (dotfiles)**.
+3.  Right-click `.htaccess` and select **Edit**.
+4.  Add the following code, replacing `https://mylib.softrly.com` with your actual app URL:
+
+   ```apache
+   <IfModule mod_headers.c>
+       Header set Access-Control-Allow-Origin "https://mylib.softrly.com"
+       Header set Access-Control-Allow-Methods "GET, POST, OPTIONS, DELETE, PUT"
+       Header set Access-Control-Allow-Headers "Content-Type, Authorization"
+   </IfModule>
+   ```
+
+### 🐘 Part 2: The PHP Upload Endpoint
+
+Next, create the server-side script that will handle the file upload. Create a new file named `upload.php` in your subdomain's root folder (alongside the `.htaccess` file).
+
+Here is the secure PHP script. Be sure to replace `YOUR_VERY_LONG_AND_RANDOM_SECRET_KEY` with a strong, unique password.
+
+```php
+<?php
+// upload.php
+header('Access-Control-Allow-Origin: https://mylib.softrly.com');
+header('Access-Control-Allow-Methods: POST');
+header('Content-Type: application/json');
+header('X-Content-Type-Options: nosniff');
+
+// Security: Simple API key check. You must set this to a strong, random secret.
+$API_KEY = 'YOUR_VERY_LONG_AND_RANDOM_SECRET_KEY';
+if (!isset($_POST['api_key']) || $_POST['api_key'] !== $API_KEY) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Unauthorized']);
+    exit;
+}
+
+// Validate file
+if (!isset($_FILES['image'])) {
+    http_response_code(400);
+    echo json_encode(['error' => 'No file uploaded']);
+    exit;
+}
+
+$file = $_FILES['image'];
+$maxSize = 5 * 1024 * 1024; // 5MB
+if ($file['size'] > $maxSize) {
+    http_response_code(413);
+    echo json_encode(['error' => 'File too large (max 5MB)']);
+    exit;
+}
+
+// **SECURE MIME VALIDATION**: Use finfo to check the real file type, not the user-provided one.
+$finfo = new finfo(FILEINFO_MIME_TYPE);
+$mimeType = $finfo->file($file['tmp_name']);
+$allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+if (!in_array($mimeType, $allowedTypes)) {
+    http_response_code(415);
+    echo json_encode(['error' => 'Invalid file type']);
+    exit;
+}
+
+// Generate a unique filename
+$ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+$filename = uniqid('mylib_', true) . '.' . strtolower($ext);
+
+// Create a monthly folder for organization
+$month = date('Y-m');
+$uploadDir = __DIR__ . '/uploads/' . $month . '/';
+if (!is_dir($uploadDir)) {
+    mkdir($uploadDir, 0755, true);
+}
+
+// Save the file
+$target = $uploadDir . $filename;
+if (!move_uploaded_file($file['tmp_name'], $target)) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Failed to save file']);
+    exit;
+}
+
+// Return the public URL
+$publicUrl = 'https://files.softrly.com/uploads/' . $month . '/' . $filename;
+echo json_encode(['success' => true, 'url' => $publicUrl]);
+```
+
+### ⚛️ Part 3: React Frontend Integration (Using an AI Prompt)
+
+Now, let's give your CLI AI agent the instructions to integrate this into your React app.
+
+**Copy and paste this prompt into your AI agent:**
+
+---
+
+**PROMPT START**
+
+I have set up a custom PHP image upload endpoint on my own cPanel hosting. I need you to integrate it into my React application.
+
+**Backend Details:**
+- **Upload URL:** `https://files.softrly.com/upload.php`
+- **API Key:** `YOUR_VERY_LONG_AND_RANDOM_SECRET_KEY` (I will store this in an environment variable).
+- **Field Name:** The file must be sent as `image`.
+
+**Task 1: Environment Variable**
+1.  Add `VITE_UPLOAD_API_KEY=YOUR_VERY_LONG_AND_RANDOM_SECRET_KEY` to my `.env.local` file.
+
+**Task 2: Create an Upload Hook**
+Create a new hook `src/features/upload/hooks/useUploadImage.ts`:
+- It should use TanStack Query's `useMutation`.
+- The mutation function will take a `File` object as input.
+- It should create a `FormData` object, append the file as `image`, and append the `api_key` from the environment variable.
+- It should `POST` the `FormData` to `https://files.softrly.com/upload.php`.
+- Handle the response: if `data.success` is true, return `data.url`. If false, throw an error with `data.error`.
+- Include a timeout (e.g., 30 seconds) using `AbortController`.
+
+**Task 3: Update the Add/Edit Book Modal**
+In `src/features/library/components/AddBookModal.tsx`:
+- Find the section for the "Cover Image URL" input.
+- Next to the input field, add an "Upload" button.
+- Create a hidden `<input type="file" accept="image/*" />` element.
+- When the "Upload" button is clicked, trigger the hidden file input.
+- When a file is selected, call the `useUploadImage` mutation.
+- Show a loading spinner on the "Upload" button while the upload is in progress.
+- On success, set the `coverUrl` state to the returned URL so it appears in the input field.
+- On error, show a toast notification with the error message.
+
+**Constraints:**
+- Use the existing toast system for feedback.
+- Ensure the upload button integrates cleanly with the current styling.
+- Verify `npm run build` passes.
+
+**PROMPT END**
+
+---
+
+### 🚀 Part 4: Testing the Complete Flow
+
+Once the AI is done, do a full end-to-end test:
+
+1.  **Run your app** locally (`npm run dev`).
+2.  **Open the "Add Book" modal**.
+3.  **Click the "Upload" button** and select an image file from your computer.
+4.  **Verify the upload**:
+    - Check the browser's **Network tab** to see the successful `POST` request to `upload.php`.
+    - Confirm the `coverUrl` input field is now populated with a URL like `https://files.softrly.com/uploads/...`.
+    - Open that URL directly in a new browser tab to confirm the image is accessible.
+5.  **Save the book** and ensure the cover appears in your library grid.
+
+This method gives you complete control over your images without any third-party dependencies. If you run into any issues, let me know the error and we'll debug it together.

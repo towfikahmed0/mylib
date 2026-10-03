@@ -1,0 +1,363 @@
+📘 PRODUCT REQUIREMENTS DOCUMENT (PRD) - v2.0 (Definitive Edition)
+Project Name: MyLib – The Social Reading Sanctuary
+Version: 2.0 (Complete Migration & Replatforming)
+Status: Ready for Development
+Target Domain: mylib.softrly.com
+Tech Stack: React 18+ (Vite) + TypeScript + Tailwind CSS + Firebase Modular SDK (v10+) + Zustand + TanStack Query + shadcn/ui
+
+1. Executive Summary
+MyLib is a modern, AI-powered personal library manager transitioning from a monolithic Vanilla JS SPA into a professional, scalable React application. It combines the utility of a personal catalog (Libib) with the social discovery of Goodreads, wrapped in a modern, Instagram-style UX.
+
+Key differentiators:
+
+Granular Privacy: Users control exactly what the world sees.
+
+AI Librarian: Personalized insights, metadata fixing, voice interaction.
+
+Social Profiles: Custom URLs (mylib.softrly.com/u/username).
+
+Platform Admin: A dedicated control room for the site owner.
+
+Preserved Legacy Features: Every single feature from v1.0 is retained, but refactored into modern React patterns (Hooks, Context, React Query).
+
+2. Target Audience & User Roles
+The Guest (Unauthenticated): Can view the landing page, browse public user profiles, and read public reviews.
+
+The Reader (Authenticated): Manages their own library, sets privacy, uses AI features, and interacts with the community.
+
+The Admin (Site Owner): Full control over platform settings, user management, content moderation, and feature flags.
+
+3. Technical Architecture
+Frontend: React 18+ (Vite), TypeScript (Strict Mode), React Router v6.
+
+Styling: Tailwind CSS + shadcn/ui (Radix UI). Maintain the Glassmorphism, rounded-3xl aesthetic.
+
+State Management: TanStack Query (Server State/Firestore), Zustand (Client State/UI).
+
+Backend: Firebase Modular SDK (v10+). Replaces all firebase/compat legacy code.
+
+PWA: vite-plugin-pwa for offline caching, installability, and service worker updates.
+
+Third-party Libraries:
+
+html5-qrcode (Barcode/QR scanning).
+
+papaparse (CSV parsing).
+
+chart.js / react-chartjs-2 (Insights charts).
+
+dompurify (HTML sanitization for AI responses).
+
+confetti (Celebratory animations).
+
+4. Core Modules & Feature Requirements
+Module 1: Account, Authentication & Navigation
+Sign-In: Google Auth (popup). First-time login creates public/private user docs and a userLookup entry.
+
+Navigation Tabs: Library, My Books, Explore, Insights, Activity, Settings.
+
+Layouts: Desktop Sidebar (240px), Mobile Bottom Nav (5 tabs + FAB).
+
+Keyboard Shortcuts: / (search), N (new book), L/M/A/I/S (switch tabs), ? (help), Esc (close modals).
+
+Accessibility: Cards activate with Enter or Space. Focus trapping in modals.
+
+SRE: Global error boundary with toast notifications.
+
+Module 2: Core Library & Cataloging
+The Main Library: Primary catalog of owned books.
+
+My Books (Separate Tab):
+
+Finished Books: Books read but not necessarily owned.
+
+Wishlist: Books wanted for future purchase.
+
+Book Entry:
+
+Scanning: html5-qrcode with rear/front camera fallback.
+
+Metadata Lookup: Google Books (ISBN then Title) -> Open Library (fallback) -> Manual entry if not found.
+
+Manual Form: Title, Author, Cover URL, ISBN, Multiple Genres (autocomplete), Description, Tags, Price, Date, Owner, Wishlist checkbox.
+
+Copy Types: New Copy, Old Copy, Gifted (with "Gifted By" field).
+
+AI Magic Fill: Auto-fills form fields using AI.
+
+Draft Recovery: Unsaved manual entries are kept in sessionStorage with a restore prompt.
+
+Destination Library: Add to own library or to a partner's library (if permission granted).
+
+Duplicate Detection: ISBN or Title+Author match. Offers update instead of new record.
+
+Finished Book Shortcuts: "Add finished book" and "Mark as finished" quick actions.
+
+Custom Shelves: Unlimited user shelves. Smart Shelves (auto-generated based on rules).
+
+Module 3: Organization, Search & Bulk Actions
+Search: Debounced (150ms) over title, author, genres, ISBN, tags. Recent searches saved to localStorage.
+
+Filters: Status, Genre, Author, Owner, Tag, Copy Type, Favorites, Exact Rating, Price Range, Purchase Date Range.
+
+Sorting: Newest, Oldest, Title, Author, Copy Type, "Borrowed to Others".
+
+Views: Grid, List, Compact. Three card densities (Relaxed, Normal, Compact).
+
+Bulk Actions: Multi-select -> Change Genre (batches of 500), Transfer, Delete.
+
+Delete Undo: In-memory copy kept for 5 minutes. Batches of 200.
+
+Metadata Manager: Rename or delete an author/genre across all books.
+
+Pagination: Replaced hard limit of 50 with "Load More" button to fetch 50 at a time up to 500.
+
+Module 4: Reading Tracking & Borrowing
+Per-User Status: Want to Read / Reading / Finished, Rating (0-5), Progress (0-100), Comment, Favorite, Wishlist.
+
+Quick Actions: +5% progress button, Quick status changes. Confetti on finish.
+
+Highlights: Quotes with optional page number. Copy-quote functionality.
+
+Reading Timer: Start/Stop session timer inside the book modal. (Saved to Firestore).
+
+Borrowing (Loan Manager):
+
+Borrow requests, owner decisions, confirmed physical handovers, active loans, and returns are distinct states. Owner acceptance reserves the book but does not mark it lent; only the borrower confirming receipt creates an active loan. The borrower requests return confirmation, and the owner confirms the return. Returned loan records are retained as history.
+
+Loan records are the source of truth for lending relationships. Books may keep synchronized borrowedBy, borrowDate, borrowHistory, borrowStatus, borrowRequestId, and activeLoanId fields for rendering and availability. Loan numbers use the "Loan #" label and are allocated from a yearly counter.
+
+Borrow-request privacy is configurable as None, Collaborators, Collaborators & Followers, or Any User (default: Collaborators). Requesters must provide a contract number and address in private Settings data. These details are never copied to requests; an owner may explicitly share their phone/address with the requester after accepting.
+
+Insights distinguishes active loans, waiting handovers, return confirmations, and returned history. Owners can send rate-limited return reminders. Loan parties can navigate to one another's public profiles.
+
+Module 5: Collaboration & Sharing
+Invite System: Invite by email. App resolves email via userLookup and creates a pending collaborationRequests doc.
+
+Accept/Decline: Recipient accepts, creating the partnership with allowAddBooks: false.
+
+Permissions: Library owner toggles "Can add books". Each side can unfollow/rejoin independently.
+
+Shared Data: Books and Activity Feed visible to the other while both sides are active.
+
+Visit Library: Browse accepted collaborator's library (up to 500 books).
+
+Transfer Ownership: Single or bulk. Changes userId on the book doc. Bulk runs in 150-book chunks.
+
+Collaborator Reviews Fix: (From Cloud Analysis) openVisitedBookDetails will correctly fetch collaborator reviews using a secure Cloud Function or adjusted Firestore rules, rather than a denied query.
+
+Module 6: Social Platform & Community Feed
+Usernames: Unique handles. Public Profile URL: mylib.softrly.com/u/username.
+
+Granular Privacy: Toggle visibility for Library, Wishlist, Progress, Reviews, Feed (Public/Private/Collaborators).
+
+Followers vs. Collaborators: Followers see public updates in Explore. Collaborators have edit/shared access.
+
+Explore Tab:
+
+Search users by username (new requirement).
+
+Search book titles to see all community reviews and posts (fixing the dead code in old app).
+
+Filter posts by category (Review, Help, Others).
+
+Reviews: Category (Review, Help, Others), 10-2000 characters, Star Rating, Read-time estimate (words ÷ 200).
+
+Feed: 10 per page, "Load More", category filter.
+
+Likes & Comments: Optimistic heart animation. Likes batch write. Comments max 500 chars.
+
+Report System: Users can report inappropriate posts/reviews. Reports go to a new reports collection for Admin review.
+
+Sharing: Generate "Book/Review Cards" as images. Export library as PDF.
+
+Module 7: AI Librarian & Smart Insights
+AI Providers: Gemini (default gemma-3-12b-it) or Groq (openai/gpt-oss-20b).
+
+API Keys: BYOK (Bring Your Own Key). Stored in sessionStorage (not localStorage as previously mislabeled). Admin can toggle System AI vs BYOK.
+
+Features:
+
+Floating chat with Text-to-Speech (TTS).
+
+Natural-language library search (AI Search).
+
+Per-book AI summary and tags.
+
+AI Magic Fill in the add form.
+
+Metadata Fixer (scan library, suggest fixes, review before applying).
+
+Reading Roadmap (3-month personalized plan).
+
+Context: Last 50 finished books, up to 50 unfinished, top 3 genres. Language selectable (7 languages). Bengali keeps titles in English.
+
+Caching: Last 5 responses cached. Chat history in memory.
+
+Insights Dashboard:
+
+Totals and collection value.
+
+Status counts.
+
+Rating distribution bar chart.
+
+Reading composition doughnut.
+
+Top genres, authors, and tags.
+
+Tags per book.
+
+Yearly goal progress.
+
+Reading Velocity (finished ÷ months since first book).
+
+Momentum (books finished in last 30 days).
+
+Streak (consecutive days with activity).
+
+Module 8: Activity & Notifications
+Activity Events: Book Added, Status Updated, Rating Updated, Borrow Request Sent, Request Accepted/Rejected, Contact Information Shared, Borrow Receipt Confirmed, Agreement Cancelled, Return Requested/Confirmed, Return Reminder Sent, Transfer, Free-text Messages.
+
+Feed: Shows up to 30 recent events per library (yours and active partners').
+
+Notifications: In-app notifications for borrow requests and each important decision/loan/return transition, alongside the existing collaboration and book-request panels. Browser push/FCM is a separate planned feature.
+
+Push Notifications Fix: Implement actual push notifications via Service Worker and Firebase Cloud Messaging (FCM) instead of just requesting permission.
+
+Module 9: Data Management, Settings & Legacy Tools
+Import/Export:
+
+CSV Import: PapaParse, flexible column names, status column, duplicate merging with undo.
+
+CSV Export.
+
+JSON Export: Includes reading status, highlights, reviews.
+
+JSON Import: Merges highlights and de-duplicates reviews.
+
+Preferences (LocalStorage): Theme (Light, Dark, Sepia), Accent Colors (5), Currencies (6), Density, Default View, Default Sort, Yearly Goal.
+
+PWA: Manifest, install prompt, Live/Offline indicator.
+
+Security: Strict CSP, SRI-pinned SDKs, DOMPurify, HTML escaping, Image URL validator.
+
+Legacy Tools: "Migrate Wishlist" and "Migrate Library" buttons for old data.
+
+Settings UI: Profile, Appearance, Reading Preferences, AI Settings, Library Data, Help & About, Danger Zone.
+
+Module 10: Platform Administration (Admin Panel)
+Access: role: 'admin' only.
+
+Dashboard: Total Users, Books, AI API Usage.
+
+User Management: Search, view, upgrade plan, ban, reset password.
+
+Content Moderation: Review reports collection. Delete inappropriate reviews/posts. Issue warnings or bans.
+
+Data Management: Trigger manual Firestore backup to JSON. Danger zone for data resets.
+
+Premium Plan Management: Create tiers (Free, Pro). Toggle feature flags. Control System AI availability.
+
+5. Data Model (Firestore Schema)
+users/{uid}: uid, username, email, bio, avatarUrl, role (user/admin), plan (free/pro), privacySettings (map), totalBooksCount, completedBooksCount, joinedAt.
+
+users/{uid}/private/data: email, phoneNumber, address, contractNumber, lastAIAnalysis, lastAIAnalysisDate.
+
+userLookup/{email}: uid (maps email to uid).
+
+partnerships/{uidA_uidB}: userId1, userId2, initiatorId, status, user1Unsubscribed, user2Unsubscribed, allowAddBooks, grantedBy.
+
+collaborationRequests/{uidA_uidB}: fromUserId, fromEmail, fromName, toUserId, toEmail, status (pending, accepted, rejected, cancelled).
+
+books/{id}: userId, title, author, isbn, coverUrl, thumbnail, description, price, purchaseDate, tags (array), genres (array), categories (array), shelfId, borrowedBy, borrowDate, borrowHistory (array), borrowStatus, borrowRequestId, activeLoanId, highlights (array), copyType, gifterName, source, averageRating, ratingCount, createdAt, updatedAt, addedBy.
+
+books/{id}/readingStatus/{uid}: userId, status (want_to_read, reading, finished), rating, progress, comment, isWishlist, isFavorite, updatedAt, highlights (user-specific).
+
+shelves/{id}: userId, name, isPublic, createdAt.
+
+activityFeed/{id}: type, userId, userName, libraryId, timestamp, bookId, bookTitle, addedTo, status, rating, comment, text, recipientId, targetUserId, borrowedBy, message.
+
+bookRequests/{id}: fromUserId, toUserId, bookId, bookTitle, requesterName, requesterUsername, ownerName, ownerUsername, status (pending, accepted_waiting_confirmation, rejected, cancelled, active), contactInfoShared, optional owner contact fields only after explicit sharing, lifecycle timestamps.
+
+loans/{requestId}: loanNumber, bookId, bookTitle, owner and borrower identities, requestId, status (active, return_pending_confirmation, returned), requestedAt, acceptedAt, confirmedAt, returnedAt, lastReminderAt.
+
+loanCounters/{year}: sequence, lastRequestId, updatedAt.
+
+reviews/{id}: userId, userName, bookTitle, author, category, body, rating, likesCount, commentsCount, createdAt, updatedAt, reported (boolean).
+
+reviews/{id}/likes/{uid}: userId, createdAt.
+
+reviews/{id}/comments/{id}: userId, userName, body, createdAt.
+
+reports/{id}: reporterId, targetType (review/comment/user), targetId, reason, status (pending, resolved), createdAt.
+
+adminConfig/{id}: featureFlags, landingPageContent, systemAISettings.
+
+6. UX/UI Guidelines
+Mobile-First: Bottom nav must be thumb-friendly. FAB for adding books.
+
+Glassmorphism: Premium backdrop-blur and bg-white/80 (or dark/sepia equivalents) aesthetic.
+
+Loading States: Skeleton loaders (skeleton-base) for every Firestore fetch.
+
+Feedback: Toast notifications for all actions (success, error, undo).
+
+Animations: Confetti on finishing a book. Smooth slide-up animations for modals. Floating orbs on the landing page.
+
+7. Security & Firestore Rules (Updated)
+Books: Readable by owner or active partner. Created by owner or partner with valid grant. Schema-validated.
+
+Reading Status: Readable only by its own user (strict rule).
+
+Users & UserLookup: Readable by any signed-in user. Bounded list queries.
+
+Reviews/Comments/Likes: Author-owned.
+
+Like Counts: Checked against the like doc to prevent forgery.
+
+Comment Count Forgery: Fixed in the new app using Cloud Functions or stricter rules to prevent forged commentsCount.
+
+AI API Keys: Stored securely in sessionStorage, text clarified in UI. Never logged to Firestore.
+
+8. Development Roadmap (Phases)
+Phase 1: Foundation (Vite, TS, Tailwind, Firebase, Router, Auth, Layout, Theme Store).
+
+Phase 2: Core Library (Books, Shelves, My Books, Statuses, TanStack Query setup).
+
+Phase 3: Data Entry (Manual Entry, Scanner, Magic Fill, CSV/JSON Import/Export).
+
+Phase 4: AI & Insights (AI Chat, Roadmap, Metadata Fixer, Charts, Heatmap).
+
+Phase 5: Social & Collaboration (Usernames, Profiles, Feed, Followers, Report System, Sharing).
+
+Phase 6: Admin & Polish (Admin Panel, Feature Flags, PWA, Bug Fixes from Cloud Analysis).
+
+9. Fixing Legacy Bugs (From Cloud Analysis)
+Collaborator Reviews: Fix the Firestore query to correctly fetch collaborator reviews in openVisitedBookDetails.
+
+Push Notifications: Implement actual FCM push notifications instead of just a permission prompt.
+
+Key Storage Text: Update UI to correctly state keys are in sessionStorage.
+
+AI Context Size: Optimize the payload sent to AI to avoid exceeding token limits.
+
+Phone/Address Sharing: Ensure this is opt-in per request, or clearly communicated.
+
+"Finished" Date Bug: Store an explicit finishedAt timestamp separate from updatedAt.
+
+Dead Code: Remove fetchSocialReviewsWithSearch and replace it with the new functional Explore search.
+
+Book Cap: Implement proper pagination instead of hard-capping at 50.
+
+Bulk Transfer Notification: Uncomment and implement the recipient activity log.
+
+Timer Not Saved: Save reading session time to Firestore as readingTimeMinutes.
+
+Wishlist Duplication: Store wishlist state ONLY in the readingStatus subcollection.
+
+Theme Color Mismatch: Align theme-color meta tag with the manifest.
+
+External Icon: Move app icon to local assets.
+
+Landing Page Hardcoded Numbers: Make these dynamic or editable via the Admin Panel.

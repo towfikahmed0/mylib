@@ -1,0 +1,33 @@
+The migration tool isn't needed — this is a fresh project with no legacy borrowedBy data.
+
+Task 1: Delete the migration tool
+
+Delete src/features/admin/utils/migrateLegacyLoans.ts
+
+Remove the "Migrate Legacy Loans" button and modal from DangerZoneCard.tsx
+
+Remove the legacy-lending doc comment from BookDetailsModal.tsx:742-743 (or leave it as informational — your call)
+
+Task 2: Fix the Windows test:rules script
+
+Open firebase.json.
+
+Add an "emulators" block with the harness ports:
+
+json
+"emulators": {
+  "firestore": { "port": 38765 },
+  "auth": { "port": 38766 },
+  "ui": { "enabled": false }
+}
+Update package.json's test:rules script to:
+
+text
+"test:rules": "firebase emulators:exec --only firestore,auth \"node rule-lifecycle-check.mjs\""
+Run npm run test:rules and confirm it passes.
+
+Task 3: Verify
+
+npm run build — must pass.
+
+npm run lint — must pass.

@@ -9,3 +9,5 @@
 - Expects work to be verified with the project's lint and build (type-check) scripts and the results reported before a phase is declared complete. Confidence: 0.55
 - Prefers backend/infra config (Firestore rules and indexes, `firebase.json`) delivered as files to apply manually via the console, and explicitly asks that deploy/CLI commands (e.g. `firebase-tools`) not be run. Confidence: 0.5
 - Expects the agent to pause for explicit sign-off on high blast-radius decisions (e.g. Firestore security rules and data-visibility model changes) before implementing, presenting the options with a recommended default rather than deciding unilaterally. Confidence: 0.5
+- Wants code/commands prescribed in a task brief (e.g. an exact `package.json` script line) reproduced verbatim, and prefers the agent report environment-level failures instead of silently rewriting the prescribed text; ask before adjusting infra config. Confidence: 0.5
+- Requires destructive/irreversible data operations to be gated behind a multi-step confirmation flow (e.g. a 2-step review-then-confirm modal in a "Danger Zone") with explicit "cannot be undone / back up first" warning copy. Confidence: 0.5
