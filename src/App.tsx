@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router-dom'
+import { BannedNotice } from './components/BannedNotice'
 import { AppLayout } from './components/layout/AppLayout'
 import { PublicProfileLayout } from './components/layout/PublicProfileLayout'
 import { ProtectedRoute } from './components/ProtectedRoute'
@@ -37,9 +38,7 @@ function App() {
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
 
-          <Route element={<ProtectedRoute requireAdmin />}>
-            <Route path="/admin" element={<AdminPage />} />
-          </Route>
+          <Route path="/admin" element={<AdminPage />} />
         </Route>
 
         <Route element={<PublicProfileLayout />}>
@@ -49,6 +48,7 @@ function App() {
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
 
+      <BannedNotice />
       <Toaster />
     </>
   )

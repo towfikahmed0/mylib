@@ -25,6 +25,16 @@ function MobileTopBar() {
       </Link>
 
       <div className="flex items-center gap-1">
+        {appUser?.role === 'admin' ? (
+          <Link
+            to="/insights"
+            aria-label="Insights"
+            title="Insights"
+            className="rounded-xl p-2 text-muted transition hover:text-foreground"
+          >
+            <Sparkles size={20} />
+          </Link>
+        ) : null}
         <NotificationBell />
         {appUser?.username ? (
           <Link

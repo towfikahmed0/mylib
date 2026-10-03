@@ -43,6 +43,8 @@ export interface AppUser {
   followerCount: number
   followingCount: number
   joinedAt: FirestoreDate
+  banned?: boolean
+  bannedReason?: string
 }
 
 /** users/{uid}/private/data */

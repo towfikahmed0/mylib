@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
-  onAuthStateChanged,
+  onIdTokenChanged,
   signInWithPopup,
   signOut as firebaseSignOut,
   type User,
@@ -10,6 +11,7 @@ import { auth, db, googleProvider } from '../../lib/firebase'
 import { sanitizeFirestoreData } from '../../lib/firestore'
 import type { AppUser, PrivacySettings } from '../../types'
 import { AuthContext, type AuthContextValue } from './useAuth'
+import { setBanNotice } from './banNotice'
 
 const DEFAULT_PRIVACY_SETTINGS: PrivacySettings = {
   library: 'private',
@@ -109,11 +111,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [appUser, setAppUser] = useState<AppUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     let active = true
 
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    // onIdTokenChanged (rather than onAuthStateChanged) so the ban check re-runs
+    // on every fresh load AND token refresh — a user banned mid-session is
+    // ejected the next time their token refreshes or they reload.
+    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
       if (!active) return
 
       setUser(firebaseUser)
@@ -127,15 +133,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const profile = await loadOrCreateUserProfile(firebaseUser)
         if (!active) return
+
+        if (profile.banned === true) {
+          setBanNotice(profile.bannedReason ?? '')
+          setAppUser(null)
+          setError(null)
+          await firebaseSignOut(auth)
+          queryClient.clear()
+          if (active) setLoading(false)
+          return
+        }
+
         setAppUser(profile)
         setError(null)
+        if (active) setLoading(false)
       } catch (profileError) {
         if (!active) return
         setAppUser(null)
         setError(
           profileError instanceof Error ? profileError.message : 'Could not load your profile.',
         )
-      } finally {
         if (active) setLoading(false)
       }
     })
@@ -144,7 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       active = false
       unsubscribe()
     }
-  }, [])
+  }, [queryClient])
 
   const signInWithGoogle = useCallback(async () => {
     setError(null)

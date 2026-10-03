@@ -1,4 +1,4 @@
-import { Activity, LogOut, Settings } from 'lucide-react'
+import { Activity, LogOut, Settings, Shield } from 'lucide-react'
 import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../../features/auth/useAuth'
 import { useUnreadCount } from '../../features/notifications/hooks/useNotifications'
@@ -17,6 +17,14 @@ const BOTTOM_LINKS = [
 
 export function DesktopSidebar() {
   const { appUser, user, signOutUser } = useAuth()
+  const isAdmin = appUser?.role === 'admin'
+  const bottomLinks = isAdmin
+    ? [
+        { label: 'Settings', to: '/settings', icon: Settings },
+        { label: 'Admin', to: '/admin', icon: Shield },
+        { label: 'Activity', to: '/activity', icon: Activity },
+      ]
+    : BOTTOM_LINKS
   const displayName = appUser?.username ?? user?.displayName ?? 'Reader'
   const avatarUrl = appUser?.avatarUrl || user?.photoURL
   const unread = useUnreadCount()
@@ -65,7 +73,7 @@ export function DesktopSidebar() {
       </nav>
 
       <div className="space-y-2 border-t border-border/60 p-3">
-        {BOTTOM_LINKS.map(({ label, to, icon: Icon }) => (
+        {bottomLinks.map(({ label, to, icon: Icon }) => (
           <NavLink key={to} to={to} className={navClass}>
             {({ isActive }) => (
               <>
