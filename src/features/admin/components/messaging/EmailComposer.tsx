@@ -5,6 +5,7 @@ import { useAdminUsers } from '../../hooks/useAdminUsers'
 import { useSendEmail } from '../../hooks/useAdminMessaging'
 import type { AdminNotificationTarget, EmailComposeInput } from '../../types/admin.types'
 import { NOTIFICATION_TARGET_LABELS, NOTIFICATION_TARGET_OPTIONS } from '../../utils/adminConstants'
+import { renderTemplate } from '../../utils/emailTemplate'
 
 const FIELD_CLASS =
   'w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent'
@@ -76,6 +77,15 @@ export function EmailComposer() {
 
   const targetLabel =
     target === 'specific' ? selectedUser?.displayName ?? 'Specific user' : NOTIFICATION_TARGET_LABELS[target]
+
+  const previewVariables: Record<string, string> =
+    target === 'specific' && selectedUser
+      ? {
+          username: selectedUser.username,
+          displayName: selectedUser.displayName,
+          booksCount: String(selectedUser.totalBooksCount),
+        }
+      : { username: 'reader', displayName: 'Reader', booksCount: '12' }
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -159,9 +169,11 @@ export function EmailComposer() {
       <div className="space-y-3">
         <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Live preview</p>
         <div className="rounded-2xl border border-border/60 p-4">
-          <p className="text-sm font-semibold">{subject || 'Email subject'}</p>
+          <p className="text-sm font-semibold">
+            {renderTemplate(subject, previewVariables) || 'Email subject'}
+          </p>
           <p className="mt-2 whitespace-pre-wrap text-xs text-muted">
-            {body || 'Email body will appear here.'}
+            {renderTemplate(body, previewVariables) || 'Email body will appear here.'}
           </p>
           <p className="mt-3 text-[11px] text-muted">To: {targetLabel}</p>
           {target === 'specific' && selectedUser ? (

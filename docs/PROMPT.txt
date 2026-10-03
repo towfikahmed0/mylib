@@ -1,0 +1,34 @@
+"Request Book" fails with "Missing or insufficient permissions." Fix it.
+
+STEPS:
+1. Find the request-book handler (search src/ for 'bookRequests'). List
+   EVERY write in the batch: collection, full field set.
+2. Compare each write to firestore.rules. Specifically check:
+   - bookRequests create: does the app write EXACTLY the 12 fields in the
+     hasOnly list? Any extra or missing field → denied.
+   - bookRequests create: does the app's write satisfy
+     requesterHasLendingInfo()? (This requires users/{uid}/private/data
+     .contractNumber and .address to be non-empty strings. If the app
+     doesn't validate this BEFORE submitting, the user gets a cryptic
+     permission error. Add a client-side check that shows a friendly
+     "Fill in your lending info first" message when missing.)
+   - books update: does the app write happen in the same batch with the
+     required borrowStatus/borrowRequestId changes? The rule uses getAfter()
+     so the write must be atomic.
+3. Report which rule is failing and why.
+4. Fix:
+   - If field list mismatch → align the app write to the rule's hasOnly list
+     OR (preferred) loosen the rule to allow additional non-critical fields
+     like createdAtClient. Prefer aligning the app.
+   - If lending info missing → add a client-side guard that checks the user's
+     private/data BEFORE writing, and shows "Please complete your lending
+     info in Settings first" instead of hitting the rule.
+   - If book state wrong → show "Book is not available" message.
+
+CONSTRAINTS:
+- Report exact firestore.rules diff (user publishes manually).
+- Do NOT loosen rules beyond what's needed.
+- Do NOT touch other flows.
+
+VERIFY: npm run build && npm run lint. Report: failing collection, root cause,
+fix, rules diff, files changed. Do not summarize docs back.

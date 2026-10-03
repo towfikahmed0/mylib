@@ -63,7 +63,7 @@ export function NotificationComposer() {
     sendNotification.mutate(input, {
       onSuccess: (outcome) => {
         if (outcome.pushError) {
-          toast.error('Saved, but push delivery failed — backend not deployed yet.')
+          toast.error(`Saved, but push delivery failed: ${outcome.pushError}`)
         } else if (input.scheduledAt) {
           toast.success('Notification scheduled.')
         } else {

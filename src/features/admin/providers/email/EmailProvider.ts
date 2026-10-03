@@ -1,7 +1,16 @@
 /** Email provider abstraction (ARCH §4.2). Implemented verbatim. */
 
+/** Audience the backend resolves to addresses when the client has none. */
+export interface EmailAudience {
+  kind: 'all' | 'specific'
+  userId?: string
+}
+
 export interface EmailOptions {
-  to: string | string[]
+  /** Explicit recipient address(es). Omit when sending to a resolved `audience`. */
+  to?: string | string[]
+  /** Server-resolved audience for bulk or specific-user sends. */
+  audience?: EmailAudience
   subject: string
   html: string
   from?: string

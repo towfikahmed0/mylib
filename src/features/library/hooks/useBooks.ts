@@ -9,7 +9,7 @@ export const bookKeys = {
   list: (uid: string) => [...bookKeys.all, 'list', uid] as const,
 }
 
-async function fetchBooks(uid: string): Promise<Book[]> {
+export async function fetchBooks(uid: string): Promise<Book[]> {
   const booksQuery = query(
     collection(db, 'books'),
     where('userId', '==', uid),

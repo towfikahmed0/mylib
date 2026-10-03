@@ -20,7 +20,7 @@ import { BookCard, type BookCardView } from '../features/library/components/Book
 import { BookDetailsModal } from '../features/library/components/BookDetailsModal'
 import { ScannerModal } from '../features/library/components/ScannerModal'
 import { SkeletonBookCard } from '../features/library/components/SkeletonBookCard'
-import { useBooks } from '../features/library/hooks/useBooks'
+import { useLibraryShelf } from '../features/library/hooks/useLibraryShelf'
 import { useReadingStatus } from '../features/library/hooks/useReadingStatus'
 import { NotificationBell } from '../features/notifications/components/NotificationBell'
 import type { Book } from '../types'
@@ -55,7 +55,7 @@ function readStoredView(): BookCardView {
 
 export function LibraryPage() {
   const navigate = useNavigate()
-  const { books, isLoading, isError, error, refetch } = useBooks()
+  const { groups, hasPartners, isLoading, isError, error, refetch } = useLibraryShelf()
   const { statuses } = useReadingStatus()
   const [isChooserOpen, setIsChooserOpen] = useState(false)
   const [isScannerOpen, setIsScannerOpen] = useState(false)
@@ -85,14 +85,20 @@ export function LibraryPage() {
 
   const tagFilter = searchParams.get('tag')
   const genreFilter = searchParams.get('genre')
-  const libraryBooks = books.filter((book) => book.isInLibrary !== false)
-  const authorOptions = Array.from(new Set(libraryBooks.map((book) => book.author.trim()).filter(Boolean)))
-    .sort((a, b) => a.localeCompare(b))
-  const genreOptions = Array.from(new Set(libraryBooks.flatMap((book) => book.genres ?? [])))
-    .sort((a, b) => a.localeCompare(b))
   const effectiveGenre = genreFilter || selectedGenre
   const query = searchQuery.trim().toLocaleLowerCase()
-  const visibleBooks = libraryBooks.filter((book) => {
+
+  const allLibraryBooks = groups.flatMap((group) =>
+    group.books.filter((book) => book.isInLibrary !== false),
+  )
+  const authorOptions = Array.from(
+    new Set(allLibraryBooks.map((book) => book.author.trim()).filter(Boolean)),
+  ).sort((a, b) => a.localeCompare(b))
+  const genreOptions = Array.from(
+    new Set(allLibraryBooks.flatMap((book) => book.genres ?? [])),
+  ).sort((a, b) => a.localeCompare(b))
+
+  const matchesFilters = (book: Book): boolean => {
     if (tagFilter && !(book.tags ?? []).includes(tagFilter)) return false
     if (effectiveGenre && !(book.genres ?? []).includes(effectiveGenre)) return false
     if (authorFilter && book.author !== authorFilter) return false
@@ -101,12 +107,16 @@ export function LibraryPage() {
       lendingFilter === 'lent' &&
       borrowStatus !== 'on_loan' &&
       borrowStatus !== 'return_pending_confirmation'
-    ) return false
+    ) {
+      return false
+    }
     if (
       lendingFilter === 'waiting' &&
       borrowStatus !== 'pending_request' &&
       borrowStatus !== 'accepted_waiting_confirmation'
-    ) return false
+    ) {
+      return false
+    }
     if (lendingFilter === 'available' && borrowStatus !== 'available') return false
     if (sortBy === 'favorites' && !statuses[book.id]?.isFavorite) return false
     if (
@@ -119,16 +129,32 @@ export function LibraryPage() {
       return false
     }
     return true
-  })
-  visibleBooks.sort((a, b) => {
-    if (sortBy === 'favorites') return b.createdAt.toMillis() - a.createdAt.toMillis()
-    if (sortBy === 'title') return a.title.localeCompare(b.title)
-    if (sortBy === 'author') return a.author.localeCompare(b.author) || a.title.localeCompare(b.title)
-    if (sortBy === 'genre') {
-      return (a.genres[0] ?? '').localeCompare(b.genres[0] ?? '') || a.title.localeCompare(b.title)
-    }
-    return b.createdAt.toMillis() - a.createdAt.toMillis()
-  })
+  }
+
+  const sortBooks = (list: Book[]): Book[] =>
+    [...list].sort((a, b) => {
+      if (sortBy === 'favorites') return b.createdAt.toMillis() - a.createdAt.toMillis()
+      if (sortBy === 'title') return a.title.localeCompare(b.title)
+      if (sortBy === 'author') {
+        return a.author.localeCompare(b.author) || a.title.localeCompare(b.title)
+      }
+      if (sortBy === 'genre') {
+        return (
+          (a.genres[0] ?? '').localeCompare(b.genres[0] ?? '') || a.title.localeCompare(b.title)
+        )
+      }
+      return b.createdAt.toMillis() - a.createdAt.toMillis()
+    })
+
+  const groupViews = groups.map((group) => ({
+    ...group,
+    visibleBooks: sortBooks(
+      group.books.filter((book) => book.isInLibrary !== false).filter(matchesFilters),
+    ),
+  }))
+  const totalLibraryCount = allLibraryBooks.length
+  const visibleBooks = groupViews.flatMap((group) => group.visibleBooks)
+
   const hasFilters = Boolean(
     tagFilter || genreFilter || searchQuery.trim() || selectedGenre || authorFilter ||
       lendingFilter !== 'all' || sortBy === 'favorites',
@@ -167,8 +193,8 @@ export function LibraryPage() {
             {isLoading
               ? 'Loading your books…'
               : hasFilters
-                ? `${visibleBooks.length} of ${libraryBooks.length} books`
-                : `${libraryBooks.length} book${libraryBooks.length === 1 ? '' : 's'} in your catalog`}
+                ? `${visibleBooks.length} of ${totalLibraryCount} books`
+                : `${totalLibraryCount} book${totalLibraryCount === 1 ? '' : 's'} in your catalog`}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
@@ -319,7 +345,7 @@ export function LibraryPage() {
             <SkeletonBookCard key={index} />
           ))}
         </div>
-      ) : libraryBooks.length === 0 ? (
+      ) : totalLibraryCount === 0 ? (
         <div className="card-surface flex flex-col items-center gap-3 px-6 py-16 text-center">
           <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
             <BookOpen size={22} />
@@ -350,6 +376,31 @@ export function LibraryPage() {
           >
             Clear filter
           </button>
+        </div>
+      ) : hasPartners ? (
+        <div className="space-y-8">
+          {groupViews.map((group) =>
+            group.visibleBooks.length === 0 ? null : (
+              <section key={group.ownerUid} className="space-y-3">
+                <h2 className="text-sm font-semibold text-muted">
+                  {group.isOwn ? 'From your library' : `From ${group.ownerName}'s library`}
+                </h2>
+                <div className={cardContainerClass}>
+                  {group.visibleBooks.map((book) => (
+                    <BookCard
+                      key={book.id}
+                      book={book}
+                      status={statuses[book.id]}
+                      view={view}
+                      showReadingStatus={group.isOwn}
+                      onClick={setSelectedBook}
+                      onEdit={group.isOwn ? setEditingBook : undefined}
+                    />
+                  ))}
+                </div>
+              </section>
+            ),
+          )}
         </div>
       ) : (
         <div className={cardContainerClass}>

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, CheckCheck } from 'lucide-react'
+import { Bell, BellRing, CheckCheck } from 'lucide-react'
 import { cn } from '../../../lib/utils'
+import { toast } from '../../../store/toastStore'
 import type { AppNotification } from '../../../types'
 import {
   useMarkAllAsRead,
@@ -9,6 +10,7 @@ import {
   useNotifications,
   useUnreadCount,
 } from '../hooks/useNotifications'
+import { usePushRegistration } from '../hooks/usePushRegistration'
 import { NotificationItem } from './NotificationItem'
 
 export function NotificationBell({ className }: { className?: string }) {
@@ -17,6 +19,7 @@ export function NotificationBell({ className }: { className?: string }) {
   const unread = useUnreadCount()
   const markAsRead = useMarkAsRead()
   const markAllAsRead = useMarkAllAsRead()
+  const { support, isRegistering, enablePush } = usePushRegistration()
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -97,6 +100,24 @@ export function NotificationBell({ className }: { className?: string }) {
               ))
             )}
           </div>
+
+          {support === 'default' ? (
+            <button
+              type="button"
+              onClick={() => {
+                enablePush().catch((error) => {
+                  toast.error(
+                    error instanceof Error ? error.message : 'Could not enable notifications.',
+                  )
+                })
+              }}
+              disabled={isRegistering}
+              className="flex w-full items-center justify-center gap-1.5 border-t border-border/60 px-4 py-3 text-center text-xs font-semibold text-accent transition hover:bg-surface-muted/60 disabled:opacity-50"
+            >
+              <BellRing size={13} />
+              {isRegistering ? 'Enabling…' : 'Enable push notifications'}
+            </button>
+          ) : null}
 
           <button
             type="button"

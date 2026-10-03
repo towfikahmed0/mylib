@@ -1,10 +1,11 @@
-import { Activity, LogOut, Settings, Shield } from 'lucide-react'
+import { Activity, Download, LogOut, Settings, Shield } from 'lucide-react'
 import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../../features/auth/useAuth'
 import { useUnreadCount } from '../../features/notifications/hooks/useNotifications'
 import { cn } from '../../lib/utils'
 import { NAV_ITEMS } from './navItems'
 import { ThemeToggle } from './ThemeToggle'
+import { useInstallPrompt } from './useInstallPrompt'
 
 const PRIMARY_NAV = NAV_ITEMS.filter(
   (item) => item.to !== '/settings' && item.to !== '/activity',
@@ -28,6 +29,7 @@ export function DesktopSidebar() {
   const displayName = appUser?.username ?? user?.displayName ?? 'Reader'
   const avatarUrl = appUser?.avatarUrl || user?.photoURL
   const unread = useUnreadCount()
+  const { canInstall, promptInstall } = useInstallPrompt()
 
   const navClass = ({ isActive }: { isActive: boolean }) =>
     cn(
@@ -86,6 +88,17 @@ export function DesktopSidebar() {
             )}
           </NavLink>
         ))}
+
+        {canInstall ? (
+          <button
+            type="button"
+            onClick={() => void promptInstall()}
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-secondary/60 hover:text-foreground"
+          >
+            <Download size={20} strokeWidth={1.9} />
+            <span className="flex-1 text-left">Install app</span>
+          </button>
+        ) : null}
 
         <ThemeToggle />
 

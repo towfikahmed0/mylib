@@ -8,6 +8,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  updateDoc,
   writeBatch,
   type DocumentData,
 } from 'firebase/firestore'
@@ -24,6 +25,7 @@ import type {
   NotificationDeliveryOutcome,
   SystemNotificationRecord,
 } from '../types/admin.types'
+import type { EmailAudience } from '../providers/email/EmailProvider'
 import type { PushPayload } from '../providers/push/PushProvider'
 import { getPushProvider } from '../providers/push/PushProviderFactory'
 import { getEmailProvider } from '../providers/email/EmailProviderFactory'
@@ -128,11 +130,12 @@ async function fetchEmailHistory(): Promise<MessagingHistoryItem[]> {
         typeof data.details === 'object' && data.details !== null
           ? (data.details as Record<string, unknown>)
           : {}
-      const target = pickString(details.target, 'all')
+      const target = toTarget(pickString(details.target, 'all'))
+      const targetUserId = pickString(details.targetUserId) || null
       return {
         id: document.id,
         kind: 'email' as const,
-        target: targetLabel(toTarget(target), null),
+        target: targetLabel(target, targetUserId),
         title: pickString(details.subject, 'Email'),
         sentAt: (data.createdAt as FirestoreDate | undefined) ?? null,
         deliveryCount: pickNumber(details.recipients),
@@ -190,8 +193,8 @@ export function useSendNotification() {
           actionLabel: actionLabel || null,
           scheduledAt:
             isScheduled && input.scheduledAt ? Timestamp.fromDate(input.scheduledAt) : null,
-          sentAt: isScheduled ? null : serverTimestamp(),
-          status: isScheduled ? 'scheduled' : 'sent',
+          sentAt: null,
+          status: isScheduled ? 'scheduled' : 'processing',
           deliveryCount: 0,
           createdBy: actor.uid,
           createdAt: serverTimestamp(),
@@ -226,9 +229,26 @@ export function useSendNotification() {
         const target =
           input.target === 'specific' && input.targetUserId ? [input.targetUserId] : 'all'
         const result = await provider.send(target, payload)
+        await updateDoc(
+          ref,
+          sanitizeFirestoreData({
+            status: 'sent',
+            sentAt: serverTimestamp(),
+            deliveryCount: result.successCount,
+          }),
+        )
         return { notificationId: ref.id, delivered: result.successCount, pushError: null }
-      } catch {
-        return { notificationId: ref.id, delivered: 0, pushError: 'Backend not deployed yet' }
+      } catch (error) {
+        try {
+          await updateDoc(ref, sanitizeFirestoreData({ status: 'failed' }))
+        } catch {
+          // The status write is best-effort; the send error below is what matters.
+        }
+        return {
+          notificationId: ref.id,
+          delivered: 0,
+          pushError: error instanceof Error ? error.message : 'Push delivery failed.',
+        }
       }
     },
     onSuccess: () => invalidateMessaging(queryClient),
@@ -243,12 +263,14 @@ export function useSendEmail() {
     mutationFn: async (input: EmailComposeInput) => {
       if (!actor.uid) throw new Error('You must be signed in.')
       const provider = await getEmailProvider()
-      // The backend resolves targets/user IDs to actual addresses.
-      const recipient =
-        input.target === 'specific' && input.targetUserId ? input.targetUserId : input.target
+      const isSpecific = input.target === 'specific' && Boolean(input.targetUserId)
+      // The backend resolves the audience (or user id) to actual addresses.
+      const audience: EmailAudience = isSpecific
+        ? { kind: 'specific', userId: input.targetUserId ?? undefined }
+        : { kind: 'all' }
 
       const result = await provider.sendEmail({
-        to: recipient,
+        audience,
         subject: input.subject,
         html: input.body,
         variables: input.variables,
@@ -257,9 +279,14 @@ export function useSendEmail() {
 
       await commitAuditOnly(actor, {
         action: 'send_email',
-        targetType: input.target === 'specific' ? 'user' : 'platform',
-        targetId: recipient,
-        details: { subject: input.subject, target: input.target, recipients: 1 },
+        targetType: isSpecific ? 'user' : 'platform',
+        targetId: isSpecific ? (input.targetUserId ?? 'specific') : 'all',
+        details: {
+          subject: input.subject,
+          target: input.target,
+          targetUserId: isSpecific ? input.targetUserId : null,
+          recipients: isSpecific ? 1 : null,
+        },
       })
       return result
     },

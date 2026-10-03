@@ -35,6 +35,10 @@ export async function getEmailProvider(): Promise<EmailProvider> {
       throw new Error(`Unknown email provider: ${activeName}`)
   }
 
+  if (!next.enabled) {
+    throw new Error(`The ${activeName} email provider is disabled in settings.`)
+  }
+
   cachedProvider = next
   cachedSignature = signature
   return next

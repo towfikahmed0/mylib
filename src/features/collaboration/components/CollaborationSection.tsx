@@ -34,7 +34,10 @@ export function CollaborationSection() {
       setEmail('')
       toast.success('Invitation sent.')
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not send the invitation.')
+      const code = (error as { code?: unknown } | null)?.code
+      const message = error instanceof Error ? error.message : 'Could not send the invitation.'
+      console.error('[invite] failed:', error, code, message)
+      toast.error(message)
     }
   }
 

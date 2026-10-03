@@ -1,4 +1,8 @@
 import type { AdminPushIntegration } from '../../types/admin.types'
+import {
+  registerWebPushSubscription,
+  unregisterPushToken,
+} from '../../../../lib/push/pushRegistration'
 import { postAdminEndpoint } from '../../utils/adminBackend'
 import type { PushPayload, PushProvider, SendResult } from './PushProvider'
 
@@ -12,12 +16,11 @@ export class WebPushAdapter implements PushProvider {
   }
 
   async subscribe(userId: string, subscription: PushSubscriptionJSON): Promise<void> {
-    void subscription
-    console.warn('Web Push client registration is not wired in this phase.', userId)
+    await registerWebPushSubscription(userId, subscription)
   }
 
   async unsubscribe(userId: string): Promise<void> {
-    console.warn('Web Push client registration is not wired in this phase.', userId)
+    await unregisterPushToken(userId)
   }
 
   async send(targetUserIds: string[] | 'all', payload: PushPayload): Promise<SendResult> {
@@ -32,8 +35,8 @@ export class WebPushAdapter implements PushProvider {
     try {
       await postAdminEndpoint('/admin/test-push', { provider: 'webpush' })
       return { ok: true, message: 'Test push dispatched.' }
-    } catch {
-      return { ok: false, message: 'Backend not deployed yet' }
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : 'Test push failed.' }
     }
   }
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Sparkles } from 'lucide-react'
+import { Download, Plus, Sparkles } from 'lucide-react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../../features/auth/useAuth'
 import { AIChatModal } from '../../features/ai/components/AIChatModal'
@@ -8,10 +8,12 @@ import { useSyncLibraryStats } from '../../features/library/hooks/useSyncLibrary
 import { NotificationBell } from '../../features/notifications/components/NotificationBell'
 import { DesktopSidebar } from './DesktopSidebar'
 import { MobileBottomNav } from './MobileBottomNav'
+import { useInstallPrompt } from './useInstallPrompt'
 
 function MobileTopBar() {
   const { appUser, user } = useAuth()
   const avatarUrl = appUser?.avatarUrl || user?.photoURL
+  const { canInstall, promptInstall } = useInstallPrompt()
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-x-0 border-b border-t-0 border-border bg-surface px-4 lg:hidden">
@@ -25,6 +27,17 @@ function MobileTopBar() {
       </Link>
 
       <div className="flex items-center gap-1">
+        {canInstall ? (
+          <button
+            type="button"
+            onClick={() => void promptInstall()}
+            aria-label="Install app"
+            title="Install app"
+            className="rounded-xl p-2 text-muted transition hover:text-foreground"
+          >
+            <Download size={20} />
+          </button>
+        ) : null}
         {appUser?.role === 'admin' ? (
           <Link
             to="/insights"

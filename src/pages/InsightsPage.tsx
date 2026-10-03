@@ -17,9 +17,11 @@ import { ReadingChallenges } from '../features/insights/components/ReadingChalle
 import { FinishedBooksByMonth } from '../features/insights/components/FinishedBooksByMonth'
 import { ReadingHeatmap } from '../features/insights/components/ReadingHeatmap'
 import { useAuth } from '../features/auth/useAuth'
+import { useActivePartners } from '../features/collaboration/hooks/useCollaboration'
 import { useBooks } from '../features/library/hooks/useBooks'
 import { useReadingStatus } from '../features/library/hooks/useReadingStatus'
 import { ShareModal } from '../features/sharing/components/ShareModal'
+import { cn } from '../lib/utils'
 
 function formatCurrency(value: number, decimals = 0): string {
   return new Intl.NumberFormat('en-US', {
@@ -267,10 +269,13 @@ function InsightsContent({
 }
 
 export function InsightsPage() {
-  const { stats, isLoading } = useLibraryStats()
+  const [includeCollaborators, setIncludeCollaborators] = useState(true)
+  const { stats, isLoading } = useLibraryStats(includeCollaborators)
   const { appUser } = useAuth()
   const { books } = useBooks()
   const { statuses } = useReadingStatus()
+  const { partners } = useActivePartners()
+  const hasPartners = partners.some((partner) => partner.isActive)
   const navigate = useNavigate()
   const [isShareOpen, setIsShareOpen] = useState(false)
   const [isMomentumShareOpen, setIsMomentumShareOpen] = useState(false)
@@ -315,6 +320,36 @@ export function InsightsPage() {
           Share Insights
         </button>
       </header>
+
+      {hasPartners ? (
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-surface px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Include collaborators&apos; libraries</p>
+            <p className="text-xs text-muted">
+              Counts your active collaborators&apos; books in these totals. Reading activity stays
+              yours.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={includeCollaborators}
+            aria-label="Include collaborators' libraries"
+            onClick={() => setIncludeCollaborators((value) => !value)}
+            className={cn(
+              'relative h-6 w-11 shrink-0 rounded-full border transition',
+              includeCollaborators ? 'border-accent bg-accent' : 'border-border bg-surface-muted',
+            )}
+          >
+            <span
+              className={cn(
+                'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-[left]',
+                includeCollaborators ? 'left-[26px]' : 'left-0.5',
+              )}
+            />
+          </button>
+        </div>
+      ) : null}
 
       {isLoading ? (
         <div className="space-y-5">

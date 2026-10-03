@@ -263,14 +263,28 @@ service cloud.firestore {
 
       // Notifications are written by other users (the actor) into the recipient's
       // subcollection, but only the recipient can read, update, or delete them.
-      match /notifications/{notifId} {
-        allow read: if isSignedIn() && request.auth.uid == userId;
-        allow create: if isSignedIn()
-          && request.resource.data.actorUserId == request.auth.uid
-          && request.resource.data.title.size() <= 200
-          && request.resource.data.body.size() <= 500
-          && request.resource.data.link.size() <= 500;
-        allow update, delete: if isSignedIn() && request.auth.uid == userId;
+match /notifications/{notifId} {
+  allow read: if isSignedIn() && request.auth.uid == userId;
+
+  allow create: if isSignedIn()
+    && request.resource.data.actorUserId == request.auth.uid
+    && request.resource.data.keys().hasAll(['title', 'body'])
+    && request.resource.data.title is string
+    && request.resource.data.title.size() <= 200
+    && request.resource.data.body is string
+    && request.resource.data.body.size() <= 500
+    && (!request.resource.data.keys().hasAny(['link'])
+      || request.resource.data.link == null
+      || (request.resource.data.link is string
+        && request.resource.data.link.size() <= 500));
+
+  allow update, delete: if isSignedIn() && request.auth.uid == userId;
+}
+
+      // Push registration tokens — private to their owner. The trusted backend
+      // reads them (Admin SDK) to deliver notifications.
+      match /pushTokens/{tokenId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
       }
     }
 
@@ -537,8 +551,14 @@ service cloud.firestore {
     // ---------------------------------------------------------------
 
     match /partnerships/{partnershipId} {
+      // A participant may read the partnership. The request-book flow reads both
+      // "<a>_<b>" orderings of the id to locate the pair, so one of them is
+      // always absent; dereferencing the null `resource` would otherwise deny
+      // that read and abort the whole transaction with permission-denied.
       allow read: if isSignedIn()
-        && (resource.data.userId1 == request.auth.uid || resource.data.userId2 == request.auth.uid);
+        && (resource == null
+          || resource.data.userId1 == request.auth.uid
+          || resource.data.userId2 == request.auth.uid);
 
       // FIX: require an accepted collaborationRequest from the OTHER party.
       // Only the recipient of an accepted request can create the partnership.
@@ -570,8 +590,13 @@ service cloud.firestore {
     // ---------------------------------------------------------------
 
     match /collaborationRequests/{requestId} {
+      // A participant may read the request doc. The inviter checks for an existing
+      // request BEFORE creating one, so the doc is often absent; dereferencing the
+      // null `resource` would otherwise deny that check with permission-denied.
       allow read: if isSignedIn()
-        && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid);
+        && (resource == null
+          || resource.data.fromUserId == request.auth.uid
+          || resource.data.toUserId == request.auth.uid);
 
       // FIX: pin both fromUserId and toUserId, and require pending on create.
       allow create: if isSignedIn()

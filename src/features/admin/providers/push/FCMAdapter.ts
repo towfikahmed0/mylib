@@ -1,4 +1,8 @@
 import type { AdminPushIntegration } from '../../types/admin.types'
+import {
+  registerFcmToken,
+  unregisterPushToken,
+} from '../../../../lib/push/pushRegistration'
 import { postAdminEndpoint } from '../../utils/adminBackend'
 import type { PushPayload, PushProvider, SendResult } from './PushProvider'
 
@@ -12,12 +16,13 @@ export class FCMAdapter implements PushProvider {
   }
 
   async subscribe(userId: string, subscription: PushSubscriptionJSON): Promise<void> {
+    // FCM uses registration tokens, not browser subscriptions.
     void subscription
-    console.warn('FCM client registration is not wired in this phase.', userId)
+    await registerFcmToken(userId)
   }
 
   async unsubscribe(userId: string): Promise<void> {
-    console.warn('FCM client registration is not wired in this phase.', userId)
+    await unregisterPushToken(userId)
   }
 
   async send(targetUserIds: string[] | 'all', payload: PushPayload): Promise<SendResult> {
@@ -32,8 +37,8 @@ export class FCMAdapter implements PushProvider {
     try {
       await postAdminEndpoint('/admin/test-push', { provider: 'fcm' })
       return { ok: true, message: 'Test push dispatched.' }
-    } catch {
-      return { ok: false, message: 'Backend not deployed yet' }
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : 'Test push failed.' }
     }
   }
 }
