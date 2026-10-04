@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Flame, Gauge, Library, Share2, Tag, Tags, TrendingUp, Wallet } from 'lucide-react'
+import { Flame, FileText, Gauge, Library, Share2, Tag, Tags, TrendingUp, Wallet } from 'lucide-react'
 import {
   ChartCard,
   ChartEmpty,
@@ -21,6 +21,7 @@ import { useActivePartners } from '../features/collaboration/hooks/useCollaborat
 import { useBooks } from '../features/library/hooks/useBooks'
 import { useReadingStatus } from '../features/library/hooks/useReadingStatus'
 import { ShareModal } from '../features/sharing/components/ShareModal'
+import { LibraryReportModal } from '../features/reports/components/LibraryReportModal'
 import { cn } from '../lib/utils'
 
 function formatCurrency(value: number, decimals = 0): string {
@@ -279,6 +280,7 @@ export function InsightsPage() {
   const navigate = useNavigate()
   const [isShareOpen, setIsShareOpen] = useState(false)
   const [isMomentumShareOpen, setIsMomentumShareOpen] = useState(false)
+  const [isReportOpen, setIsReportOpen] = useState(false)
 
   const handleSelectTag = (tag: string) => {
     navigate(`/library?tag=${encodeURIComponent(tag)}`)
@@ -310,15 +312,26 @@ export function InsightsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Insights</h1>
           <p className="text-sm text-muted">Charts, goals, and reading momentum</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setIsShareOpen(true)}
-          disabled={isLoading || stats.totalBooks === 0}
-          className="flex shrink-0 items-center gap-1.5 rounded-2xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90 disabled:opacity-50"
-        >
-          <Share2 size={16} />
-          Share Insights
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsReportOpen(true)}
+            disabled={isLoading || stats.totalBooks === 0}
+            className="flex shrink-0 items-center gap-1.5 rounded-2xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-surface-muted disabled:opacity-50"
+          >
+            <FileText size={16} />
+            <span className="hidden sm:inline">Library Report</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsShareOpen(true)}
+            disabled={isLoading || stats.totalBooks === 0}
+            className="flex shrink-0 items-center gap-1.5 rounded-2xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90 disabled:opacity-50"
+          >
+            <Share2 size={16} />
+            Share Insights
+          </button>
+        </div>
       </header>
 
       {hasPartners ? (
@@ -413,6 +426,7 @@ export function InsightsPage() {
         }}
         onClose={() => setIsMomentumShareOpen(false)}
       />
+      <LibraryReportModal open={isReportOpen} onClose={() => setIsReportOpen(false)} />
     </section>
   )
 }

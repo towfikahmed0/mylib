@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent, type MouseEvent } from 'react'
-import { BookOpen, Copy, HandCoins, Heart, Pencil, Star } from 'lucide-react'
+import { BookOpen, Check, Copy, HandCoins, Heart, Pencil, Star } from 'lucide-react'
 import { cn } from '../../../lib/utils'
 import { toast } from '../../../store/toastStore'
 import type { Book, ReadingStatus, ReadingStatusValue } from '../../../types'
@@ -38,6 +38,9 @@ interface BookCardProps {
   requestDisabledReason?: string
   onMoveToLibrary?: (book: Book) => void
   onEdit?: (book: Book) => void
+  selectionMode?: boolean
+  selected?: boolean
+  onToggleSelect?: (book: Book) => void
 }
 
 function formatDate(value: Book['createdAt']): string {
@@ -63,6 +66,9 @@ export function BookCard({
   requestDisabledReason,
   onMoveToLibrary,
   onEdit,
+  selectionMode = false,
+  selected = false,
+  onToggleSelect,
 }: BookCardProps) {
   const cover = book.coverUrl || book.thumbnail
   const rating = status?.rating || book.averageRating
@@ -75,13 +81,35 @@ export function BookCard({
   const [favorite, setFavorite] = useState(isFavorite)
   const [isBursting, setIsBursting] = useState(false)
 
-  const activate = () => onClick?.(book)
+  const activate = () => {
+    if (selectionMode) {
+      onToggleSelect?.(book)
+      return
+    }
+    onClick?.(book)
+  }
   const handleKeyDown = (event: KeyboardEvent) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
       activate()
     }
   }
+
+  const selectionBadge = (position: string) =>
+    selectionMode ? (
+      <span
+        aria-hidden="true"
+        className={cn(
+          'absolute z-30 flex h-6 w-6 items-center justify-center rounded-lg border shadow-sm transition',
+          position,
+          selected
+            ? 'border-primary bg-primary text-primary-foreground'
+            : 'border-slate-300 bg-white/90 text-transparent dark:border-slate-600 dark:bg-slate-700/90',
+        )}
+      >
+        <Check size={14} />
+      </span>
+    ) : null
 
   const handleFavorite = (event: MouseEvent) => {
     event.stopPropagation()
@@ -232,10 +260,15 @@ export function BookCard({
         onClick={activate}
         onKeyDown={handleKeyDown}
         aria-label={`${book.title} by ${book.author}`}
-        className="book-card group relative cursor-pointer rounded-2xl outline-none focus-visible:ring-4 focus-visible:ring-primary/30"
+        aria-pressed={selectionMode ? selected : undefined}
+        className={cn(
+          'book-card group relative cursor-pointer rounded-2xl outline-none focus-visible:ring-4 focus-visible:ring-primary/30',
+          selected && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
+        )}
       >
         <div className="absolute inset-0 rounded-2xl bg-slate-900/10 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" />
         <div className="relative aspect-[2/3] overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+          {selectionBadge('left-2 top-2')}
           {cover ? (
             <img
               src={cover}
@@ -268,8 +301,8 @@ export function BookCard({
             </div>
           ) : null}
           <div className="absolute left-2 top-2 flex flex-col gap-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-            {favoriteButton('h-5 w-5', 14)}
-            {copyButton('h-5 w-5', 14)}
+            {!selectionMode ? favoriteButton('h-5 w-5', 14) : null}
+            {!selectionMode ? copyButton('h-5 w-5', 14) : null}
           </div>
         </div>
         <div className="mt-2 px-1">
@@ -290,9 +323,14 @@ export function BookCard({
         onClick={activate}
         onKeyDown={handleKeyDown}
         aria-label={`${book.title} by ${book.author}`}
-        className="book-card group relative flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 outline-none shadow-sm transition-all hover:bg-slate-50 focus-visible:ring-4 focus-visible:ring-primary/30 sm:gap-4 sm:px-6 sm:py-4 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+        aria-pressed={selectionMode ? selected : undefined}
+        className={cn(
+          'book-card group relative flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 outline-none shadow-sm transition-all hover:bg-slate-50 focus-visible:ring-4 focus-visible:ring-primary/30 sm:gap-4 sm:px-6 sm:py-4 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700',
+          selected && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
+        )}
       >
-        <div className="h-14 w-10 flex-shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100 sm:h-16 sm:w-12 dark:border-slate-700 dark:bg-slate-800">
+        <div className="relative h-14 w-10 flex-shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100 sm:h-16 sm:w-12 dark:border-slate-700 dark:bg-slate-800">
+          {selectionBadge('left-1 top-1')}
           {cover ? (
             <img src={cover} alt="" loading="lazy" className="h-full w-full object-cover" />
           ) : (
@@ -319,8 +357,8 @@ export function BookCard({
         <div className="flex flex-shrink-0 flex-col items-end text-right">
           <div className="text-[10px] text-amber-400">{stars}</div>
           <div className="mt-1 flex items-center gap-2">
-            {favoriteButton('h-6 w-6', 14)}
-            {onEdit ? (
+            {!selectionMode ? favoriteButton('h-6 w-6', 14) : null}
+            {!selectionMode && onEdit ? (
               <button
                 type="button"
                 onClick={handleEdit}
@@ -332,7 +370,7 @@ export function BookCard({
                 <Pencil size={14} />
               </button>
             ) : null}
-            {copyButton('h-6 w-6', 14)}
+            {!selectionMode ? copyButton('h-6 w-6', 14) : null}
             {statusBadge}
             {actionPill}
           </div>
@@ -349,11 +387,16 @@ export function BookCard({
         onClick={activate}
         onKeyDown={handleKeyDown}
         aria-label={`${book.title} by ${book.author}`}
-        className="book-card book-card-responsive-layout group relative flex min-h-[13rem] cursor-pointer animate-slide-up gap-6 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm outline-none focus-visible:ring-4 focus-visible:ring-primary/30 dark:border-slate-700 dark:bg-slate-800"
+        aria-pressed={selectionMode ? selected : undefined}
+        className={cn(
+          'book-card book-card-responsive-layout group relative flex min-h-[13rem] cursor-pointer animate-slide-up gap-6 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm outline-none focus-visible:ring-4 focus-visible:ring-primary/30 dark:border-slate-700 dark:bg-slate-800',
+          selected && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
+        )}
       >
+      {selectionBadge('left-4 top-4')}
       <div className="absolute left-4 top-4 z-20 flex flex-col gap-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-        {favoriteButton('h-6 w-6', 16)}
-        {copyButton('h-6 w-6', 16)}
+        {!selectionMode ? favoriteButton('h-6 w-6', 16) : null}
+        {!selectionMode ? copyButton('h-6 w-6', 16) : null}
       </div>
 
       <div className="book-card-responsive-cover relative h-40 w-28 flex-shrink-0 overflow-hidden rounded-3xl border border-slate-200 bg-slate-100 shadow-lg dark:border-slate-700 dark:bg-slate-800">
@@ -408,7 +451,7 @@ export function BookCard({
             <span className="text-sm font-black text-slate-900 dark:text-white">
               {book.price ? `$${book.price}` : ''}
             </span>
-            {onEdit ? (
+            {!selectionMode && onEdit ? (
               <button
                 type="button"
                 onClick={handleEdit}

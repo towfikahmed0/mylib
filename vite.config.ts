@@ -39,7 +39,7 @@ export default defineConfig(() => {
         includeAssets: ['favicon.svg', 'logo.png', 'icons/*.png'],
         manifest,
         injectManifest: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,ttf}'],
           // The FCM worker is registered separately and must never be precached.
           globIgnores: ['**/firebase-messaging-sw.js'],
         },

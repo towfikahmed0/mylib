@@ -6,6 +6,7 @@ import {
   EyeOff,
   FileJson,
   FileSpreadsheet,
+  FileText,
   KeyRound,
   Loader2,
   Sparkles,
@@ -39,6 +40,7 @@ import { CollaborationSection } from '../features/collaboration/components/Colla
 import { DangerZoneCard } from '../features/profile/components/DangerZoneCard'
 import { PrivacySettings } from '../features/profile/components/PrivacySettings'
 import { ProfileCard } from '../features/profile/components/ProfileCard'
+import { LibraryReportModal } from '../features/reports/components/LibraryReportModal'
 import type { AIProvider } from '../types'
 
 const FIELD_CLASS =
@@ -139,6 +141,7 @@ export function SettingsPage() {
   const [isImporting, setIsImporting] = useState(false)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [isFixerOpen, setIsFixerOpen] = useState(false)
+  const [isReportOpen, setIsReportOpen] = useState(false)
 
   const handleSaveAI = () => {
     setApiKey('gemini', geminiKey)
@@ -251,6 +254,13 @@ export function SettingsPage() {
         </p>
 
         <div className="grid gap-3 sm:grid-cols-2">
+          <DataAction
+            icon={<FileText size={18} />}
+            label="Download Library Report"
+            description="A professional PDF of your library."
+            onClick={() => setIsReportOpen(true)}
+            disabled={isImporting}
+          />
           <DataAction
             icon={<Download size={18} />}
             label="Export CSV"
@@ -434,6 +444,8 @@ export function SettingsPage() {
         books={books}
         onClose={() => setIsFixerOpen(false)}
       />
+
+      <LibraryReportModal open={isReportOpen} onClose={() => setIsReportOpen(false)} />
     </section>
   )
 }

@@ -596,7 +596,7 @@ export function useConfirmBookReceived() {
   })
 }
 
-export function useLoanList() {
+export function useLoanList(enabled = true) {
   const { user } = useAuth()
   const uid = user?.uid
   const { data, isPending, isError } = useQuery({
@@ -613,7 +613,7 @@ export function useLoanList() {
         .map((loan) => ({ id: loan.id, ...loan.data() }) as import('../../../types').Loan)
         .sort((a, b) => toMillis(b.confirmedAt) - toMillis(a.confirmedAt))
     },
-    enabled: Boolean(uid),
+    enabled: Boolean(uid) && enabled,
   })
   return { loans: data ?? [], isLoading: isPending, isError }
 }

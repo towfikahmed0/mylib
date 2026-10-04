@@ -3,23 +3,36 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   AlertCircle,
   AlignJustify,
+  ArrowRightLeft,
   BookOpen,
+  CheckSquare,
   LayoutGrid,
   List,
+  Loader2,
   Plus,
+  RefreshCw,
   Search,
+  Trash2,
   X,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
+import { toast } from '../store/toastStore'
+import { Modal } from '../components/ui/Modal'
 import { AddBookFlow } from '../features/library/components/AddBookChooser'
 import { AddBookModal } from '../features/library/components/AddBookModal'
 import { BookCard, type BookCardView } from '../features/library/components/BookCard'
 import { BookDetailsModal } from '../features/library/components/BookDetailsModal'
+import { BulkTransferModal } from '../features/library/components/BulkTransferModal'
 import { SkeletonBookCard } from '../features/library/components/SkeletonBookCard'
+import { READING_STATUS_OPTIONS } from '../features/library/constants'
+import {
+  useBulkDeleteBooks,
+  useBulkUpdateReadingStatus,
+} from '../features/library/hooks/useBulkBookActions'
 import { useLibraryShelf } from '../features/library/hooks/useLibraryShelf'
 import { useReadingStatus } from '../features/library/hooks/useReadingStatus'
 import { NotificationBell } from '../features/notifications/components/NotificationBell'
-import type { Book } from '../types'
+import type { Book, ReadingStatusValue } from '../types'
 
 const SKELETON_COUNT = 10
 const GRID_CLASS = 'grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3'
@@ -63,6 +76,14 @@ export function LibraryPage() {
   const [lendingFilter, setLendingFilter] = useState<LendingFilter>('all')
   const [authorFilter, setAuthorFilter] = useState('')
   const [selectedGenre, setSelectedGenre] = useState('')
+  const [isSelecting, setIsSelecting] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [isBulkStatusOpen, setIsBulkStatusOpen] = useState(false)
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false)
+  const [isBulkTransferOpen, setIsBulkTransferOpen] = useState(false)
+
+  const bulkStatus = useBulkUpdateReadingStatus()
+  const bulkDelete = useBulkDeleteBooks()
 
   const selectView = (next: BookCardView) => {
     setView(next)
@@ -148,6 +169,56 @@ export function LibraryPage() {
   const totalLibraryCount = allLibraryBooks.length
   const visibleBooks = groupViews.flatMap((group) => group.visibleBooks)
 
+  const ownGroupView = groupViews.find((group) => group.isOwn)
+  const ownBooks = groups.find((group) => group.isOwn)?.books ?? []
+  const selectableVisibleBooks = ownGroupView?.visibleBooks ?? []
+  const selectedBooks = ownBooks.filter((book) => selectedIds.has(book.id))
+
+  const toggleSelect = (book: Book) => {
+    setSelectedIds((previous) => {
+      const next = new Set(previous)
+      if (next.has(book.id)) next.delete(book.id)
+      else next.add(book.id)
+      return next
+    })
+  }
+
+  const selectAllVisible = () => {
+    setSelectedIds(new Set(selectableVisibleBooks.map((book) => book.id)))
+  }
+
+  const clearSelection = () => setSelectedIds(new Set())
+
+  const exitSelection = () => {
+    setIsSelecting(false)
+    clearSelection()
+  }
+
+  const handleBulkStatus = async (status: ReadingStatusValue) => {
+    try {
+      await bulkStatus.mutateAsync({ bookIds: [...selectedIds], status })
+      toast.success(
+        `Status updated for ${selectedIds.size} book${selectedIds.size === 1 ? '' : 's'}.`,
+      )
+      setIsBulkStatusOpen(false)
+      exitSelection()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not update the selected books.')
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    const ids = [...selectedIds]
+    try {
+      await bulkDelete.mutateAsync(ids)
+      toast.success(`Deleted ${ids.length} book${ids.length === 1 ? '' : 's'}.`)
+      setIsBulkDeleteOpen(false)
+      exitSelection()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not delete the selected books.')
+    }
+  }
+
   const hasFilters = Boolean(
     tagFilter || genreFilter || searchQuery.trim() || selectedGenre || authorFilter ||
       lendingFilter !== 'all' || sortBy === 'favorites',
@@ -182,14 +253,91 @@ export function LibraryPage() {
           <NotificationBell />
           <button
             type="button"
-            onClick={() => setIsAddFlowOpen(true)}
-            className="hidden shrink-0 items-center gap-1.5 rounded-2xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90 sm:flex"
+            onClick={() => (isSelecting ? exitSelection() : setIsSelecting(true))}
+            aria-pressed={isSelecting}
+            className={cn(
+              'flex shrink-0 items-center gap-1.5 rounded-2xl border px-3 py-2.5 text-sm font-semibold transition',
+              isSelecting
+                ? 'border-accent bg-accent/10 text-accent'
+                : 'border-border bg-surface text-foreground hover:bg-surface-muted',
+            )}
           >
-            <Plus size={16} />
-            Add Book
+            <CheckSquare size={16} />
+            <span className="hidden sm:inline">{isSelecting ? 'Done' : 'Select'}</span>
           </button>
+          {!isSelecting ? (
+            <button
+              type="button"
+              onClick={() => setIsAddFlowOpen(true)}
+              className="hidden shrink-0 items-center gap-1.5 rounded-2xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90 sm:flex"
+            >
+              <Plus size={16} />
+              Add Book
+            </button>
+          ) : null}
         </div>
       </header>
+
+      {isSelecting ? (
+        <div className="card-surface sticky top-16 z-20 flex flex-wrap items-center gap-2 p-3 lg:top-2">
+          <span className="text-sm font-semibold">
+            {selectedIds.size} selected
+          </span>
+          <button
+            type="button"
+            onClick={selectAllVisible}
+            disabled={selectableVisibleBooks.length === 0}
+            className="rounded-xl bg-surface-muted px-3 py-1.5 text-xs font-medium transition hover:opacity-80 disabled:opacity-50"
+          >
+            Select all
+          </button>
+          <button
+            type="button"
+            onClick={clearSelection}
+            disabled={selectedIds.size === 0}
+            className="rounded-xl px-3 py-1.5 text-xs font-medium text-muted transition hover:text-foreground disabled:opacity-50"
+          >
+            Clear
+          </button>
+          <div className="ml-auto flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setIsBulkStatusOpen(true)}
+              disabled={selectedIds.size === 0}
+              className="flex items-center gap-1.5 rounded-xl bg-surface-muted px-3 py-2 text-xs font-semibold transition hover:opacity-80 disabled:opacity-50"
+            >
+              <RefreshCw size={14} />
+              Status
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsBulkTransferOpen(true)}
+              disabled={selectedIds.size === 0}
+              className="flex items-center gap-1.5 rounded-xl bg-surface-muted px-3 py-2 text-xs font-semibold transition hover:opacity-80 disabled:opacity-50"
+            >
+              <ArrowRightLeft size={14} />
+              Transfer
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsBulkDeleteOpen(true)}
+              disabled={selectedIds.size === 0}
+              className="flex items-center gap-1.5 rounded-xl bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-500/20 disabled:opacity-50 dark:text-rose-300"
+            >
+              <Trash2 size={14} />
+              Delete
+            </button>
+            <button
+              type="button"
+              onClick={exitSelection}
+              aria-label="Exit selection mode"
+              className="rounded-xl border border-border bg-surface p-2 text-muted transition hover:text-foreground"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
@@ -376,6 +524,9 @@ export function LibraryPage() {
                       showReadingStatus={group.isOwn}
                       onClick={setSelectedBook}
                       onEdit={group.isOwn ? setEditingBook : undefined}
+                      selectionMode={group.isOwn && isSelecting}
+                      selected={selectedIds.has(book.id)}
+                      onToggleSelect={toggleSelect}
                     />
                   ))}
                 </div>
@@ -393,6 +544,9 @@ export function LibraryPage() {
               view={view}
               onClick={setSelectedBook}
               onEdit={setEditingBook}
+              selectionMode={isSelecting}
+              selected={selectedIds.has(book.id)}
+              onToggleSelect={toggleSelect}
             />
           ))}
         </div>
@@ -412,6 +566,71 @@ export function LibraryPage() {
         book={selectedBook}
         status={selectedBook ? statuses[selectedBook.id] : undefined}
         onClose={() => setSelectedBook(null)}
+      />
+
+      <Modal
+        open={isBulkStatusOpen}
+        onClose={() => setIsBulkStatusOpen(false)}
+        title="Change status"
+        description={`Apply a reading status to ${selectedIds.size} selected book${selectedIds.size === 1 ? '' : 's'}.`}
+        size="sm"
+      >
+        <div className="space-y-2">
+          {READING_STATUS_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              disabled={bulkStatus.isPending}
+              onClick={() => void handleBulkStatus(option.value)}
+              className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800"
+            >
+              {option.label}
+              {bulkStatus.isPending ? <Loader2 className="animate-spin" size={15} /> : null}
+            </button>
+          ))}
+        </div>
+      </Modal>
+
+      <Modal
+        open={isBulkDeleteOpen}
+        onClose={() => setIsBulkDeleteOpen(false)}
+        title={`Delete ${selectedIds.size} book${selectedIds.size === 1 ? '' : 's'}?`}
+        description="This action cannot be undone."
+        size="sm"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsBulkDeleteOpen(false)}
+              disabled={bulkDelete.isPending}
+              className="rounded-2xl px-4 py-2.5 text-sm font-medium text-muted transition hover:bg-surface-muted hover:text-foreground disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleBulkDelete()}
+              disabled={bulkDelete.isPending}
+              className="flex items-center gap-2 rounded-2xl bg-rose-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:opacity-60"
+            >
+              {bulkDelete.isPending ? <Loader2 className="animate-spin" size={16} /> : null}
+              Delete
+            </button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted">
+          {selectedIds.size === 1
+            ? 'The selected book will be permanently removed from your library.'
+            : `The ${selectedIds.size} selected books will be permanently removed from your library.`}
+        </p>
+      </Modal>
+
+      <BulkTransferModal
+        open={isBulkTransferOpen}
+        books={selectedBooks}
+        onClose={() => setIsBulkTransferOpen(false)}
+        onTransferred={exitSelection}
       />
     </section>
   )
