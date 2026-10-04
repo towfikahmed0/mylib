@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRightLeft,
@@ -11,6 +11,7 @@ import {
   Layers,
   Loader2,
   MessageSquare,
+  MoreVertical,
   Pencil,
   Play,
   Plus,
@@ -121,6 +122,38 @@ function StatBox({ label, value }: { label: string; value: string }) {
   )
 }
 
+function MenuAction({
+  icon: Icon,
+  label,
+  onClick,
+  disabled,
+  danger,
+}: {
+  icon: ComponentType<{ size?: number | string }>
+  label: string
+  onClick: () => void
+  disabled?: boolean
+  danger?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50',
+        danger
+          ? 'text-rose-600 hover:bg-rose-500/10 dark:text-rose-300'
+          : 'text-foreground hover:bg-surface-muted',
+      )}
+    >
+      <Icon size={16} />
+      {label}
+    </button>
+  )
+}
+
 function BookDetailsContent({
   book,
   status,
@@ -168,6 +201,8 @@ function BookDetailsContent({
   const [isAskOpen, setIsAskOpen] = useState(false)
   const [isShelfOpen, setIsShelfOpen] = useState(false)
   const [isShareOpen, setIsShareOpen] = useState(false)
+  const [isMoreOpen, setIsMoreOpen] = useState(false)
+  const moreRef = useRef<HTMLDivElement>(null)
 
   const [isTimerRunning, setIsTimerRunning] = useState(false)
   const [timerSeconds, setTimerSeconds] = useState(0)
@@ -183,6 +218,17 @@ function BookDetailsContent({
       if (timerRef.current) clearInterval(timerRef.current)
     }
   }, [isTimerRunning])
+
+  useEffect(() => {
+    if (!isMoreOpen) return
+    const handlePointerDown = (event: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(event.target as Node)) {
+        setIsMoreOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [isMoreOpen])
 
   const runStatusUpdate = async (
     variables: Parameters<typeof updateStatus.mutateAsync>[0],
@@ -361,7 +407,8 @@ function BookDetailsContent({
       fullScreen
     >
       <div className="flex min-h-0 flex-1 flex-col bg-background px-4 pb-3 pt-16 sm:px-8">
-        <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-3 sm:grid-cols-[7rem_minmax(0,1fr)] sm:grid-rows-1 sm:gap-5">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain sm:overflow-hidden">
+        <div className="flex flex-col items-center gap-3 sm:grid sm:h-full sm:min-h-0 sm:grid-rows-1 sm:grid-cols-[7rem_minmax(0,1fr)] sm:gap-5">
           {/* Left column */}
           <div className="flex flex-col items-center gap-3 sm:sticky sm:top-0 sm:self-start">
             <div className="relative aspect-[2/3] h-40 w-28 shrink-0 overflow-hidden rounded-xl bg-surface-muted shadow-md">
@@ -376,7 +423,7 @@ function BookDetailsContent({
           </div>
 
           {/* Right column */}
-          <div className="min-h-0 min-w-0 space-y-3 overflow-y-auto overscroll-contain py-2 pr-1">
+          <div className="w-full min-w-0 space-y-3 py-2 pr-1 sm:h-full sm:min-h-0 sm:overflow-y-auto sm:overscroll-contain">
             <div className="space-y-2">
               {book.genres.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
@@ -845,9 +892,10 @@ function BookDetailsContent({
 
         </div>
         </div>
+        </div>
 
-        {/* Bottom action bar */}
-        <div className="mt-3 shrink-0 border-t border-border/60 bg-background py-2">
+        {/* Bottom action bar (desktop) */}
+        <div className="mt-3 hidden shrink-0 border-t border-border/60 bg-background py-2 sm:block">
           <div className="flex items-center justify-between gap-2">
           <button
             type="button"
@@ -942,6 +990,115 @@ function BookDetailsContent({
               Close
             </button>
           </div>
+          </div>
+        </div>
+
+        {/* Bottom action bar (mobile) */}
+        <div className="mt-3 shrink-0 border-t border-border/60 bg-background py-2 sm:hidden">
+          <div className="flex items-center gap-1.5">
+            {isOwner ? (
+              <button
+                type="button"
+                onClick={() => setIsEditOpen(true)}
+                className="flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-surface-muted px-2 py-2.5 text-xs font-semibold transition hover:opacity-80"
+              >
+                <Pencil size={15} />
+                Edit
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setIsShelfOpen(true)}
+              className="flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-accent px-2 py-2.5 text-xs font-semibold text-accent-foreground transition hover:opacity-90"
+            >
+              <Layers size={15} />
+              Add to Shelf
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsShareOpen(true)}
+              className="flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-surface-muted px-2 py-2.5 text-xs font-semibold transition hover:opacity-80"
+            >
+              <Share2 size={15} />
+              Share
+            </button>
+
+            <div ref={moreRef} className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsMoreOpen((value) => !value)}
+                aria-label="More actions"
+                aria-haspopup="menu"
+                aria-expanded={isMoreOpen}
+                className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-muted text-foreground transition hover:opacity-80"
+              >
+                <MoreVertical size={18} />
+              </button>
+
+              {isMoreOpen ? (
+                <div
+                  role="menu"
+                  aria-label="More actions"
+                  className="absolute bottom-full right-0 z-50 mb-2 w-60 overflow-hidden rounded-2xl border border-border bg-surface p-1 shadow-xl"
+                >
+                  <MenuAction
+                    icon={Sparkles}
+                    label="AI Summary"
+                    onClick={() => {
+                      setIsMoreOpen(false)
+                      setIsSummaryOpen(true)
+                    }}
+                  />
+                  <MenuAction
+                    icon={MessageSquare}
+                    label="Ask AI"
+                    onClick={() => {
+                      setIsMoreOpen(false)
+                      setIsAskOpen(true)
+                    }}
+                  />
+                  <MenuAction
+                    icon={Copy}
+                    label="Copy Info"
+                    onClick={() => {
+                      setIsMoreOpen(false)
+                      void handleCopyInfo()
+                    }}
+                  />
+                  {isOwner ? (
+                    <MenuAction
+                      icon={ArrowRightLeft}
+                      label="Transfer"
+                      onClick={() => {
+                        setIsMoreOpen(false)
+                        setIsTransferOpen(true)
+                      }}
+                    />
+                  ) : null}
+                  {onRemoveFromShelf ? (
+                    <MenuAction
+                      icon={Trash2}
+                      label="Remove from Shelf"
+                      onClick={() => {
+                        setIsMoreOpen(false)
+                        onRemoveFromShelf()
+                      }}
+                    />
+                  ) : null}
+                  <div className="my-1 h-px bg-border" />
+                  <MenuAction
+                    icon={Trash2}
+                    label="Delete"
+                    danger
+                    disabled={deleteBook.isPending || !isOwner}
+                    onClick={() => {
+                      setIsMoreOpen(false)
+                      void handleDelete()
+                    }}
+                  />
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>

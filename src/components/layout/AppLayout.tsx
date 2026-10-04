@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Download, Plus, Sparkles } from 'lucide-react'
-import { Link, Outlet, useLocation } from 'react-router-dom'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../features/auth/useAuth'
 import { AIChatModal } from '../../features/ai/components/AIChatModal'
-import { AddBookModal } from '../../features/library/components/AddBookModal'
+import { AddBookFlow } from '../../features/library/components/AddBookChooser'
 import { useSyncLibraryStats } from '../../features/library/hooks/useSyncLibraryStats'
 import { NotificationBell } from '../../features/notifications/components/NotificationBell'
 import { DesktopSidebar } from './DesktopSidebar'
@@ -89,6 +89,7 @@ function AddBookFab({ onClick }: { onClick: () => void }) {
 
 export function AppLayout() {
   const location = useLocation()
+  const navigate = useNavigate()
   const isExplorePage = location.pathname === '/explore'
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [isAddBookOpen, setIsAddBookOpen] = useState(false)
@@ -106,7 +107,11 @@ export function AppLayout() {
       </div>
 
       {!isExplorePage ? <AddBookFab onClick={() => setIsAddBookOpen(true)} /> : null}
-      <AddBookModal open={isAddBookOpen} onClose={() => setIsAddBookOpen(false)} />
+      <AddBookFlow
+        open={isAddBookOpen}
+        onClose={() => setIsAddBookOpen(false)}
+        onImport={() => navigate('/settings')}
+      />
 
       {!isChatOpen ? (
         <button

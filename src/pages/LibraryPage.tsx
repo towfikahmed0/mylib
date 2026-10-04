@@ -4,21 +4,17 @@ import {
   AlertCircle,
   AlignJustify,
   BookOpen,
-  FileUp,
   LayoutGrid,
   List,
-  PenLine,
   Plus,
-  ScanLine,
   Search,
   X,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
-import { Modal } from '../components/ui/Modal'
-import { AddBookModal, type BookPrefill } from '../features/library/components/AddBookModal'
+import { AddBookFlow } from '../features/library/components/AddBookChooser'
+import { AddBookModal } from '../features/library/components/AddBookModal'
 import { BookCard, type BookCardView } from '../features/library/components/BookCard'
 import { BookDetailsModal } from '../features/library/components/BookDetailsModal'
-import { ScannerModal } from '../features/library/components/ScannerModal'
 import { SkeletonBookCard } from '../features/library/components/SkeletonBookCard'
 import { useLibraryShelf } from '../features/library/hooks/useLibraryShelf'
 import { useReadingStatus } from '../features/library/hooks/useReadingStatus'
@@ -57,10 +53,7 @@ export function LibraryPage() {
   const navigate = useNavigate()
   const { groups, hasPartners, isLoading, isError, error, refetch } = useLibraryShelf()
   const { statuses } = useReadingStatus()
-  const [isChooserOpen, setIsChooserOpen] = useState(false)
-  const [isScannerOpen, setIsScannerOpen] = useState(false)
-  const [isAddOpen, setIsAddOpen] = useState(false)
-  const [prefill, setPrefill] = useState<BookPrefill | null>(null)
+  const [isAddFlowOpen, setIsAddFlowOpen] = useState(false)
   const [selectedBook, setSelectedBook] = useState<Book | null>(null)
   const [editingBook, setEditingBook] = useState<Book | null>(null)
   const [view, setView] = useState<BookCardView>(() => readStoredView())
@@ -172,18 +165,6 @@ export function LibraryPage() {
     setSortBy('recent')
   }
 
-  const openManual = () => {
-    setPrefill(null)
-    setIsChooserOpen(false)
-    setIsAddOpen(true)
-  }
-
-  const handleScanned = (data: BookPrefill) => {
-    setPrefill(data)
-    setIsScannerOpen(false)
-    setIsAddOpen(true)
-  }
-
   return (
     <section className="animate-fade-in space-y-5">
       <header className="flex items-start justify-between gap-3">
@@ -201,7 +182,7 @@ export function LibraryPage() {
           <NotificationBell />
           <button
             type="button"
-            onClick={() => setIsChooserOpen(true)}
+            onClick={() => setIsAddFlowOpen(true)}
             className="hidden shrink-0 items-center gap-1.5 rounded-2xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90 sm:flex"
           >
             <Plus size={16} />
@@ -356,7 +337,7 @@ export function LibraryPage() {
           </p>
           <button
             type="button"
-            onClick={() => setIsChooserOpen(true)}
+            onClick={() => setIsAddFlowOpen(true)}
             className="mt-1 flex items-center gap-1.5 rounded-2xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
           >
             <Plus size={16} />
@@ -417,31 +398,10 @@ export function LibraryPage() {
         </div>
       )}
 
-      <AddBookChooser
-        open={isChooserOpen}
-        onClose={() => setIsChooserOpen(false)}
-        onScan={() => {
-          setIsChooserOpen(false)
-          setIsScannerOpen(true)
-        }}
-        onManual={openManual}
-        onImport={() => {
-          setIsChooserOpen(false)
-          navigate('/settings')
-        }}
-      />
-      <ScannerModal
-        open={isScannerOpen}
-        onClose={() => setIsScannerOpen(false)}
-        onResolved={handleScanned}
-      />
-      <AddBookModal
-        open={isAddOpen}
-        prefill={prefill}
-        onClose={() => {
-          setIsAddOpen(false)
-          setPrefill(null)
-        }}
+      <AddBookFlow
+        open={isAddFlowOpen}
+        onClose={() => setIsAddFlowOpen(false)}
+        onImport={() => navigate('/settings')}
       />
       <AddBookModal
         open={editingBook !== null}
@@ -457,68 +417,3 @@ export function LibraryPage() {
   )
 }
 
-const ADD_OPTIONS = [
-  {
-    icon: ScanLine,
-    label: 'Scan Barcode / QR Code',
-    description: 'Use your camera to look a book up by its ISBN.',
-  },
-  {
-    icon: PenLine,
-    label: 'Add Manually',
-    description: 'Type in the book details yourself.',
-  },
-  {
-    icon: FileUp,
-    label: 'Import CSV / JSON',
-    description: 'Bring in books from a file in Settings.',
-  },
-] as const
-
-function AddBookChooser({
-  open,
-  onClose,
-  onScan,
-  onManual,
-  onImport,
-}: {
-  open: boolean
-  onClose: () => void
-  onScan: () => void
-  onManual: () => void
-  onImport: () => void
-}) {
-  const handlers = [onScan, onManual, onImport]
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Add a book"
-      description="Choose how you would like to add books."
-      size="sm"
-    >
-      <div className="space-y-2">
-        {ADD_OPTIONS.map((option, index) => {
-          const Icon = option.icon
-          return (
-            <button
-              key={option.label}
-              type="button"
-              onClick={handlers[index]}
-              className="flex w-full items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
-            >
-              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
-                <Icon size={18} />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-sm font-medium">{option.label}</span>
-                <span className="block text-xs text-muted">{option.description}</span>
-              </span>
-            </button>
-          )
-        })}
-      </div>
-    </Modal>
-  )
-}

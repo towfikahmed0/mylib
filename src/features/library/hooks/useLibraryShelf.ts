@@ -4,6 +4,7 @@ import type { Book } from '../../../types'
 import { useAuth } from '../../auth/useAuth'
 import { useActivePartners } from '../../collaboration/hooks/useCollaboration'
 import { bookKeys, fetchBooks, useBooks } from './useBooks'
+import { useReadingStatus } from './useReadingStatus'
 
 export interface PartnerBookGroup {
   uid: string
@@ -62,13 +63,17 @@ export function useLibraryShelf() {
   const { user, appUser } = useAuth()
   const mine = useBooks()
   const partner = usePartnerBookGroups(Boolean(user))
+  const { statuses, isLoading: statusesLoading } = useReadingStatus()
 
   const groups = useMemo<LibraryBookGroup[]>(() => {
+    // Wishlist books live in My Books → Wishlist, never in the main Library tab.
+    const forLibrary = (books: Book[]) =>
+      books.filter((book) => !statuses[book.id]?.isWishlist)
     const own: LibraryBookGroup = {
       ownerUid: user?.uid ?? 'self',
       ownerName: appUser?.displayName || appUser?.username || 'You',
       isOwn: true,
-      books: mine.books,
+      books: forLibrary(mine.books),
     }
     return [
       own,
@@ -76,15 +81,15 @@ export function useLibraryShelf() {
         ownerUid: group.uid,
         ownerName: group.ownerName,
         isOwn: false,
-        books: group.books,
+        books: forLibrary(group.books),
       })),
     ]
-  }, [user?.uid, appUser, mine.books, partner.groups])
+  }, [user?.uid, appUser, mine.books, partner.groups, statuses])
 
   return {
     groups,
     hasPartners: partner.groups.length > 0,
-    isLoading: mine.isLoading || partner.isLoading,
+    isLoading: mine.isLoading || partner.isLoading || statusesLoading,
     isError: mine.isError || partner.isError,
     error: mine.error,
     refetch: mine.refetch,
