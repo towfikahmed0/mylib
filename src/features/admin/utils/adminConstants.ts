@@ -191,6 +191,11 @@ export const DEFAULT_ADMIN_CONFIG_PUBLIC: Omit<AdminConfigPublic, 'updatedAt' | 
       },
     ],
   },
+  aboutPage: {
+    title: 'About My Lib',
+    subtitle: 'A social reading sanctuary for everything you read.',
+    body: 'My Lib is a personal library manager and reading companion. Catalog the books you own, track your reading journey, organise your shelves, and connect with the readers you trust — all in one calm, beautifully organised space.\n\nOur goal is simple: help you preserve every word and never lose track of a book again.',
+  },
 }
 
 /* ------------------------------------------------------------------ *
@@ -470,6 +475,7 @@ export const AUDIT_ACTION_LABELS: Record<AdminAuditAction, string> = {
   update_config: 'Updated configuration',
   update_feature_flags: 'Updated feature flags',
   update_landing: 'Updated landing content',
+  update_about: 'Updated About page',
 }
 
 export const ADMIN_USERS_PAGE_SIZE = 20

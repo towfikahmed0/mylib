@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   AlertCircle,
   AlignJustify,
@@ -24,6 +24,8 @@ import { BookCard, type BookCardView } from '../features/library/components/Book
 import { BookDetailsModal } from '../features/library/components/BookDetailsModal'
 import { BulkTransferModal } from '../features/library/components/BulkTransferModal'
 import { SkeletonBookCard } from '../features/library/components/SkeletonBookCard'
+import { useActivePartners } from '../features/collaboration/hooks/useCollaboration'
+import { useSendBookRequest } from '../features/collaboration/hooks/useBookRequests'
 import { READING_STATUS_OPTIONS } from '../features/library/constants'
 import {
   useBulkDeleteBooks,
@@ -84,6 +86,42 @@ export function LibraryPage() {
 
   const bulkStatus = useBulkUpdateReadingStatus()
   const bulkDelete = useBulkDeleteBooks()
+  const { partners } = useActivePartners()
+  const sendRequest = useSendBookRequest()
+  const [needsLendingInfo, setNeedsLendingInfo] = useState(false)
+  const [requestingBookId, setRequestingBookId] = useState<string | null>(null)
+
+  const requestPermissionByUid = useMemo(
+    () => new Map(partners.map((partner) => [partner.uid, partner.borrowRequestPermission])),
+    [partners],
+  )
+
+  const canRequestFrom = (ownerUid: string) =>
+    (requestPermissionByUid.get(ownerUid) ?? 'collaborators') !== 'none'
+
+  const requestDisabledReason = (book: Book): string | undefined => {
+    if (sendRequest.isPending || requestingBookId === book.id) return 'Sending your request…'
+    const availability = book.borrowStatus ?? (book.borrowedBy ? 'on_loan' : 'available')
+    if (availability !== 'available') return 'This book is currently unavailable.'
+    return undefined
+  }
+
+  const handleRequest = async (book: Book) => {
+    if (sendRequest.isPending) return
+    setRequestingBookId(book.id)
+    try {
+      await sendRequest.mutateAsync({ bookId: book.id, toUserId: book.userId })
+      toast.success('Book request sent.')
+    } catch (error) {
+      if (error instanceof Error && error.message === 'LENDING_INFO_REQUIRED') {
+        setNeedsLendingInfo(true)
+        return
+      }
+      toast.error(error instanceof Error ? error.message : 'Could not send the request.')
+    } finally {
+      setRequestingBookId(null)
+    }
+  }
 
   const selectView = (next: BookCardView) => {
     setView(next)
@@ -524,6 +562,14 @@ export function LibraryPage() {
                       showReadingStatus={group.isOwn}
                       onClick={setSelectedBook}
                       onEdit={group.isOwn ? setEditingBook : undefined}
+                      onRequest={
+                        !group.isOwn && canRequestFrom(group.ownerUid) ? handleRequest : undefined
+                      }
+                      requestDisabledReason={
+                        !group.isOwn && canRequestFrom(group.ownerUid)
+                          ? requestDisabledReason(book)
+                          : undefined
+                      }
                       selectionMode={group.isOwn && isSelecting}
                       selected={selectedIds.has(book.id)}
                       onToggleSelect={toggleSelect}
@@ -632,6 +678,37 @@ export function LibraryPage() {
         onClose={() => setIsBulkTransferOpen(false)}
         onTransferred={exitSelection}
       />
+
+      <Modal
+        open={needsLendingInfo}
+        onClose={() => setNeedsLendingInfo(false)}
+        title="Complete your lending information first"
+        description="To request books from other readers, add your contract number and address."
+        size="sm"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setNeedsLendingInfo(false)}
+              className="rounded-2xl px-4 py-2.5 text-sm font-medium text-muted transition hover:bg-surface-muted hover:text-foreground"
+            >
+              Not now
+            </button>
+            <Link
+              to="/settings"
+              onClick={() => setNeedsLendingInfo(false)}
+              className="rounded-2xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
+            >
+              Go to Settings
+            </Link>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted">
+          Add your personal contract number and address in Settings before requesting books from
+          another reader.
+        </p>
+      </Modal>
     </section>
   )
 }

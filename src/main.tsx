@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { AuthProvider } from './features/auth/AuthContext'
 import { initializeTheme } from './store/themeStore'
+import './styles/fonts.css'
 import './index.css'
 
 const queryClient = new QueryClient({

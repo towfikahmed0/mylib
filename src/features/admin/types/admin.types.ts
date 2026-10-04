@@ -203,8 +203,15 @@ export interface AdminLandingPage {
   featureCards: AdminLandingFeatureCard[]
 }
 
+export interface AdminAboutPage {
+  title: string
+  subtitle: string
+  body: string
+}
+
 export interface AdminConfigPublic {
   landingPage: AdminLandingPage
+  aboutPage: AdminAboutPage
   updatedAt: FirestoreDate
   updatedBy: string
 }
@@ -247,6 +254,7 @@ export type AdminAuditAction =
   | 'update_config'
   | 'update_feature_flags'
   | 'update_landing'
+  | 'update_about'
 
 export type AdminAuditTargetType =
   | 'user'

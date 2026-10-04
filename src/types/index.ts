@@ -43,6 +43,7 @@ export interface AppUser {
   followerCount: number
   followingCount: number
   joinedAt: FirestoreDate
+  readingPlan?: ReadingPlanItem[]
   banned?: boolean
   bannedReason?: string
 }
@@ -145,6 +146,21 @@ export interface Book {
 }
 
 export type ReadingStatusValue = 'want_to_read' | 'reading' | 'finished'
+
+export type ReadingPlanStatus = 'upcoming' | 'reading' | 'finished'
+
+/** users/{uid}.readingPlan[] — an ordered, reorderable reading roadmap. */
+export interface ReadingPlanItem {
+  id: string
+  bookId: string
+  title: string
+  author: string
+  coverUrl: string
+  startDate: string | null
+  targetFinishDate: string | null
+  status: ReadingPlanStatus
+  order: number
+}
 
 /** books/{id}/readingStatus/{uid} — the single source of truth for per-user state */
 export interface ReadingStatus {
@@ -372,6 +388,7 @@ export interface Review {
   userId: string
   visibility?: PostVisibility
   userName: string
+  bookId?: string
   bookTitle: string
   author: string
   coverUrl?: string

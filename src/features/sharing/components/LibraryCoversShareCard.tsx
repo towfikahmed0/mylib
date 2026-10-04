@@ -4,9 +4,14 @@ export interface BookCoversShareData {
   periodLabel?: string
 }
 
+// Keep the exported PNG within browser canvas/SVG limits even for huge libraries.
+// The count badge still shows the true total.
+const MAX_COVERS = 36
+
 export function LibraryCoversShareCard({ data }: { data: BookCoversShareData }) {
-  const columns = Math.max(1, Math.ceil(Math.sqrt(data.covers.length * 1.125)))
-  const rows = Math.max(1, Math.ceil(data.covers.length / columns))
+  const covers = data.covers.slice(0, MAX_COVERS)
+  const columns = Math.max(1, Math.ceil(Math.sqrt(covers.length * 1.125)))
+  const rows = Math.max(1, Math.ceil(covers.length / columns))
 
   return (
     <div
@@ -20,7 +25,7 @@ export function LibraryCoversShareCard({ data }: { data: BookCoversShareData }) 
           gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
         }}
       >
-        {data.covers.map((cover, index) => (
+        {covers.map((cover, index) => (
           <div key={`${cover ?? 'no-cover'}-${index}`} className="min-h-0 min-w-0 overflow-hidden">
             {cover ? (
               <img src={cover} alt="" className="h-full w-full object-cover" />

@@ -4,6 +4,7 @@ import { AppLayout } from './components/layout/AppLayout'
 import { PublicProfileLayout } from './components/layout/PublicProfileLayout'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { Toaster } from './components/ui/Toaster'
+import { AboutPage } from './pages/AboutPage'
 import { AdminPage } from './pages/AdminPage'
 import { ActivityPage } from './pages/ActivityPage'
 import { ExplorePage } from './pages/ExplorePage'
@@ -26,6 +27,7 @@ function App() {
 
         <Route element={<AppLayout />}>
           <Route path="/explore" element={<ExplorePage />} />
+          <Route path="/about" element={<AboutPage />} />
 
           <Route element={<ProtectedRoute />}>
             <Route path="/library" element={<LibraryPage />} />

@@ -6,6 +6,7 @@ import {
   BookOpen,
   Clock,
   Copy,
+  HandCoins,
   Heart,
   Highlighter,
   Layers,
@@ -35,13 +36,15 @@ import { TransferBookModal } from '../../collaboration/components/TransferBookMo
 import { AddToShelfModal } from '../../shelves/components/AddToShelfModal'
 import { ShareModal } from '../../sharing/components/ShareModal'
 import { ReviewCard } from '../../social/components/ReviewCard'
+import { ShareFinishedBookModal } from '../../social/components/ShareFinishedBookModal'
 import { useReviewsForBook } from '../../social/hooks/useFeed'
 import { READING_STATUS_OPTIONS } from '../constants'
 import { useDeleteBook } from '../hooks/useBookActions'
 import { useBooks } from '../hooks/useBooks'
 import { useUpdateBook } from '../hooks/useUpdateBook'
 import { useUpdateReadingStatus } from '../hooks/useUpdateReadingStatus'
-import { useLoanActions, useLoanList } from '../../collaboration/hooks/useBookRequests'
+import { useLoanActions, useLoanList, useSendBookRequest } from '../../collaboration/hooks/useBookRequests'
+import { useActivePartners } from '../../collaboration/hooks/useCollaboration'
 
 const SECTION_LABEL = 'text-[10px] font-bold uppercase tracking-widest text-slate-400'
 const FIELD_CLASS =
@@ -172,6 +175,8 @@ function BookDetailsContent({
   const deleteBook = useDeleteBook()
   const loansQuery = useLoanList()
   const loanActions = useLoanActions()
+  const { partners } = useActivePartners()
+  const sendRequest = useSendBookRequest()
   const activeLoan = loansQuery.loans.find((loan) => loan.id === book.activeLoanId)
   const borrowAvailability = book.borrowStatus ?? (book.borrowedBy ? 'on_loan' : 'available')
   const { reviews } = useReviewsForBook(book.title)
@@ -179,6 +184,14 @@ function BookDetailsContent({
   const cover = book.coverUrl || book.thumbnail
   const isOwner = Boolean(user && book.userId === user.uid)
   const highlights = book.highlights ?? []
+
+  const ownerBorrowPermission =
+    partners.find((partner) => partner.uid === book.userId)?.borrowRequestPermission ?? 'collaborators'
+  const canRequestBook =
+    !isOwner &&
+    ownerBorrowPermission !== 'none' &&
+    book.isInLibrary !== false &&
+    borrowAvailability === 'available'
 
   const [selected, setSelected] = useState<ReadingStatusValue>(status?.status ?? 'want_to_read')
   const [isWishlist, setIsWishlist] = useState(status?.isWishlist ?? false)
@@ -202,6 +215,12 @@ function BookDetailsContent({
   const [isShelfOpen, setIsShelfOpen] = useState(false)
   const [isShareOpen, setIsShareOpen] = useState(false)
   const [isMoreOpen, setIsMoreOpen] = useState(false)
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+  const [isRequestSent, setIsRequestSent] = useState(false)
+  const [needsLendingInfo, setNeedsLendingInfo] = useState(false)
+  const [finishedShare, setFinishedShare] = useState<{ rating: number; reviewText: string } | null>(
+    null,
+  )
   const moreRef = useRef<HTMLDivElement>(null)
 
   const [isTimerRunning, setIsTimerRunning] = useState(false)
@@ -252,6 +271,9 @@ function BookDetailsContent({
         ...(value === 'finished' ? { finishedAt: fromDateInputValue(finishedDate) } : {}),
       })
       toast.success('Reading status updated.')
+      if (value === 'finished' && previous !== 'finished') {
+        setFinishedShare({ rating, reviewText: comment.trim() })
+      }
     } catch (error) {
       setSelected(previous)
       toast.error(error instanceof Error ? error.message : 'Could not update reading status.')
@@ -383,13 +405,28 @@ function BookDetailsContent({
   }
 
   const handleDelete = async () => {
-    if (!window.confirm(`Delete "${book.title}" from your library? This cannot be undone.`)) return
     try {
       await deleteBook.mutateAsync(book.id)
       toast.success('Book deleted.')
+      setIsDeleteOpen(false)
       onClose()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not delete the book.')
+    }
+  }
+
+  const handleRequestBook = async () => {
+    if (sendRequest.isPending || isRequestSent) return
+    try {
+      await sendRequest.mutateAsync({ bookId: book.id, toUserId: book.userId })
+      setIsRequestSent(true)
+      toast.success('Book request sent.')
+    } catch (error) {
+      if (error instanceof Error && error.message === 'LENDING_INFO_REQUIRED') {
+        setNeedsLendingInfo(true)
+        return
+      }
+      toast.error(error instanceof Error ? error.message : 'Could not send the request.')
     }
   }
 
@@ -700,6 +737,16 @@ function BookDetailsContent({
                 {updateStatus.isPending ? <Loader2 className="animate-spin" size={15} /> : null}
                 Save Review
               </button>
+              {selected === 'finished' ? (
+                <button
+                  type="button"
+                  onClick={() => setFinishedShare({ rating, reviewText: comment.trim() })}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-accent/50 bg-accent/5 px-4 py-2.5 text-xs font-bold uppercase text-accent transition hover:bg-accent/10"
+                >
+                  <Share2 size={15} />
+                  Share with community
+                </button>
+              ) : null}
             </div>
 
             <div className="space-y-2 border-t border-border/60 pt-3">
@@ -794,6 +841,35 @@ function BookDetailsContent({
                 </p>
               ) : book.isInLibrary === false ? (
                 <p className="text-xs text-muted">This book is not in your library and can&apos;t be lent.</p>
+              ) : !isOwner ? (
+                <div className="space-y-2">
+                  {canRequestBook ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => void handleRequestBook()}
+                        disabled={sendRequest.isPending || isRequestSent}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-xs font-bold uppercase text-accent-foreground transition hover:opacity-90 disabled:opacity-60"
+                      >
+                        {sendRequest.isPending ? (
+                          <Loader2 className="animate-spin" size={15} />
+                        ) : (
+                          <HandCoins size={15} />
+                        )}
+                        {isRequestSent ? 'Request pending' : 'Request to Borrow'}
+                      </button>
+                      <p className="text-xs text-muted">
+                        The owner will confirm before any loan begins.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted">
+                      {ownerBorrowPermission === 'none'
+                        ? 'This reader is not accepting borrow requests.'
+                        : 'This book cannot be requested right now.'}
+                    </p>
+                  )}
+                </div>
               ) : (
                 <p className="text-xs text-muted">
                   Available for a borrow request. The owner will confirm before any loan begins.
@@ -899,7 +975,7 @@ function BookDetailsContent({
           <div className="flex items-center justify-between gap-2">
           <button
             type="button"
-            onClick={() => void handleDelete()}
+            onClick={() => setIsDeleteOpen(true)}
             disabled={deleteBook.isPending || !isOwner}
             className="flex shrink-0 items-center gap-1.5 rounded-xl bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-500/20 disabled:opacity-50 dark:text-rose-300"
           >
@@ -1093,7 +1169,7 @@ function BookDetailsContent({
                     disabled={deleteBook.isPending || !isOwner}
                     onClick={() => {
                       setIsMoreOpen(false)
-                      void handleDelete()
+                      setIsDeleteOpen(true)
                     }}
                   />
                 </div>
@@ -1141,6 +1217,82 @@ function BookDetailsContent({
         status={status}
         onClose={() => setIsShareOpen(false)}
       />
+
+      <ShareFinishedBookModal
+        open={finishedShare !== null}
+        book={book}
+        rating={finishedShare?.rating ?? 0}
+        reviewText={finishedShare?.reviewText ?? ''}
+        onClose={() => setFinishedShare(null)}
+      />
+
+      <Modal
+        open={isDeleteOpen}
+        onClose={() => setIsDeleteOpen(false)}
+        title="Delete this book?"
+        description="This action cannot be undone."
+        size="sm"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsDeleteOpen(false)}
+              disabled={deleteBook.isPending}
+              className="rounded-2xl px-4 py-2.5 text-sm font-medium text-muted transition hover:bg-surface-muted hover:text-foreground disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleDelete()}
+              disabled={deleteBook.isPending}
+              className="flex items-center gap-2 rounded-2xl bg-rose-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:opacity-60"
+            >
+              {deleteBook.isPending ? <Loader2 className="animate-spin" size={16} /> : null}
+              Delete Book
+            </button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted">
+          <span className="font-semibold text-foreground">{book.title}</span> and its reading status
+          will be permanently removed from your library.
+        </p>
+      </Modal>
+
+      <Modal
+        open={needsLendingInfo}
+        onClose={() => setNeedsLendingInfo(false)}
+        title="Complete your lending information first"
+        description="To request books from other readers, add your contract number and address."
+        size="sm"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setNeedsLendingInfo(false)}
+              className="rounded-2xl px-4 py-2.5 text-sm font-medium text-muted transition hover:bg-surface-muted hover:text-foreground"
+            >
+              Not now
+            </button>
+            <Link
+              to="/settings"
+              onClick={() => {
+                setNeedsLendingInfo(false)
+                onClose()
+              }}
+              className="rounded-2xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
+            >
+              Go to Settings
+            </Link>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted">
+          Add your personal contract number and address in Settings before requesting books from
+          another reader.
+        </p>
+      </Modal>
     </Modal>
   )
 }

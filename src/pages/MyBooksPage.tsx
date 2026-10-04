@@ -11,11 +11,12 @@ import { useUpdateReadingStatus } from '../features/library/hooks/useUpdateReadi
 import { DistributionDoughnut } from '../features/insights/components/InsightsCharts'
 import { CHART_PALETTE } from '../features/insights/chartPalette'
 import { useActivePartners } from '../features/collaboration/hooks/useCollaboration'
+import { ReadingPlan } from '../features/reading-plan/components/ReadingPlan'
 import { ShareModal } from '../features/sharing/components/ShareModal'
 import type { CountedItem } from '../features/insights/hooks/useLibraryStats'
 import type { Book, FirestoreDate } from '../types'
 
-type MyBooksTab = 'finished' | 'wishlist'
+type MyBooksTab = 'finished' | 'wishlist' | 'plan'
 const TAB_STORAGE_KEY = 'mylib-mybooks-tab'
 const GRID_CLASS = 'grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3'
 const SKELETON_COUNT = 10
@@ -23,7 +24,8 @@ const SKELETON_COUNT = 10
 function readStoredTab(): MyBooksTab {
   if (typeof window === 'undefined') return 'finished'
   try {
-    return window.localStorage.getItem(TAB_STORAGE_KEY) === 'wishlist' ? 'wishlist' : 'finished'
+    const stored = window.localStorage.getItem(TAB_STORAGE_KEY)
+    return stored === 'wishlist' || stored === 'plan' ? stored : 'finished'
   } catch {
     return 'finished'
   }
@@ -113,6 +115,7 @@ export function MyBooksPage() {
         </button>
       </header>
 
+      {tab === 'plan' ? null : (
       <div className="space-y-3">
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
             <div className="flex flex-col items-center gap-8 sm:flex-row">
@@ -218,6 +221,7 @@ export function MyBooksPage() {
             )}
           </div>
       </div>
+      )}
 
       <div
         role="tablist"
@@ -228,6 +232,7 @@ export function MyBooksPage() {
           [
             { value: 'finished', label: 'Finished Books' },
             { value: 'wishlist', label: 'Wishlist' },
+            { value: 'plan', label: 'Reading Plan' },
           ] as { value: MyBooksTab; label: string }[]
         ).map((option) => (
           <button
@@ -248,7 +253,9 @@ export function MyBooksPage() {
         ))}
       </div>
 
-      {isLoading ? (
+      {tab === 'plan' ? (
+        <ReadingPlan />
+      ) : isLoading ? (
         <div className={GRID_CLASS}>
           {Array.from({ length: SKELETON_COUNT }, (_, index) => (
             <SkeletonBookCard key={index} />

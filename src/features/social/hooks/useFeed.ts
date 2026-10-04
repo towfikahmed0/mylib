@@ -3,11 +3,14 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import {
   addDoc,
   collection,
+  doc,
+  getDoc,
   getDocs,
   limit,
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   startAfter,
   where,
   type DocumentData,
@@ -150,12 +153,43 @@ export function useFollowingFeed() {
 }
 
 export interface WriteReviewInput {
+  bookId?: string
   bookTitle: string
   author: string
   coverUrl?: string
   category: ReviewCategory
   rating: number
   body: string
+}
+
+/** Best-effort fan-out of a "new review" notification to the author's followers. */
+async function notifyFollowersOfReview(options: {
+  uid: string
+  userName: string
+  avatar: string | null
+  bookTitle: string
+}) {
+  try {
+    const followers = await getDocs(
+      query(
+        collection(db, 'users', options.uid, 'followers'),
+        limit(MAX_FOLLOWER_NOTIFICATIONS),
+      ),
+    )
+    await sendNotificationBatch(
+      followers.docs.map((document) => ({
+        toUserId: document.id,
+        type: 'new_post_from_following' as const,
+        title: `${options.userName} shared a new review`,
+        body: `"${options.bookTitle}"`,
+        link: '/explore',
+        metadata: { bookTitle: options.bookTitle },
+      })),
+      { uid: options.uid, name: options.userName, avatar: options.avatar },
+    )
+  } catch {
+    // Best-effort: the review itself was already posted.
+  }
 }
 
 export function useWriteReview() {
@@ -171,6 +205,7 @@ export function useWriteReview() {
       await addDoc(collection(db, 'reviews'), sanitizeFirestoreData({
         userId: user.uid,
         userName,
+        bookId: input.bookId?.trim() ?? '',
         bookTitle,
         author: input.author.trim(),
         coverUrl: input.coverUrl?.trim() ?? '',
@@ -185,29 +220,81 @@ export function useWriteReview() {
         updatedAt: serverTimestamp(),
       }))
 
-      // Fan out a notification to followers (capped to avoid write storms).
-      try {
-        const followers = await getDocs(
-          query(collection(db, 'users', user.uid, 'followers'), limit(MAX_FOLLOWER_NOTIFICATIONS)),
-        )
-        await sendNotificationBatch(
-          followers.docs.map((document) => ({
-            toUserId: document.id,
-            type: 'new_post_from_following' as const,
-            title: `${userName} shared a new review`,
-            body: `"${bookTitle}"`,
-            link: '/explore',
-            metadata: { bookTitle },
-          })),
-          {
-            uid: user.uid,
-            name: userName,
-            avatar: appUser?.avatarUrl || user.photoURL || null,
-          },
-        )
-      } catch {
-        // Best-effort: the review itself was already posted.
-      }
+      await notifyFollowersOfReview({
+        uid: user.uid,
+        userName,
+        avatar: appUser?.avatarUrl || user.photoURL || null,
+        bookTitle,
+      })
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: reviewKeys.all })
+    },
+  })
+}
+
+export interface ShareFinishedBookInput {
+  bookId: string
+  bookTitle: string
+  author: string
+  coverUrl?: string
+  rating: number
+  body: string
+}
+
+export interface ShareFinishedBookResult {
+  alreadyShared: boolean
+}
+
+/**
+ * Shares a finished book's rating + review to the community feed.
+ *
+ * Idempotent: the review uses a deterministic document id (`{uid}_{bookId}`),
+ * so repeated shares can never create duplicate community posts.
+ */
+export function useShareFinishedBook() {
+  const { user, appUser } = useAuth()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: ShareFinishedBookInput): Promise<ShareFinishedBookResult> => {
+      if (!user) throw new Error('You must be signed in to share a review.')
+      const userName = appUser?.username ?? user.displayName ?? 'Reader'
+      const bookTitle = input.bookTitle.trim()
+      const body = input.body.trim()
+      const reviewRef = doc(db, 'reviews', `${user.uid}_${input.bookId}`)
+
+      const existing = await getDoc(reviewRef)
+      if (existing.exists()) return { alreadyShared: true }
+
+      await setDoc(reviewRef, sanitizeFirestoreData({
+        userId: user.uid,
+        userName,
+        bookId: input.bookId,
+        bookTitle,
+        title: bookTitle,
+        author: input.author.trim(),
+        coverUrl: input.coverUrl?.trim() ?? '',
+        category: 'review' as const,
+        rating: input.rating,
+        body,
+        reviewText: body,
+        visibility: appUser?.privacySettings.posts ?? 'public',
+        likesCount: 0,
+        commentsCount: 0,
+        reported: false,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }))
+
+      await notifyFollowersOfReview({
+        uid: user.uid,
+        userName,
+        avatar: appUser?.avatarUrl || user.photoURL || null,
+        bookTitle,
+      })
+
+      return { alreadyShared: false }
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: reviewKeys.all })

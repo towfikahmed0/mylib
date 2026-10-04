@@ -1,4 +1,5 @@
 import { useRef, useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Database,
   Download,
@@ -7,6 +8,7 @@ import {
   FileJson,
   FileSpreadsheet,
   FileText,
+  Info,
   KeyRound,
   Loader2,
   Sparkles,
@@ -38,6 +40,7 @@ import { recordToBookFormInput, type BookImportRecord } from '../features/librar
 import { ChangeUsernameCard } from '../features/profile/components/ChangeUsernameCard'
 import { CollaborationSection } from '../features/collaboration/components/CollaborationSection'
 import { DangerZoneCard } from '../features/profile/components/DangerZoneCard'
+import { DeleteAccountCard } from '../features/profile/components/DeleteAccountCard'
 import { PrivacySettings } from '../features/profile/components/PrivacySettings'
 import { ProfileCard } from '../features/profile/components/ProfileCard'
 import { LibraryReportModal } from '../features/reports/components/LibraryReportModal'
@@ -438,6 +441,28 @@ export function SettingsPage() {
       </div>
 
       <DangerZoneCard />
+
+      <DeleteAccountCard />
+
+      <div className="card-surface flex flex-wrap items-center justify-between gap-3 p-5">
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+            <Info size={18} />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold">About Us</h2>
+            <p className="text-xs text-muted">
+              Learn about My Lib, its features, and the technology behind it.
+            </p>
+          </div>
+        </div>
+        <Link
+          to="/about"
+          className="shrink-0 rounded-2xl bg-surface-muted px-4 py-2.5 text-sm font-semibold text-foreground transition hover:opacity-80"
+        >
+          About Us
+        </Link>
+      </div>
 
       <MetadataFixerModal
         open={isFixerOpen}

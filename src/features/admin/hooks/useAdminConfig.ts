@@ -11,6 +11,7 @@ import { auth, db } from '../../../lib/firebase'
 import { sanitizeFirestoreData } from '../../../lib/firestore'
 import type { FirestoreDate } from '../../../types'
 import type {
+  AdminAboutPage,
   AdminConfigMain,
   AdminConfigPublic,
   AdminEmailTemplates,
@@ -106,6 +107,7 @@ function toPublicConfig(data: DocumentData | undefined): AdminConfigPublic {
   const merged = deepMerge(DEFAULT_ADMIN_CONFIG_PUBLIC, data ?? {})
   return {
     landingPage: merged.landingPage,
+    aboutPage: merged.aboutPage,
     updatedAt: toFirestoreDate(data?.updatedAt),
     updatedBy: pickString(data?.updatedBy),
   }
@@ -242,6 +244,35 @@ export function useUpdateLandingContent() {
         targetType: 'platform',
         targetId: 'public',
         details: { section: 'landingPage', cards: landingPage.featureCards.length },
+      })
+      await batch.commit()
+    },
+    onSuccess: () => invalidateConfig(queryClient),
+  })
+}
+
+export function useUpdateAboutContent() {
+  const queryClient = useQueryClient()
+  const actor = useAdminActor()
+
+  return useMutation({
+    mutationFn: async (aboutPage: AdminAboutPage) => {
+      if (!actor.uid) throw new Error('You must be signed in.')
+      const batch = writeBatch(db)
+      batch.set(
+        doc(db, 'adminConfig', 'public'),
+        sanitizeFirestoreData({
+          aboutPage,
+          updatedAt: serverTimestamp(),
+          updatedBy: actor.uid,
+        }),
+        { merge: true },
+      )
+      writeAuditLog(batch, actor, {
+        action: 'update_about',
+        targetType: 'platform',
+        targetId: 'public',
+        details: { section: 'aboutPage' },
       })
       await batch.commit()
     },

@@ -208,6 +208,9 @@ export function LandingPage() {
               {link.label}
             </a>
           ))}
+          <Link to="/about" className="nav-link-anim transition-colors hover:text-primary">
+            About Us
+          </Link>
         </nav>
 
         <div className="flex items-center gap-3">
@@ -587,6 +590,14 @@ export function LandingPage() {
             <img src="/logo.png" alt="My Lib Icon" className="h-full w-full object-cover" />
           </div>
           <span className="font-serif text-xl font-black text-foreground">My Lib</span>
+        </div>
+        <div className="mb-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-semibold">
+          <Link to="/about" className="text-muted-foreground transition-colors hover:text-primary">
+            About Us
+          </Link>
+          <Link to="/explore" className="text-muted-foreground transition-colors hover:text-primary">
+            Explore libraries
+          </Link>
         </div>
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
           © 2026 My Lib · v3.1 · Preserve Every Word

@@ -8,6 +8,7 @@ import {
   EMAIL_FREQUENCY_OPTIONS,
   EMAIL_TEMPLATE_VARIABLES,
 } from '../../utils/adminConstants'
+import { AboutContentEditor } from './AboutContentEditor'
 import { FeatureFlagsEditor } from './FeatureFlagsEditor'
 import { IntegrationsSection } from './IntegrationsSection'
 import { ResetDatabaseSection } from './ResetDatabaseSection'
@@ -238,7 +239,7 @@ function AuditShortcut() {
 }
 
 export function SettingsTab() {
-  const { config, isLoading, isError } = useAdminConfig()
+  const { config, publicConfig, isLoading, isError } = useAdminConfig()
 
   if (isError) {
     return (
@@ -262,6 +263,7 @@ export function SettingsTab() {
     <div className="space-y-8">
       <IntegrationsSection integrations={config.integrations} />
       <FeatureFlagsEditor featureFlags={config.featureFlags} />
+      <AboutContentEditor aboutPage={publicConfig.aboutPage} />
       <EmailTemplatesEditor emailTemplates={config.emailTemplates} />
       <AuditShortcut />
       <ResetDatabaseSection />

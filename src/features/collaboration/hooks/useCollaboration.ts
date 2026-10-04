@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
 import { sanitizeFirestoreData } from '../../../lib/firestore'
-import type { CollaborationRequest, Partnership } from '../../../types'
+import type { CollaborationRequest, Partnership, BorrowRequestPermission } from '../../../types'
 import { useAuth } from '../../auth/useAuth'
 import { sendNotification, type ActorInfo } from '../../notifications/utils/createNotification'
 import { activePartnerKeys } from '../../profile/hooks/useActivePartner'
@@ -29,6 +29,7 @@ export interface PartnerSummary {
   grantedBy: string
   unsubscribed: boolean
   isActive: boolean
+  borrowRequestPermission: BorrowRequestPermission
 }
 
 export const collaborationKeys = {
@@ -107,6 +108,7 @@ async function fetchPartners(uid: string): Promise<PartnerSummary[]> {
       let displayName = ''
       let avatarUrl = ''
       let totalBooksCount = 0
+      let borrowRequestPermission: BorrowRequestPermission = 'collaborators'
       try {
         const snapshot = await getDoc(doc(db, 'users', otherUid))
         if (snapshot.exists()) {
@@ -115,11 +117,13 @@ async function fetchPartners(uid: string): Promise<PartnerSummary[]> {
             displayName?: string
             avatarUrl?: string
             totalBooksCount?: number
+            privacySettings?: { borrowRequestPermission?: BorrowRequestPermission }
           }
           username = data.username ?? ''
           displayName = data.displayName ?? data.username ?? 'Reader'
           avatarUrl = data.avatarUrl ?? ''
           totalBooksCount = data.totalBooksCount ?? 0
+          borrowRequestPermission = data.privacySettings?.borrowRequestPermission ?? 'collaborators'
         }
       } catch {
         displayName = 'Reader'
@@ -136,6 +140,7 @@ async function fetchPartners(uid: string): Promise<PartnerSummary[]> {
         grantedBy: partnership.grantedBy,
         unsubscribed,
         isActive: !unsubscribed && !partnerUnsubscribed,
+        borrowRequestPermission,
       }
     }),
   )

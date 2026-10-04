@@ -70,7 +70,10 @@ export function usePublicLibrary(uid: string | undefined, enabled: boolean) {
   })
 
   return {
-    books: data?.pages.flatMap((page) => page.books) ?? [],
+    books:
+      data?.pages
+        .flatMap((page) => page.books)
+        .filter((book) => book.isInLibrary !== false) ?? [],
     isLoading: isPending,
     isLoadingMore: isFetchingNextPage,
     hasMore: Boolean(hasNextPage),

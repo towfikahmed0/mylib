@@ -140,7 +140,10 @@ export function PublicProfilePage() {
     )
   }
 
-  const totalBooks = canViewLibrary ? libraryCount : profile.totalBooksCount
+  // Prefer the synced profile count, which already excludes books marked
+  // "not in the library"; fall back to the live count for legacy profiles.
+  const totalBooks =
+    profile.totalBooksCount > 0 ? profile.totalBooksCount : canViewLibrary ? libraryCount : 0
 
   return (
     <section className="animate-fade-in space-y-6">

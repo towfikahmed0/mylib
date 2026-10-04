@@ -18,7 +18,10 @@ export function useSyncLibraryStats() {
 
   const totalBooks = books.filter((book) => book.isInLibrary !== false).length
   const completedBooks = useMemo(
-    () => books.filter((book) => statuses[book.id]?.status === 'finished').length,
+    () =>
+      books.filter(
+        (book) => book.isInLibrary !== false && statuses[book.id]?.status === 'finished',
+      ).length,
     [books, statuses],
   )
 

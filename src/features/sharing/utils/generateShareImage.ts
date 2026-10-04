@@ -1,13 +1,24 @@
 import { toPng } from 'html-to-image'
 
-const OPTIONS = {
-  cacheBust: true,
+const TRANSPARENT_PIXEL =
+  'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+
+const BASE_OPTIONS = {
   pixelRatio: 2,
   backgroundColor: '#ffffff',
-} as const
+  // Never let one broken/unfetchable cover abort the whole export.
+  imagePlaceholder: TRANSPARENT_PIXEL,
+  onImageErrorHandler: () => TRANSPARENT_PIXEL,
+}
 
 export async function generateShareImageDataUrl(element: HTMLElement): Promise<string> {
-  return toPng(element, OPTIONS)
+  try {
+    return await toPng(element, BASE_OPTIONS)
+  } catch {
+    // Last-resort retry: skip font embedding (e.g. a font host is unreachable)
+    // and drop to 1x so a large canvas still has a chance to render.
+    return toPng(element, { ...BASE_OPTIONS, skipFonts: true, pixelRatio: 1 })
+  }
 }
 
 export async function generateShareImage(element: HTMLElement, filename: string): Promise<void> {
