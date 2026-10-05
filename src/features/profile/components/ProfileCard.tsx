@@ -5,6 +5,7 @@ import { toast } from '../../../store/toastStore'
 import { useAuth } from '../../auth/useAuth'
 import { usePrivateProfile } from '../hooks/usePrivateProfile'
 import { useUpdateProfile } from '../hooks/useUpdateProfile'
+import { FacebookIcon, InstagramIcon } from './SocialLinkIcons'
 
 const FIELD_CLASS =
   'w-full rounded-2xl border border-border/60 bg-surface-muted/50 px-3.5 py-2.5 text-sm outline-none transition placeholder:text-muted focus:border-accent/60'
@@ -15,6 +16,8 @@ const BIO_MAX = 500
 interface ProfileFormState {
   displayName: string
   bio: string
+  facebookUrl: string
+  instagramUrl: string
   phoneNumber: string
   address: string
   contractNumber: string
@@ -23,6 +26,8 @@ interface ProfileFormState {
 const EMPTY_FORM: ProfileFormState = {
   displayName: '',
   bio: '',
+  facebookUrl: '',
+  instagramUrl: '',
   phoneNumber: '',
   address: '',
   contractNumber: '',
@@ -44,6 +49,8 @@ export function ProfileCard() {
     setForm({
       displayName: appUser.displayName ?? appUser.username ?? '',
       bio: appUser.bio ?? '',
+      facebookUrl: appUser.facebookUrl ?? '',
+      instagramUrl: appUser.instagramUrl ?? '',
       phoneNumber: privateProfile?.phoneNumber ?? '',
       address: privateProfile?.address ?? '',
       contractNumber: privateProfile?.contractNumber ?? '',
@@ -87,6 +94,8 @@ export function ProfileCard() {
         email: privateProfile?.email ?? user?.email ?? '',
         displayName: form.displayName,
         bio: form.bio,
+        facebookUrl: form.facebookUrl,
+        instagramUrl: form.instagramUrl,
         phoneNumber: form.phoneNumber,
         address: form.address,
         contractNumber: form.contractNumber,
@@ -105,9 +114,9 @@ export function ProfileCard() {
         <h2 className="text-sm font-semibold">Profile</h2>
       </div>
       <p className="text-xs text-muted">
-        Your display name and bio are public. Contract number and address stay private and are
-        required to request a book. You may share your phone and address with a borrower when you
-        accept a request and choose to share contact information.
+        Your display name, bio, and social links are public. Contract number and address stay
+        private and are required to request a book. You may share your phone and address with a
+        borrower when you accept a request and choose to share contact information.
       </p>
 
       <div className="space-y-1.5">
@@ -142,6 +151,48 @@ export function ProfileCard() {
           placeholder="Tell readers a little about yourself…"
           className={cn(FIELD_CLASS, 'resize-none')}
         />
+      </div>
+
+      <div className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <label htmlFor="profile-facebook" className={LABEL_CLASS}>
+              <span className="flex items-center gap-1.5">
+                <FacebookIcon size={13} />
+                Facebook
+              </span>
+            </label>
+            <input
+              id="profile-facebook"
+              type="text"
+              inputMode="url"
+              value={form.facebookUrl}
+              onChange={(event) => update('facebookUrl', event.target.value)}
+              placeholder="https://facebook.com/yourname"
+              className={FIELD_CLASS}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="profile-instagram" className={LABEL_CLASS}>
+              <span className="flex items-center gap-1.5">
+                <InstagramIcon size={13} />
+                Instagram
+              </span>
+            </label>
+            <input
+              id="profile-instagram"
+              type="text"
+              inputMode="url"
+              value={form.instagramUrl}
+              onChange={(event) => update('instagramUrl', event.target.value)}
+              placeholder="https://instagram.com/yourname"
+              className={FIELD_CLASS}
+            />
+          </div>
+        </div>
+        <p className="text-[11px] text-muted">
+          Shown on your public profile, just under your bio.
+        </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">

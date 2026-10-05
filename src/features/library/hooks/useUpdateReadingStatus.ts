@@ -4,7 +4,9 @@ import { db } from '../../../lib/firebase'
 import { sanitizeFirestoreData } from '../../../lib/firestore'
 import type { Highlight, ReadingStatusValue } from '../../../types'
 import { useAuth } from '../../auth/useAuth'
-import { createActivityEvent } from '../../collaboration/utils/activity'
+import { useActivityRecorder } from '../../collaboration/hooks/useActivityRecorder'
+import { useActivePartners } from '../../collaboration/hooks/useCollaboration'
+import { notifyCollaborators } from '../../collaboration/utils/partnerNotifications'
 import { sendNotification } from '../../notifications/utils/createNotification'
 import { readingStatusKeys } from './useReadingStatus'
 
@@ -25,6 +27,8 @@ export function useUpdateReadingStatus() {
   const { user, appUser } = useAuth()
   const uid = user?.uid
   const queryClient = useQueryClient()
+  const { recordActivity } = useActivityRecorder()
+  const { partners } = useActivePartners()
 
   return useMutation({
     mutationFn: async ({
@@ -70,24 +74,40 @@ export function useUpdateReadingStatus() {
         { merge: true },
       )
 
+      let bookTitle: string | undefined
+      let ownerUid: string | undefined
       if (status !== undefined || rating !== undefined) {
         try {
           const snapshot = await getDoc(doc(db, 'books', bookId))
           if (snapshot.exists()) {
             const book = snapshot.data() as { userId?: string; title?: string }
-            const activityBase = {
-              userId: uid,
-              userName: appUser?.username ?? user?.displayName ?? 'Reader',
-              libraryId: book.userId ?? uid,
+            bookTitle = book.title ?? 'a book'
+            ownerUid = book.userId
+          }
+        } catch {
+          // Activity metadata is best-effort; the status write already succeeded.
+        }
+      }
+
+      if (bookTitle && (status !== undefined || rating !== undefined)) {
+        try {
+          if (status !== undefined) {
+            await recordActivity({
+              type: 'status_updated',
+              libraryId: ownerUid,
               bookId,
-              bookTitle: book.title ?? 'a book',
-            }
-            if (status !== undefined) {
-              await createActivityEvent({ ...activityBase, type: 'status_updated', status })
-            }
-            if (rating !== undefined) {
-              await createActivityEvent({ ...activityBase, type: 'rating_updated', rating })
-            }
+              bookTitle,
+              status,
+            })
+          }
+          if (rating !== undefined) {
+            await recordActivity({
+              type: 'rating_updated',
+              libraryId: ownerUid,
+              bookId,
+              bookTitle,
+              rating,
+            })
           }
         } catch {
           // The reading status update has already succeeded.
@@ -97,31 +117,49 @@ export function useUpdateReadingStatus() {
       // Notify the library owner when a collaborator changes a shared book's
       // status. Skipped for field-only edits (favorite, progress, review…).
       if (status === undefined) return
-      try {
-        const snapshot = await getDoc(doc(db, 'books', bookId))
-        if (!snapshot.exists()) return
-        const book = snapshot.data() as { userId?: string; title?: string }
-        const ownerUid = book.userId
-        if (!ownerUid || ownerUid === uid) return
 
-        const actorName = appUser?.username ?? user?.displayName ?? 'A collaborator'
-        await sendNotification(
-          {
-            toUserId: ownerUid,
-            type: 'collaborator_status_changed',
-            title: `${actorName} updated a shared book`,
-            body: `"${book.title ?? 'A book'}" is now ${status.replace(/_/g, ' ')}.`,
-            link: `/library?book=${bookId}`,
-            metadata: { bookId, status },
-          },
-          {
-            uid,
-            name: actorName,
-            avatar: appUser?.avatarUrl || user?.photoURL || null,
-          },
-        )
-      } catch {
-        // Best-effort: the status write already succeeded.
+      const actorName = appUser?.username ?? user?.displayName ?? 'A collaborator'
+      const actor = {
+        uid,
+        name: actorName,
+        avatar: appUser?.avatarUrl || user?.photoURL || null,
+      }
+
+      if (ownerUid && ownerUid !== uid) {
+        try {
+          await sendNotification(
+            {
+              toUserId: ownerUid,
+              type: 'collaborator_status_changed',
+              title: `${actorName} updated a shared book`,
+              body: `"${bookTitle ?? 'A book'}" is now ${status.replace(/_/g, ' ')}.`,
+              link: `/library?book=${bookId}`,
+              metadata: { bookId, status },
+            },
+            actor,
+          )
+        } catch {
+          // Best-effort: the status write already succeeded.
+        }
+      }
+
+      // Notify every collaborator when the reader finishes a book.
+      if (status === 'finished') {
+        try {
+          await notifyCollaborators(
+            partners,
+            {
+              type: 'collaborator_finished_book',
+              title: `${actorName} finished a book`,
+              body: `"${bookTitle ?? 'A book'}"`,
+              link: `/library?book=${bookId}`,
+              metadata: { bookId },
+            },
+            actor,
+          )
+        } catch {
+          // Best-effort: the status write already succeeded.
+        }
       }
     },
     onSuccess: () => {

@@ -4,7 +4,7 @@ import { db } from '../../../lib/firebase'
 import { sanitizeFirestoreData } from '../../../lib/firestore'
 import type { Highlight } from '../../../types'
 import { useAuth } from '../../auth/useAuth'
-import { createActivityEvent } from '../../collaboration/utils/activity'
+import { useActivityRecorder } from '../../collaboration/hooks/useActivityRecorder'
 import { bookKeys } from './useBooks'
 
 export interface UpdateBookVariables {
@@ -15,8 +15,9 @@ export interface UpdateBookVariables {
 }
 
 export function useUpdateBook() {
-  const { user, appUser } = useAuth()
+  const { user } = useAuth()
   const queryClient = useQueryClient()
+  const { recordActivity } = useActivityRecorder()
 
   return useMutation({
     mutationFn: async ({ bookId, description, tags, highlights }: UpdateBookVariables) => {
@@ -32,10 +33,8 @@ export function useUpdateBook() {
 
       if (user && book?.userId) {
         try {
-          await createActivityEvent({
+          await recordActivity({
             type: 'book_edited',
-            userId: user.uid,
-            userName: appUser?.username ?? user.displayName ?? 'Reader',
             libraryId: book.userId,
             bookId,
             bookTitle: book.title ?? 'a book',

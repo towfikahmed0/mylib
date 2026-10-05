@@ -4,6 +4,8 @@ import { BookOpen, CalendarDays, CheckCircle2, Flag, Pencil, UserPlus, Users } f
 import type { PublicProfile } from '../../../types'
 import { ReportModal } from '../../reports/components/ReportModal'
 import { FollowButton } from '../../social/components/FollowButton'
+import { toSafeSocialUrl } from '../utils/socialLinks'
+import { FacebookIcon, InstagramIcon } from './SocialLinkIcons'
 
 function formatJoined(value: PublicProfile['joinedAt']): string | null {
   if (!value) return null
@@ -42,6 +44,10 @@ export function ProfileHeader({
   const joined = formatJoined(profile.joinedAt)
   const initial = profile.username.slice(0, 2).toUpperCase()
   const [isReportOpen, setIsReportOpen] = useState(false)
+  const facebookUrl = toSafeSocialUrl(profile.facebookUrl)
+  const instagramUrl = toSafeSocialUrl(profile.instagramUrl)
+  const socialLinkClass =
+    'flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-surface-muted/50 text-muted transition hover:border-accent/60 hover:text-accent focus-visible:ring-2 focus-visible:ring-accent'
 
   return (
     <div className="card-surface relative space-y-5 p-5 sm:p-6">
@@ -111,6 +117,35 @@ export function ProfileHeader({
       <p className={profile.bio ? 'text-sm' : 'text-sm text-muted'}>
         {profile.bio || 'No bio yet.'}
       </p>
+
+      {facebookUrl || instagramUrl ? (
+        <div className="flex items-center gap-2">
+          {facebookUrl ? (
+            <a
+              href={facebookUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Facebook profile"
+              title="Facebook"
+              className={socialLinkClass}
+            >
+              <FacebookIcon size={16} />
+            </a>
+          ) : null}
+          {instagramUrl ? (
+            <a
+              href={instagramUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram profile"
+              title="Instagram"
+              className={socialLinkClass}
+            >
+              <InstagramIcon size={16} />
+            </a>
+          ) : null}
+        </div>
+      ) : null}
 
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat icon={<BookOpen size={16} />} label="Books" value={totalBooks} />

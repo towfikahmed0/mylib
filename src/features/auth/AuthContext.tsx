@@ -59,6 +59,8 @@ async function createUserProfile(user: User): Promise<AppUser> {
     displayName: user.displayName ?? username,
     bio: '',
     avatarUrl: user.photoURL ?? '',
+    facebookUrl: '',
+    instagramUrl: '',
     role: 'user',
     plan: 'free',
     privacySettings: DEFAULT_PRIVACY_SETTINGS,

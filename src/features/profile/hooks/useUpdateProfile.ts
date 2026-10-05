@@ -13,19 +13,34 @@ export interface UpdateProfileVariables {
   email: string
   displayName: string
   bio: string
+  facebookUrl: string
+  instagramUrl: string
   phoneNumber: string
   address: string
   contractNumber: string
 }
 
 async function updateProfile(variables: UpdateProfileVariables): Promise<void> {
-  const { uid, username, avatarUrl, email, displayName, bio, phoneNumber, address, contractNumber } =
-    variables
+  const {
+    uid,
+    username,
+    avatarUrl,
+    email,
+    displayName,
+    bio,
+    facebookUrl,
+    instagramUrl,
+    phoneNumber,
+    address,
+    contractNumber,
+  } = variables
 
   const batch = writeBatch(db)
   batch.update(doc(db, 'users', uid), sanitizeFirestoreData({
     displayName: displayName.trim(),
     bio: bio.trim(),
+    facebookUrl: facebookUrl.trim(),
+    instagramUrl: instagramUrl.trim(),
   }))
   batch.set(
     doc(db, 'users', uid, 'private', 'data'),

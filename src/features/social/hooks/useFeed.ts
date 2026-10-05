@@ -22,6 +22,7 @@ import { sanitizeFirestoreData } from '../../../lib/firestore'
 import type { Review, ReviewCategory } from '../../../types'
 import { useAuth } from '../../auth/useAuth'
 import { useActivePartners } from '../../collaboration/hooks/useCollaboration'
+import { notifyCollaborators } from '../../collaboration/utils/partnerNotifications'
 import { sendNotificationBatch } from '../../notifications/utils/createNotification'
 import {
   BOOK_REVIEWS_LIMIT,
@@ -195,12 +196,14 @@ async function notifyFollowersOfReview(options: {
 export function useWriteReview() {
   const { user, appUser } = useAuth()
   const queryClient = useQueryClient()
+  const { partners } = useActivePartners()
 
   return useMutation({
     mutationFn: async (input: WriteReviewInput) => {
       if (!user) throw new Error('You must be signed in to write a review.')
       const userName = appUser?.username ?? user.displayName ?? 'Reader'
       const bookTitle = input.bookTitle.trim()
+      const avatar = appUser?.avatarUrl || user.photoURL || null
 
       await addDoc(collection(db, 'reviews'), sanitizeFirestoreData({
         userId: user.uid,
@@ -223,9 +226,25 @@ export function useWriteReview() {
       await notifyFollowersOfReview({
         uid: user.uid,
         userName,
-        avatar: appUser?.avatarUrl || user.photoURL || null,
+        avatar,
         bookTitle,
       })
+
+      try {
+        await notifyCollaborators(
+          partners,
+          {
+            type: 'collaborator_posted',
+            title: `${userName} shared a new review`,
+            body: `"${bookTitle}"`,
+            link: '/explore',
+            metadata: { bookTitle },
+          },
+          { uid: user.uid, name: userName, avatar },
+        )
+      } catch {
+        // Best-effort: the review itself was already posted.
+      }
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: reviewKeys.all })
@@ -255,6 +274,7 @@ export interface ShareFinishedBookResult {
 export function useShareFinishedBook() {
   const { user, appUser } = useAuth()
   const queryClient = useQueryClient()
+  const { partners } = useActivePartners()
 
   return useMutation({
     mutationFn: async (input: ShareFinishedBookInput): Promise<ShareFinishedBookResult> => {
@@ -262,6 +282,7 @@ export function useShareFinishedBook() {
       const userName = appUser?.username ?? user.displayName ?? 'Reader'
       const bookTitle = input.bookTitle.trim()
       const body = input.body.trim()
+      const avatar = appUser?.avatarUrl || user.photoURL || null
       const reviewRef = doc(db, 'reviews', `${user.uid}_${input.bookId}`)
 
       const existing = await getDoc(reviewRef)
@@ -290,9 +311,25 @@ export function useShareFinishedBook() {
       await notifyFollowersOfReview({
         uid: user.uid,
         userName,
-        avatar: appUser?.avatarUrl || user.photoURL || null,
+        avatar,
         bookTitle,
       })
+
+      try {
+        await notifyCollaborators(
+          partners,
+          {
+            type: 'collaborator_posted',
+            title: `${userName} shared a new review`,
+            body: `"${bookTitle}"`,
+            link: '/explore',
+            metadata: { bookTitle },
+          },
+          { uid: user.uid, name: userName, avatar },
+        )
+      } catch {
+        // Best-effort: the review itself was already posted.
+      }
 
       return { alreadyShared: false }
     },

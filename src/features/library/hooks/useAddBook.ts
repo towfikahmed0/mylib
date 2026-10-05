@@ -13,7 +13,7 @@ import { db } from '../../../lib/firebase'
 import { sanitizeFirestoreData } from '../../../lib/firestore'
 import type { Book, CopyType } from '../../../types'
 import { useAuth } from '../../auth/useAuth'
-import { createActivityEvent } from '../../collaboration/utils/activity'
+import { useActivityRecorder } from '../../collaboration/hooks/useActivityRecorder'
 import { sendNotification } from '../../notifications/utils/createNotification'
 import { publicLibraryKeys } from '../../profile/hooks/usePublicLibrary'
 import { bookKeys } from './useBooks'
@@ -146,6 +146,7 @@ export function useAddBook() {
   const { user, appUser } = useAuth()
   const uid = user?.uid
   const queryClient = useQueryClient()
+  const { recordActivity } = useActivityRecorder()
 
   return useMutation({
     mutationFn: async (input: AddBookVariables) => {
@@ -154,10 +155,8 @@ export function useAddBook() {
 
       const ownerUid = input.targetUserId ?? uid
       try {
-        await createActivityEvent({
+        await recordActivity({
           type: input.existingBookId ? 'book_edited' : 'book_added',
-          userId: uid,
-          userName: appUser?.username ?? user?.displayName ?? 'Reader',
           libraryId: ownerUid,
           bookId,
           bookTitle: input.title.trim(),

@@ -46,6 +46,9 @@ export interface AppUser {
   readingPlan?: ReadingPlanItem[]
   banned?: boolean
   bannedReason?: string
+  /** Public social profile links shown under the bio. */
+  facebookUrl?: string
+  instagramUrl?: string
 }
 
 /** users/{uid}/private/data */
@@ -82,6 +85,8 @@ export interface PublicProfile extends Pick<
   | 'followerCount'
   | 'followingCount'
   | 'joinedAt'
+  | 'facebookUrl'
+  | 'instagramUrl'
 > {
   privacySettings: PrivacySettings
 }
@@ -349,6 +354,8 @@ export type NotificationType =
   | 'new_follower'
   | 'collaborator_added_book'
   | 'collaborator_status_changed'
+  | 'collaborator_finished_book'
+  | 'collaborator_posted'
   | 'new_post_from_following'
   | 'book_request'
   | 'book_request_accepted'
