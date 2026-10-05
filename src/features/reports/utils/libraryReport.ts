@@ -100,6 +100,150 @@ function registerReportFonts(doc: jsPDF, fonts: ReportFonts | null): void {
   }
 }
 
+/* ------------------------------------------------------------------ *
+ * Complex-script text (Bengali)
+ *
+ * jsPDF maps each character to a single glyph and never applies OpenType
+ * shaping, so Bengali matras are not reordered and conjuncts never form
+ * (for example "ক্ষ" stays as ka + virama + ssa). Even with the font
+ * embedded, the glyph run is emitted in logical order. To render these runs
+ * correctly we rasterise them with the browser's own text engine - which does
+ * shape - and embed the result as an image. Latin text still goes through
+ * jsPDF.text(), so English output is unchanged.
+ * ------------------------------------------------------------------ */
+
+const DISPLAY_FONT = 'NotoSansBengali'
+const CANVAS_SCALE = 3
+
+interface TextImage {
+  dataUrl: string
+  width: number
+  height: number
+  ascent: number
+}
+
+const textImageCache = new Map<string, TextImage>()
+let displayFontsPromise: Promise<void> | null = null
+
+/** Loads the Bengali webfont so the canvas can shape it. Safe to call many times. */
+function ensureDisplayFonts(): Promise<void> {
+  if (!displayFontsPromise) {
+    displayFontsPromise = (async () => {
+      if (typeof document === 'undefined' || !document.fonts) return
+      try {
+        await Promise.all([
+          document.fonts.load(`400 24px "${DISPLAY_FONT}"`),
+          document.fonts.load(`700 24px "${DISPLAY_FONT}"`),
+        ])
+      } catch {
+        // The canvas falls back to a system font if the webfont cannot load.
+      }
+    })()
+  }
+  return displayFontsPromise
+}
+
+function displayFontSpec(sizePt: number, style: 'normal' | 'bold'): string {
+  const weight = style === 'bold' ? 700 : 400
+  return `${weight} ${((sizePt * 96) / 72) * CANVAS_SCALE}px "${DISPLAY_FONT}", sans-serif`
+}
+
+function canvasToMm(value: number): number {
+  return (value / CANVAS_SCALE) * (25.4 / 96)
+}
+
+function renderComplexText(
+  text: string,
+  sizePt: number,
+  style: 'normal' | 'bold',
+  color: [number, number, number],
+): TextImage | null {
+  if (typeof document === 'undefined' || text === '') return null
+  const key = `${sizePt}|${style}|${color.join(',')}|${text}`
+  const cached = textImageCache.get(key)
+  if (cached) return cached
+
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+
+  const fontSpec = displayFontSpec(sizePt, style)
+  ctx.font = fontSpec
+  const metrics = ctx.measureText(text)
+  const fontPx = ((sizePt * 96) / 72) * CANVAS_SCALE
+  const ascent = metrics.actualBoundingBoxAscent || fontPx * 0.8
+  const descent = metrics.actualBoundingBoxDescent || fontPx * 0.25
+  const pad = Math.ceil(fontPx * 0.12)
+
+  canvas.width = Math.max(1, Math.ceil(metrics.width) + pad * 2)
+  canvas.height = Math.max(1, Math.ceil(ascent + descent) + pad * 2)
+
+  // Setting width/height resets the context, so re-apply the style.
+  ctx.font = fontSpec
+  ctx.textBaseline = 'alphabetic'
+  ctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`
+  ctx.fillText(text, pad, pad + ascent)
+
+  const image: TextImage = {
+    dataUrl: canvas.toDataURL('image/png'),
+    width: canvasToMm(canvas.width),
+    height: canvasToMm(canvas.height),
+    ascent: canvasToMm(pad + ascent),
+  }
+  textImageCache.set(key, image)
+  return image
+}
+
+function truncateComplexText(
+  text: string,
+  sizePt: number,
+  style: 'normal' | 'bold',
+  maxWidth: number,
+): string {
+  if (typeof document === 'undefined') return text
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return text
+  ctx.font = displayFontSpec(sizePt, style)
+  if (canvasToMm(ctx.measureText(text).width) <= maxWidth) return text
+  let result = text
+  while (result.length > 1 && canvasToMm(ctx.measureText(`${result}…`).width) > maxWidth) {
+    result = result.slice(0, -1)
+  }
+  return `${result}…`
+}
+
+interface TextLineOptions {
+  size: number
+  style: 'normal' | 'bold'
+  color: [number, number, number]
+  align?: 'left' | 'center' | 'right'
+}
+
+/** Draws one line, rasterising non-Latin runs and keeping Latin as jsPDF text. */
+function drawTextLine(
+  doc: jsPDF,
+  text: string,
+  x: number,
+  y: number,
+  options: TextLineOptions,
+): void {
+  const { size, style, color, align = 'left' } = options
+  if (needsUnicodeFont(text) && hasUnicodeFont(doc)) {
+    const image = renderComplexText(text, size, style, color)
+    if (image) {
+      const drawX = align === 'right' ? x - image.width : align === 'center' ? x - image.width / 2 : x
+      doc.addImage(image.dataUrl, 'PNG', drawX, y - image.ascent, image.width, image.height)
+      return
+    }
+  }
+  applyTextFont(doc, text, style)
+  doc.setFontSize(size)
+  doc.setTextColor(color[0], color[1], color[2])
+  if (align === 'left') doc.text(text, x, y)
+  else doc.text(text, x, y, { align })
+}
+
 export interface LibraryReportInput {
   username: string
   displayName: string
@@ -443,15 +587,18 @@ function drawBarChart(
 
   visible.forEach((row, index) => {
     const rowY = startY + index * (barH + gap)
-    applyTextFont(doc, row.label, 'normal')
-    doc.setFontSize(8)
-    doc.setTextColor(INK[0], INK[1], INK[2])
-    doc.text(truncate(row.label, 26), MARGIN, rowY + barH - 1.5)
+    const baseline = rowY + barH - 1.5
+    const label = needsUnicodeFont(row.label)
+      ? truncateComplexText(row.label, 8, 'normal', labelW - 4)
+      : truncate(row.label, 26)
+    drawTextLine(doc, label, MARGIN, baseline, { size: 8, style: 'normal', color: INK })
     const width = Math.max(2, (row.count / max) * barMaxW)
     doc.setFillColor(ACCENT[0], ACCENT[1], ACCENT[2])
     doc.roundedRect(MARGIN + labelW, rowY, width, barH, 1, 1, 'F')
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
     doc.setTextColor(MUTED[0], MUTED[1], MUTED[2])
-    doc.text(String(row.count), MARGIN + labelW + width + 2, rowY + barH - 1.5)
+    doc.text(String(row.count), MARGIN + labelW + width + 2, baseline)
   })
 
   startY += visible.length * (barH + gap)
@@ -488,9 +635,45 @@ function drawTable(
     },
     alternateRowStyles: { fillColor: STRIPE },
     didParseCell: (hook: CellHookData) => {
-      if (hasUnicodeFont(doc) && needsUnicodeFont(hook.cell.text.join('\n'))) {
+      if (hook.section === 'head') return
+      const raw = hook.cell.raw
+      const text =
+        typeof raw === 'string' ? raw : typeof raw === 'number' ? String(raw) : hook.cell.text.join('\n')
+      if (!hasUnicodeFont(doc) || !needsUnicodeFont(text)) return
+      const size = typeof hook.cell.styles.fontSize === 'number' ? hook.cell.styles.fontSize : 8
+      const style = hook.cell.styles.fontStyle === 'bold' ? 'bold' : 'normal'
+      const image = renderComplexText(text, size, style, INK)
+      if (image) {
+        // Blank autoTable's unshaped glyphs and reserve room for the image.
+        hook.cell.text = []
+        hook.cell.styles.minCellHeight = image.height + 4
+      } else {
         hook.cell.styles.font = UNICODE_FONT
       }
+    },
+    didDrawCell: (hook: CellHookData) => {
+      if (hook.section !== 'body') return
+      const raw = hook.cell.raw
+      const text = typeof raw === 'string' ? raw : typeof raw === 'number' ? String(raw) : ''
+      if (text === '' || !hasUnicodeFont(doc) || !needsUnicodeFont(text)) return
+      const size = typeof hook.cell.styles.fontSize === 'number' ? hook.cell.styles.fontSize : 8
+      const style = hook.cell.styles.fontStyle === 'bold' ? 'bold' : 'normal'
+      const padding = 2
+      const available = hook.cell.width - padding * 2
+      const fitted = truncateComplexText(text, size, style, available)
+      const image = renderComplexText(fitted, size, style, INK)
+      if (!image) return
+      const width = Math.min(image.width, available)
+      const height = image.width === 0 ? image.height : image.height * (width / image.width)
+      const halign = hook.cell.styles.halign
+      const drawX =
+        halign === 'right'
+          ? hook.cell.x + hook.cell.width - padding - width
+          : halign === 'center'
+            ? hook.cell.x + (hook.cell.width - width) / 2
+            : hook.cell.x + padding
+      const drawY = hook.cell.y + (hook.cell.height - height) / 2
+      doc.addImage(image.dataUrl, 'PNG', drawX, drawY, width, height)
     },
     margin: { top: CONTENT_TOP, bottom: FOOTER_RESERVE, left: MARGIN, right: MARGIN },
     columnStyles,
@@ -557,9 +740,7 @@ function drawCover(doc: jsPDF, data: ReportData, input: LibraryReportInput): num
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(MUTED[0], MUTED[1], MUTED[2])
     doc.text(`${label}:`, MARGIN, y)
-    applyTextFont(doc, value, 'normal')
-    doc.setTextColor(INK[0], INK[1], INK[2])
-    doc.text(value, MARGIN + 34, y)
+    drawTextLine(doc, value, MARGIN + 34, y, { size: 9, style: 'normal', color: INK })
     y += 5.5
   })
 
@@ -769,6 +950,7 @@ export async function generateLibraryReportPdf(
   input: LibraryReportInput,
 ): Promise<LibraryReportResult> {
   const fonts = await loadReportFonts()
+  await ensureDisplayFonts()
   const data = buildReportData(input)
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
   registerReportFonts(doc, fonts)

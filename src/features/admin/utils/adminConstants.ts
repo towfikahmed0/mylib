@@ -151,6 +151,137 @@ export const DEFAULT_ADMIN_CONFIG_MAIN: Omit<AdminConfigMain, 'updatedAt' | 'upd
   },
 }
 
+/** Default markdown for the "About My Lib" section (converted from the shipped copy). */
+export const DEFAULT_ABOUT_OVERVIEW =
+  'My Lib is a personal library manager and reading companion. Catalog the books you own, track your reading journey, organise your shelves, and connect with the readers you trust — all in one calm, beautifully organised space.\n\nOur goal is simple: help you preserve every word and never lose track of a book again.'
+
+/** Default markdown for the "User Guide" section, shown until an admin edits it. */
+export const DEFAULT_ABOUT_DOCS = `### Personal Library
+Your personal library keeps every book you own in one organised place.
+
+**How to use:**
+1. Open Library from the sidebar or the bottom navigation.
+2. Search by title or author, then open a book to see its details.
+
+**How it works:** Each book stores its cover, author, genre, ISBN, price, and copy type. You can sort, filter, and update any book at any time.
+
+### Adding Books
+You can add books by scanning a code, importing a file, or typing the details yourself.
+
+**How to use:**
+1. Select Add Book and choose scan, import, or manual entry.
+2. Confirm the details and save the book to your library.
+
+**How it works:** Scanned codes fill in the title and cover automatically, while CSV and JSON imports add many books at once.
+
+### Reading Status
+Reading status tracks where each book sits in your reading journey.
+
+**How to use:**
+1. Open a book and choose Want to Read, Reading, or Finished.
+2. Change the status whenever your progress changes.
+
+**How it works:** Your saved status powers the My Books views, your reading plan, and the charts on your Insights page.
+
+### Shelves and Tags
+Shelves group your books the way you think about them.
+
+**How to use:**
+1. Open Shelves and create a shelf with a name, icon, and colour.
+2. Add books to the shelf from the book menu or the shelf view.
+
+**How it works:** Custom shelves hold exactly the books you choose, smart shelves update themselves from the rules you set, and tags and genres give you a second way to filter.
+
+### Favourites and Wishlist
+Favourites mark the books you love, and the wishlist keeps track of books you want.
+
+**How to use:**
+1. Open a book and mark it as a favourite or add it to your wishlist.
+2. Filter by favourite or wishlist on the Library and My Books pages.
+
+**How it works:** Both lists are private to you and update across the app as soon as you change them.
+
+### Reading Plan
+The reading plan sequences the books you want to read next.
+
+**How to use:**
+1. Open the Reading Plan and add the books you plan to read.
+2. Drag the cards to reorder them, and mark a book as finished when you are done.
+
+**How it works:** Your plan is saved automatically and stays in step with the reading status of each book.
+
+### Reading Insights
+Insights turns your reading history into charts and goals.
+
+**How to use:**
+1. Open Insights to see your finished books, monthly totals, and reading activity.
+2. Set a reading challenge or goal and follow your progress over time.
+
+**How it works:** Your library and reading status feed the charts, and nothing is shared unless you choose to share it.
+
+### AI Librarian
+The AI Librarian answers questions about your library and helps you fill in book details.
+
+**How to use:**
+1. Open the AI Librarian and ask a question about your books.
+2. Use the metadata tools to complete a book's details or fix missing information.
+
+**How it works:** The assistant reads your own library to answer in context, and the metadata tools suggest details you can review before saving.
+
+### Collaboration and Lending
+Collaboration lets you share a library with readers you trust and lend books to them.
+
+**How to use:**
+1. Invite a collaborator from the collaboration section.
+2. Browse a shared library and request to borrow a book.
+
+**How it works:** The owner of each book confirms every loan request, and both sides can follow the current lending status.
+
+### Community and Reviews
+The community feed collects reviews and updates from readers you follow.
+
+**How to use:**
+1. Open Activity to read reviews and updates.
+2. Write your own review from a finished book and follow readers you enjoy.
+
+**How it works:** You can like and comment on posts, and your own posts follow the privacy settings you choose.
+
+### Explore Readers
+Explore helps you discover other readers and public libraries.
+
+**How to use:**
+1. Open Explore and open a public profile.
+2. Follow a reader or browse their shelves.
+
+**How it works:** Only readers who have made their profile public appear in Explore.
+
+### Notifications
+Notifications keep you up to date on follows, comments, and requests.
+
+**How to use:**
+1. Open Notifications to read your latest updates.
+2. Open a notification to jump straight to the related book, review, or request.
+
+**How it works:** The bell shows unread items, and you can enable push notifications so updates reach you even when the app is closed.
+
+### Sharing and Reports
+You can share your library as images, PDF reports, and file backups.
+
+**How to use:**
+1. Open a book, shelf, or insight and choose Share.
+2. Pick a share card, a PDF report, or a CSV or JSON export.
+
+**How it works:** Share cards and reports are generated on your device, and backups let you move your library to another account.
+
+### Install and Offline
+MyLib installs as an app and keeps working when you lose your connection.
+
+**How to use:**
+1. Open the install prompt in your browser and add MyLib to your device.
+2. Launch it from your home screen like any other app.
+
+**How it works:** Recently viewed books and pages are cached, so you can keep browsing your library offline.`
+
 export const DEFAULT_ADMIN_CONFIG_PUBLIC: Omit<AdminConfigPublic, 'updatedAt' | 'updatedBy'> = {
   landingPage: {
     showPlans: false,
@@ -194,7 +325,8 @@ export const DEFAULT_ADMIN_CONFIG_PUBLIC: Omit<AdminConfigPublic, 'updatedAt' | 
   aboutPage: {
     title: 'About My Lib',
     subtitle: 'A social reading sanctuary for everything you read.',
-    body: 'My Lib is a personal library manager and reading companion. Catalog the books you own, track your reading journey, organise your shelves, and connect with the readers you trust — all in one calm, beautifully organised space.\n\nOur goal is simple: help you preserve every word and never lose track of a book again.',
+    overview: DEFAULT_ABOUT_OVERVIEW,
+    docs: '',
   },
 }
 

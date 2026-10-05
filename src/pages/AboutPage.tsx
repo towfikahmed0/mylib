@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import {
   ArrowLeft,
   BarChart3,
@@ -16,7 +17,16 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { MarkdownRenderer } from '../components/MarkdownRenderer'
 import { useAboutContent } from '../features/about/hooks/useAboutContent'
+import { usePageMeta } from '../hooks/usePageMeta'
+
+const ABOUT_META = {
+  title: 'About MyLib — Social Reading Sanctuary',
+  description:
+    'Learn how MyLib works: library cataloging, AI librarian, borrowing, collaboration, reading insights, and offline PWA.',
+  canonical: 'https://mylib.softrly.com/about',
+}
 
 const FEATURES: { icon: LucideIcon; title: string; copy: string }[] = [
   {
@@ -93,12 +103,41 @@ const TECH_INFO: { icon: LucideIcon; label: string; value: string }[] = [
   { icon: BookOpen, label: 'Exports', value: 'CSV/JSON backups, PDF library reports, PNG share cards' },
 ]
 
+function AboutHeaderSkeleton() {
+  return (
+    <header className="card-surface space-y-3 p-6 sm:p-8">
+      <div className="skeleton-base h-6 w-28 rounded-full" />
+      <div className="skeleton-base h-9 w-2/3" />
+      <div className="skeleton-base h-4 w-full max-w-3xl" />
+      <div className="max-w-3xl space-y-3 pt-2">
+        <div className="skeleton-base h-3.5 w-full" />
+        <div className="skeleton-base h-3.5 w-11/12" />
+        <div className="skeleton-base h-3.5 w-4/5" />
+      </div>
+    </header>
+  )
+}
+
 export function AboutPage() {
-  const { about } = useAboutContent()
-  const paragraphs = about.body
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
+  const { about, isLoading } = useAboutContent()
+
+  usePageMeta(ABOUT_META)
+
+  useEffect(() => {
+    const script = document.createElement('script')
+    script.type = 'application/ld+json'
+    script.text = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'AboutPage',
+      name: ABOUT_META.title,
+      description: ABOUT_META.description,
+      url: ABOUT_META.canonical,
+    })
+    document.head.appendChild(script)
+    return () => {
+      document.head.removeChild(script)
+    }
+  }, [])
 
   return (
     <section className="animate-fade-in space-y-8">
@@ -112,21 +151,21 @@ export function AboutPage() {
         </Link>
       </div>
 
-      <header className="card-surface space-y-3 p-6 sm:p-8">
-        <span className="inline-flex items-center gap-2 rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">
-          <BookOpen size={14} />
-          About Us
-        </span>
-        <h1 className="font-serif text-3xl font-black tracking-tight sm:text-4xl">{about.title}</h1>
-        <p className="max-w-3xl text-base text-muted">{about.subtitle}</p>
-        {paragraphs.length > 0 ? (
-          <div className="max-w-3xl space-y-3 pt-2 text-sm leading-relaxed text-muted">
-            {paragraphs.map((paragraph, index) => (
-              <p key={index}>{paragraph}</p>
-            ))}
-          </div>
-        ) : null}
-      </header>
+      {isLoading ? (
+        <AboutHeaderSkeleton />
+      ) : (
+        <header className="card-surface space-y-3 p-6 sm:p-8">
+          <span className="inline-flex items-center gap-2 rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">
+            <BookOpen size={14} />
+            About Us
+          </span>
+          <h1 className="font-serif text-3xl font-black tracking-tight sm:text-4xl">
+            {about.title}
+          </h1>
+          <p className="max-w-3xl text-base text-muted">{about.subtitle}</p>
+          <MarkdownRenderer content={about.overview} className="max-w-3xl pt-2" />
+        </header>
+      )}
 
       <div className="space-y-3">
         <h2 className="font-serif text-2xl font-black tracking-tight">What you can do</h2>
@@ -172,6 +211,13 @@ export function AboutPage() {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <h2 className="font-serif text-2xl font-black tracking-tight">User Guide</h2>
+        <div className="card-surface p-6 sm:p-8">
+          <MarkdownRenderer content={about.docs} />
         </div>
       </div>
     </section>

@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /library
+Disallow: /u/*/settings
+Sitemap: https://mylib.softrly.com/sitemap.xml

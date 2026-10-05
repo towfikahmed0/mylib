@@ -4,6 +4,7 @@ import { AppLayout } from './components/layout/AppLayout'
 import { PublicProfileLayout } from './components/layout/PublicProfileLayout'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { Toaster } from './components/ui/Toaster'
+import { useAnalytics } from './hooks/useAnalytics'
 import { AboutPage } from './pages/AboutPage'
 import { AdminPage } from './pages/AdminPage'
 import { ActivityPage } from './pages/ActivityPage'
@@ -20,6 +21,8 @@ import { ShelfDetailPage } from './pages/ShelfDetailPage'
 import { ShelvesPage } from './pages/ShelvesPage'
 
 function App() {
+  useAnalytics()
+
   return (
     <>
       <Routes>

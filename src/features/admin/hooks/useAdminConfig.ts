@@ -103,11 +103,27 @@ function toMainConfig(data: DocumentData | undefined): AdminConfigMain {
   }
 }
 
+/**
+ * Normalises stored About content, applying shipped defaults and mapping the
+ * legacy `body` field onto `overview` so previously saved content survives the
+ * schema change.
+ */
+function toAboutPage(raw: unknown): AdminAboutPage {
+  const base = DEFAULT_ADMIN_CONFIG_PUBLIC.aboutPage
+  if (!isPlainObject(raw)) return base
+  return {
+    title: pickString(raw.title) || base.title,
+    subtitle: pickString(raw.subtitle) || base.subtitle,
+    overview: pickString(raw.overview) || pickString(raw.body) || base.overview,
+    docs: pickString(raw.docs) || base.docs,
+  }
+}
+
 function toPublicConfig(data: DocumentData | undefined): AdminConfigPublic {
   const merged = deepMerge(DEFAULT_ADMIN_CONFIG_PUBLIC, data ?? {})
   return {
     landingPage: merged.landingPage,
-    aboutPage: merged.aboutPage,
+    aboutPage: toAboutPage(data?.aboutPage),
     updatedAt: toFirestoreDate(data?.updatedAt),
     updatedBy: pickString(data?.updatedBy),
   }
@@ -251,12 +267,20 @@ export function useUpdateLandingContent() {
   })
 }
 
+export type AboutContentSection = 'about_overview' | 'about_docs'
+
 export function useUpdateAboutContent() {
   const queryClient = useQueryClient()
   const actor = useAdminActor()
 
   return useMutation({
-    mutationFn: async (aboutPage: AdminAboutPage) => {
+    mutationFn: async ({
+      aboutPage,
+      section,
+    }: {
+      aboutPage: AdminAboutPage
+      section: AboutContentSection
+    }) => {
       if (!actor.uid) throw new Error('You must be signed in.')
       const batch = writeBatch(db)
       batch.set(
@@ -269,10 +293,10 @@ export function useUpdateAboutContent() {
         { merge: true },
       )
       writeAuditLog(batch, actor, {
-        action: 'update_about',
+        action: 'update_landing',
         targetType: 'platform',
         targetId: 'public',
-        details: { section: 'aboutPage' },
+        details: { section },
       })
       await batch.commit()
     },

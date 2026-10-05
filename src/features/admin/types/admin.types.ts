@@ -206,7 +206,10 @@ export interface AdminLandingPage {
 export interface AdminAboutPage {
   title: string
   subtitle: string
-  body: string
+  /** Markdown body for the "About My Lib" section. */
+  overview: string
+  /** Markdown body for the "User Guide" section. */
+  docs: string
 }
 
 export interface AdminConfigPublic {

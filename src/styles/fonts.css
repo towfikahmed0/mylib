@@ -2,6 +2,23 @@
  * Kept in a same-origin stylesheet so html-to-image can embed them without
  * hitting the cross-origin `cssRules` SecurityError from the remote <link>. */
 
+/* Bengali, used by the PDF report to shape matras/conjuncts on a canvas. */
+@font-face {
+  font-family: 'NotoSansBengali';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/NotoSansBengali-Regular.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'NotoSansBengali';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/NotoSansBengali-Bold.ttf') format('truetype');
+}
+
+
 /* vietnamese */
 @font-face {
   font-family: 'Fraunces';

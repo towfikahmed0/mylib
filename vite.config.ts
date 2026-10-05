@@ -40,6 +40,9 @@ export default defineConfig(() => {
         manifest,
         injectManifest: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,ttf}'],
+          // The main app chunk (with react-markdown) is ~2.2 MB, above the 2 MiB
+          // Workbox default, so raise the precache ceiling to keep it cached.
+          maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
           // The FCM worker is registered separately and must never be precached.
           globIgnores: ['**/firebase-messaging-sw.js'],
         },

@@ -14,9 +14,45 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <meta
       name="description"
-      content="MyLib - your personal library, social reading sanctuary, and AI librarian."
+      content="Catalog your library, track reading, share shelves, and collaborate with fellow readers."
     />
-    <title>MyLib – The Social Reading Sanctuary</title>
+    <title>MyLib — Your Social Reading Sanctuary</title>
+
+    <!-- Canonical & social sharing -->
+    <link rel="canonical" href="https://mylib.softrly.com/" />
+    <meta property="og:title" content="MyLib — Your Social Reading Sanctuary" />
+    <meta
+      property="og:description"
+      content="Catalog your library, track reading, share shelves, and collaborate with fellow readers."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://mylib.softrly.com" />
+    <meta property="og:image" content="/img/hero.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- Structured data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "MyLib",
+        "url": "https://mylib.softrly.com",
+        "description": "Social reading sanctuary",
+        "applicationCategory": "LifestyleApplication",
+        "operatingSystem": "Web"
+      }
+    </script>
+
+    <!-- Google Analytics 4 -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-81JG9GTWCT"></script>
+    <script>
+      window.dataLayer = window.dataLayer || []
+      function gtag() {
+        dataLayer.push(arguments)
+      }
+      gtag('js', new Date())
+      gtag('config', 'G-81JG9GTWCT', { send_page_view: false })
+    </script>
   </head>
   <body>
     <div id="root"></div>
