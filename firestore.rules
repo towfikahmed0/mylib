@@ -64,6 +64,7 @@ service cloud.firestore {
 
     function canReadPosts(post) {
       return isAdmin()
+        || (isSignedIn() && post.get('userId', '') == request.auth.uid)
         || post.get('visibility', 'public') == 'public'
         || (isSignedIn() && post.get('visibility', 'public') == 'signed_in')
         || (isSignedIn()

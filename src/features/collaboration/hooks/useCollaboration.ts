@@ -25,6 +25,7 @@ export interface PartnerSummary {
   displayName: string
   avatarUrl: string
   totalBooksCount: number
+  completedBooksCount: number
   allowAddBooks: boolean
   grantedBy: string
   unsubscribed: boolean
@@ -108,6 +109,7 @@ async function fetchPartners(uid: string): Promise<PartnerSummary[]> {
       let displayName = ''
       let avatarUrl = ''
       let totalBooksCount = 0
+      let completedBooksCount = 0
       let borrowRequestPermission: BorrowRequestPermission = 'collaborators'
       try {
         const snapshot = await getDoc(doc(db, 'users', otherUid))
@@ -117,12 +119,14 @@ async function fetchPartners(uid: string): Promise<PartnerSummary[]> {
             displayName?: string
             avatarUrl?: string
             totalBooksCount?: number
+            completedBooksCount?: number
             privacySettings?: { borrowRequestPermission?: BorrowRequestPermission }
           }
           username = data.username ?? ''
           displayName = data.displayName ?? data.username ?? 'Reader'
           avatarUrl = data.avatarUrl ?? ''
           totalBooksCount = data.totalBooksCount ?? 0
+          completedBooksCount = data.completedBooksCount ?? 0
           borrowRequestPermission = data.privacySettings?.borrowRequestPermission ?? 'collaborators'
         }
       } catch {
@@ -136,6 +140,7 @@ async function fetchPartners(uid: string): Promise<PartnerSummary[]> {
         displayName,
         avatarUrl,
         totalBooksCount,
+        completedBooksCount,
         allowAddBooks: partnership.allowAddBooks,
         grantedBy: partnership.grantedBy,
         unsubscribed,

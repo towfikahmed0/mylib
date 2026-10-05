@@ -12,6 +12,8 @@ export interface UpdateBookVariables {
   description?: string
   tags?: string[]
   highlights?: Highlight[]
+  isInLibrary?: boolean
+  isWishlist?: boolean
 }
 
 export function useUpdateBook() {
@@ -20,11 +22,20 @@ export function useUpdateBook() {
   const { recordActivity } = useActivityRecorder()
 
   return useMutation({
-    mutationFn: async ({ bookId, description, tags, highlights }: UpdateBookVariables) => {
+    mutationFn: async ({
+      bookId,
+      description,
+      tags,
+      highlights,
+      isInLibrary,
+      isWishlist,
+    }: UpdateBookVariables) => {
       const fields: Record<string, unknown> = { updatedAt: serverTimestamp() }
       if (description !== undefined) fields.description = description
       if (tags !== undefined) fields.tags = tags
       if (highlights !== undefined) fields.highlights = highlights
+      if (isInLibrary !== undefined) fields.isInLibrary = isInLibrary
+      if (isWishlist !== undefined) fields.isWishlist = isWishlist
 
       const bookRef = doc(db, 'books', bookId)
       const snapshot = await getDoc(bookRef)

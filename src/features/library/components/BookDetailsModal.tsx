@@ -179,10 +179,14 @@ function BookDetailsContent({
   const sendRequest = useSendBookRequest()
   const activeLoan = loansQuery.loans.find((loan) => loan.id === book.activeLoanId)
   const borrowAvailability = book.borrowStatus ?? (book.borrowedBy ? 'on_loan' : 'available')
-  const { reviews } = useReviewsForBook(book.title)
+  const { reviews, averageRating, ratingCount } = useReviewsForBook(book.title)
 
   const cover = book.coverUrl || book.thumbnail
   const isOwner = Boolean(user && book.userId === user.uid)
+  // Community rating aggregated from every review of this book (own and
+  // collaborators' copies), falling back to the stored book fields.
+  const communityRating = averageRating > 0 ? averageRating : book.averageRating
+  const communityRatingCount = ratingCount > 0 ? ratingCount : book.ratingCount
   const highlights = book.highlights ?? []
 
   const ownerBorrowPermission =
@@ -191,6 +195,7 @@ function BookDetailsContent({
     !isOwner &&
     ownerBorrowPermission !== 'none' &&
     book.isInLibrary !== false &&
+    book.isWishlist !== true &&
     borrowAvailability === 'available'
 
   const [selected, setSelected] = useState<ReadingStatusValue>(status?.status ?? 'want_to_read')
@@ -303,10 +308,18 @@ function BookDetailsContent({
   const handleWishlist = (checked: boolean) => {
     setIsWishlist(checked)
     void updateStatus.mutateAsync({ bookId: book.id, isWishlist: checked })
+    // Keep the book's owner-level marker in sync so wishlist items stay private
+    // and never show up in a collaborator's library.
+    if (isOwner) {
+      void updateBook.mutateAsync({ bookId: book.id, isInLibrary: !checked, isWishlist: checked })
+    }
   }
 
   const handleMoveToLibrary = () => {
     setIsWishlist(false)
+    if (isOwner) {
+      void updateBook.mutateAsync({ bookId: book.id, isInLibrary: true, isWishlist: false })
+    }
     void runStatusUpdate(
       { bookId: book.id, isWishlist: false, status: 'want_to_read' },
       'Moved to your library.',
@@ -532,8 +545,8 @@ function BookDetailsContent({
                 />
               ))}
               <span className="ml-1.5 text-[10px] font-semibold text-muted">
-                Avg {book.averageRating > 0 ? book.averageRating.toFixed(1) : '—'}
-                {book.ratingCount > 0 ? ` · ${book.ratingCount}` : ''}
+                Avg {communityRating > 0 ? communityRating.toFixed(1) : '—'}
+                {communityRatingCount > 0 ? ` · ${communityRatingCount}` : ''}
               </span>
             </div>
 

@@ -291,7 +291,9 @@ export function InsightsPage() {
   const periodStart = new Date(periodEnd.getTime() - 30 * 24 * 60 * 60 * 1000)
   const momentumBooks = books.filter((book) => {
     if (book.isInLibrary === false) return false
+    if (book.isWishlist === true) return false
     const status = statuses[book.id]
+    if (status?.isWishlist) return false
     if (status?.status !== 'finished') return false
     const finishedAt = status.finishedAt ?? status.updatedAt
     if (!finishedAt) return false
@@ -410,7 +412,12 @@ export function InsightsPage() {
           streak: stats.readingStreak,
           topGenres: stats.genreCounts.slice(0, 3).map((genre) => genre.label),
           covers: books
-            .filter((book) => book.isInLibrary !== false)
+            .filter(
+              (book) =>
+                book.isInLibrary !== false &&
+                book.isWishlist !== true &&
+                !statuses[book.id]?.isWishlist,
+            )
             .map((book) => book.coverUrl || book.thumbnail || null),
         }}
         onClose={() => setIsShareOpen(false)}

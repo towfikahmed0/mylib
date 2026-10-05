@@ -366,7 +366,10 @@ function bookStatusLabel(book: Book, status?: ReadingStatus): string {
 
 function buildReportData(input: LibraryReportInput): ReportData {
   const books = input.books.filter(
-    (book) => book.isInLibrary !== false && !input.statuses[book.id]?.isWishlist,
+    (book) =>
+      book.isInLibrary !== false &&
+      book.isWishlist !== true &&
+      !input.statuses[book.id]?.isWishlist,
   )
 
   const categories = new Map<string, { count: number; value: number }>()

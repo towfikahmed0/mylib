@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import { cn } from '../../../lib/utils'
 import { Modal } from '../../../components/ui/Modal'
 import type { BookPrefill } from './AddBookModal'
 
-type ScannerStatus = 'scanning' | 'looking-up' | 'error'
+type ScannerStatus = 'starting' | 'scanning' | 'looking-up' | 'error'
 
 interface ScannerModalProps {
   open: boolean
@@ -32,6 +32,16 @@ interface OpenLibraryBook {
   subjects?: Array<{ name?: string }>
   notes?: string
 }
+
+const SCAN_FORMATS = [
+  Html5QrcodeSupportedFormats.QR_CODE,
+  Html5QrcodeSupportedFormats.EAN_13,
+  Html5QrcodeSupportedFormats.EAN_8,
+  Html5QrcodeSupportedFormats.UPC_A,
+  Html5QrcodeSupportedFormats.UPC_E,
+  Html5QrcodeSupportedFormats.CODE_128,
+  Html5QrcodeSupportedFormats.ITF,
+]
 
 function extractIsbn(raw: string): string | null {
   const cleaned = raw.replace(/[^0-9Xx]/g, '').toUpperCase()
@@ -109,6 +119,25 @@ async function resolveIsbn(isbn: string): Promise<BookPrefill> {
   return { isbn }
 }
 
+function describeCameraError(error: unknown): string {
+  const name = (error as { name?: string } | null)?.name ?? ''
+  const message = error instanceof Error ? error.message : String(error ?? '')
+
+  if (name === 'NotAllowedError' || /permission|denied/i.test(message)) {
+    return 'Camera permission was denied. Allow camera access for this site in your browser settings, then try again.'
+  }
+  if (name === 'NotFoundError' || /no camera|not found|no device/i.test(message)) {
+    return 'No camera was found on this device. Enter the ISBN manually below.'
+  }
+  if (name === 'NotReadableError' || /in use|track start|readable/i.test(message)) {
+    return 'Your camera is busy in another app or tab. Close it and try again.'
+  }
+  if (name === 'OverconstrainedError') {
+    return 'No suitable camera was found. Enter the ISBN manually below.'
+  }
+  return 'Could not start the camera. Enter the ISBN manually below.'
+}
+
 export function ScannerModal({ open, onClose, onResolved }: ScannerModalProps) {
   const [session, setSession] = useState(0)
 
@@ -139,12 +168,16 @@ function ScannerSession({
   onRetry: () => void
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const scannerRef = useRef<Html5Qrcode | null>(null)
+  const disposedRef = useRef(false)
   const handlingRef = useRef(false)
+  const runningRef = useRef(false)
   const onResolvedRef = useRef(onResolved)
 
-  const [status, setStatus] = useState<ScannerStatus>('scanning')
+  const [status, setStatus] = useState<ScannerStatus>('starting')
   const [hint, setHint] = useState('Point the camera at the ISBN barcode or QR code.')
   const [errorMessage, setErrorMessage] = useState('')
+  const [manualIsbn, setManualIsbn] = useState('')
 
   useEffect(() => {
     onResolvedRef.current = onResolved
@@ -154,54 +187,21 @@ function ScannerSession({
     const wrapper = containerRef.current
     if (!wrapper) return
 
+    disposedRef.current = false
     const containerId = `scanner-region-${Math.random().toString(36).slice(2)}`
     const container = document.createElement('div')
     container.id = containerId
+    container.style.width = '100%'
     wrapper.appendChild(container)
 
-    const scanner = new Html5Qrcode(containerId, {
-      verbose: false,
-      formatsToSupport: [
-        Html5QrcodeSupportedFormats.QR_CODE,
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.UPC_E,
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.ITF,
-      ],
-    })
-
-    let disposed = false
-    let isRunning = false
-    let startSettled = false
-
-    const teardown = async () => {
-      if (isRunning) {
-        try {
-          await scanner.stop()
-        } catch {
-          /* already stopped */
-        }
-        isRunning = false
-      }
-      try {
-        scanner.clear()
-      } catch {
-        /* nothing to clear */
-      }
-      container.remove()
-    }
-
     const handleScan = (decodedText: string) => {
-      if (disposed || handlingRef.current) return
+      if (disposedRef.current || handlingRef.current) return
 
       const isbn = extractIsbn(decodedText)
       if (!isbn) {
         setHint('That code did not contain a valid ISBN. Try another barcode.')
         return
       }
-
       handlingRef.current = true
       setStatus('looking-up')
       void resolveIsbn(isbn).then((prefill) => onResolvedRef.current(prefill))
@@ -209,59 +209,138 @@ function ScannerSession({
 
     const scanConfig = {
       fps: 10,
+      aspectRatio: 1.0,
       qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
         const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.7)
         return { width: size, height: size }
       },
     }
 
-    const start = async () => {
-      const cameras: MediaTrackConstraints[] = [
-        { facingMode: 'environment' },
-        { facingMode: 'user' },
-      ]
-
-      for (const camera of cameras) {
+    const stopRunningCamera = async () => {
+      const scanner = scannerRef.current
+      if (runningRef.current && scanner) {
         try {
-          await scanner.start(camera, scanConfig, handleScan, () => {})
-          isRunning = true
-          break
+          await scanner.stop()
         } catch {
-          /* try the next camera */
+          /* already stopped */
         }
       }
+      runningRef.current = false
+    }
 
-      startSettled = true
+    const attachVideoAttributes = () => {
+      const video = container.querySelector('video')
+      if (!video) return
+      // iOS/Safari requires an inline, muted video for the feed to render, and
+      // the element needs real, non-zero dimensions.
+      video.setAttribute('playsinline', 'true')
+      video.setAttribute('webkit-playsinline', 'true')
+      video.setAttribute('muted', 'true')
+      video.muted = true
+      video.autoplay = true
+      video.style.width = '100%'
+      video.style.height = '100%'
+      video.style.objectFit = 'cover'
+    }
 
-      if (disposed) {
-        await teardown()
+    const start = async () => {
+      if (disposedRef.current) return
+
+      if (
+        typeof window !== 'undefined' &&
+        (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia)
+      ) {
+        setErrorMessage(
+          'Camera scanning needs a secure (HTTPS) connection. Enter the ISBN manually below.',
+        )
+        setStatus('error')
         return
       }
 
-      if (!isRunning) {
-        setErrorMessage('Camera access was denied or no camera is available.')
-        setStatus('error')
+      const scanner = new Html5Qrcode(containerId, {
+        verbose: false,
+        formatsToSupport: SCAN_FORMATS,
+      })
+      scannerRef.current = scanner
+
+      const attempts: MediaTrackConstraints[] = [{ facingMode: { ideal: 'environment' } }]
+      try {
+        const cameras = await Html5Qrcode.getCameras()
+        const back =
+          cameras.find((camera) => /back|rear|environment/i.test(camera.label)) ?? cameras[0]
+        if (back) attempts.push({ deviceId: { exact: back.id } })
+      } catch {
+        // Camera enumeration can require permission; fall back to facingMode.
       }
+      attempts.push({ facingMode: 'user' })
+
+      let lastError: unknown = null
+      for (const constraints of attempts) {
+        if (disposedRef.current) return
+        try {
+          await scanner.start(constraints, scanConfig, handleScan, () => {})
+          runningRef.current = true
+          attachVideoAttributes()
+          setStatus('scanning')
+          return
+        } catch (error) {
+          lastError = error
+        }
+      }
+
+      if (disposedRef.current) return
+      setErrorMessage(describeCameraError(lastError))
+      setStatus('error')
     }
 
     void start()
 
     return () => {
-      disposed = true
-      if (isRunning || startSettled) void teardown()
+      disposedRef.current = true
+      void (async () => {
+        await stopRunningCamera()
+        try {
+          scannerRef.current?.clear()
+        } catch {
+          /* nothing to clear */
+        }
+        container.remove()
+        scannerRef.current = null
+      })()
     }
   }, [])
+
+  const handleManualSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const isbn = extractIsbn(manualIsbn)
+    if (!isbn) {
+      setHint('Enter a valid 10 or 13 digit ISBN.')
+      return
+    }
+    handlingRef.current = true
+    setStatus('looking-up')
+    void resolveIsbn(isbn).then((prefill) => onResolvedRef.current(prefill))
+  }
+
+  const showCamera = status === 'starting' || status === 'scanning'
 
   return (
     <div className="space-y-4">
       <div
         className={cn(
           'overflow-hidden rounded-2xl bg-black',
-          status === 'scanning' ? 'min-h-[240px]' : 'hidden',
+          showCamera ? 'min-h-[240px]' : 'hidden',
         )}
       >
         <div ref={containerRef} className="w-full [&_video]:w-full [&_video]:rounded-2xl" />
       </div>
+
+      {status === 'starting' ? (
+        <p className="flex items-center justify-center gap-2 text-center text-xs text-muted">
+          <Loader2 className="animate-spin" size={14} />
+          Starting camera…
+        </p>
+      ) : null}
 
       {status === 'scanning' ? (
         <p className="text-center text-xs text-muted">{hint}</p>
@@ -276,7 +355,7 @@ function ScannerSession({
       ) : null}
 
       {status === 'error' ? (
-        <div className="flex flex-col items-center gap-3 py-8 text-center">
+        <div className="flex flex-col items-center gap-3 py-6 text-center">
           <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-500">
             <AlertCircle size={22} />
           </span>
@@ -291,6 +370,36 @@ function ScannerSession({
           </button>
         </div>
       ) : null}
+
+      <form
+        onSubmit={handleManualSubmit}
+        className={cn(
+          'space-y-2 border-t border-border/60 pt-4',
+          status === 'looking-up' ? 'hidden' : '',
+        )}
+      >
+        <label htmlFor="manual-isbn" className="text-xs font-medium text-muted">
+          {status === 'error' ? 'Enter the ISBN manually' : 'Or type the ISBN'}
+        </label>
+        <div className="flex gap-2">
+          <input
+            id="manual-isbn"
+            value={manualIsbn}
+            onChange={(event) => setManualIsbn(event.target.value)}
+            inputMode="numeric"
+            autoComplete="off"
+            placeholder="978…"
+            className="w-full rounded-2xl border border-border/60 bg-surface-muted/50 px-3.5 py-2.5 text-sm outline-none transition placeholder:text-muted focus:border-accent/60"
+          />
+          <button
+            type="submit"
+            disabled={manualIsbn.trim() === ''}
+            className="shrink-0 rounded-2xl bg-surface-muted px-4 py-2.5 text-sm font-semibold text-foreground transition hover:opacity-80 disabled:opacity-50"
+          >
+            Look up
+          </button>
+        </div>
+      </form>
     </div>
   )
 }

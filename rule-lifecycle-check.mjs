@@ -10,12 +10,15 @@ import {
   connectFirestoreEmulator,
   doc,
   getDoc,
+  getDocs,
   getFirestore,
+  query,
   runTransaction,
   serverTimestamp,
   setDoc,
   Timestamp,
   updateDoc,
+  where,
 } from 'firebase/firestore'
 
 const projectId = 'demo-mylib'
@@ -567,6 +570,57 @@ const raceResults = await Promise.allSettled([
 assert.equal(raceResults.filter((result) => result.status === 'fulfilled').length, 1)
 assert.equal((await getDoc(raceBookRef)).data().borrowStatus, 'pending_request')
 console.log('Concurrent requests cannot reserve the same book')
+
+// --- Post audience ("signed-in users") privacy ---
+await updateDoc(doc(owner.db, 'users', owner.uid), { 'privacySettings.posts': 'signed_in' })
+const secretReviewId = 'owner-secret-review'
+await setDoc(doc(owner.db, 'reviews', secretReviewId), {
+  userId: owner.uid,
+  userName: 'owner',
+  bookTitle: 'Secret',
+  author: 'Test Author',
+  category: 'review',
+  rating: 5,
+  body: 'signed-in only',
+  visibility: 'signed_in',
+  likesCount: 0,
+  commentsCount: 0,
+  reported: false,
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+})
+
+const anonApp = initializeApp(config, 'anon-privacy')
+const anonDb = getFirestore(anonApp)
+connectFirestoreEmulator(anonDb, '127.0.0.1', firestorePort)
+
+await mustBeDenied(
+  getDoc(doc(anonDb, 'reviews', secretReviewId)),
+  'a signed-out user cannot read a signed-in post',
+)
+const anonVisible = await getDocs(
+  query(
+    collection(anonDb, 'reviews'),
+    where('userId', '==', owner.uid),
+    where('visibility', 'in', ['public']),
+  ),
+)
+assert.equal(anonVisible.size, 0, 'a signed-out user sees no signed-in posts')
+
+const ownerVisible = await getDocs(
+  query(
+    collection(owner.db, 'reviews'),
+    where('userId', '==', owner.uid),
+    where('visibility', 'in', ['public', 'signed_in', 'followers_collaborators']),
+  ),
+)
+assert.ok(
+  ownerVisible.docs.some((document) => document.id === secretReviewId),
+  'the owner can read their own signed-in post',
+)
+
+await deleteApp(anonApp)
+console.log('Post audience privacy verified')
 
 await Promise.all([deleteApp(owner.app), deleteApp(borrower.app), deleteApp(outsider.app)])
 console.log('Borrowing rules lifecycle passed.')

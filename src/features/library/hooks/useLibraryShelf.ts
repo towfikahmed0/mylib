@@ -66,9 +66,16 @@ export function useLibraryShelf() {
   const { statuses, isLoading: statusesLoading } = useReadingStatus()
 
   const groups = useMemo<LibraryBookGroup[]>(() => {
-    // Wishlist books live in My Books → Wishlist, never in the main Library tab.
+    // Wishlist books live in My Books → Wishlist, never in the main Library.
+    // They are stored with `isInLibrary: false`, so this also keeps them out of
+    // every collaborator's view of the shared library.
     const forLibrary = (books: Book[]) =>
-      books.filter((book) => !statuses[book.id]?.isWishlist)
+      books.filter(
+        (book) =>
+          book.isInLibrary !== false &&
+          book.isWishlist !== true &&
+          !statuses[book.id]?.isWishlist,
+      )
     const own: LibraryBookGroup = {
       ownerUid: user?.uid ?? 'self',
       ownerName: appUser?.displayName || appUser?.username || 'You',

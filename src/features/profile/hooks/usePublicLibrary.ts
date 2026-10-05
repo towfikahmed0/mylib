@@ -73,7 +73,7 @@ export function usePublicLibrary(uid: string | undefined, enabled: boolean) {
     books:
       data?.pages
         .flatMap((page) => page.books)
-        .filter((book) => book.isInLibrary !== false) ?? [],
+        .filter((book) => book.isInLibrary !== false && book.isWishlist !== true) ?? [],
     isLoading: isPending,
     isLoadingMore: isFetchingNextPage,
     hasMore: Boolean(hasNextPage),

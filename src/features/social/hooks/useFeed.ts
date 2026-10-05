@@ -19,7 +19,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
 import { sanitizeFirestoreData } from '../../../lib/firestore'
-import type { Review, ReviewCategory } from '../../../types'
+import type { PostVisibility, Review, ReviewCategory } from '../../../types'
 import { useAuth } from '../../auth/useAuth'
 import { useActivePartners } from '../../collaboration/hooks/useCollaboration'
 import { notifyCollaborators } from '../../collaboration/utils/partnerNotifications'
@@ -339,15 +339,45 @@ export function useShareFinishedBook() {
   })
 }
 
+function toDateMillis(value: Review['createdAt']): number {
+  try {
+    return value?.toMillis?.() ?? 0
+  } catch {
+    return 0
+  }
+}
+
+/**
+ * Reviews and aggregate rating for a book, keyed by title so they appear for
+ * every copy of the book — the signed-in user's own books and their
+ * collaborators' books alike.
+ *
+ * Two safe reads are merged: (1) public/signed-in reviews from anyone, and
+ * (2) every review written by an active collaborator (including
+ * followers/collaborators-only ones, which the rules permit a partner to read).
+ */
 export function useReviewsForBook(bookTitle: string | undefined) {
   const { user } = useAuth()
+  const { partners } = useActivePartners()
   const title = bookTitle?.trim() ?? ''
 
+  const partnerUids = useMemo(
+    () =>
+      partners
+        .filter((partner) => partner.isActive)
+        .map((partner) => partner.uid)
+        .slice(0, 30),
+    [partners],
+  )
+  const partnerKey = [...partnerUids].sort().join(',')
+
   const { data, isPending } = useQuery({
-    queryKey: reviewKeys.book(title, user?.uid ?? 'anonymous'),
+    queryKey: reviewKeys.book(title, `${user?.uid ?? 'anonymous'}|${partnerKey}`),
     queryFn: async () => {
       if (!title) return []
-      const snapshot = await getDocs(
+      const byId = new Map<string, Review>()
+
+      const publicSnapshot = await getDocs(
         query(
           collection(db, 'reviews'),
           where('bookTitle', '==', title),
@@ -356,12 +386,40 @@ export function useReviewsForBook(bookTitle: string | undefined) {
           limit(BOOK_REVIEWS_LIMIT),
         ),
       )
-      return snapshot.docs.map(toReview)
+      publicSnapshot.docs.forEach((document) => byId.set(document.id, toReview(document)))
+
+      if (user) {
+        const audienceUids = [...new Set([...partnerUids, user.uid])]
+        const partnerSnapshot = await getDocs(
+          query(
+            collection(db, 'reviews'),
+            where('bookTitle', '==', title),
+            where('userId', 'in', audienceUids),
+            orderBy('createdAt', 'desc'),
+            limit(BOOK_REVIEWS_LIMIT),
+          ),
+        )
+        partnerSnapshot.docs.forEach((document) => byId.set(document.id, toReview(document)))
+      }
+
+      return [...byId.values()]
+        .sort((a, b) => toDateMillis(b.createdAt) - toDateMillis(a.createdAt))
+        .slice(0, BOOK_REVIEWS_LIMIT)
     },
     enabled: title.length > 0,
   })
 
-  return { reviews: data ?? [], isLoading: isPending }
+  const reviews = data ?? []
+  const rated = reviews.filter((review) => (review.rating ?? 0) > 0)
+  const averageRating =
+    rated.length > 0 ? rated.reduce((total, review) => total + review.rating, 0) / rated.length : 0
+
+  return {
+    reviews,
+    isLoading: isPending,
+    averageRating,
+    ratingCount: rated.length,
+  }
 }
 
 export interface BookSearchGroup {
@@ -414,16 +472,34 @@ export function useBookSearch(term: string) {
   return { groups, isSearching: enabled && isFetching }
 }
 
-export function useReviewsForUser(userId: string | undefined, enabled = true) {
+export function useReviewsForUser(
+  userId: string | undefined,
+  enabled = true,
+  audience?: PostVisibility[],
+) {
   const { user } = useAuth()
+  // The visibility filter is mandatory: Firestore rules cannot filter query
+  // results, so an unbounded query would return restricted posts to anyone.
+  // Signed-out viewers may only ever read `public` posts.
+  const allowed: PostVisibility[] =
+    audience && audience.length > 0
+      ? [...new Set(audience)].sort()
+      : user
+        ? ['public', 'signed_in']
+        : ['public']
+  const audienceKey = allowed.join(',')
   const { data, isPending, isError } = useQuery({
-    queryKey: reviewKeys.user(userId ?? 'anonymous', user?.uid ?? 'anonymous'),
+    queryKey: reviewKeys.user(
+      userId ?? 'anonymous',
+      `${user?.uid ?? 'anonymous'}|${audienceKey}`,
+    ),
     queryFn: async () => {
       if (!userId) return []
       const snapshot = await getDocs(
         query(
           collection(db, 'reviews'),
           where('userId', '==', userId),
+          where('visibility', 'in', allowed),
           orderBy('createdAt', 'desc'),
         ),
       )

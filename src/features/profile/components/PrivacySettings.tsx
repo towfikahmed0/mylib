@@ -17,7 +17,6 @@ const FIELDS: { key: keyof PrivacySettingsValue; label: string; description: str
   { key: 'library', label: 'Library', description: 'Your book collection.' },
   { key: 'wishlist', label: 'Wishlist', description: 'Books you want to read.' },
   { key: 'progress', label: 'Progress', description: 'Reading progress and statuses.' },
-  { key: 'reviews', label: 'Reviews', description: 'Reviews you have written.' },
   { key: 'feed', label: 'Activity Feed', description: 'Your recent reading activity.' },
 ]
 

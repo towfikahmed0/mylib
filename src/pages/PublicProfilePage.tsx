@@ -17,7 +17,7 @@ import { usePublicProfile } from '../features/profile/hooks/usePublicProfile'
 import { ShelfCard } from '../features/shelves/components/ShelfCard'
 import { usePublicShelves } from '../features/shelves/hooks/useShelves'
 import { toast } from '../store/toastStore'
-import type { Book } from '../types'
+import type { Book, PostVisibility } from '../types'
 
 const GRID_CLASS = 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
 const SKELETON_COUNT = 10
@@ -64,6 +64,14 @@ export function PublicProfilePage() {
       postsVisibility === 'public' ||
       (postsVisibility === 'signed_in' && Boolean(user)) ||
       (postsVisibility === 'followers_collaborators' && Boolean(user) && (isPartner || isFollowing)))
+  // Per-post audiences must be filtered in the query itself — Firestore rules
+  // cannot filter results, and a signed-out viewer must never receive anything
+  // other than public posts.
+  const postsAudience: PostVisibility[] = !user
+    ? ['public']
+    : isOwnProfile || isPartner || isFollowing
+      ? ['public', 'signed_in', 'followers_collaborators']
+      : ['public', 'signed_in']
   const borrowPermission = profile?.privacySettings?.borrowRequestPermission ?? 'collaborators'
   const canSendBorrowRequest =
     borrowPermission === 'anyone' ||
@@ -88,6 +96,7 @@ export function PublicProfilePage() {
   const { reviews, isLoading: isLoadingReviews, isError: isReviewsError } = useReviewsForUser(
     profile?.uid,
     activeTab === 'posts' && canViewPosts,
+    postsAudience,
   )
 
   const handleRequest = async (book: Book) => {

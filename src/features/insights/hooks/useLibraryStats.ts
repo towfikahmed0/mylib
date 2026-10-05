@@ -74,7 +74,10 @@ function computeStats(
   personalBooks: Book[],
   statuses: ReadingStatusMap,
 ): LibraryStats {
-  const inLibrary = allBooks.filter((book) => book.isInLibrary !== false)
+  const inLibrary = allBooks.filter(
+    (book) =>
+      book.isInLibrary !== false && book.isWishlist !== true && !statuses[book.id]?.isWishlist,
+  )
   const totalBooks = inLibrary.length
 
   const statusCounts: Record<ReadingStatusValue, number> = {
@@ -116,7 +119,10 @@ function computeStats(
     }
   }
 
-  const personal = personalBooks.filter((book) => book.isInLibrary !== false)
+  const personal = personalBooks.filter(
+    (book) =>
+      book.isInLibrary !== false && book.isWishlist !== true && !statuses[book.id]?.isWishlist,
+  )
   const activityDays = new Set<string>()
   let finishedCount = 0
   let momentum = 0

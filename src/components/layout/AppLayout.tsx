@@ -5,6 +5,7 @@ import { useAuth } from '../../features/auth/useAuth'
 import { AIChatModal } from '../../features/ai/components/AIChatModal'
 import { AddBookFlow } from '../../features/library/components/AddBookChooser'
 import { useSyncLibraryStats } from '../../features/library/hooks/useSyncLibraryStats'
+import { useSyncWishlistFlags } from '../../features/library/hooks/useSyncWishlistFlags'
 import { NotificationBell } from '../../features/notifications/components/NotificationBell'
 import { DesktopSidebar } from './DesktopSidebar'
 import { MobileBottomNav } from './MobileBottomNav'
@@ -94,6 +95,7 @@ export function AppLayout() {
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [isAddBookOpen, setIsAddBookOpen] = useState(false)
   useSyncLibraryStats()
+  useSyncWishlistFlags()
 
   return (
     <div className="min-h-dvh bg-background">

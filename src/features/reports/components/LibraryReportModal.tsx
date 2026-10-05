@@ -28,7 +28,8 @@ export function LibraryReportModal({ open, onClose }: { open: boolean; onClose: 
     usePartnerBookGroups(open && includePartnerBooks)
 
   const ownBooks = books.filter(
-    (book) => book.isInLibrary !== false && !statuses[book.id]?.isWishlist,
+    (book) =>
+      book.isInLibrary !== false && book.isWishlist !== true && !statuses[book.id]?.isWishlist,
   )
   const isPreparing =
     open && (booksLoading || statusesLoading || (includePartnerBooks && partnersLoading))

@@ -39,7 +39,7 @@ import { exportToJSON, parseJSONFile } from '../features/library/utils/json'
 import { recordToBookFormInput, type BookImportRecord } from '../features/library/utils/importTypes'
 import { ChangeUsernameCard } from '../features/profile/components/ChangeUsernameCard'
 import { CollaborationSection } from '../features/collaboration/components/CollaborationSection'
-import { DangerZoneCard } from '../features/profile/components/DangerZoneCard'
+import { AccountSection } from '../features/profile/components/AccountSection'
 import { DeleteAccountCard } from '../features/profile/components/DeleteAccountCard'
 import { PrivacySettings } from '../features/profile/components/PrivacySettings'
 import { ProfileCard } from '../features/profile/components/ProfileCard'
@@ -440,7 +440,7 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <DangerZoneCard />
+      <AccountSection />
 
       <DeleteAccountCard />
 

@@ -16,11 +16,18 @@ export function useSyncLibraryStats() {
   const { statuses, isLoading: statusLoading } = useReadingStatus()
   const queryClient = useQueryClient()
 
-  const totalBooks = books.filter((book) => book.isInLibrary !== false).length
+  const totalBooks = books.filter(
+    (book) =>
+      book.isInLibrary !== false && book.isWishlist !== true && !statuses[book.id]?.isWishlist,
+  ).length
   const completedBooks = useMemo(
     () =>
       books.filter(
-        (book) => book.isInLibrary !== false && statuses[book.id]?.status === 'finished',
+        (book) =>
+          book.isInLibrary !== false &&
+          book.isWishlist !== true &&
+          !statuses[book.id]?.isWishlist &&
+          statuses[book.id]?.status === 'finished',
       ).length,
     [books, statuses],
   )

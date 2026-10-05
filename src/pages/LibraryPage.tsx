@@ -141,7 +141,7 @@ export function LibraryPage() {
   const query = searchQuery.trim().toLocaleLowerCase()
 
   const allLibraryBooks = groups.flatMap((group) =>
-    group.books.filter((book) => book.isInLibrary !== false),
+    group.books.filter((book) => book.isInLibrary !== false && book.isWishlist !== true),
   )
   const authorOptions = Array.from(
     new Set(allLibraryBooks.map((book) => book.author.trim()).filter(Boolean)),
@@ -201,7 +201,9 @@ export function LibraryPage() {
   const groupViews = groups.map((group) => ({
     ...group,
     visibleBooks: sortBooks(
-      group.books.filter((book) => book.isInLibrary !== false).filter(matchesFilters),
+      group.books
+        .filter((book) => book.isInLibrary !== false && book.isWishlist !== true)
+        .filter(matchesFilters),
     ),
   }))
   const totalLibraryCount = allLibraryBooks.length

@@ -129,6 +129,12 @@ export interface Book {
   price: number
   purchaseDate: FirestoreDate | null
   isInLibrary?: boolean
+  /**
+   * Owner-level marker denormalized from the owner's reading status. A wishlist
+   * book is one the owner wants to buy (not read), so it is never part of the
+   * shared library and is hidden from collaborators and public viewers.
+   */
+  isWishlist?: boolean
   tags: string[]
   genres: string[]
   categories: string[]

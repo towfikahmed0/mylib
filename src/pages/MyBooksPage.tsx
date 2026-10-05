@@ -1,12 +1,15 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Award, BookMarked, Heart, Share2 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { toast } from '../store/toastStore'
 import { BookCard } from '../features/library/components/BookCard'
 import { BookDetailsModal } from '../features/library/components/BookDetailsModal'
 import { SkeletonBookCard } from '../features/library/components/SkeletonBookCard'
+import { useAuth } from '../features/auth/useAuth'
 import { useBooks } from '../features/library/hooks/useBooks'
+import { usePartnerBookGroups } from '../features/library/hooks/useLibraryShelf'
 import { useReadingStatus } from '../features/library/hooks/useReadingStatus'
+import { useUpdateBook } from '../features/library/hooks/useUpdateBook'
 import { useUpdateReadingStatus } from '../features/library/hooks/useUpdateReadingStatus'
 import { DistributionDoughnut } from '../features/insights/components/InsightsCharts'
 import { CHART_PALETTE } from '../features/insights/chartPalette'
@@ -56,10 +59,13 @@ function genreCounts(books: Book[]): CountedItem[] {
 }
 
 export function MyBooksPage() {
-  const { books, isLoading } = useBooks()
+  const { user, appUser } = useAuth()
+  const { books: ownBooks, isLoading: ownLoading } = useBooks()
+  const { groups: partnerGroups, isLoading: partnersLoading } = usePartnerBookGroups(true)
   const { partners } = useActivePartners()
-  const { statuses } = useReadingStatus()
+  const { statuses, isLoading: statusesLoading } = useReadingStatus()
   const updateStatus = useUpdateReadingStatus()
+  const updateBook = useUpdateBook()
   const [tab, setTab] = useState<MyBooksTab>(() => readStoredTab())
   const [selectedBook, setSelectedBook] = useState<Book | null>(null)
   const [isFinishedShareOpen, setIsFinishedShareOpen] = useState(false)
@@ -73,15 +79,30 @@ export function MyBooksPage() {
     }
   }
 
-  const finishedBooks = books
-    .filter((book) => statuses[book.id]?.status === 'finished')
+  // "Finished" spans your own books AND collaborators' books that *you* have
+  // marked finished — ownership alone never decides this list.
+  const allBooks = useMemo(
+    () => [...ownBooks, ...partnerGroups.flatMap((group) => group.books)],
+    [ownBooks, partnerGroups],
+  )
+
+  const finishedBooks = allBooks
+    .filter(
+      (book) =>
+        statuses[book.id]?.status === 'finished' && !statuses[book.id]?.isWishlist,
+    )
     .sort((a, b) => toMillis(statuses[b.id]?.finishedAt) - toMillis(statuses[a.id]?.finishedAt))
 
-  const wishlistBooks = books.filter((book) => statuses[book.id]?.isWishlist)
+  // Wishlist is always scoped to the current user's own reading status and is
+  // never surfaced anywhere else.
+  const wishlistBooks = allBooks.filter((book) => statuses[book.id]?.isWishlist)
 
   const genres = genreCounts(finishedBooks)
 
   const handleMoveToLibrary = (book: Book) => {
+    if (book.userId === user?.uid) {
+      void updateBook.mutateAsync({ bookId: book.id, isInLibrary: true, isWishlist: false })
+    }
     updateStatus
       .mutateAsync({ bookId: book.id, isWishlist: false, status: 'want_to_read' })
       .then(() => toast.success(`"${book.title}" moved to your library.`))
@@ -90,12 +111,34 @@ export function MyBooksPage() {
       )
   }
 
+  // Activity ranking is based on how many books each reader has *finished*, and
+  // always includes the current user alongside their collaborators.
+  const readerActivity = [
+    {
+      uid: user?.uid ?? 'self',
+      displayName: appUser?.displayName || appUser?.username || 'You',
+      avatarUrl: appUser?.avatarUrl ?? '',
+      finishedCount: finishedBooks.length,
+      isSelf: true,
+    },
+    ...partners
+      .filter((partner) => !partner.unsubscribed)
+      .map((partner) => ({
+        uid: partner.uid,
+        displayName: partner.displayName,
+        avatarUrl: partner.avatarUrl,
+        finishedCount: partner.completedBooksCount,
+        isSelf: false,
+      })),
+  ]
+    .filter((reader, index, list) => list.findIndex((item) => item.uid === reader.uid) === index)
+    .sort((a, b) => b.finishedCount - a.finishedCount)
+
+  const bestReaderCount = readerActivity[0]?.finishedCount ?? 0
+
   const activeBooks = tab === 'finished' ? finishedBooks : wishlistBooks
-  const activePartners = partners
-    .filter((partner) => !partner.unsubscribed)
-    .sort((a, b) => b.totalBooksCount - a.totalBooksCount)
-  const bestReaderCount = activePartners[0]?.totalBooksCount ?? 0
   const genreTotal = genres.reduce((total, item) => total + item.value, 0)
+  const isLoading = ownLoading || partnersLoading || statusesLoading
 
   return (
     <section className="animate-fade-in space-y-5">
@@ -178,47 +221,51 @@ export function MyBooksPage() {
             </div>
           </div>
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-            <h3 className="mb-4 text-xs font-black uppercase tracking-widest text-slate-400">
+            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">
               Collaborator Activity
             </h3>
-            {activePartners.length > 0 ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {activePartners.map((partner, index) => {
-                  const isBestReader = index === 0 && partner.totalBooksCount > 0 && partner.totalBooksCount === bestReaderCount
-                    return (
-                      <div
-                        key={partner.uid}
-                        className={`flex min-w-0 items-center gap-3 rounded-2xl border p-4 ${isBestReader ? 'border-amber-200 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/20' : 'border-slate-200 dark:border-slate-700'}`}
-                      >
-                        <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-900 text-xs font-bold text-white dark:bg-white dark:text-slate-900">
-                          {partner.avatarUrl ? (
-                            <img src={partner.avatarUrl} alt="" className="h-full w-full object-cover" />
-                          ) : (
-                            partner.displayName.slice(0, 2).toUpperCase()
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="truncate text-sm font-bold">{partner.displayName}</p>
-                            {isBestReader ? (
-                              <span className="inline-flex items-center gap-1 rounded-md bg-amber-400 px-1.5 py-0.5 text-[9px] font-black uppercase text-amber-950">
-                                <Award size={11} /> Best Reader
-                              </span>
-                            ) : null}
-                          </div>
-                          <p className="mt-0.5 text-xs text-muted">
-                            {partner.totalBooksCount} {partner.totalBooksCount === 1 ? 'book' : 'books'}
-                          </p>
-                        </div>
+            <p className="mb-4 mt-1 text-xs text-muted">
+              Ranked by the number of books each reader has finished. Includes you.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {readerActivity.map((reader, index) => {
+                const isBestReader = index === 0 && reader.finishedCount > 0 && reader.finishedCount === bestReaderCount
+                return (
+                  <div
+                    key={reader.uid}
+                    className={`flex min-w-0 items-center gap-3 rounded-2xl border p-4 ${isBestReader ? 'border-amber-200 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/20' : 'border-slate-200 dark:border-slate-700'}`}
+                  >
+                    <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-900 text-xs font-bold text-white dark:bg-white dark:text-slate-900">
+                      {reader.avatarUrl ? (
+                        <img src={reader.avatarUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        reader.displayName.slice(0, 2).toUpperCase()
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-bold">
+                          {reader.displayName}
+                          {reader.isSelf ? ' (You)' : ''}
+                        </p>
+                        {isBestReader ? (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-amber-400 px-1.5 py-0.5 text-[9px] font-black uppercase text-amber-950">
+                            <Award size={11} /> Best Reader
+                          </span>
+                        ) : null}
                       </div>
-                    )
-                  })}
-              </div>
-            ) : (
-              <p className="text-sm italic text-muted">
-                No collaborators yet. Add one from Settings to see shared reading activity here.
-              </p>
-            )}
+                      <p
+                        className="mt-0.5 text-xs text-muted"
+                        title="Books finished"
+                      >
+                        {reader.finishedCount}{' '}
+                        {reader.finishedCount === 1 ? 'book finished' : 'books finished'}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
       </div>
       )}

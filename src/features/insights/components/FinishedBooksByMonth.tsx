@@ -27,7 +27,9 @@ export function FinishedBooksByMonth() {
     const dates: FinishedBookDate[] = []
     for (const book of books) {
       if (book.isInLibrary === false) continue
+      if (book.isWishlist === true) continue
       const status = statuses[book.id]
+      if (status?.isWishlist) continue
       if (status?.status !== 'finished') continue
       const finishedAt = toDate(status.finishedAt) ?? toDate(status.updatedAt)
       if (finishedAt) dates.push({ year: finishedAt.getFullYear(), month: finishedAt.getMonth() })

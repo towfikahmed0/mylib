@@ -44,6 +44,10 @@ export interface AddBookVariables extends BookFormInput {
 async function persistBook(uid: string, input: AddBookVariables): Promise<string> {
   const ownerUid = input.targetUserId ?? uid
   const now = serverTimestamp()
+  const isWishlist = input.isWishlist
+  // A wishlist book of your own is private: it is never part of the shared
+  // library, so collaborators can never see it.
+  const isInLibrary = input.isInLibrary && !(isWishlist && ownerUid === uid)
 
   const bookFields = {
     title: input.title.trim(),
@@ -55,7 +59,8 @@ async function persistBook(uid: string, input: AddBookVariables): Promise<string
     purchaseDate: input.purchaseDate ? Timestamp.fromDate(input.purchaseDate) : null,
     copyType: input.copyType,
     gifterName: input.copyType === 'gifted' ? input.gifterName?.trim() || null : null,
-    isInLibrary: input.isInLibrary,
+    isInLibrary,
+    isWishlist: isWishlist && ownerUid === uid,
     genres: input.genres,
     tags: input.tags,
     updatedAt: now,
@@ -63,10 +68,14 @@ async function persistBook(uid: string, input: AddBookVariables): Promise<string
 
   const statusFields: Record<string, unknown> = {
     userId: uid,
-    isWishlist: input.isWishlist,
+    isWishlist,
     updatedAt: now,
   }
-  if (!input.isInLibrary) {
+  if (isWishlist) {
+    statusFields.status = 'want_to_read'
+    statusFields.progress = 0
+    statusFields.finishedAt = null
+  } else if (!isInLibrary) {
     statusFields.status = 'finished'
     statusFields.progress = 100
     statusFields.finishedAt = now
@@ -102,13 +111,13 @@ async function persistBook(uid: string, input: AddBookVariables): Promise<string
   }))
   batch.set(doc(db, 'books', bookRef.id, 'readingStatus', uid), sanitizeFirestoreData({
     ...statusFields,
-    status: input.isInLibrary ? 'want_to_read' : 'finished',
+    status: isWishlist || isInLibrary ? 'want_to_read' : 'finished',
     rating: 0,
-    progress: input.isInLibrary ? 0 : 100,
+    progress: isWishlist || isInLibrary ? 0 : 100,
     comment: '',
     isFavorite: false,
     readingTimeMinutes: 0,
-    finishedAt: input.isInLibrary ? null : now,
+    finishedAt: isWishlist || isInLibrary ? null : now,
     highlights: [],
   }))
   await batch.commit()
