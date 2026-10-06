@@ -1,17 +1,24 @@
 name: Deploy to cPanel
 
 on:
-  # This allows you to click a button in GitHub to deploy
+  # Allows you to click a button in GitHub to deploy
   workflow_dispatch: 
-  # This allows you to deploy by running: git tag deploy && git push --tags
+  # Runs on pushes to your branch
   push:
-    tags:
-      - 'deploy'
+    branches:
+      - mylib-react  # <-- Change this if your branch is named differently
 
 jobs:
-  build-and-deploy:
+  # ==========================================
+  # JOB 1: Build the React App
+  # ==========================================
+  build:
+    # Only run if manually triggered OR if commit message contains "DEPLOY"
+    if: |
+      github.event_name == 'workflow_dispatch' || 
+      (github.event_name == 'push' && contains(github.event.head_commit.message, 'DEPLOY'))
+    
     runs-on: ubuntu-latest
-
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
@@ -30,18 +37,50 @@ jobs:
     - name: Copy .htaccess
       run: cp .htaccess dist/.htaccess
 
-    - name: Push to cPanel Git
+    - name: Upload Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: production-build
+        path: dist/
+
+  # ==========================================
+  # JOB 2: Deploy the Build to cPanel
+  # ==========================================
+  deploy:
+    needs: build
+    # Only run if the build job succeeded
+    if: |
+      github.event_name == 'workflow_dispatch' || 
+      (github.event_name == 'push' && contains(github.event.head_commit.message, 'DEPLOY'))
+    
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download Build Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: production-build
+        path: dist
+
+    - name: Setup SSH Agent
       run: |
         mkdir -p ~/.ssh
         ssh-keyscan -H ${{ secrets.CPANEL_HOST }} >> ~/.ssh/known_hosts
         eval $(ssh-agent -s)
         ssh-add - <<< "${{ secrets.CPANEL_SSH_KEY }}"
+
+    - name: Test SSH Connection
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.CPANEL_USER }}@${{ secrets.CPANEL_HOST }} "echo 'SSH Connection Successful!'"
+
+    - name: Push to cPanel Git
+      run: |
+        git init
         git config --global user.name "GitHub Action"
         git config --global user.email "action@github.com"
-        git add -f dist
+        git add dist
         git commit -m "deploy: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
         git remote add cpanel ssh://${{ secrets.CPANEL_USER }}@${{ secrets.CPANEL_HOST }}${{ secrets.CPANEL_REPO_PATH }}
-        GIT_SSH_COMMAND="ssh -v" git push cpanel HEAD:mylib-react --force
+        git push cpanel HEAD:mylib-react --force
 
     - name: Trigger cPanel Deployment
       uses: appleboy/ssh-action@v1.0.3
