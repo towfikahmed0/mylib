@@ -61,18 +61,17 @@ jobs:
         name: production-build
         path: dist
 
-    - name: Setup SSH Agent
+    - name: Setup SSH Key
       run: |
         mkdir -p ~/.ssh
-        echo "${{ secrets.CPANEL_SSH_KEY }}" > ~/.ssh/id_ed25519
+        # Strip Windows carriage returns from the secret
+        echo "${{ secrets.CPANEL_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_ed25519
         chmod 600 ~/.ssh/id_ed25519
         ssh-keyscan -H ${{ secrets.CPANEL_HOST }} >> ~/.ssh/known_hosts
-        eval $(ssh-agent -s)
-        ssh-add ~/.ssh/id_ed25519
 
     - name: Test SSH Connection
       run: |
-        ssh -o StrictHostKeyChecking=no ${{ secrets.CPANEL_USER }}@${{ secrets.CPANEL_HOST }} "echo 'SSH Connection Successful!'"
+        ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no ${{ secrets.CPANEL_USER }}@${{ secrets.CPANEL_HOST }} "echo 'SSH Connection Successful!'"
 
     - name: Push to cPanel Git
       run: |
@@ -82,7 +81,7 @@ jobs:
         git add dist
         git commit -m "deploy: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
         git remote add cpanel ssh://${{ secrets.CPANEL_USER }}@${{ secrets.CPANEL_HOST }}${{ secrets.CPANEL_REPO_PATH }}
-        git push cpanel HEAD:mylib-react --force
+        GIT_SSH_COMMAND="ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no" git push cpanel HEAD:mylib-react --force
 
     - name: Trigger cPanel Deployment
       uses: appleboy/ssh-action@v1.0.3
