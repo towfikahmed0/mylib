@@ -41,7 +41,7 @@ jobs:
         git add -f dist
         git commit -m "deploy: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
         git remote add cpanel ssh://${{ secrets.CPANEL_USER }}@${{ secrets.CPANEL_HOST }}${{ secrets.CPANEL_REPO_PATH }}
-        git push cpanel HEAD:main --force
+        GIT_SSH_COMMAND="ssh -v" git push cpanel HEAD:mylib-react --force
 
     - name: Trigger cPanel Deployment
       uses: appleboy/ssh-action@v1.0.3
