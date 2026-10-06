@@ -1,0 +1,3 @@
+## 2025-10-06 - Translucent Overlay vs Inline Card Action Buttons
+**Learning:** Re-using image overlay button styles (e.g. `bg-white/20 text-white backdrop-blur`) inside light inline card content leads to severe contrast accessibility failures (near 1:1 contrast ratio, rendering white icons invisible on light card backgrounds).
+**Action:** Always differentiate overlay action buttons (rendered over dark cover images) from inline card action buttons (rendered on card surface backgrounds) by applying high-contrast surface styles (`bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300`) and keyboard focus rings (`focus-visible:ring-2`) to inline action buttons.

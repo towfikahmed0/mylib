@@ -137,7 +137,7 @@ export function BookCard({
     onEdit?.(book)
   }
 
-  const favoriteButton = (className: string, iconSize: number) => (
+  const favoriteButton = (className: string, iconSize: number, isInline = false) => (
     <button
       type="button"
       onClick={handleFavorite}
@@ -145,19 +145,30 @@ export function BookCard({
       aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'}
       title={favorite ? 'Remove from favorites' : 'Add to favorites'}
       className={cn(
-        'flex items-center justify-center rounded-lg bg-white/20 text-white shadow-lg backdrop-blur-sm transition-transform hover:scale-110',
+        'flex items-center justify-center rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+        isInline
+          ? favorite
+            ? 'bg-rose-100 text-rose-600 hover:bg-rose-200 dark:bg-rose-950/60 dark:text-rose-400'
+            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600'
+          : 'bg-slate-900/40 text-white shadow-lg backdrop-blur-sm hover:scale-110 hover:bg-slate-900/60',
         isBursting && 'heart-burst',
         className,
       )}
     >
       <Heart
         size={iconSize}
-        className={favorite ? 'fill-rose-500 stroke-rose-500' : 'stroke-white'}
+        className={
+          favorite
+            ? 'fill-rose-500 stroke-rose-500'
+            : isInline
+              ? 'stroke-slate-600 dark:stroke-slate-300'
+              : 'stroke-white'
+        }
       />
     </button>
   )
 
-  const copyButton = (className: string, iconSize: number) => (
+  const copyButton = (className: string, iconSize: number, isInline = false) => (
     <button
       type="button"
       onClick={handleCopy}
@@ -165,7 +176,10 @@ export function BookCard({
       aria-label="Copy ISBN or title"
       title="Copy ISBN or title"
       className={cn(
-        'flex items-center justify-center rounded-lg bg-white/20 text-white shadow-lg backdrop-blur-sm transition-transform hover:scale-110',
+        'flex items-center justify-center rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+        isInline
+          ? 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600'
+          : 'bg-slate-900/40 text-white shadow-lg backdrop-blur-sm hover:scale-110 hover:bg-slate-900/60',
         className,
       )}
     >
@@ -357,7 +371,7 @@ export function BookCard({
         <div className="flex flex-shrink-0 flex-col items-end text-right">
           <div className="text-[10px] text-amber-400">{stars}</div>
           <div className="mt-1 flex items-center gap-2">
-            {!selectionMode ? favoriteButton('h-6 w-6', 14) : null}
+            {!selectionMode ? favoriteButton('h-6 w-6', 14, true) : null}
             {!selectionMode && onEdit ? (
               <button
                 type="button"
@@ -365,12 +379,12 @@ export function BookCard({
                 onKeyDown={(event) => event.stopPropagation()}
                 aria-label="Edit book details"
                 title="Edit book details"
-                className="flex h-6 w-6 items-center justify-center rounded-lg bg-white/20 text-white shadow-lg backdrop-blur-sm transition-transform hover:scale-110"
+                className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
               >
                 <Pencil size={14} />
               </button>
             ) : null}
-            {!selectionMode ? copyButton('h-6 w-6', 14) : null}
+            {!selectionMode ? copyButton('h-6 w-6', 14, true) : null}
             {statusBadge}
             {actionPill}
           </div>
@@ -458,7 +472,7 @@ export function BookCard({
                 onKeyDown={(event) => event.stopPropagation()}
                 aria-label="Edit book details"
                 title="Edit book details"
-                className="rounded-full p-2 text-blue-400 opacity-0 transition-colors hover:bg-slate-50 group-hover:opacity-100 group-focus-within:opacity-100 dark:hover:bg-slate-700"
+                className="rounded-full p-2 text-blue-400 opacity-0 transition-colors hover:bg-slate-50 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary group-hover:opacity-100 group-focus-within:opacity-100 dark:hover:bg-slate-700"
               >
                 <Pencil size={16} />
               </button>
