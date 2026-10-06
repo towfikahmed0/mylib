@@ -1,113 +1,45 @@
-# name: Deploy to cPanel
-
-# on:
-#   # Allows you to click a button in GitHub to deploy
-#   workflow_dispatch: 
-#   # Runs on pushes to your branch
-#   push:
-#     branches:
-#       - mylib-react  # <-- Change this if your branch is named differently
-
-# jobs:
-#   # ==========================================
-#   # JOB 1: Build the React App
-#   # ==========================================
-#   build:
-#     # Only run if manually triggered OR if commit message contains "DEPLOY"
-#     if: |
-#       github.event_name == 'workflow_dispatch' || 
-#       (github.event_name == 'push' && contains(github.event.head_commit.message, 'DEPLOY'))
-    
-#     runs-on: ubuntu-latest
-#     steps:
-#     - name: Checkout Code
-#       uses: actions/checkout@v4
-
-#     - name: Setup Node.js
-#       uses: actions/setup-node@v4
-#       with:
-#         node-version: '20'
-
-#     - name: Install Dependencies
-#       run: npm ci
-
-#     - name: Build Project
-#       run: npm run build
-
-#     - name: Copy .htaccess
-#       run: cp .htaccess dist/.htaccess
-
-#     - name: Upload Build Artifact
-#       uses: actions/upload-artifact@v4
-#       with:
-#         name: production-build
-#         path: dist/
-
-#   # ==========================================
-#   # JOB 2: Deploy the Build to cPanel
-#   # ==========================================
-#   deploy:
-#     needs: build
-#     # Only run if the build job succeeded
-#     if: |
-#       github.event_name == 'workflow_dispatch' || 
-#       (github.event_name == 'push' && contains(github.event.head_commit.message, 'DEPLOY'))
-    
-#     runs-on: ubuntu-latest
-#     steps:
-#     - name: Download Build Artifact
-#       uses: actions/download-artifact@v4
-#       with:
-#         name: production-build
-#         path: dist
-
-#     - name: Setup SSH Key
-#       run: |
-#         mkdir -p ~/.ssh
-#         # Strip Windows carriage returns from the secret
-#         echo "${{ secrets.CPANEL_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_ed25519
-#         chmod 600 ~/.ssh/id_ed25519
-#         ssh-keyscan -H ${{ secrets.CPANEL_HOST }} >> ~/.ssh/known_hosts
-
-#     - name: Test SSH Connection
-#       run: |
-#         ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no ${{ secrets.CPANEL_USER }}@${{ secrets.CPANEL_HOST }} "echo 'SSH Connection Successful!'"
-
-#     - name: Push to cPanel Git
-#       run: |
-#         git init
-#         git config --global user.name "GitHub Action"
-#         git config --global user.email "action@github.com"
-#         git add dist
-#         git commit -m "deploy: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-#         git remote add cpanel ssh://${{ secrets.CPANEL_USER }}@${{ secrets.CPANEL_HOST }}${{ secrets.CPANEL_REPO_PATH }}
-#         GIT_SSH_COMMAND="ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no" git push cpanel HEAD:mylib-react --force
-
-#     - name: Trigger cPanel Deployment
-#       uses: appleboy/ssh-action@v1.0.3
-#       with:
-#         host: ${{ secrets.CPANEL_HOST }}
-#         username: ${{ secrets.CPANEL_USER }}
-#         key: ${{ secrets.CPANEL_SSH_KEY }}
-#         script: |
-#           /usr/bin/uapi VersionControlDeployment create repository_root=${{ secrets.CPANEL_REPO_PATH }}
-
-
-name: Test SSH
+name: Deploy to cPanel via FTP
 
 on:
-  workflow_dispatch:
+  # Allows you to click a button in GitHub to deploy
+  workflow_dispatch: 
+  # Runs on pushes to your branch
+  push:
+    branches:
+      - mylib-react
 
 jobs:
-  test:
+  build-and-deploy:
+    # Only run if manually triggered OR if commit message contains "DEPLOY"
+    if: |
+      github.event_name == 'workflow_dispatch' || 
+      (github.event_name == 'push' && contains(github.event.head_commit.message, 'DEPLOY'))
+    
     runs-on: ubuntu-latest
     steps:
-    - name: Setup SSH Key
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.CPANEL_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_ed25519
-        chmod 600 ~/.ssh/id_ed25519
+    - name: Checkout Code
+      uses: actions/checkout@v4
 
-    - name: Test SSH Connection
-      run: |
-        ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no ${{ secrets.CPANEL_USER }}@${{ secrets.CPANEL_HOST }} "echo 'SUCCESS! SSH works perfectly.'"
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Dependencies
+      run: npm ci
+
+    - name: Build Project
+      run: npm run build
+
+    - name: Copy .htaccess
+      run: cp .htaccess dist/.htaccess
+
+    - name: Deploy via FTP
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        local-dir: ./dist/
+        server-dir: ${{ secrets.FTP_SERVER_DIR }}
+        dangerous-clean-slate: false
