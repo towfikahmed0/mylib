@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA, type ManifestOptions } from 'vite-plugin-pwa'
@@ -26,6 +27,10 @@ export default defineConfig(() => {
   }
 
   return {
+    test: {
+      environment: 'jsdom',
+      globals: true,
+    },
     plugins: [
       react(),
       VitePWA({
