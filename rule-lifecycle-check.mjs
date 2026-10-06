@@ -19,6 +19,7 @@ import {
   Timestamp,
   updateDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore'
 
 const projectId = 'demo-mylib'
@@ -621,6 +622,114 @@ assert.ok(
 
 await deleteApp(anonApp)
 console.log('Post audience privacy verified')
+
+// --- Privacy enforcement for books and activityFeed ---
+const collabReqId = `${owner.uid}_${borrower.uid}`
+await setDoc(doc(owner.db, 'collaborationRequests', collabReqId), {
+  fromUserId: owner.uid,
+  toUserId: borrower.uid,
+  status: 'pending',
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+})
+
+const collabBatch = writeBatch(borrower.db)
+collabBatch.update(doc(borrower.db, 'collaborationRequests', collabReqId), {
+  status: 'accepted',
+  updatedAt: serverTimestamp(),
+})
+collabBatch.set(doc(borrower.db, 'partnerships', collabReqId), {
+  userId1: owner.uid,
+  userId2: borrower.uid,
+  initiatorId: owner.uid,
+  status: 'accepted',
+  allowAddBooks: false,
+  grantedBy: '',
+  user1Unsubscribed: false,
+  user2Unsubscribed: false,
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+})
+await collabBatch.commit()
+console.log('Partnership created between owner and borrower for privacy verification')
+
+// Book library privacy checks
+const privacyBookRef = doc(owner.db, 'books', 'privacy-check-book')
+await setDoc(privacyBookRef, {
+  userId: owner.uid,
+  title: 'Privacy Check Book',
+  author: 'Test Author',
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+  borrowedBy: null,
+  borrowDate: null,
+  borrowHistory: [],
+  borrowStatus: 'available',
+  borrowRequestId: null,
+  activeLoanId: null,
+})
+
+// When library is private: partner and outsider cannot read, owner can read
+await updateDoc(ownerProfile, { 'privacySettings.library': 'private' })
+await mustBeDenied(
+  getDoc(doc(borrower.db, 'books', 'privacy-check-book')),
+  'Active partner cannot read book when owner library is private',
+)
+await mustBeDenied(
+  getDoc(doc(outsider.db, 'books', 'privacy-check-book')),
+  'Outsider cannot read book when owner library is private',
+)
+const ownerSelfBook = await getDoc(privacyBookRef)
+assert.equal(ownerSelfBook.data().title, 'Privacy Check Book')
+
+// When library is collaborators: active partner CAN read, outsider CANNOT read
+await updateDoc(ownerProfile, { 'privacySettings.library': 'collaborators' })
+const partnerReadCollab = await getDoc(doc(borrower.db, 'books', 'privacy-check-book'))
+assert.equal(partnerReadCollab.data().title, 'Privacy Check Book')
+await mustBeDenied(
+  getDoc(doc(outsider.db, 'books', 'privacy-check-book')),
+  'Outsider cannot read book when owner library is collaborators-only',
+)
+
+// When library is public: both active partner and outsider CAN read
+await updateDoc(ownerProfile, { 'privacySettings.library': 'public' })
+const partnerReadPublic = await getDoc(doc(borrower.db, 'books', 'privacy-check-book'))
+assert.equal(partnerReadPublic.data().title, 'Privacy Check Book')
+const outsiderReadPublic = await getDoc(doc(outsider.db, 'books', 'privacy-check-book'))
+assert.equal(outsiderReadPublic.data().title, 'Privacy Check Book')
+console.log('Book library privacy enforcement verified')
+
+// Activity feed privacy checks
+const privacyFeedRef = doc(collection(owner.db, 'activityFeed'))
+await setDoc(privacyFeedRef, {
+  type: 'book_added',
+  userId: owner.uid,
+  userName: 'owner',
+  libraryId: owner.uid,
+  timestamp: serverTimestamp(),
+  bookId: 'privacy-check-book',
+  bookTitle: 'Privacy Check Book',
+  message: 'Added Privacy Check Book',
+})
+
+// When feed is private: active partner CANNOT read, owner CAN read
+await updateDoc(ownerProfile, { 'privacySettings.feed': 'private' })
+await mustBeDenied(
+  getDoc(doc(borrower.db, 'activityFeed', privacyFeedRef.id)),
+  'Partner cannot read owner activity feed event when feed is private',
+)
+const ownerFeedDoc = await getDoc(privacyFeedRef)
+assert.equal(ownerFeedDoc.data().bookTitle, 'Privacy Check Book')
+
+// When feed is collaborators: active partner CAN read, outsider CANNOT read
+await updateDoc(ownerProfile, { 'privacySettings.feed': 'collaborators' })
+const partnerFeedDoc = await getDoc(doc(borrower.db, 'activityFeed', privacyFeedRef.id))
+assert.equal(partnerFeedDoc.data().bookTitle, 'Privacy Check Book')
+await mustBeDenied(
+  getDoc(doc(outsider.db, 'activityFeed', privacyFeedRef.id)),
+  'Outsider cannot read partner activity feed event',
+)
+console.log('Activity feed privacy enforcement verified')
 
 await Promise.all([deleteApp(owner.app), deleteApp(borrower.app), deleteApp(outsider.app)])
 console.log('Borrowing rules lifecycle passed.')

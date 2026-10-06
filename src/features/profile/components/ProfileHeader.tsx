@@ -33,6 +33,7 @@ interface ProfileHeaderProps {
   isOwnProfile: boolean
   isPartner: boolean
   totalBooks: number
+  completedBooks?: number
 }
 
 export function ProfileHeader({
@@ -40,6 +41,7 @@ export function ProfileHeader({
   isOwnProfile,
   isPartner,
   totalBooks,
+  completedBooks,
 }: ProfileHeaderProps) {
   const joined = formatJoined(profile.joinedAt)
   const initial = profile.username.slice(0, 2).toUpperCase()
@@ -101,7 +103,9 @@ export function ProfileHeader({
         ) : (
           <div className="flex shrink-0 flex-wrap items-center gap-2 sm:pr-10">
             <FollowButton targetUid={profile.uid} />
-            {isPartner ? (
+            {isPartner &&
+            (profile.privacySettings?.library === 'public' ||
+              profile.privacySettings?.library === 'collaborators') ? (
               <Link
                 to={`/u/${profile.username}?view=library`}
                 className="flex shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-surface-muted px-4 py-2.5 text-sm font-semibold text-foreground transition hover:opacity-80"
@@ -152,7 +156,7 @@ export function ProfileHeader({
         <Stat
           icon={<CheckCircle2 size={16} />}
           label="Completed"
-          value={profile.completedBooksCount ?? 0}
+          value={completedBooks ?? (profile.completedBooksCount ?? 0)}
         />
         <Stat
           icon={<Users size={16} />}

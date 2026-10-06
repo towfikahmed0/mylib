@@ -20,7 +20,7 @@ This document describes the checked-in [Firestore rules](firestore.rules), clien
 | `users/{uid}/notifications/{id}` | In-app notifications | Recipient can read/update/delete; any signed-in actor can create under a recipient path if `actorUserId` matches and text/link lengths fit. |
 | `userLookup/{email}` | Email-to-UID lookup | Signed-in exact get; signed-in list with query limit at most one. Writes require the document email to match the caller's token email and UID. |
 | `usernameLookup/{username}` | Public username-to-profile lookup | Public exact get; list limit at most ten. Signed-in create/update requires only that the new document's `uid` is the caller. Delete checks existing UID. |
-| `books/{bookId}` | Catalog record, owned by `userId`; optional `isInLibrary` boolean separates owned/finished books from the active library | Read by owner, active partner, or anyone when owner's library setting is public. Create/update validates a small required-field set and validates `isInLibrary` when present. Missing `isInLibrary` is treated by the client as `true` for existing records. See the high-risk grant/update issue below. |
+| `books/{bookId}` | Catalog record, owned by `userId`; optional `isInLibrary` boolean separates owned/finished books from the active library | Read by owner, active partner (when owner's library setting is public or collaborators), current borrower (when `borrowedBy` is the caller), or anyone when owner's library setting is public. Create/update validates a small required-field set and validates `isInLibrary` when present. Missing `isInLibrary` is treated by the client as `true` for existing records. See the high-risk grant/update issue below. |
 | `books/{bookId}/readingStatus/{uid}` | Per-user status, rating, progress, wishlist/favorite, timer, highlights | Read if `resource.data.userId` is caller. Write if path UID and resulting `userId` are caller. |
 | `partnerships/{id}` | Collaboration state and add-book permission | Read/update/delete by either participant. Create requires an accepted request in the same batch and a recipient check. Update field restrictions are insufficient; see finding F-03. |
 | `collaborationRequests/{id}` | Invite request | Read by either participant; create requires caller as sender and pending status; participant updates are restricted to `status`/`updatedAt`, but valid transitions are not checked. |
@@ -32,7 +32,7 @@ This document describes the checked-in [Firestore rules](firestore.rules), clien
 | `reviews/{id}/comments/{id}` | Review comments | Read and create require access to the parent post; author/admin update/delete also require parent-post access. |
 | `shelves/{id}` | User shelf and smart-shelf metadata | Read if `isPublic` or owner; create/update/delete by owner. |
 | `reports/{id}` | User-submitted reports | Signed-in create requires caller reporter ID and pending status; read/update/delete admin-only. |
-| `activityFeed/{id}` | Library event, keyed by `libraryId` | Read by library owner or active partner. Create requires caller as actor and own/active-partner library. No update/delete. |
+| `activityFeed/{id}` | Library event, keyed by `libraryId` | Read by library owner or active partner (when owner's `privacySettings.feed` is not private). Create requires caller as actor and own/active-partner library. No update/delete. |
 | `adminConfig/{id}` | Admin feature/config data | Admin-only read/write. |
 
 `readingStatus` is also matched using a collection-group wildcard rule. The project has composite indexes in [firestore.indexes.json](firestore.indexes.json). The PRD describes additional schema fields; only fields and access above are supported by current rules/code evidence.
@@ -56,13 +56,13 @@ Severity is a repository-based risk assessment, not a statement that an exploit 
 
 **Recommended fix:** Make the grant authorize only creation of books in the owner's library. Require the owner for edits/deletes, or define narrowly allowlisted partner-edit fields if intended. Freeze `userId` on ordinary updates. Implement ownership transfer as a separate explicit operation with validated participants and a deliberate transfer workflow.
 
-### F-02 — High: Library privacy settings are not consistently enforced
+### F-02 — Medium: Library privacy settings partially hardened in rules
 
-**Evidence:** Book reads allow every active partner regardless of `privacySettings.library`; the public-profile page also allows an active partner through its forced-library view even when the setting is private. Other legacy `privacySettings` choices (library, wishlist, progress, reviews, and feed) remain inconsistently enforced. Posts now have a separate `privacySettings.posts` audience, copied onto review records and enforced by review rules; changed settings migrate existing reviews, with large histories processed in multiple batches.
+**Evidence:** Rules for `books/{bookId}` now enforce that active partners can only read books if the owner's `privacySettings.library` is `'public'` or `'collaborators'`, preventing unauthorized partner reads when the library is `'private'` (while preserving access for current active borrowers). Rules for `activityFeed/{id}` now enforce that active partners cannot read the library owner's activity feed documents when `privacySettings.feed == 'private'`. Other legacy `privacySettings` choices (wishlist, progress, reviews) remain client-filtered, while posts use `privacySettings.posts` audience migration.
 
-**Risk:** A user's selected visibility may not match actual access for library, reading status, and activity data. For users with more than 499 posts, the audience migration is multi-batch, so a failed batch can leave some existing posts with their prior audience until the user retries saving. Legacy controls may be ineffective or unsupported rather than reliably private/shared.
+**Risk:** A user's selected visibility for secondary data types (wishlist/progress/reviews) may still rely partly on client queries rather than database-level rules where evaluation is complex.
 
-**Recommended fix:** Define the intended access matrix per data type, then enforce it in rules and align UI queries. Do not depend on hiding controls or client-side profile checks. For per-user status/reviews where rule evaluation is impractical, use a carefully scoped server-side read path or a schema that rules can safely evaluate.
+**Recommended fix:** Continue aligning UI queries with database rules across remaining subcollections and legacy fields. For per-user status/reviews where rule evaluation is impractical, use a carefully scoped server-side read path or a schema that rules can safely evaluate.
 
 ### F-03 — High: Partnership participants can rewrite permission state
 

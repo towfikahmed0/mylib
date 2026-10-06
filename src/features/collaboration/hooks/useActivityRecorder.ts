@@ -24,7 +24,7 @@ export function useActivityRecorder(): {
       if (!user) return
 
       const audience = new Set<string>([user.uid])
-      const feedVisibility = appUser?.privacySettings.feed ?? 'collaborators'
+      const feedVisibility = appUser?.privacySettings?.feed ?? 'collaborators'
       if (feedVisibility !== 'private') {
         for (const partner of partners) {
           if (partner.isActive) audience.add(partner.uid)

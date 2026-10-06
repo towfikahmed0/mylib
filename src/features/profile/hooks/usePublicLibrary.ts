@@ -69,11 +69,11 @@ export function usePublicLibrary(uid: string | undefined, enabled: boolean) {
     enabled: Boolean(uid) && enabled,
   })
 
+  const allBooks = data?.pages.flatMap((page) => page.books) ?? []
+
   return {
-    books:
-      data?.pages
-        .flatMap((page) => page.books)
-        .filter((book) => book.isInLibrary !== false && book.isWishlist !== true) ?? [],
+    books: allBooks.filter((book) => book.isInLibrary !== false && book.isWishlist !== true),
+    wishlistBooks: allBooks.filter((book) => book.isWishlist === true),
     isLoading: isPending,
     isLoadingMore: isFetchingNextPage,
     hasMore: Boolean(hasNextPage),

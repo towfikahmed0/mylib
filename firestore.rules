@@ -329,17 +329,31 @@ match /notifications/{notifId} {
         return isSignedIn() && resource.data.userId == request.auth.uid;
       }
 
+      function isCurrentBorrower() {
+        return isSignedIn()
+          && resource.data.get('borrowedBy', '') == request.auth.uid;
+      }
+
+      function ownerLibraryPrivacy() {
+        let userPath = /databases/$(database)/documents/users/$(resource.data.userId);
+        return exists(userPath)
+          && get(userPath).data.keys().hasAll(['privacySettings'])
+          && get(userPath).data.privacySettings is map
+          ? get(userPath).data.privacySettings.get('library', 'private')
+          : 'private';
+      }
+
       function isPartnerOfOwner() {
         return isSignedIn()
           && resource.data.userId != request.auth.uid
-          && isActivePartner(resource.data.userId);
+          && isActivePartner(resource.data.userId)
+          && ownerLibraryPrivacy() in ['public', 'collaborators'];
       }
 
       // A book becomes world-readable when its owner has published their
-      // library. Collaborators are already covered by isPartnerOfOwner().
+      // library. Collaborators are covered by isPartnerOfOwner().
       function isOwnerLibraryPublic() {
-        return exists(/databases/$(database)/documents/users/$(resource.data.userId))
-          && get(/databases/$(database)/documents/users/$(resource.data.userId)).data.privacySettings.library == 'public';
+        return ownerLibraryPrivacy() == 'public';
       }
 
       function isValidBook() {
@@ -483,7 +497,10 @@ match /notifications/{notifId} {
             ]);
       }
 
-      allow read: if isBookOwner() || isPartnerOfOwner() || isOwnerLibraryPublic();
+      allow read: if isBookOwner()
+        || isCurrentBorrower()
+        || isPartnerOfOwner()
+        || isOwnerLibraryPublic();
 
       allow create: if isSignedIn()
         && isValidBook()
@@ -962,9 +979,19 @@ match /notifications/{notifId} {
     // ---------------------------------------------------------------
 
     match /activityFeed/{eventId} {
+      function isFeedPrivate(libraryId) {
+        let userPath = /databases/$(database)/documents/users/$(libraryId);
+        return exists(userPath)
+          && get(userPath).data.keys().hasAll(['privacySettings'])
+          && get(userPath).data.privacySettings is map
+          && get(userPath).data.privacySettings.get('feed', 'collaborators') == 'private';
+      }
+
       allow read: if isSignedIn()
-        && (resource.data.libraryId == request.auth.uid
-          || isActivePartner(resource.data.libraryId));
+        && (
+          resource.data.libraryId == request.auth.uid
+          || (isActivePartner(resource.data.libraryId) && !isFeedPrivate(resource.data.libraryId))
+        );
 
       // FIX: only post into your own feed or an active partner's feed.
       allow create: if isSignedIn()

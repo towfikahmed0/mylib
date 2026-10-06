@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { BookOpen, Layers, Loader2, Lock, Plus, UserX } from 'lucide-react'
+import { BookOpen, Heart, Layers, Loader2, Lock, Plus, UserX } from 'lucide-react'
 import { useAuth } from '../features/auth/useAuth'
 import { useAddablePartners } from '../features/collaboration/hooks/useCollaboration'
 import { useSendBookRequest } from '../features/collaboration/hooks/useBookRequests'
@@ -41,8 +41,9 @@ export function PublicProfilePage() {
   const isOwnProfile = Boolean(profile && user && profile.uid === user.uid)
   const isPartner = useIsActivePartner(user?.uid, profile?.uid)
   const { isFollowing } = useIsFollowing(profile?.uid)
-  const forceLibrary = searchParams.get('view') === 'library'
-  const activeTab = searchParams.get('view') === 'posts' ? 'posts' : 'library'
+  const viewParam = searchParams.get('view')
+  const activeTab: 'library' | 'wishlist' | 'posts' =
+    viewParam === 'posts' ? 'posts' : viewParam === 'wishlist' ? 'wishlist' : 'library'
 
   const { partners: addablePartners } = useAddablePartners()
   const sendRequest = useSendBookRequest()
@@ -54,8 +55,21 @@ export function PublicProfilePage() {
     Boolean(profile) &&
     (isOwnProfile ||
       libraryVisibility === 'public' ||
-      (libraryVisibility === 'collaborators' && isPartner) ||
-      (isPartner && forceLibrary))
+      (libraryVisibility === 'collaborators' && isPartner))
+
+  const wishlistVisibility = profile?.privacySettings?.wishlist ?? 'private'
+  const canViewWishlist =
+    Boolean(profile) &&
+    (isOwnProfile ||
+      wishlistVisibility === 'public' ||
+      (wishlistVisibility === 'collaborators' && isPartner))
+
+  const progressVisibility = profile?.privacySettings?.progress ?? 'collaborators'
+  const canViewProgress =
+    Boolean(profile) &&
+    (isOwnProfile ||
+      progressVisibility === 'public' ||
+      (progressVisibility === 'collaborators' && isPartner))
 
   const postsVisibility = profile?.privacySettings?.posts ?? 'public'
   const canViewPosts =
@@ -86,11 +100,12 @@ export function PublicProfilePage() {
 
   const {
     books,
+    wishlistBooks,
     isLoading: isLoadingBooks,
     isLoadingMore,
     hasMore,
     loadMore,
-  } = usePublicLibrary(profile?.uid, canViewLibrary)
+  } = usePublicLibrary(profile?.uid, canViewLibrary || canViewWishlist)
   const libraryCount = usePublicLibraryCount(profile?.uid, canViewLibrary)
   const { shelves, isLoading: isLoadingShelves } = usePublicShelves(profile?.uid)
   const { reviews, isLoading: isLoadingReviews, isError: isReviewsError } = useReviewsForUser(
@@ -151,8 +166,12 @@ export function PublicProfilePage() {
 
   // Prefer the synced profile count, which already excludes books marked
   // "not in the library"; fall back to the live count for legacy profiles.
-  const totalBooks =
-    profile.totalBooksCount > 0 ? profile.totalBooksCount : canViewLibrary ? libraryCount : 0
+  const totalBooks = canViewLibrary
+    ? profile.totalBooksCount > 0
+      ? profile.totalBooksCount
+      : libraryCount
+    : 0
+  const completedBooks = canViewProgress ? (profile.completedBooksCount ?? 0) : 0
 
   return (
     <section className="animate-fade-in space-y-6">
@@ -161,6 +180,7 @@ export function PublicProfilePage() {
         isOwnProfile={isOwnProfile}
         isPartner={isPartner}
         totalBooks={totalBooks}
+        completedBooks={completedBooks}
       />
 
       <div
@@ -168,14 +188,20 @@ export function PublicProfilePage() {
         aria-label="Profile sections"
         className="flex w-fit gap-1 rounded-2xl bg-surface-muted/60 p-1"
       >
-        {(['library', 'posts'] as const).map((tab) => (
+        {(['library', 'wishlist', 'posts'] as const).map((tab) => (
           <button
             key={tab}
             type="button"
             role="tab"
             aria-selected={activeTab === tab}
             onClick={() =>
-              setSearchParams(tab === 'library' ? { view: 'library' } : { view: 'posts' })
+              setSearchParams(
+                tab === 'library'
+                  ? { view: 'library' }
+                  : tab === 'wishlist'
+                    ? { view: 'wishlist' }
+                    : { view: 'posts' },
+              )
             }
             className={`rounded-xl px-4 py-2 text-sm font-medium capitalize transition ${
               activeTab === tab
@@ -183,7 +209,7 @@ export function PublicProfilePage() {
                 : 'text-muted hover:text-foreground'
             }`}
           >
-            {tab === 'library' ? 'Library' : 'Posts'}
+            {tab === 'library' ? 'Library' : tab === 'wishlist' ? 'Wishlist' : 'Posts'}
           </button>
         ))}
       </div>
@@ -232,7 +258,7 @@ export function PublicProfilePage() {
                 <BookCard
                   key={book.id}
                   book={book}
-                  showReadingStatus={Boolean(user)}
+                  showReadingStatus={canViewProgress}
                   onRequest={!isOwnProfile ? handleRequest : undefined}
                   requestDisabledReason={
                     borrowPermission === 'none'
@@ -265,7 +291,7 @@ export function PublicProfilePage() {
         )}
       </div>
 
-      {activeTab === 'library' && !isLoadingShelves && shelves.length > 0 ? (
+      {activeTab === 'library' && canViewLibrary && !isLoadingShelves && shelves.length > 0 ? (
         <div className="space-y-4">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
             <Layers size={16} className="text-accent" />
@@ -280,6 +306,48 @@ export function PublicProfilePage() {
               />
             ))}
           </div>
+        </div>
+      ) : null}
+
+      {activeTab === 'wishlist' ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="flex items-center gap-2 text-sm font-semibold">
+              <Heart size={16} className="text-accent" />
+              Wishlist
+            </h2>
+          </div>
+
+          {!canViewWishlist ? (
+            <div className="card-surface flex flex-col items-center gap-2 px-6 py-12 text-center">
+              <Lock className="text-muted" size={22} />
+              <p className="text-sm text-muted">
+                {wishlistVisibility === 'collaborators'
+                  ? 'This wishlist is shared with collaborators only.'
+                  : 'This wishlist is private.'}
+              </p>
+            </div>
+          ) : isLoadingBooks ? (
+            <div className={GRID_CLASS}>
+              {Array.from({ length: SKELETON_COUNT }, (_, index) => (
+                <SkeletonBookCard key={index} />
+              ))}
+            </div>
+          ) : wishlistBooks.length === 0 ? (
+            <div className="card-surface px-6 py-12 text-center text-sm text-muted">
+              No wishlist books to show yet.
+            </div>
+          ) : (
+            <div className={GRID_CLASS}>
+              {wishlistBooks.map((book) => (
+                <BookCard
+                  key={book.id}
+                  book={book}
+                  showReadingStatus={canViewProgress}
+                />
+              ))}
+            </div>
+          )}
         </div>
       ) : null}
 

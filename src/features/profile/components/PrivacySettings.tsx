@@ -39,29 +39,48 @@ const BORROW_REQUEST_OPTIONS: { value: BorrowRequestPermission; label: string }[
   { value: 'anyone', label: 'Any User' },
 ]
 
+function getInitialPrivacySettings(
+  privacy?: Partial<PrivacySettingsValue> | null,
+): PrivacySettingsValue {
+  return {
+    library: privacy?.library ?? 'private',
+    wishlist: privacy?.wishlist ?? 'private',
+    progress: privacy?.progress ?? 'collaborators',
+    reviews: privacy?.reviews ?? 'public',
+    feed: privacy?.feed ?? 'collaborators',
+    posts: privacy?.posts ?? 'public',
+    borrowRequestPermission: privacy?.borrowRequestPermission ?? 'collaborators',
+  }
+}
+
 export function PrivacySettings() {
   const { appUser, refreshProfile } = useAuth()
-  const [draft, setDraft] = useState<PrivacySettingsValue | null>(
-    appUser
-      ? {
-          ...appUser.privacySettings,
-          posts: appUser.privacySettings.posts ?? 'public',
-          borrowRequestPermission:
-            appUser.privacySettings.borrowRequestPermission ?? 'collaborators',
-        }
-      : null,
+  const [draft, setDraft] = useState<PrivacySettingsValue | null>(() =>
+    appUser ? getInitialPrivacySettings(appUser.privacySettings) : null,
   )
+  const [syncedKey, setSyncedKey] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+
+  const currentKey = appUser
+    ? `${appUser.uid}_${JSON.stringify(appUser.privacySettings ?? {})}`
+    : null
+
+  if (appUser && syncedKey !== currentKey && !isSaving) {
+    setSyncedKey(currentKey)
+    setDraft(getInitialPrivacySettings(appUser.privacySettings))
+  }
 
   if (!appUser || !draft) return null
 
   const settings = draft
+  const savedSettings = getInitialPrivacySettings(appUser.privacySettings)
+
   const isDirty =
-    FIELDS.some(({ key }) => settings[key] !== appUser.privacySettings[key]) ||
-    settings.posts !== (appUser.privacySettings.posts ?? 'public') ||
-    settings.borrowRequestPermission !==
-      (appUser.privacySettings.borrowRequestPermission ?? 'collaborators') ||
-    !appUser.privacySettings.posts
+    FIELDS.some(({ key }) => settings[key] !== savedSettings[key]) ||
+    settings.posts !== savedSettings.posts ||
+    settings.borrowRequestPermission !== savedSettings.borrowRequestPermission ||
+    !appUser.privacySettings?.posts ||
+    !appUser.privacySettings?.borrowRequestPermission
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -70,8 +89,8 @@ export function PrivacySettings() {
       const userRef = doc(db, 'users', appUser.uid)
       let postsToMigrate: Awaited<ReturnType<typeof getDocs>> | null = null
       if (
-        settings.posts !== (appUser.privacySettings.posts ?? 'public') ||
-        !appUser.privacySettings.posts
+        settings.posts !== (appUser.privacySettings?.posts ?? 'public') ||
+        !appUser.privacySettings?.posts
       ) {
         postsToMigrate = await getDocs(
           query(collection(db, 'reviews'), where('userId', '==', appUser.uid)),
