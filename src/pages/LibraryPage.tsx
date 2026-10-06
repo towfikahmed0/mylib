@@ -33,7 +33,9 @@ import {
 } from '../features/library/hooks/useBulkBookActions'
 import { useLibraryShelf } from '../features/library/hooks/useLibraryShelf'
 import { useReadingStatus } from '../features/library/hooks/useReadingStatus'
-import { NotificationBell } from '../features/notifications/components/NotificationBell'
+import { useLibraryBookRatings } from '../features/library/hooks/useBookReviews'
+import { CurrentlyReadingSection } from '../features/library/components/CurrentlyReadingSection'
+import { useAuth } from '../features/auth/useAuth'
 import type { Book, ReadingStatusValue } from '../types'
 
 const SKELETON_COUNT = 10
@@ -66,6 +68,7 @@ function readStoredView(): BookCardView {
 
 export function LibraryPage() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const { groups, hasPartners, isLoading, isError, error, refetch } = useLibraryShelf()
   const { statuses } = useReadingStatus()
   const [isAddFlowOpen, setIsAddFlowOpen] = useState(false)
@@ -143,6 +146,16 @@ export function LibraryPage() {
   const allLibraryBooks = groups.flatMap((group) =>
     group.books.filter((book) => book.isInLibrary !== false && book.isWishlist !== true),
   )
+  const { getBookSummary } = useLibraryBookRatings(allLibraryBooks, statuses)
+
+  const allAvailableBooks = useMemo(() => groups.flatMap((group) => group.books), [groups])
+  const currentlyReadingBooks = useMemo(
+    () =>
+      allAvailableBooks.filter(
+        (book) => statuses[book.id]?.status === 'reading' && !statuses[book.id]?.isWishlist,
+      ),
+    [allAvailableBooks, statuses],
+  )
   const authorOptions = Array.from(
     new Set(allLibraryBooks.map((book) => book.author.trim()).filter(Boolean)),
   ).sort((a, b) => a.localeCompare(b))
@@ -211,8 +224,15 @@ export function LibraryPage() {
 
   const ownGroupView = groupViews.find((group) => group.isOwn)
   const ownBooks = groups.find((group) => group.isOwn)?.books ?? []
-  const selectableVisibleBooks = ownGroupView?.visibleBooks ?? []
-  const selectedBooks = ownBooks.filter((book) => selectedIds.has(book.id))
+  const selectableVisibleBooks = visibleBooks
+  const selectedBookList = useMemo(
+    () => allLibraryBooks.filter((book) => selectedIds.has(book.id)),
+    [allLibraryBooks, selectedIds],
+  )
+  const hasCollaboratorBooksSelected = selectedBookList.some(
+    (book) => book.userId !== (user?.uid ?? ''),
+  )
+  const selectedBooks = selectedBookList.filter((book) => book.userId === user?.uid)
 
   const toggleSelect = (book: Book) => {
     setSelectedIds((previous) => {
@@ -238,7 +258,7 @@ export function LibraryPage() {
     try {
       await bulkStatus.mutateAsync({ bookIds: [...selectedIds], status })
       toast.success(
-        `Status updated for ${selectedIds.size} book${selectedIds.size === 1 ? '' : 's'}.`,
+        `Reading status updated for ${selectedIds.size} book${selectedIds.size === 1 ? '' : 's'}.`,
       )
       setIsBulkStatusOpen(false)
       exitSelection()
@@ -248,10 +268,16 @@ export function LibraryPage() {
   }
 
   const handleBulkDelete = async () => {
-    const ids = [...selectedIds]
+    const ownIds = selectedBookList
+      .filter((book) => book.userId === user?.uid)
+      .map((book) => book.id)
+    if (ownIds.length === 0) {
+      toast.error('No owned books selected to delete.')
+      return
+    }
     try {
-      await bulkDelete.mutateAsync(ids)
-      toast.success(`Deleted ${ids.length} book${ids.length === 1 ? '' : 's'}.`)
+      await bulkDelete.mutateAsync(ownIds)
+      toast.success(`Deleted ${ownIds.length} book${ownIds.length === 1 ? '' : 's'}.`)
       setIsBulkDeleteOpen(false)
       exitSelection()
     } catch (error) {
@@ -290,7 +316,6 @@ export function LibraryPage() {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <NotificationBell />
           <button
             type="button"
             onClick={() => (isSelecting ? exitSelection() : setIsSelecting(true))}
@@ -340,6 +365,11 @@ export function LibraryPage() {
             Clear
           </button>
           <div className="ml-auto flex items-center gap-1.5">
+            {hasCollaboratorBooksSelected ? (
+              <span className="hidden rounded-lg bg-amber-500/15 px-2 py-1 text-[11px] font-semibold text-amber-700 sm:inline-block dark:text-amber-300">
+                Collaborator books: status only
+              </span>
+            ) : null}
             <button
               type="button"
               onClick={() => setIsBulkStatusOpen(true)}
@@ -352,8 +382,13 @@ export function LibraryPage() {
             <button
               type="button"
               onClick={() => setIsBulkTransferOpen(true)}
-              disabled={selectedIds.size === 0}
-              className="flex items-center gap-1.5 rounded-xl bg-surface-muted px-3 py-2 text-xs font-semibold transition hover:opacity-80 disabled:opacity-50"
+              disabled={selectedIds.size === 0 || hasCollaboratorBooksSelected}
+              title={
+                hasCollaboratorBooksSelected
+                  ? 'Cannot transfer collaborator-owned books'
+                  : 'Transfer selected books'
+              }
+              className="flex items-center gap-1.5 rounded-xl bg-surface-muted px-3 py-2 text-xs font-semibold transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ArrowRightLeft size={14} />
               Transfer
@@ -361,8 +396,13 @@ export function LibraryPage() {
             <button
               type="button"
               onClick={() => setIsBulkDeleteOpen(true)}
-              disabled={selectedIds.size === 0}
-              className="flex items-center gap-1.5 rounded-xl bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-500/20 disabled:opacity-50 dark:text-rose-300"
+              disabled={selectedIds.size === 0 || hasCollaboratorBooksSelected}
+              title={
+                hasCollaboratorBooksSelected
+                  ? 'Cannot delete collaborator-owned books'
+                  : 'Delete selected books'
+              }
+              className="flex items-center gap-1.5 rounded-xl bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-40 dark:text-rose-300"
             >
               <Trash2 size={14} />
               Delete
@@ -546,58 +586,65 @@ export function LibraryPage() {
             Clear filter
           </button>
         </div>
-      ) : hasPartners ? (
-        <div className="space-y-8">
-          {groupViews.map((group) =>
-            group.visibleBooks.length === 0 ? null : (
-              <section key={group.ownerUid} className="space-y-3">
-                <h2 className="text-sm font-semibold text-muted">
-                  {group.isOwn ? 'From your library' : `From ${group.ownerName}'s library`}
-                </h2>
-                <div className={cardContainerClass}>
-                  {group.visibleBooks.map((book) => (
-                    <BookCard
-                      key={book.id}
-                      book={book}
-                      status={statuses[book.id]}
-                      view={view}
-                      showReadingStatus={group.isOwn}
-                      onClick={setSelectedBook}
-                      onEdit={group.isOwn ? setEditingBook : undefined}
-                      onRequest={
-                        !group.isOwn && canRequestFrom(group.ownerUid) ? handleRequest : undefined
-                      }
-                      requestDisabledReason={
-                        !group.isOwn && canRequestFrom(group.ownerUid)
-                          ? requestDisabledReason(book)
-                          : undefined
-                      }
-                      selectionMode={group.isOwn && isSelecting}
-                      selected={selectedIds.has(book.id)}
-                      onToggleSelect={toggleSelect}
-                    />
-                  ))}
-                </div>
-              </section>
-            ),
-          )}
-        </div>
       ) : (
-        <div className={cardContainerClass}>
-          {visibleBooks.map((book) => (
-            <BookCard
-              key={book.id}
-              book={book}
-              status={statuses[book.id]}
-              view={view}
-              onClick={setSelectedBook}
-              onEdit={setEditingBook}
-              selectionMode={isSelecting}
-              selected={selectedIds.has(book.id)}
-              onToggleSelect={toggleSelect}
-            />
-          ))}
-        </div>
+        <>
+          <CurrentlyReadingSection
+            books={currentlyReadingBooks}
+            statuses={statuses}
+            onOpenDetails={setSelectedBook}
+          />
+
+          {hasPartners ? (
+            <div className="space-y-8">
+              {groupViews.map((group) =>
+                group.visibleBooks.length === 0 ? null : (
+                  <section key={group.ownerUid} className="space-y-3">
+                    <h2 className="text-sm font-semibold text-muted">
+                      {group.isOwn ? 'From your library' : `From ${group.ownerName}'s library`}
+                    </h2>
+                    <div className={cardContainerClass}>
+                      {group.visibleBooks.map((book) => (
+                        <BookCard
+                          key={book.id}
+                          book={book}
+                          status={statuses[book.id]}
+                          view={view}
+                          showReadingStatus={true}
+                          averageRating={getBookSummary(book.id).averageRating}
+                          ratingCount={getBookSummary(book.id).ratingCount}
+                          onClick={setSelectedBook}
+                          onEdit={group.isOwn ? setEditingBook : undefined}
+                          selectionMode={isSelecting}
+                          selected={selectedIds.has(book.id)}
+                          onToggleSelect={toggleSelect}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ),
+              )}
+            </div>
+          ) : (
+            <div className={cardContainerClass}>
+              {visibleBooks.map((book) => (
+                <BookCard
+                  key={book.id}
+                  book={book}
+                  status={statuses[book.id]}
+                  view={view}
+                  showReadingStatus={true}
+                  averageRating={getBookSummary(book.id).averageRating}
+                  ratingCount={getBookSummary(book.id).ratingCount}
+                  onClick={setSelectedBook}
+                  onEdit={setEditingBook}
+                  selectionMode={isSelecting}
+                  selected={selectedIds.has(book.id)}
+                  onToggleSelect={toggleSelect}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       <AddBookFlow

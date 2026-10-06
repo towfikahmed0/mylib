@@ -104,10 +104,16 @@ export function ReviewCard({ review }: { review: Review }) {
         </div>
       </div>
 
-      <div
-        className="whitespace-pre-wrap text-sm leading-relaxed"
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+      {html ? (
+        <div
+          className="whitespace-pre-wrap text-sm leading-relaxed"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      ) : rating > 0 ? (
+        <p className="text-xs italic text-muted">
+          Rated {rating} star{rating === 1 ? '' : 's'} without a written comment.
+        </p>
+      ) : null}
 
       <div className="flex items-center gap-5 border-t border-border/60 pt-3">
         <button

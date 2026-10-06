@@ -70,10 +70,14 @@ export interface NewPlanBook {
   title: string
   author: string
   coverUrl: string
+  startDate?: string | null
+  targetFinishDate?: string | null
 }
 
 export function toPlanItem(book: NewPlanBook): ReadingPlanItem {
-  const startDate = todayIso()
+  const startDate = book.startDate || todayIso()
+  const targetFinishDate =
+    book.targetFinishDate || addDaysIso(startDate, PLAN_DEFAULT_DURATION_DAYS)
   return {
     id: createPlanId(),
     bookId: book.bookId,
@@ -81,7 +85,7 @@ export function toPlanItem(book: NewPlanBook): ReadingPlanItem {
     author: book.author,
     coverUrl: book.coverUrl,
     startDate,
-    targetFinishDate: addDaysIso(startDate, PLAN_DEFAULT_DURATION_DAYS),
+    targetFinishDate,
     status: 'upcoming',
     order: 0,
   }

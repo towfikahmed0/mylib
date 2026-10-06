@@ -43,6 +43,7 @@ import { useDeleteBook } from '../hooks/useBookActions'
 import { useBooks } from '../hooks/useBooks'
 import { useUpdateBook } from '../hooks/useUpdateBook'
 import { useUpdateReadingStatus } from '../hooks/useUpdateReadingStatus'
+import { useSaveBookReview } from '../hooks/useBookReviews'
 import { useLoanActions, useLoanList, useSendBookRequest } from '../../collaboration/hooks/useBookRequests'
 import { useActivePartners } from '../../collaboration/hooks/useCollaboration'
 
@@ -183,20 +184,7 @@ function BookDetailsContent({
 
   const cover = book.coverUrl || book.thumbnail
   const isOwner = Boolean(user && book.userId === user.uid)
-  // Community rating aggregated from every review of this book (own and
-  // collaborators' copies), falling back to the stored book fields.
-  const communityRating = averageRating > 0 ? averageRating : book.averageRating
-  const communityRatingCount = ratingCount > 0 ? ratingCount : book.ratingCount
-  const highlights = book.highlights ?? []
-
-  const ownerBorrowPermission =
-    partners.find((partner) => partner.uid === book.userId)?.borrowRequestPermission ?? 'collaborators'
-  const canRequestBook =
-    !isOwner &&
-    ownerBorrowPermission !== 'none' &&
-    book.isInLibrary !== false &&
-    book.isWishlist !== true &&
-    borrowAvailability === 'available'
+  const saveReviewMutation = useSaveBookReview()
 
   const [selected, setSelected] = useState<ReadingStatusValue>(status?.status ?? 'want_to_read')
   const [isWishlist, setIsWishlist] = useState(status?.isWishlist ?? false)
@@ -218,6 +206,43 @@ function BookDetailsContent({
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isAskOpen, setIsAskOpen] = useState(false)
   const [isShelfOpen, setIsShelfOpen] = useState(false)
+
+  // Reviews by collaborators (any partner/collaborator other than the active viewer)
+  const collaboratorReviews = reviews.filter((r) => r.userId !== user?.uid)
+  const userEffectiveRating = rating > 0 ? rating : (status?.rating ?? 0)
+
+  // Requirement 2: AVG rating is the mean of the user and all collaborators rating
+  const allDistinctRatings: number[] = []
+  if (userEffectiveRating > 0) {
+    allDistinctRatings.push(userEffectiveRating)
+  }
+  const collaboratorRatingMap = new Map<string, number>()
+  for (const cr of collaboratorReviews) {
+    if ((cr.rating ?? 0) > 0) {
+      collaboratorRatingMap.set(cr.userId, cr.rating)
+    }
+  }
+  for (const crRating of collaboratorRatingMap.values()) {
+    allDistinctRatings.push(crRating)
+  }
+
+  const meanRating =
+    allDistinctRatings.length > 0
+      ? allDistinctRatings.reduce((sum, r) => sum + r, 0) / allDistinctRatings.length
+      : averageRating > 0
+        ? averageRating
+        : book.averageRating
+  const meanRatingCount = allDistinctRatings.length > 0 ? allDistinctRatings.length : ratingCount
+  const highlights = book.highlights ?? []
+
+  const ownerBorrowPermission =
+    partners.find((partner) => partner.uid === book.userId)?.borrowRequestPermission ?? 'collaborators'
+  const canRequestBook =
+    !isOwner &&
+    ownerBorrowPermission !== 'none' &&
+    book.isInLibrary !== false &&
+    book.isWishlist !== true &&
+    borrowAvailability === 'available'
   const [isShareOpen, setIsShareOpen] = useState(false)
   const [isMoreOpen, setIsMoreOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
@@ -326,11 +351,20 @@ function BookDetailsContent({
     )
   }
 
-  const handleSaveReview = () => {
-    void runStatusUpdate(
-      { bookId: book.id, rating, comment: comment.trim() },
-      'Review saved.',
-    )
+  const handleSaveReview = async () => {
+    try {
+      await runStatusUpdate(
+        { bookId: book.id, rating, comment: comment.trim() },
+        'Review saved.',
+      )
+      await saveReviewMutation.mutateAsync({
+        book,
+        rating,
+        comment: comment.trim(),
+      })
+    } catch {
+      // Best-effort
+    }
   }
 
   const handleRatingChange = async (nextRating: number) => {
@@ -338,6 +372,11 @@ function BookDetailsContent({
     setRating(nextRating)
     try {
       await updateStatus.mutateAsync({ bookId: book.id, rating: nextRating })
+      await saveReviewMutation.mutateAsync({
+        book,
+        rating: nextRating,
+        comment: comment.trim(),
+      })
       toast.success(nextRating === 0 ? 'Rating cleared.' : 'Rating updated.')
     } catch (error) {
       setRating(previous)
@@ -541,12 +580,12 @@ function BookDetailsContent({
                 <Star
                   key={index}
                   size={14}
-                  className={index < rating ? 'fill-current' : 'text-slate-300 dark:text-slate-600'}
+                  className={index < Math.round(meanRating) ? 'fill-current' : 'text-slate-300 dark:text-slate-600'}
                 />
               ))}
               <span className="ml-1.5 text-[10px] font-semibold text-muted">
-                Avg {communityRating > 0 ? communityRating.toFixed(1) : '—'}
-                {communityRatingCount > 0 ? ` · ${communityRatingCount}` : ''}
+                Avg {meanRating > 0 ? meanRating.toFixed(1) : '—'}
+                {meanRatingCount > 0 ? ` · ${meanRatingCount} ${meanRatingCount === 1 ? 'rating' : 'ratings'}` : ''}
               </span>
             </div>
 
@@ -891,19 +930,26 @@ function BookDetailsContent({
             </div>
 
         {/* Collaborator reviews */}
-        {reviews.length > 0 ? (
-          <div className="mt-6 space-y-3">
-            <p className="flex items-center gap-1.5 text-sm font-semibold">
-              <MessageSquare size={15} className="text-accent" />
-              Collaborator Reviews
-            </p>
+        <div className="mt-6 space-y-3">
+          <p className="flex items-center gap-1.5 text-sm font-semibold">
+            <MessageSquare size={15} className="text-accent" />
+            Collaborator Reviews &amp; Ratings {collaboratorReviews.length > 0 ? `(${collaboratorReviews.length})` : ''}
+          </p>
+          {collaboratorReviews.length > 0 ? (
             <div className="space-y-2">
-              {reviews.map((review) => (
+              {collaboratorReviews.map((review) => (
                 <ReviewCard key={review.id} review={review} />
               ))}
             </div>
-          </div>
-        ) : null}
+          ) : (
+            <div className="rounded-2xl border border-dashed border-border/60 p-4 text-center">
+              <p className="text-xs font-medium text-muted">No collaborator reviews yet</p>
+              <p className="mt-0.5 text-[11px] text-muted/70">
+                Ratings and reviews from your collaborators will appear here.
+              </p>
+            </div>
+          )}
+        </div>
 
         {/* Highlights & quotes */}
         <div className="mt-4 space-y-2.5 border-t border-border/60 pt-4">

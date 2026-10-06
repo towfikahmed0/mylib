@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { doc, getDoc, runTransaction } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
 import { sanitizeFirestoreData } from '../../../lib/firestore'
-import type { ReadingPlanItem } from '../../../types'
+import type { ReadingPlanItem, ReadingPlanStatus } from '../../../types'
 import { useAuth } from '../../auth/useAuth'
 
 export const readingPlanKeys = {
@@ -14,8 +14,26 @@ export type ReadingPlanUpdater = (current: ReadingPlanItem[]) => ReadingPlanItem
 
 const EMPTY_PLAN: ReadingPlanItem[] = []
 
+function normalizeStatus(status?: string | null): ReadingPlanStatus {
+  if (status === 'reading' || status === 'in_progress') return 'reading'
+  if (status === 'finished' || status === 'completed') return 'finished'
+  return 'upcoming'
+}
+
 function normalize(plan: ReadingPlanItem[]): ReadingPlanItem[] {
-  return plan.map((item, index) => ({ ...item, order: index }))
+  if (!Array.isArray(plan)) return []
+  return plan.map((item, index) => {
+    const id = item?.id || (item?.bookId ? `item_${item.bookId}` : `plan_item_${index}`)
+    return {
+      ...item,
+      id,
+      status: normalizeStatus(item?.status),
+      title: item?.title || 'Untitled',
+      author: item?.author || '',
+      coverUrl: item?.coverUrl || '',
+      order: index,
+    }
+  })
 }
 
 async function fetchReadingPlan(uid: string): Promise<ReadingPlanItem[]> {

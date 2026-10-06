@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { BookOpen, Check, Loader2, Plus, Search } from 'lucide-react'
+import { BookOpen, Calendar, Check, Loader2, Plus, Search } from 'lucide-react'
 import { Modal } from '../../../components/ui/Modal'
 import { cn } from '../../../lib/utils'
 import type { Book } from '../../../types'
 import { useBooks } from '../../library/hooks/useBooks'
 import { usePartnerBookGroups } from '../../library/hooks/useLibraryShelf'
 import { useReadingStatus } from '../../library/hooks/useReadingStatus'
-import type { NewPlanBook } from '../utils'
+import { todayIso, addDaysIso, PLAN_DEFAULT_DURATION_DAYS, type NewPlanBook } from '../utils'
 
 const FIELD_CLASS =
   'w-full rounded-2xl border border-border/60 bg-surface-muted/50 px-3.5 py-2.5 text-sm outline-none transition placeholder:text-muted focus:border-accent/60'
@@ -41,6 +41,10 @@ function AddToPlanContent({
   const [mode, setMode] = useState<'library' | 'manual'>('library')
   const [term, setTerm] = useState('')
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
+  const [startDate, setStartDate] = useState(() => todayIso())
+  const [targetFinishDate, setTargetFinishDate] = useState(() =>
+    addDaysIso(todayIso(), PLAN_DEFAULT_DURATION_DAYS),
+  )
   const [manualTitle, setManualTitle] = useState('')
   const [manualAuthor, setManualAuthor] = useState('')
   const [manualCover, setManualCover] = useState('')
@@ -82,6 +86,8 @@ function AddToPlanContent({
         title: book.title,
         author: book.author,
         coverUrl: book.coverUrl || book.thumbnail,
+        startDate,
+        targetFinishDate,
       })),
     )
     onClose()
@@ -96,6 +102,8 @@ function AddToPlanContent({
         title,
         author: manualAuthor.trim(),
         coverUrl: manualCover.trim(),
+        startDate,
+        targetFinishDate,
       },
     ])
     onClose()
@@ -270,6 +278,39 @@ function AddToPlanContent({
                 ))}
               </div>
             )}
+
+            <div className="rounded-2xl border border-border/60 bg-surface-muted/30 p-3">
+              <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                <Calendar size={14} className="text-accent" />
+                <span>Reading Schedule</span>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label htmlFor="plan-lib-start-date" className={LABEL_CLASS}>
+                    Start Date
+                  </label>
+                  <input
+                    id="plan-lib-start-date"
+                    type="date"
+                    value={startDate}
+                    onChange={(event) => setStartDate(event.target.value)}
+                    className={FIELD_CLASS}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="plan-lib-target-date" className={LABEL_CLASS}>
+                    Target Finish Date
+                  </label>
+                  <input
+                    id="plan-lib-target-date"
+                    type="date"
+                    value={targetFinishDate}
+                    onChange={(event) => setTargetFinishDate(event.target.value)}
+                    className={FIELD_CLASS}
+                  />
+                </div>
+              </div>
+            </div>
           </>
         ) : (
           <div className="space-y-3">
@@ -312,9 +353,41 @@ function AddToPlanContent({
                 />
               </div>
             </div>
+            <div className="rounded-2xl border border-border/60 bg-surface-muted/30 p-3">
+              <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                <Calendar size={14} className="text-accent" />
+                <span>Reading Schedule</span>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label htmlFor="plan-manual-start-date" className={LABEL_CLASS}>
+                    Start Date
+                  </label>
+                  <input
+                    id="plan-manual-start-date"
+                    type="date"
+                    value={startDate}
+                    onChange={(event) => setStartDate(event.target.value)}
+                    className={FIELD_CLASS}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="plan-manual-target-date" className={LABEL_CLASS}>
+                    Target Finish Date
+                  </label>
+                  <input
+                    id="plan-manual-target-date"
+                    type="date"
+                    value={targetFinishDate}
+                    onChange={(event) => setTargetFinishDate(event.target.value)}
+                    className={FIELD_CLASS}
+                  />
+                </div>
+              </div>
+            </div>
             <p className="flex items-center gap-1.5 text-xs text-muted">
               <Plus size={14} />
-              Added books start as “Upcoming” with a 3-week target.
+              Added books start as “Upcoming” with your chosen schedule.
             </p>
           </div>
         )}

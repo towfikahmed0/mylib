@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
-import { AlertCircle, Loader2 } from 'lucide-react'
+import { AlertCircle, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { cn } from '../../../lib/utils'
 import { Modal } from '../../../components/ui/Modal'
 import type { BookPrefill } from './AddBookModal'
@@ -169,6 +169,7 @@ function ScannerSession({
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const scannerRef = useRef<Html5Qrcode | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const disposedRef = useRef(false)
   const handlingRef = useRef(false)
   const runningRef = useRef(false)
@@ -251,40 +252,67 @@ function ScannerSession({
         (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia)
       ) {
         setErrorMessage(
-          'Camera scanning needs a secure (HTTPS) connection. Enter the ISBN manually below.',
+          'Camera scanning needs a secure (HTTPS) connection or device camera support. Enter the ISBN manually or upload a barcode image below.',
         )
         setStatus('error')
         return
       }
 
-      const scanner = new Html5Qrcode(containerId, {
-        verbose: false,
-        formatsToSupport: SCAN_FORMATS,
-      })
-      scannerRef.current = scanner
-
-      const attempts: MediaTrackConstraints[] = [{ facingMode: { ideal: 'environment' } }]
+      // Collect camera configurations in order of priority:
+      // 1) Rear/back camera ID string (ideal for mobile)
+      // 2) Any available camera ID string (desktop webcams)
+      // 3) Standard facingMode: 'environment'
+      // 4) Standard facingMode: 'user'
+      const configs: Array<string | MediaTrackConstraints> = []
       try {
         const cameras = await Html5Qrcode.getCameras()
-        const back =
-          cameras.find((camera) => /back|rear|environment/i.test(camera.label)) ?? cameras[0]
-        if (back) attempts.push({ deviceId: { exact: back.id } })
+        if (cameras && cameras.length > 0) {
+          const back = cameras.find((camera) => /back|rear|environment/i.test(camera.label))
+          if (back) configs.push(back.id)
+          for (const camera of cameras) {
+            if (camera.id !== back?.id) configs.push(camera.id)
+          }
+        }
       } catch {
-        // Camera enumeration can require permission; fall back to facingMode.
+        // Camera enumeration may require prior permission; continue to facingMode fallback
       }
-      attempts.push({ facingMode: 'user' })
+      configs.push({ facingMode: 'environment' })
+      configs.push({ facingMode: 'user' })
 
       let lastError: unknown = null
-      for (const constraints of attempts) {
+      for (const config of configs) {
         if (disposedRef.current) return
+        let scanner: Html5Qrcode | null = null
         try {
-          await scanner.start(constraints, scanConfig, handleScan, () => {})
+          scanner = new Html5Qrcode(containerId, {
+            verbose: false,
+            formatsToSupport: SCAN_FORMATS,
+          })
+          await scanner.start(config, scanConfig, handleScan, () => {})
+          if (disposedRef.current) {
+            try {
+              await scanner.stop()
+            } catch {}
+            try {
+              scanner.clear()
+            } catch {}
+            return
+          }
+          scannerRef.current = scanner
           runningRef.current = true
           attachVideoAttributes()
           setStatus('scanning')
           return
         } catch (error) {
           lastError = error
+          if (scanner) {
+            try {
+              await scanner.stop()
+            } catch {}
+            try {
+              scanner.clear()
+            } catch {}
+          }
         }
       }
 
@@ -322,10 +350,68 @@ function ScannerSession({
     void resolveIsbn(isbn).then((prefill) => onResolvedRef.current(prefill))
   }
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (disposedRef.current || handlingRef.current) return
+    handlingRef.current = true
+    setStatus('looking-up')
+
+    const fileContainer = containerRef.current
+    if (!fileContainer) return
+    const tempId = `file-scan-${Math.random().toString(36).slice(2)}`
+    const tempDiv = document.createElement('div')
+    tempDiv.id = tempId
+    tempDiv.style.display = 'none'
+    fileContainer.appendChild(tempDiv)
+
+    let fileScanner: Html5Qrcode | null = null
+    try {
+      fileScanner = new Html5Qrcode(tempId, {
+        verbose: false,
+        formatsToSupport: SCAN_FORMATS,
+      })
+      const decodedText = await fileScanner.scanFile(file, false)
+      const isbn = extractIsbn(decodedText)
+      if (isbn) {
+        const prefill = await resolveIsbn(isbn)
+        onResolvedRef.current(prefill)
+      } else {
+        handlingRef.current = false
+        setStatus('error')
+        setErrorMessage(
+          'No valid 10 or 13-digit ISBN was detected in this image. Try another photo or enter the ISBN manually.',
+        )
+      }
+    } catch {
+      handlingRef.current = false
+      setStatus('error')
+      setErrorMessage(
+        'Could not find a clear barcode in the uploaded image. Try another photo or enter the ISBN manually.',
+      )
+    } finally {
+      if (fileScanner) {
+        try {
+          fileScanner.clear()
+        } catch {}
+      }
+      tempDiv.remove()
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
   const showCamera = status === 'starting' || status === 'scanning'
 
   return (
     <div className="space-y-4">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileUpload}
+      />
+
       <div
         className={cn(
           'overflow-hidden rounded-2xl bg-black',
@@ -361,13 +447,23 @@ function ScannerSession({
           </span>
           <p className="text-sm font-medium">Scanner unavailable</p>
           <p className="max-w-xs text-xs text-muted">{errorMessage}</p>
-          <button
-            type="button"
-            onClick={onRetry}
-            className="mt-1 rounded-2xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
-          >
-            Try again
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onRetry}
+              className="rounded-2xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
+            >
+              Try camera again
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-1.5 rounded-2xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-foreground transition hover:bg-surface-muted"
+            >
+              <ImageIcon size={15} />
+              Upload barcode image
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -378,9 +474,19 @@ function ScannerSession({
           status === 'looking-up' ? 'hidden' : '',
         )}
       >
-        <label htmlFor="manual-isbn" className="text-xs font-medium text-muted">
-          {status === 'error' ? 'Enter the ISBN manually' : 'Or type the ISBN'}
-        </label>
+        <div className="flex items-center justify-between">
+          <label htmlFor="manual-isbn" className="text-xs font-medium text-muted">
+            {status === 'error' ? 'Enter the ISBN manually' : 'Or type the ISBN'}
+          </label>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-1 text-xs font-semibold text-accent transition hover:underline"
+          >
+            <ImageIcon size={13} />
+            Scan from image
+          </button>
+        </div>
         <div className="flex gap-2">
           <input
             id="manual-isbn"
@@ -403,3 +509,4 @@ function ScannerSession({
     </div>
   )
 }
+

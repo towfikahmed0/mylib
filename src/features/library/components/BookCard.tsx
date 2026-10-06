@@ -41,6 +41,8 @@ interface BookCardProps {
   selectionMode?: boolean
   selected?: boolean
   onToggleSelect?: (book: Book) => void
+  averageRating?: number
+  ratingCount?: number
 }
 
 function formatDate(value: Book['createdAt']): string {
@@ -69,9 +71,14 @@ export function BookCard({
   selectionMode = false,
   selected = false,
   onToggleSelect,
+  averageRating,
+  ratingCount: _ratingCount,
 }: BookCardProps) {
   const cover = book.coverUrl || book.thumbnail
-  const rating = status?.rating || book.averageRating
+  const effectiveAverageRating =
+    averageRating !== undefined ? averageRating : (book.averageRating || 0)
+  const rating =
+    effectiveAverageRating > 0 ? effectiveAverageRating : (status?.rating || 0)
   const statusValue: ReadingStatusValue = status?.status ?? 'want_to_read'
   const statusMeta = STATUS_META[statusValue]
   const isFavorite = status?.isFavorite ?? false
@@ -237,6 +244,13 @@ export function BookCard({
     </span>
   ))
 
+  const notInLibraryBadge =
+    book.isInLibrary === false ? (
+      <span className="inline-flex rounded-full bg-amber-500/15 px-2 py-0.5 text-[9px] font-bold text-amber-700 dark:text-amber-300">
+        Not in library
+      </span>
+    ) : null
+
   const stars = (
     <span className="flex items-center gap-0.5">
       {Array.from({ length: 5 }, (_, index) => (
@@ -246,8 +260,8 @@ export function BookCard({
           className={index < Math.round(rating) ? 'fill-current' : 'text-slate-300 dark:text-slate-600'}
         />
       ))}
-      {book.averageRating > 0 ? (
-        <span className="ml-1 text-slate-400">({book.averageRating.toFixed(1)})</span>
+      {rating > 0 ? (
+        <span className="ml-1 text-slate-400">({rating.toFixed(1)})</span>
       ) : null}
     </span>
   )
@@ -283,21 +297,26 @@ export function BookCard({
               </span>
             </div>
           )}
-          {showReadingStatus ? (
+          {showReadingStatus || book.isInLibrary === false ? (
             <div className="absolute bottom-2 right-2 flex flex-col items-end gap-1">
-            <span
-              className={cn(
-                'rounded-lg px-1.5 py-0.5 text-[7px] font-black uppercase text-white',
-                statusMeta.solid,
-                statusValue === 'reading' && 'animate-pulse-subtle',
-              )}
-            >
-              {statusValue === 'want_to_read'
-                ? ''
-                : statusValue === 'reading'
-                  ? `Reading (${progress}%)`
-                  : statusMeta.label}
-            </span>
+              {book.isInLibrary === false ? (
+                <span className="rounded-lg bg-amber-600/90 px-1.5 py-0.5 text-[7px] font-black uppercase text-white shadow-sm">
+                  Not in library
+                </span>
+              ) : null}
+              {showReadingStatus ? (
+                <span
+                  className={cn(
+                    'rounded-lg px-1.5 py-0.5 text-[7px] font-black uppercase text-white shadow-sm',
+                    statusMeta.solid,
+                    statusValue === 'reading' && 'animate-pulse-subtle',
+                  )}
+                >
+                  {statusValue === 'reading'
+                    ? `Reading (${progress}%)`
+                    : statusMeta.label}
+                </span>
+              ) : null}
             </div>
           ) : null}
           <div className="absolute left-2 top-2 flex flex-col gap-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
@@ -372,6 +391,7 @@ export function BookCard({
             ) : null}
             {!selectionMode ? copyButton('h-6 w-6', 14) : null}
             {statusBadge}
+            {notInLibraryBadge}
             {actionPill}
           </div>
         </div>
@@ -442,6 +462,7 @@ export function BookCard({
           <div className="mt-2 flex max-h-[20px] flex-wrap gap-1 overflow-hidden">{tags}</div>
           <div className="mt-2 flex flex-wrap gap-1">
             {statusBadge}
+            {notInLibraryBadge}
             {actionPill}
           </div>
         </div>
