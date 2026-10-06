@@ -1,0 +1,5 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/spcschoolc/mylib
+    - /bin/cp -R dist/. $DEPLOYPATH
