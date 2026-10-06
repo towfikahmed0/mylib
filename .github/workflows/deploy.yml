@@ -1,0 +1,53 @@
+name: Deploy to cPanel
+
+on:
+  # This allows you to click a button in GitHub to deploy
+  workflow_dispatch: 
+  # This allows you to deploy by running: git tag deploy && git push --tags
+  push:
+    tags:
+      - 'deploy'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Dependencies
+      run: npm ci
+
+    - name: Build Project
+      run: npm run build
+
+    - name: Copy .htaccess
+      run: cp .htaccess dist/.htaccess
+
+    - name: Push to cPanel Git
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -H ${{ secrets.CPANEL_HOST }} >> ~/.ssh/known_hosts
+        eval $(ssh-agent -s)
+        ssh-add - <<< "${{ secrets.CPANEL_SSH_KEY }}"
+        git config --global user.name "GitHub Action"
+        git config --global user.email "action@github.com"
+        git add -f dist
+        git commit -m "deploy: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        git remote add cpanel ssh://${{ secrets.CPANEL_USER }}@${{ secrets.CPANEL_HOST }}${{ secrets.CPANEL_REPO_PATH }}
+        git push cpanel HEAD:main --force
+
+    - name: Trigger cPanel Deployment
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.CPANEL_HOST }}
+        username: ${{ secrets.CPANEL_USER }}
+        key: ${{ secrets.CPANEL_SSH_KEY }}
+        script: |
+          /usr/bin/uapi VersionControlDeployment create repository_root=${{ secrets.CPANEL_REPO_PATH }}
