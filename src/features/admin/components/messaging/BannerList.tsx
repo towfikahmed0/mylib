@@ -165,7 +165,7 @@ export function BannerList() {
 
       {deleteTarget && (
         <ConfirmDangerModal
-          isOpen={Boolean(deleteTarget)}
+          open={Boolean(deleteTarget)}
           title="Delete Announcement Banner"
           description={`Are you sure you want to delete "${deleteTarget.title}"? This action cannot be undone.`}
           confirmLabel="Delete Banner"

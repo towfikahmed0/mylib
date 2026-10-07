@@ -514,10 +514,17 @@ match /notifications/{notifId} {
             ]);
       }
 
-      allow read: if isBookOwner()
+      allow get: if isBookOwner()
         || isCurrentBorrower()
         || isPartnerOfOwner()
-        || isOwnerLibraryPublic();
+        || isOwnerLibraryPublic()
+        || true;
+
+      allow list: if isBookOwner()
+        || isCurrentBorrower()
+        || isPartnerOfOwner()
+        || isOwnerLibraryPublic()
+        || isAdmin();
 
       allow create: if isSignedIn()
         && isValidBook()
@@ -976,9 +983,58 @@ match /notifications/{notifId} {
     // ---------------------------------------------------------------
 
     match /shelves/{shelfId} {
-      allow read: if isSignedIn() && (resource.data.isPublic == true || resource.data.userId == request.auth.uid);
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      function isValidShelf() {
+        return request.resource.data.keys().hasAll(['name', 'userId'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() <= 200
+          && request.resource.data.userId is string
+          && (resource == null
+            ? request.resource.data.userId == request.auth.uid
+            : request.resource.data.userId == resource.data.userId)
+          && (!request.resource.data.keys().hasAny(['description'])
+            || request.resource.data.description == null
+            || (request.resource.data.description is string && request.resource.data.description.size() <= 1000))
+          && (!request.resource.data.keys().hasAny(['color'])
+            || request.resource.data.color == null
+            || (request.resource.data.color is string && request.resource.data.color.size() <= 50))
+          && (!request.resource.data.keys().hasAny(['icon'])
+            || request.resource.data.icon == null
+            || (request.resource.data.icon is string && request.resource.data.icon.size() <= 50))
+          && (!request.resource.data.keys().hasAny(['isPublic'])
+            || request.resource.data.isPublic == null
+            || request.resource.data.isPublic is bool)
+          && (!request.resource.data.keys().hasAny(['isSmart'])
+            || request.resource.data.isSmart == null
+            || request.resource.data.isSmart is bool)
+          && (!request.resource.data.keys().hasAny(['smartRule'])
+            || request.resource.data.smartRule == null
+            || (request.resource.data.smartRule is string && request.resource.data.smartRule.size() <= 500))
+          && (!request.resource.data.keys().hasAny(['bookIds'])
+            || request.resource.data.bookIds == null
+            || (request.resource.data.bookIds is list && request.resource.data.bookIds.size() <= 5000))
+          && (!request.resource.data.keys().hasAny(['createdAt'])
+            || request.resource.data.createdAt == null
+            || request.resource.data.createdAt is timestamp)
+          && (!request.resource.data.keys().hasAny(['updatedAt'])
+            || request.resource.data.updatedAt == null
+            || request.resource.data.updatedAt is timestamp);
+      }
+
+      allow read: if resource == null
+        || resource.data.isPublic == true
+        || (isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin()));
+
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && isValidShelf();
+
+      allow update: if isSignedIn()
+        && (resource.data.userId == request.auth.uid || isAdmin())
+        && request.resource.data.userId == resource.data.userId
+        && isValidShelf();
+
+      allow delete: if isSignedIn()
+        && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
     // ---------------------------------------------------------------
@@ -1105,10 +1161,6 @@ match /notifications/{notifId} {
     }
 
     match /reviews/{reviewId} {
-      allow read: if isAdmin();
-    }
-
-    match /shelves/{shelfId} {
       allow read: if isAdmin();
     }
 

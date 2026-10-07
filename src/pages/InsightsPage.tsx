@@ -408,6 +408,7 @@ export function InsightsPage() {
           totalBooks: stats.totalBooks,
           finished: stats.statusCounts.finished,
           reading: stats.statusCounts.reading,
+          collectionValue: formatCurrency(stats.collectionValue),
           wishlist: wishlistCount,
           streak: stats.readingStreak,
           topGenres: stats.genreCounts.slice(0, 3).map((genre) => genre.label),

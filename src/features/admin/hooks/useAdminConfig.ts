@@ -7,7 +7,7 @@ import {
   writeBatch,
   type DocumentData,
 } from 'firebase/firestore'
-import { auth, db } from '../../../lib/firebase'
+import { db } from '../../../lib/firebase'
 import { sanitizeFirestoreData } from '../../../lib/firestore'
 import type { FirestoreDate } from '../../../types'
 import type {
@@ -18,9 +18,8 @@ import type {
   AdminFeatureFlags,
   AdminIntegrations,
   AdminLandingPage,
-  SecretSection,
 } from '../types/admin.types'
-import { commitAuditOnly, writeAuditLog } from '../utils/adminAudit'
+import { writeAuditLog } from '../utils/adminAudit'
 import {
   DEFAULT_ADMIN_CONFIG_MAIN,
   DEFAULT_ADMIN_CONFIG_PUBLIC,
@@ -29,8 +28,6 @@ import { adminKeys } from './queryKeys'
 import { useAdminActor } from './useAdminUsers'
 
 const SETTINGS_KEY = [...adminKeys.config(), 'settings'] as const
-
-const ADMIN_BACKEND_CONFIG_URL = 'https://mylib-api.softrly.com/admin/config'
 
 const FALLBACK_MAIN: AdminConfigMain = {
   ...DEFAULT_ADMIN_CONFIG_MAIN,
@@ -301,56 +298,5 @@ export function useUpdateAboutContent() {
       await batch.commit()
     },
     onSuccess: () => invalidateConfig(queryClient),
-  })
-}
-
-async function postSecretConfig(payload: {
-  section: SecretSection
-  values: Record<string, string>
-}): Promise<void> {
-  const currentUser = auth.currentUser
-  if (!currentUser) throw new Error('You must be signed in.')
-  const token = await currentUser.getIdToken()
-  const response = await fetch(ADMIN_BACKEND_CONFIG_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(payload),
-  })
-  if (!response.ok) {
-    throw new Error(`Backend rejected the request (${response.status}).`)
-  }
-}
-
-/**
- * Posts secret values to the authenticated backend (never Firestore). On success
- * an audit entry is written; on failure no audit entry is created.
- */
-export function useSubmitSecretConfig() {
-  const queryClient = useQueryClient()
-  const actor = useAdminActor()
-
-  return useMutation({
-    mutationFn: async ({
-      section,
-      values,
-    }: {
-      section: SecretSection
-      values: Record<string, string>
-    }) => {
-      if (!actor.uid) throw new Error('You must be signed in.')
-      await postSecretConfig({ section, values })
-      await commitAuditOnly(actor, {
-        action: 'update_config',
-        targetType: 'platform',
-        targetId: 'main',
-        details: { section, secret: true, fields: Object.keys(values) },
-      })
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: adminKeys.auditLog.all() })
-    },
   })
 }

@@ -1,4 +1,4 @@
-import { BookOpen, CheckCircle2, Flame, Heart, Library } from 'lucide-react'
+import { BookOpen, CheckCircle2, Flame, Library, Wallet } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { BookCoversShareData } from './LibraryCoversShareCard'
 import { ShareLogo } from './ShareLogo'
@@ -8,12 +8,13 @@ export interface InsightsShareData extends BookCoversShareData {
   username: string
   finished: number
   reading: number
-  wishlist: number
+  wishlist?: number
+  collectionValue: string | number
   streak: number
   topGenres: string[]
 }
 
-function StatBox({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {
+function StatBox({ icon, label, value }: { icon: ReactNode; label: string; value: ReactNode }) {
   return (
     <div className="rounded-2xl bg-slate-50 p-4">
       <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent/10 text-accent">
@@ -54,7 +55,11 @@ export function LibraryInsightsShareCard({ data }: { data: InsightsShareData }) 
       <div className="mt-6 grid grid-cols-2 gap-4">
         <StatBox icon={<CheckCircle2 size={16} />} label="Finished" value={data.finished} />
         <StatBox icon={<BookOpen size={16} />} label="Reading" value={data.reading} />
-        <StatBox icon={<Heart size={16} />} label="Wishlist" value={data.wishlist} />
+        <StatBox
+          icon={<Wallet size={16} />}
+          label="Collection Value"
+          value={typeof data.collectionValue === 'number' ? `$${data.collectionValue.toLocaleString()}` : data.collectionValue}
+        />
         <StatBox icon={<Flame size={16} />} label="Streak (days)" value={data.streak} />
       </div>
 

@@ -149,9 +149,6 @@ VITE_FIREBASE_STORAGE_BUCKET=your_project.firebasestorage.app
 VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
 VITE_FIREBASE_VAPID_KEY=your_web_push_vapid_key
-
-# Optional APIs
-VITE_ADMIN_API_URL=https://mylib-api.softrly.com
 ```
 
 ---

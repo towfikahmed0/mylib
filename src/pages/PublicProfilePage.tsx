@@ -291,11 +291,11 @@ export function PublicProfilePage() {
         )}
       </div>
 
-      {activeTab === 'library' && canViewLibrary && !isLoadingShelves && shelves.length > 0 ? (
+      {activeTab === 'library' && (canViewLibrary || shelves.length > 0) && !isLoadingShelves && shelves.length > 0 ? (
         <div className="space-y-4">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
             <Layers size={16} className="text-accent" />
-            Shelves
+            Public Shelves
           </h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {shelves.map((shelf) => (

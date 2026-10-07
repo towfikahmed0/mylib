@@ -4,9 +4,6 @@ import { registerRoute } from 'workbox-routing'
 import { CacheFirst, NetworkFirst, NetworkOnly } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
 
-const ADMIN_API_ORIGIN = new URL(
-  import.meta.env.VITE_ADMIN_API_URL || 'https://mylib-api.softrly.com',
-).origin
 
 self.skipWaiting()
 clientsClaim()
@@ -24,15 +21,6 @@ registerRoute(
   new NetworkOnly(),
 )
 
-// Trusted admin API — network first, short-lived cache as a fallback.
-registerRoute(
-  ({ url }) => url.origin === ADMIN_API_ORIGIN,
-  new NetworkFirst({
-    cacheName: 'admin-api',
-    networkTimeoutSeconds: 10,
-    plugins: [new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 300 })],
-  }),
-)
 
 // Firestore — network first.
 registerRoute(

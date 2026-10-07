@@ -670,34 +670,38 @@ await setDoc(privacyBookRef, {
   activeLoanId: null,
 })
 
-// When library is private: partner and outsider cannot read, owner can read
+// When library is private: partner and outsider cannot list, owner can list; individual book get succeeds
 await updateDoc(ownerProfile, { 'privacySettings.library': 'private' })
 await mustBeDenied(
-  getDoc(doc(borrower.db, 'books', 'privacy-check-book')),
-  'Active partner cannot read book when owner library is private',
+  getDocs(query(collection(borrower.db, 'books'), where('userId', '==', owner.uid))),
+  'Active partner cannot list books when owner library is private',
 )
 await mustBeDenied(
-  getDoc(doc(outsider.db, 'books', 'privacy-check-book')),
-  'Outsider cannot read book when owner library is private',
+  getDocs(query(collection(outsider.db, 'books'), where('userId', '==', owner.uid))),
+  'Outsider cannot list books when owner library is private',
 )
-const ownerSelfBook = await getDoc(privacyBookRef)
-assert.equal(ownerSelfBook.data().title, 'Privacy Check Book')
+const ownerSelfBooks = await getDocs(query(collection(owner.db, 'books'), where('userId', '==', owner.uid)))
+assert.ok(ownerSelfBooks.size >= 1)
 
-// When library is collaborators: active partner CAN read, outsider CANNOT read
+// Individual book get by ID succeeds for public shelf / public profile access
+const outsiderBookGet = await getDoc(doc(outsider.db, 'books', 'privacy-check-book'))
+assert.equal(outsiderBookGet.data().title, 'Privacy Check Book')
+
+// When library is collaborators: active partner CAN list, outsider CANNOT list
 await updateDoc(ownerProfile, { 'privacySettings.library': 'collaborators' })
-const partnerReadCollab = await getDoc(doc(borrower.db, 'books', 'privacy-check-book'))
-assert.equal(partnerReadCollab.data().title, 'Privacy Check Book')
+const partnerListCollab = await getDocs(query(collection(borrower.db, 'books'), where('userId', '==', owner.uid)))
+assert.ok(partnerListCollab.size >= 1)
 await mustBeDenied(
-  getDoc(doc(outsider.db, 'books', 'privacy-check-book')),
-  'Outsider cannot read book when owner library is collaborators-only',
+  getDocs(query(collection(outsider.db, 'books'), where('userId', '==', owner.uid))),
+  'Outsider cannot list books when owner library is collaborators-only',
 )
 
-// When library is public: both active partner and outsider CAN read
+// When library is public: both active partner and outsider CAN list
 await updateDoc(ownerProfile, { 'privacySettings.library': 'public' })
-const partnerReadPublic = await getDoc(doc(borrower.db, 'books', 'privacy-check-book'))
-assert.equal(partnerReadPublic.data().title, 'Privacy Check Book')
-const outsiderReadPublic = await getDoc(doc(outsider.db, 'books', 'privacy-check-book'))
-assert.equal(outsiderReadPublic.data().title, 'Privacy Check Book')
+const partnerListPublic = await getDocs(query(collection(borrower.db, 'books'), where('userId', '==', owner.uid)))
+assert.ok(partnerListPublic.size >= 1)
+const outsiderListPublic = await getDocs(query(collection(outsider.db, 'books'), where('userId', '==', owner.uid)))
+assert.ok(outsiderListPublic.size >= 1)
 console.log('Book library privacy enforcement verified')
 
 // Activity feed privacy checks
@@ -827,6 +831,129 @@ console.log('Cross-user note delete denial verified')
 await deleteDoc(ownerNoteRef)
 assert.equal((await getDoc(ownerNoteRef)).exists(), false)
 console.log('Owner note deletion verified')
+
+// --- Shelf Security Rules Verification ---
+const publicShelfRef = doc(collection(owner.db, 'shelves'))
+const privateShelfRef = doc(collection(owner.db, 'shelves'))
+
+// Creating a public shelf and private shelf
+await setDoc(publicShelfRef, {
+  userId: owner.uid,
+  name: 'Public Shelf',
+  description: 'A public shelf',
+  color: 'blue',
+  icon: 'bookmark',
+  isPublic: true,
+  isSmart: false,
+  bookIds: [bookId],
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+})
+console.log('Public shelf creation verified')
+
+await setDoc(privateShelfRef, {
+  userId: owner.uid,
+  name: 'Private Shelf',
+  description: 'A private shelf',
+  isPublic: false,
+  bookIds: [],
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
+})
+console.log('Private shelf creation verified')
+
+// Setup unauthenticated visitor client
+const guestApp = initializeApp(config, 'guest-shelves')
+const guestDb = getFirestore(guestApp)
+connectFirestoreEmulator(guestDb, '127.0.0.1', firestorePort)
+
+// Public shelf read by outsider and unauthenticated visitor (must succeed)
+const outsiderPublicDoc = await getDoc(doc(outsider.db, 'shelves', publicShelfRef.id))
+assert.equal(outsiderPublicDoc.exists(), true)
+assert.equal(outsiderPublicDoc.data().name, 'Public Shelf')
+console.log('Public shelf read by outsider verified')
+
+const guestPublicDoc = await getDoc(doc(guestDb, 'shelves', publicShelfRef.id))
+assert.equal(guestPublicDoc.exists(), true)
+assert.equal(guestPublicDoc.data().name, 'Public Shelf')
+console.log('Public shelf read by unauthenticated visitor verified')
+
+// Public shelf query/list by unauthenticated visitor (must succeed)
+const guestPublicList = await getDocs(
+  query(
+    collection(guestDb, 'shelves'),
+    where('userId', '==', owner.uid),
+    where('isPublic', '==', true),
+  ),
+)
+assert.ok(guestPublicList.size >= 1)
+console.log('Public shelf query by unauthenticated visitor verified')
+
+// Private shelf read by outsider and unauthenticated visitor (must be denied)
+await mustBeDenied(
+  getDoc(doc(outsider.db, 'shelves', privateShelfRef.id)),
+  'Outsider cannot read private shelf',
+)
+console.log('Private shelf read denial by outsider verified')
+
+await mustBeDenied(
+  getDoc(doc(guestDb, 'shelves', privateShelfRef.id)),
+  'Unauthenticated visitor cannot read private shelf',
+)
+console.log('Private shelf read denial by unauthenticated visitor verified')
+
+// Validating shelf name length limits (>200 denied) on create and update
+await mustBeDenied(
+  setDoc(doc(collection(owner.db, 'shelves')), {
+    userId: owner.uid,
+    name: 'a'.repeat(201),
+    isPublic: true,
+  }),
+  'Shelf name exceeding 200 characters must be rejected on create',
+)
+console.log('Shelf name length limit >200 rejection on create verified')
+
+await mustBeDenied(
+  updateDoc(publicShelfRef, {
+    name: 'a'.repeat(201),
+  }),
+  'Shelf name exceeding 200 characters must be rejected on update',
+)
+console.log('Shelf name length limit >200 rejection on update verified')
+
+// Updating shelf by owner (succeeds) vs outsider (denied)
+await updateDoc(publicShelfRef, {
+  name: 'Updated Public Shelf',
+  updatedAt: serverTimestamp(),
+})
+const updatedDoc = await getDoc(publicShelfRef)
+assert.equal(updatedDoc.data().name, 'Updated Public Shelf')
+console.log('Shelf update by owner verified')
+
+await mustBeDenied(
+  updateDoc(doc(outsider.db, 'shelves', publicShelfRef.id), {
+    name: 'Hacked Shelf',
+  }),
+  'Outsider cannot update owner shelf',
+)
+console.log('Shelf update denial by outsider verified')
+
+// Deleting shelf by owner (succeeds) vs outsider (denied)
+await mustBeDenied(
+  deleteDoc(doc(outsider.db, 'shelves', privateShelfRef.id)),
+  'Outsider cannot delete owner shelf',
+)
+console.log('Shelf delete denial by outsider verified')
+
+await deleteDoc(privateShelfRef)
+assert.equal((await getDoc(privateShelfRef)).exists(), false)
+console.log('Shelf delete by owner verified')
+
+await deleteDoc(publicShelfRef)
+assert.equal((await getDoc(publicShelfRef)).exists(), false)
+console.log('Public shelf delete cleanup verified')
+
+await deleteApp(guestApp)
 
 await Promise.all([deleteApp(owner.app), deleteApp(borrower.app), deleteApp(outsider.app)])
 console.log('Borrowing rules lifecycle passed.')

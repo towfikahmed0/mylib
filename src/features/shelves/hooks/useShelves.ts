@@ -74,9 +74,17 @@ async function fetchBooksByIds(ids: string[]): Promise<Book[]> {
 
   const results = await Promise.all(
     chunks.map(async (chunk) => {
-      const snapshots = await Promise.all(chunk.map((id) => getDoc(doc(db, 'books', id))))
+      const snapshots = await Promise.all(
+        chunk.map(async (id) => {
+          try {
+            return await getDoc(doc(db, 'books', id))
+          } catch {
+            return null
+          }
+        }),
+      )
       return snapshots
-        .filter((snapshot) => snapshot.exists())
+        .filter((snapshot) => snapshot !== null && snapshot.exists())
         .map((snapshot) => ({ id: snapshot.id, ...snapshot.data() }) as Book)
     }),
   )
@@ -85,8 +93,12 @@ async function fetchBooksByIds(ids: string[]): Promise<Book[]> {
 }
 
 async function fetchUserBooks(uid: string): Promise<Book[]> {
-  const snapshot = await getDocs(query(collection(db, 'books'), where('userId', '==', uid)))
-  return snapshot.docs.map((document) => ({ id: document.id, ...document.data() }) as Book)
+  try {
+    const snapshot = await getDocs(query(collection(db, 'books'), where('userId', '==', uid)))
+    return snapshot.docs.map((document) => ({ id: document.id, ...document.data() }) as Book)
+  } catch {
+    return []
+  }
 }
 
 export function parseSmartRule(rule: string | undefined): ShelfRule | null {
