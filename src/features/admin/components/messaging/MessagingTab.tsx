@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { cn } from '../../../../lib/utils'
 import { MESSAGING_SUBTABS } from '../../utils/adminConstants'
+import { BannerComposer } from './BannerComposer'
+import { BannerList } from './BannerList'
 import { EmailComposer } from './EmailComposer'
 import { MessagingHistory } from './MessagingHistory'
 import { NotificationComposer } from './NotificationComposer'
 
-type SubTabId = 'notifications' | 'emails' | 'history'
+type SubTabId = 'notifications' | 'emails' | 'banners' | 'history'
 
 export function MessagingTab() {
   const [activeTab, setActiveTab] = useState<SubTabId>('notifications')
@@ -21,7 +23,7 @@ export function MessagingTab() {
               type="button"
               role="tab"
               aria-selected={isActive}
-              onClick={() => setActiveTab(id)}
+              onClick={() => setActiveTab(id as SubTabId)}
               className={cn(
                 'rounded-full border px-3.5 py-1.5 text-sm font-semibold transition',
                 isActive
@@ -39,6 +41,11 @@ export function MessagingTab() {
         <NotificationComposer />
       ) : activeTab === 'emails' ? (
         <EmailComposer />
+      ) : activeTab === 'banners' ? (
+        <div className="space-y-8">
+          <BannerComposer />
+          <BannerList />
+        </div>
       ) : (
         <MessagingHistory />
       )}

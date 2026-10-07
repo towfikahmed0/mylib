@@ -35,6 +35,8 @@ import { useLibraryShelf } from '../features/library/hooks/useLibraryShelf'
 import { useReadingStatus } from '../features/library/hooks/useReadingStatus'
 import { useLibraryBookRatings } from '../features/library/hooks/useBookReviews'
 import { CurrentlyReadingSection } from '../features/library/components/CurrentlyReadingSection'
+import { LibraryBanner } from '../features/banners/components/LibraryBanner'
+import { useActiveBanners } from '../features/banners/hooks/useBanners'
 import { useAuth } from '../features/auth/useAuth'
 import type { Book, ReadingStatusValue } from '../types'
 
@@ -93,6 +95,7 @@ export function LibraryPage() {
   const sendRequest = useSendBookRequest()
   const [needsLendingInfo, setNeedsLendingInfo] = useState(false)
   const [requestingBookId, setRequestingBookId] = useState<string | null>(null)
+  const { libraryBanners, dismissBanner } = useActiveBanners()
 
   const requestPermissionByUid = useMemo(
     () => new Map(partners.map((partner) => [partner.uid, partner.borrowRequestPermission])),
@@ -222,8 +225,6 @@ export function LibraryPage() {
   const totalLibraryCount = allLibraryBooks.length
   const visibleBooks = groupViews.flatMap((group) => group.visibleBooks)
 
-  const ownGroupView = groupViews.find((group) => group.isOwn)
-  const ownBooks = groups.find((group) => group.isOwn)?.books ?? []
   const selectableVisibleBooks = visibleBooks
   const selectedBookList = useMemo(
     () => allLibraryBooks.filter((book) => selectedIds.has(book.id)),
@@ -304,6 +305,7 @@ export function LibraryPage() {
 
   return (
     <section className="animate-fade-in space-y-5">
+      <LibraryBanner banners={libraryBanners} onDismiss={dismissBanner} />
       <header className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Library</h1>
@@ -334,10 +336,11 @@ export function LibraryPage() {
             <button
               type="button"
               onClick={() => setIsAddFlowOpen(true)}
-              className="hidden shrink-0 items-center gap-1.5 rounded-2xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90 sm:flex"
+              aria-label="Add a book"
+              className="flex shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-accent px-3 py-2.5 text-sm font-semibold text-accent-foreground shadow-sm transition hover:opacity-90 sm:px-4"
             >
-              <Plus size={16} />
-              Add Book
+              <Plus size={18} />
+              <span className="hidden sm:inline">Add Book</span>
             </button>
           ) : null}
         </div>
@@ -614,6 +617,8 @@ export function LibraryPage() {
                           ratingCount={getBookSummary(book.id).ratingCount}
                           onClick={setSelectedBook}
                           onEdit={group.isOwn ? setEditingBook : undefined}
+                          onRequest={!group.isOwn && canRequestFrom(book.userId) ? handleRequest : undefined}
+                          requestDisabledReason={!group.isOwn ? requestDisabledReason(book) : undefined}
                           selectionMode={isSelecting}
                           selected={selectedIds.has(book.id)}
                           onToggleSelect={toggleSelect}
@@ -636,7 +641,9 @@ export function LibraryPage() {
                   averageRating={getBookSummary(book.id).averageRating}
                   ratingCount={getBookSummary(book.id).ratingCount}
                   onClick={setSelectedBook}
-                  onEdit={setEditingBook}
+                  onEdit={book.userId === user?.uid ? setEditingBook : undefined}
+                  onRequest={book.userId !== user?.uid && canRequestFrom(book.userId) ? handleRequest : undefined}
+                  requestDisabledReason={book.userId !== user?.uid ? requestDisabledReason(book) : undefined}
                   selectionMode={isSelecting}
                   selected={selectedIds.has(book.id)}
                   onToggleSelect={toggleSelect}

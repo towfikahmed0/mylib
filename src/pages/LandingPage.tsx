@@ -17,6 +17,7 @@ import { useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ThemeToggle } from '../components/layout/ThemeToggle'
 import { useAuth } from '../features/auth/useAuth'
+import { APP_VERSION } from '../lib/version'
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -600,7 +601,7 @@ export function LandingPage() {
           </Link>
         </div>
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
-          © 2026 My Lib · v3.1 · Preserve Every Word
+          © 2026 My Lib · v{APP_VERSION} · Preserve Every Word
         </p>
       </footer>
     </div>

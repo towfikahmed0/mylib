@@ -258,6 +258,9 @@ export type AdminAuditAction =
   | 'update_feature_flags'
   | 'update_landing'
   | 'update_about'
+  | 'create_banner'
+  | 'update_banner'
+  | 'delete_banner'
 
 export type AdminAuditTargetType =
   | 'user'
@@ -267,6 +270,7 @@ export type AdminAuditTargetType =
   | 'platform'
   | 'plan'
   | 'discount'
+  | 'banner'
 
 export interface AdminActor {
   uid: string

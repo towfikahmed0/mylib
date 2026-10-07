@@ -3,8 +3,11 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA, type ManifestOptions } from 'vite-plugin-pwa'
 
+import pkg from './package.json' with { type: 'json' }
+
 // https://vite.dev/config/
 export default defineConfig(() => {
+  process.env.VITE_APP_VERSION = pkg.version
   const manifest: Partial<ManifestOptions> = {
     name: 'MyLib',
     short_name: 'MyLib',

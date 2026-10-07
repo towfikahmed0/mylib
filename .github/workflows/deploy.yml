@@ -1,45 +1,92 @@
-name: Deploy to cPanel via FTP
+name: Production Deployment
 
 on:
-  # Allows you to click a button in GitHub to deploy
-  workflow_dispatch: 
-  # Runs on pushes to your branch
   push:
     branches:
-      - mylib-react
+      - production
+  workflow_dispatch:
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
-    # Only run if manually triggered OR if commit message contains "DEPLOY"
-    if: |
-      github.event_name == 'workflow_dispatch' || 
-      (github.event_name == 'push' && contains(github.event.head_commit.message, 'DEPLOY'))
-    
+  validate:
+    name: Lint & Test
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
 
-    - name: Install Dependencies
-      run: npm ci
+      - name: Install Dependencies
+        run: npm ci
 
-    - name: Build Project
-      run: npm run build
+      - name: Run Linter
+        run: npm run lint
 
-    - name: Copy .htaccess
-      run: cp .htaccess dist/.htaccess
+      - name: Run Test Suite
+        run: npm test
 
-    - name: Deploy via FTP
-      uses: SamKirkland/FTP-Deploy-Action@v4.3.4
-      with:
-        server: ${{ secrets.FTP_SERVER }}
-        username: ${{ secrets.FTP_USERNAME }}
-        password: ${{ secrets.FTP_PASSWORD }}
-        local-dir: ./dist/
-        server-dir: ${{ secrets.FTP_SERVER_DIR }}
-        dangerous-clean-slate: false
+  build-and-deploy:
+    name: Build & Deploy
+    needs: validate
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://mylib.softrly.com
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Project
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
+        run: npm run build
+
+      - name: Copy .htaccess to dist
+        run: |
+          if [ -f .htaccess ]; then
+            cp .htaccess dist/.htaccess
+          fi
+
+      - name: Deploy to Live Host via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./dist/
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          dangerous-clean-slate: false
+
+      - name: Production Health Check
+        run: |
+          echo "Verifying live site deployment..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://mylib.softrly.com || echo "000")
+          echo "Live HTTP status code: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 400 ]; then
+            echo "Health check passed!"
+          else
+            echo "Warning: Response status $HTTP_STATUS received. Please verify DNS/CDN propagation."
+          fi

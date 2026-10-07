@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { Download, Plus, Sparkles } from 'lucide-react'
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Download, Sparkles } from 'lucide-react'
+import { Link, Outlet } from 'react-router-dom'
 import { useAuth } from '../../features/auth/useAuth'
 import { AIChatModal } from '../../features/ai/components/AIChatModal'
-import { AddBookFlow } from '../../features/library/components/AddBookChooser'
+import { AILibrarianChoiceModal, NotesModal } from '../../features/notes'
 import { useSyncLibraryStats } from '../../features/library/hooks/useSyncLibraryStats'
 import { useSyncWishlistFlags } from '../../features/library/hooks/useSyncWishlistFlags'
 import { NotificationBell } from '../../features/notifications/components/NotificationBell'
@@ -75,25 +75,10 @@ function MobileTopBar() {
   )
 }
 
-function AddBookFab({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label="Add a book"
-      className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-md transition active:scale-95 lg:hidden"
-    >
-      <Plus size={26} />
-    </button>
-  )
-}
-
 export function AppLayout() {
-  const location = useLocation()
-  const navigate = useNavigate()
-  const isExplorePage = location.pathname === '/explore'
+  const [isChoiceOpen, setIsChoiceOpen] = useState(false)
   const [isChatOpen, setIsChatOpen] = useState(false)
-  const [isAddBookOpen, setIsAddBookOpen] = useState(false)
+  const [isNotesOpen, setIsNotesOpen] = useState(false)
   useSyncLibraryStats()
   useSyncWishlistFlags()
 
@@ -108,19 +93,13 @@ export function AppLayout() {
         </main>
       </div>
 
-      {!isExplorePage ? <AddBookFab onClick={() => setIsAddBookOpen(true)} /> : null}
-      <AddBookFlow
-        open={isAddBookOpen}
-        onClose={() => setIsAddBookOpen(false)}
-        onImport={() => navigate('/settings')}
-      />
-
-      {!isChatOpen ? (
+      {!isChatOpen && !isNotesOpen ? (
         <button
           type="button"
-          onClick={() => setIsChatOpen(true)}
-          aria-label="Open AI Librarian"
-          className="fixed bottom-36 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-md transition active:scale-95 lg:bottom-6 lg:right-6"
+          onClick={() => setIsChoiceOpen(true)}
+          aria-label="Open AI Librarian & Notes"
+          title="Open AI Librarian & Notes"
+          className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-md transition active:scale-95 lg:bottom-6 lg:right-6"
         >
           <Sparkles size={24} />
         </button>
@@ -128,7 +107,14 @@ export function AppLayout() {
 
       <MobileBottomNav />
 
+      <AILibrarianChoiceModal
+        open={isChoiceOpen}
+        onClose={() => setIsChoiceOpen(false)}
+        onSelectChat={() => setIsChatOpen(true)}
+        onSelectNotes={() => setIsNotesOpen(true)}
+      />
       <AIChatModal open={isChatOpen} onClose={() => setIsChatOpen(false)} />
+      <NotesModal open={isNotesOpen} onClose={() => setIsNotesOpen(false)} />
     </div>
   )
 }

@@ -21,7 +21,9 @@ export const adminKeys = {
     all: () => [...adminKeys.all, 'messaging'] as const,
     notifications: () => [...adminKeys.messaging.all(), 'notifications'] as const,
     emails: () => [...adminKeys.messaging.all(), 'emails'] as const,
+    banners: () => [...adminKeys.messaging.all(), 'banners'] as const,
   },
+  banners: () => [...adminKeys.all, 'banners'] as const,
   config: () => [...adminKeys.all, 'config'] as const,
   auditLog: {
     all: () => [...adminKeys.all, 'auditLog'] as const,

@@ -39,7 +39,6 @@ function normalizeTitle(title: string): string {
 export function useLibraryBookRatings(books: Book[] = [], statuses: ReadingStatusMap = {}) {
   const { user } = useAuth()
   const { partners } = useActivePartners()
-  const queryClient = useQueryClient()
 
   const partnerUids = useMemo(
     () =>

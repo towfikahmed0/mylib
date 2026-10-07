@@ -581,13 +581,14 @@ export const NOTIFICATION_SEVERITY_META: Record<
 }
 
 export interface MessagingSubTab {
-  id: 'notifications' | 'emails' | 'history'
+  id: 'notifications' | 'emails' | 'banners' | 'history'
   label: string
 }
 
 export const MESSAGING_SUBTABS: MessagingSubTab[] = [
   { id: 'notifications', label: 'Notifications' },
   { id: 'emails', label: 'Emails' },
+  { id: 'banners', label: 'Banners' },
   { id: 'history', label: 'History' },
 ]
 
@@ -608,6 +609,9 @@ export const AUDIT_ACTION_LABELS: Record<AdminAuditAction, string> = {
   update_feature_flags: 'Updated feature flags',
   update_landing: 'Updated landing content',
   update_about: 'Updated About page',
+  create_banner: 'Created a banner',
+  update_banner: 'Updated a banner',
+  delete_banner: 'Deleted a banner',
 }
 
 export const ADMIN_USERS_PAGE_SIZE = 20

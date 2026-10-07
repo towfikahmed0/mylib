@@ -1,14 +1,50 @@
 # 📚 MyLib — Personal Library Manager
 
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](#-deployment)
+[![Version](https://img.shields.io/badge/version-v3.3.0-blue.svg)](CHANGELOG.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 > **Your books, your reading life, your library — all in one place.**
 
-**MyLib** is a modern, cloud-connected library management application built with React and Firebase.
+**MyLib** is a modern, social, cloud-connected progressive web application built with React 19, TypeScript, Vite, Tailwind CSS, and Firebase.
 
-It helps users catalog the books they own, discover and add books using ISBN/barcode scanning, track reading progress, manage personal collections, upload book covers, organize books with powerful search and filters, and collaborate with other readers.
+For full developer guidance, architecture deep-dives, FCM setup, and deployment instructions, refer to **[Developer Documentation](docs/DEV_DOCUMENTATION.md)** and the **[Changelog](CHANGELOG.md)**.
 
-MyLib is designed around a simple idea:
+---
 
-> **A library is more than a database of books. It's a record of what you own, what you read, and what matters to you.**
+## ⚡ Quick Start
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/towfikahmed0/mylib.git
+cd mylib/mylib-react
+
+# 2. Install dependencies
+npm ci
+
+# 3. Configure environment variables
+cp .env.example .env.local
+
+# 4. Start local development server
+npm run dev
+```
+
+---
+
+## ⚙️ Environment Variables
+
+Configure these keys in `.env.local`:
+
+| Variable | Description |
+| :--- | :--- |
+| `VITE_FIREBASE_API_KEY` | Firebase Web API Key |
+| `VITE_FIREBASE_AUTH_DOMAIN` | Firebase Authentication Domain |
+| `VITE_FIREBASE_PROJECT_ID` | Cloud Firestore Project ID |
+| `VITE_FIREBASE_STORAGE_BUCKET` | Cloud Storage Bucket |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Cloud Messaging Sender ID |
+| `VITE_FIREBASE_APP_ID` | Firebase Web App ID |
+| `VITE_FIREBASE_VAPID_KEY` | FCM Web Push Certificate Key Pair |
+| `VITE_ADMIN_API_URL` | *(Optional)* URL for admin backend integrations |
 
 ---
 
@@ -788,6 +824,12 @@ Created with ❤️ by **Towfik Ahmed**
 
 GitHub:
 https://github.com/towfikahmed0
+
+---
+
+# 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
 
 ---
 

@@ -287,6 +287,23 @@ match /notifications/{notifId} {
       match /pushTokens/{tokenId} {
         allow read, write: if isSignedIn() && request.auth.uid == userId;
       }
+
+      // User notes — private notepad notes subcollection.
+      match /notes/{noteId} {
+        function isValidNote() {
+          return request.resource.data.content is string
+            && request.resource.data.content.size() <= 50000
+            && (!request.resource.data.keys().hasAny(['title'])
+              || request.resource.data.title == null
+              || (request.resource.data.title is string
+                && request.resource.data.title.size() <= 1000));
+        }
+
+        allow read, delete: if isSignedIn() && request.auth.uid == userId;
+        allow create, update: if isSignedIn()
+          && request.auth.uid == userId
+          && isValidNote();
+      }
     }
 
     // ---------------------------------------------------------------
@@ -1029,6 +1046,56 @@ match /notifications/{notifId} {
 
     match /systemNotifications/{notificationId} {
       allow read, write: if isAdmin();   // Admin messaging; the backend fans out to users
+    }
+
+    // ---------------------------------------------------------------
+    // systemBanners — announcements, modals, banners, and toasts
+    // ---------------------------------------------------------------
+
+    match /systemBanners/{bannerId} {
+      function isValidBanner() {
+        return request.resource.data.keys().hasAll([
+            'title',
+            'message',
+            'severity',
+            'displayType',
+            'target',
+            'active',
+            'createdBy',
+            'createdAt'
+          ])
+          && request.resource.data.title is string
+          && request.resource.data.title.size() <= 200
+          && request.resource.data.message is string
+          && request.resource.data.message.size() <= 5000
+          && request.resource.data.severity in ['info', 'warning', 'danger']
+          && request.resource.data.displayType in ['modal', 'banner', 'toast']
+          && request.resource.data.target in ['all', 'specific']
+          && request.resource.data.active is bool
+          && request.resource.data.createdBy is string
+          && request.resource.data.createdBy.size() <= 200
+          && request.resource.data.createdAt is timestamp
+          && (!request.resource.data.keys().hasAny(['targetUserId'])
+            || request.resource.data.targetUserId == null
+            || (request.resource.data.targetUserId is string
+              && request.resource.data.targetUserId.size() <= 200))
+          && (!request.resource.data.keys().hasAny(['actionLink'])
+            || request.resource.data.actionLink == null
+            || (request.resource.data.actionLink is string
+              && request.resource.data.actionLink.size() <= 2000))
+          && (!request.resource.data.keys().hasAny(['actionLabel'])
+            || request.resource.data.actionLabel == null
+            || (request.resource.data.actionLabel is string
+              && request.resource.data.actionLabel.size() <= 200))
+          && (!request.resource.data.keys().hasAny(['expiresAt'])
+            || request.resource.data.expiresAt == null
+            || request.resource.data.expiresAt is timestamp);
+      }
+
+      allow read: if true;
+      allow create: if isAdmin() && isValidBanner();
+      allow update: if isAdmin() && isValidBanner();
+      allow delete: if isAdmin();
     }
 
     // Admin dashboard read access. These blocks are OR-combined with the

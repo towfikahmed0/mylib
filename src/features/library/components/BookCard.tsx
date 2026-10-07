@@ -72,7 +72,6 @@ export function BookCard({
   selected = false,
   onToggleSelect,
   averageRating,
-  ratingCount: _ratingCount,
 }: BookCardProps) {
   const cover = book.coverUrl || book.thumbnail
   const effectiveAverageRating =

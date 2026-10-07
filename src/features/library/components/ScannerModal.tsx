@@ -292,10 +292,14 @@ function ScannerSession({
           if (disposedRef.current) {
             try {
               await scanner.stop()
-            } catch {}
+            } catch {
+              // Ignore cleanup error on stop
+            }
             try {
               scanner.clear()
-            } catch {}
+            } catch {
+              // Ignore cleanup error on clear
+            }
             return
           }
           scannerRef.current = scanner
@@ -308,10 +312,14 @@ function ScannerSession({
           if (scanner) {
             try {
               await scanner.stop()
-            } catch {}
+            } catch {
+              // Ignore cleanup error on stop
+            }
             try {
               scanner.clear()
-            } catch {}
+            } catch {
+              // Ignore cleanup error on clear
+            }
           }
         }
       }
@@ -393,7 +401,9 @@ function ScannerSession({
       if (fileScanner) {
         try {
           fileScanner.clear()
-        } catch {}
+        } catch {
+          // Ignore cleanup error on file clear
+        }
       }
       tempDiv.remove()
       if (fileInputRef.current) fileInputRef.current.value = ''

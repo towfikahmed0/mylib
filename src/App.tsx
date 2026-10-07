@@ -4,6 +4,10 @@ import { AppLayout } from './components/layout/AppLayout'
 import { PublicProfileLayout } from './components/layout/PublicProfileLayout'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { Toaster } from './components/ui/Toaster'
+import { PwaUpdateToast } from './components/ui/PwaUpdateToast'
+import { GlobalBannerContainer } from './features/banners/components/GlobalBannerContainer'
+import { NotificationPromptModal } from './features/notifications/components/NotificationPromptModal'
+import { ForegroundFcmHandler } from './features/notifications/components/ForegroundFcmHandler'
 import { useAnalytics } from './hooks/useAnalytics'
 import { AboutPage } from './pages/AboutPage'
 import { AdminPage } from './pages/AdminPage'
@@ -55,6 +59,10 @@ function App() {
 
       <BannedNotice />
       <Toaster />
+      <PwaUpdateToast />
+      <GlobalBannerContainer />
+      <ForegroundFcmHandler />
+      <NotificationPromptModal />
     </>
   )
 }

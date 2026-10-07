@@ -3,13 +3,8 @@ import {
   BookOpen,
   CheckCircle2,
   ChevronRight,
-  ExternalLink,
-  Loader2,
-  Minus,
-  Plus,
-  Sparkles,
 } from 'lucide-react'
-import { cn } from '../../../lib/utils'
+
 import { toast } from '../../../store/toastStore'
 import type { Book, ReadingStatus } from '../../../types'
 import { useAuth } from '../../auth/useAuth'

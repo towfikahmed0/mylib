@@ -20,6 +20,7 @@ import { Link } from 'react-router-dom'
 import { MarkdownRenderer } from '../components/MarkdownRenderer'
 import { useAboutContent } from '../features/about/hooks/useAboutContent'
 import { usePageMeta } from '../hooks/usePageMeta'
+import { APP_VERSION } from '../lib/version'
 
 const ABOUT_META = {
   title: 'About MyLib — Social Reading Sanctuary',
@@ -95,6 +96,7 @@ const HOW_IT_WORKS: { title: string; copy: string }[] = [
 ]
 
 const TECH_INFO: { icon: LucideIcon; label: string; value: string }[] = [
+  { icon: Layers, label: 'Version', value: `v${APP_VERSION} (Semantic Versioning)` },
   { icon: Code2, label: 'Frontend', value: 'React 19 + TypeScript, bundled with Vite' },
   { icon: Palette, label: 'Styling', value: 'Tailwind CSS with light, dark, and sepia themes' },
   { icon: Server, label: 'Backend', value: 'Firebase Authentication (Google) + Cloud Firestore' },

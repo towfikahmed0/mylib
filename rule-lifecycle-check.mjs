@@ -8,6 +8,7 @@ import {
 import {
   collection,
   connectFirestoreEmulator,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -731,5 +732,102 @@ await mustBeDenied(
 )
 console.log('Activity feed privacy enforcement verified')
 
+// --- User Notes Security Rules Verification ---
+const ownerNoteRef = doc(collection(owner.db, 'users', owner.uid, 'notes'))
+await setDoc(ownerNoteRef, {
+  content: 'Hello, this is my private note.',
+  title: 'My Title',
+  createdAt: serverTimestamp(),
+})
+console.log('Owner note creation verified')
+
+const readDoc = await getDoc(ownerNoteRef)
+assert.equal(readDoc.data().content, 'Hello, this is my private note.')
+console.log('Owner note read verified')
+
+const listQuery = await getDocs(collection(owner.db, 'users', owner.uid, 'notes'))
+assert.ok(listQuery.size >= 1)
+console.log('Owner notes query/list verified')
+
+await mustBeDenied(
+  getDoc(doc(borrower.db, 'users', owner.uid, 'notes', ownerNoteRef.id)),
+  'Another user cannot read private notes',
+)
+console.log('Cross-user note read denial verified')
+
+await mustBeDenied(
+  getDocs(collection(borrower.db, 'users', owner.uid, 'notes')),
+  'Another user cannot list private notes',
+)
+console.log('Cross-user notes list denial verified')
+
+await mustBeDenied(
+  setDoc(doc(collection(borrower.db, 'users', owner.uid, 'notes')), {
+    content: 'Evil note',
+  }),
+  'Another user cannot create note in another users subcollection',
+)
+console.log('Cross-user note create denial verified')
+
+const anonNoteApp = initializeApp(config, 'anon-notes')
+const anonNoteDb = getFirestore(anonNoteApp)
+connectFirestoreEmulator(anonNoteDb, '127.0.0.1', firestorePort)
+await mustBeDenied(
+  getDoc(doc(anonNoteDb, 'users', owner.uid, 'notes', ownerNoteRef.id)),
+  'Anonymous user cannot read private note',
+)
+await deleteApp(anonNoteApp)
+console.log('Unauthenticated note read denial verified')
+
+await updateDoc(ownerNoteRef, {
+  content: 'Updated note content',
+  updatedAt: serverTimestamp(),
+})
+assert.equal((await getDoc(ownerNoteRef)).data().content, 'Updated note content')
+console.log('Owner note update verified')
+
+await mustBeDenied(
+  setDoc(doc(collection(owner.db, 'users', owner.uid, 'notes')), {
+    content: 'a'.repeat(50001),
+  }),
+  'Note content exceeding 50000 characters must be rejected on create',
+)
+console.log('Max size 50000 on create verified')
+
+await mustBeDenied(
+  updateDoc(ownerNoteRef, {
+    content: 'a'.repeat(50001),
+  }),
+  'Note content exceeding 50000 characters must be rejected on update',
+)
+console.log('Max size 50000 on update verified')
+
+await mustBeDenied(
+  setDoc(doc(collection(owner.db, 'users', owner.uid, 'notes')), {
+    content: 12345,
+  }),
+  'Note with non-string content must be rejected',
+)
+console.log('Non-string content rejection verified')
+
+await mustBeDenied(
+  updateDoc(doc(borrower.db, 'users', owner.uid, 'notes', ownerNoteRef.id), {
+    content: 'Hijacked content',
+  }),
+  'Another user cannot update note',
+)
+console.log('Cross-user note update denial verified')
+
+await mustBeDenied(
+  deleteDoc(doc(borrower.db, 'users', owner.uid, 'notes', ownerNoteRef.id)),
+  'Another user cannot delete note',
+)
+console.log('Cross-user note delete denial verified')
+
+await deleteDoc(ownerNoteRef)
+assert.equal((await getDoc(ownerNoteRef)).exists(), false)
+console.log('Owner note deletion verified')
+
 await Promise.all([deleteApp(owner.app), deleteApp(borrower.app), deleteApp(outsider.app)])
 console.log('Borrowing rules lifecycle passed.')
+

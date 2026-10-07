@@ -1,18 +1,12 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
-  ArrowRight,
   BookOpen,
-  Calendar,
-  CheckCircle2,
-  Clock,
   Layers,
   Loader2,
   Plus,
   Shuffle,
-  Sparkles,
 } from 'lucide-react'
 import { toast } from '../../../store/toastStore'
-import { cn } from '../../../lib/utils'
 import type { ReadingPlanItem, ReadingPlanStatus } from '../../../types'
 import { useBooks } from '../../library/hooks/useBooks'
 import { useAddBook } from '../../library/hooks/useAddBook'

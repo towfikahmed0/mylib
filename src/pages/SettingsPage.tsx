@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { toast } from '../store/toastStore'
+import { APP_VERSION } from '../lib/version'
 import { MetadataFixerModal } from '../features/ai/components/MetadataFixerModal'
 import {
   AI_LANGUAGES,
@@ -42,6 +43,7 @@ import { CollaborationSection } from '../features/collaboration/components/Colla
 import { AccountSection } from '../features/profile/components/AccountSection'
 import { DeleteAccountCard } from '../features/profile/components/DeleteAccountCard'
 import { PrivacySettings } from '../features/profile/components/PrivacySettings'
+import { NotificationSettingsCard } from '../features/notifications/components/NotificationSettingsCard'
 import { ProfileCard } from '../features/profile/components/ProfileCard'
 import { LibraryReportModal } from '../features/reports/components/LibraryReportModal'
 import type { AIProvider } from '../types'
@@ -243,6 +245,8 @@ export function SettingsPage() {
       <ChangeUsernameCard />
 
       <PrivacySettings />
+
+      <NotificationSettingsCard />
 
       <CollaborationSection />
 
@@ -462,6 +466,16 @@ export function SettingsPage() {
         >
           About Us
         </Link>
+      </div>
+
+      <div className="flex flex-col items-center justify-center gap-1 py-4 text-center">
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted">
+          MyLib Version
+        </p>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-surface-muted/60 px-3 py-1 text-xs font-mono font-medium text-foreground">
+          <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+          v{APP_VERSION}
+        </span>
       </div>
 
       <MetadataFixerModal
