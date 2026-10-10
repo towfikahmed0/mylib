@@ -2,7 +2,6 @@
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](#-deployment)
 [![Version](https://img.shields.io/badge/version-v3.3.0-blue.svg)](CHANGELOG.md)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > **Your books, your reading life, your library — all in one place.**
 
@@ -824,12 +823,6 @@ Created with ❤️ by **Towfik Ahmed**
 
 GitHub:
 https://github.com/towfikahmed0
-
----
-
-# 📄 License
-
-This project is licensed under the [MIT License](LICENSE).
 
 ---
 
